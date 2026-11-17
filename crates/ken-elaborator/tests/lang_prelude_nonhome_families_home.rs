@@ -143,6 +143,116 @@ fn all_hostio_reachers_leave_fs_and_ambient_representation_private() {
     }
 }
 
+/// Promise class: durable Strict-boundary invariant. MEASURED: each ruled
+/// internal pre-source name has a registered checked identity, yet a fresh
+/// Strict client with no import refuses at that exact spelling. CLAIMED:
+/// internal actions, representations and helpers do not leak through the
+/// ambient source-name route. THE GAP: the refusal does not test imported
+/// homes or the internal checked-ID consumers; those are separate gates.
+#[test]
+fn ruled_internal_prelude_names_are_registered_but_not_strictly_nameable() {
+    let bootstrap = ElabEnv::new().expect("checked pre-source identities");
+    for name in [
+        // G1: entropy remains unavailable in the reference host.
+        "EntropyIO",
+        "random_bytes",
+        "host_entropy",
+        "ambient_entropy",
+        "EntropyOp",
+        "RandomBytes",
+        "entropy_resp",
+        // G2: monotonic clock operations remain unavailable.
+        "MonotonicInstant",
+        "MkMonotonicInstant",
+        "Deadline",
+        "MkDeadline",
+        "monotonic_now",
+        "sleep_until",
+        "ClockOp",
+        "WallNow",
+        "MonotonicNow",
+        "SleepUntil",
+        "clock_resp",
+        // G3: the ambient injection is checked representation, not source API.
+        "ambient_console",
+        "ambient_clock",
+        "AmbientTailOp",
+        "ambient_tail_resp",
+        "AmbientOp",
+        "ambient_resp",
+        // G4: the source-facing exit route is host_pure, not host_exit.
+        "host_exit",
+        // G5: FS operations are representation beneath the homed FS/HostIO.
+        "FSOp",
+        "ReadFile",
+        "WriteFile",
+        "AppendFile",
+        "Metadata",
+        "ReadDirectory",
+        "CreateDirectory",
+        "RemoveFile",
+        "RemoveDirectory",
+        "Rename",
+        "ChangeMode",
+        "fs_resp",
+        // G6: Decimal's public operations are infix, not bare representation.
+        "DecimalPair",
+        "MkDecimalPair",
+        "decimalPow10",
+        "decimalAdd",
+        "decimalSub",
+        "decimalMul",
+        "decimalEq",
+        // G7: scalar internals do not inherit a catalog namesake's route.
+        "IsTrue",
+        "inLowerScalarBool",
+        "inUpperScalarBool",
+        // G8: these pre-source names have separate catalog identities or
+        // explicit retirement/migration carries in I4.
+        "zip",
+        "is_sorted",
+        "Perm",
+        "And",
+        "and_intro",
+        "and_fst",
+        "and_snd",
+        "Not",
+        "Empty",
+        "Dec",
+        "Yes",
+        "No",
+        "decide",
+        // G9: the catalog owns separate checked buffer/transfer helpers.
+        "buffer_nat_add",
+        "buffer_nat_to_int",
+        "buffer_window_start",
+        "buffer_window_length",
+        "buffer_span_start",
+        "buffer_suc_cong",
+        "transfer_count_request_budget",
+        "write_all_call_bound",
+        "write_all_complete",
+        "write_all_first_error",
+        "write_all_all_success",
+        // G10: internal resource settlement and mapping representation.
+        "ResourceTraceIdentity",
+        "MappingExtent",
+        "MkMappingExtent",
+        "mapping_extent_length",
+        "resource_settle_ok_error",
+        "resource_settle_body_error",
+        "resource_settle_ok",
+        "resource_settle_err",
+        "resource_settle_result",
+    ] {
+        assert!(
+            bootstrap.globals.contains_key(name),
+            "internal `{name}` must have a registered pre-source identity"
+        );
+        unbound(&format!("const escaped = {name}\n"), name);
+    }
+}
+
 fn binary_head(body: &Term) -> &Term {
     let Term::Lam(_, first) = body else { panic!("missing first argument") };
     let Term::Lam(_, second) = first.as_ref() else { panic!("missing second argument") };
