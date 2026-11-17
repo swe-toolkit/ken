@@ -60,7 +60,7 @@ import Core.Logic.Conjunction (And, and_intro)
 
 import Core.Classes.LawfulClasses (IsTrue, bool_and)
 
-import Core.Logic.Transport (sym, trans)
+import Core.Logic.Transport (sym, trans, cong)
 
 import Data.Numeric.Rational
   (Rational,
@@ -1463,6 +1463,56 @@ pub theorem interval_intersect_assoc_rev_inside
         (interval_intersect_inside_right i j))
       (interval_intersect_inside_right (interval_intersect i j) k))
 
+pub theorem interval_hull_idempotent (i : Interval) : Equal Interval (interval_hull i i) i =
+  match i {
+    MkInterval a b ↦
+      trans
+        Interval
+        (MkInterval (rational_min a a) (rational_max b b))
+        (MkInterval a (rational_max b b))
+        (MkInterval a b)
+        (cong
+          Rational
+          Interval
+          (rational_min a a)
+          a
+          (λlo. MkInterval lo (rational_max b b))
+          ((proof idempotent for rational_min) a))
+        (cong
+          Rational
+          Interval
+          (rational_max b b)
+          b
+          (λhi. MkInterval a hi)
+          ((proof idempotent for rational_max) b))
+  }
+
+pub theorem interval_intersect_idempotent
+      (i : Interval)
+    : Equal Interval (interval_intersect i i) i =
+  match i {
+    MkInterval a b ↦
+      trans
+        Interval
+        (MkInterval (rational_max a a) (rational_min b b))
+        (MkInterval a (rational_min b b))
+        (MkInterval a b)
+        (cong
+          Rational
+          Interval
+          (rational_max a a)
+          a
+          (λlo. MkInterval lo (rational_min b b))
+          ((proof idempotent for rational_max) a))
+        (cong
+          Rational
+          Interval
+          (rational_min b b)
+          b
+          (λhi. MkInterval a hi)
+          ((proof idempotent for rational_min) b))
+  }
+
 pub theorem interval_add_zero_l_inside
       (i : Interval)
     : IsTrue (interval_inside (interval_add (interval_point rational_zero) i) i) =
@@ -1730,6 +1780,8 @@ included by its two operands. Intersection regrouping uses
 grouping's two operands. Transitivity connects each nested inclusion. This
 argument does not require an interval to have an ordered pair of endpoints,
 and proves mutual endpoint-value inclusion, not structural equality.
+The two idempotence laws match on the interval and rewrite each stored
+endpoint using the corresponding Rational self law lifted by `cong`.
 
 Point zero and point one act as left units for endpoint-value inclusion in
 both directions. Each proof splits the interval's two stored endpoints, uses
@@ -1786,12 +1838,14 @@ need not imply structural equality. The result of arithmetic on an empty
 interval is defined by its endpoint formula; no result-emptiness law is
 claimed. Intersection of disjoint operands returns an inverted interval;
 hull may retain a bound from an empty operand. Neither operation normalizes
-equivalent rational spellings, so structural commutativity and idempotence
-are not claimed. The associativity laws give mutual inclusion by endpoint
-value, not a generic structural `Equal Interval` claim. Closed regroupings
-can coincide in stored spelling even though open regroupings are not
-convertible. Inclusion does not equate empty intervals or normalize rational
-spellings; its converse requires an actual inner member.
+equivalent rational spellings, so structural commutativity and associativity
+are not claimed. Idempotence holds structurally because combining an operand
+with itself selects its own stored endpoints, as `interval_hull_idempotent`
+and `interval_intersect_idempotent` prove. The associativity laws give mutual
+inclusion by endpoint value, not a generic structural `Equal Interval` claim.
+Closed regroupings can coincide in stored spelling even though open
+regroupings are not convertible. Inclusion does not equate empty intervals
+or normalize rational spellings; its converse requires an actual inner member.
 Both distributive directions hold for inverted inputs without asserting
 structural `Equal Interval`: different endpoint spellings may denote equal
 Rational values. Interval subtraction, signed arithmetic, division near zero
@@ -1815,7 +1869,7 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-seven
+   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-nine
    checked interval laws, including `interval_width_mul`,
    `interval_width_inside` and `interval_width_bounds_sub`, form the public
    contract.
@@ -1830,7 +1884,8 @@ interval subtraction are not.
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
    reflexivity and antisymmetry. Hull and intersection reuse the six public
-   Rational min/max bounds, with no local copy of scalar order proofs.
+   Rational min/max bounds for inclusion and their two attached self laws
+   for structural idempotence, with no local copy of scalar order proofs.
    Inclusion soundness reuses transitivity; its isotonicity reuses Rational
    monotonicity, and its four bound laws reuse those min/max proofs. The
    four distributive inclusions reuse Rational's checked `distrib_l` and
@@ -1852,7 +1907,7 @@ interval subtraction are not.
    inclusion comparisons as its only premises. Product width uses checked
    multiplication monotonicity and distributivity over addition, then public
    Rational right-add cancellation to remove the common `lo1·lo2`.
-4. **Trusted-base delta.** Zero: all fifty-seven laws have checked proof bodies,
+4. **Trusted-base delta.** Zero: all fifty-nine laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1904,6 +1959,10 @@ interval subtraction are not.
    and both missing-order-premise claims after fresh same-form controls.
    The width-bound package test checks the open law and two closed bounds,
    including a tight endpoint case. It accepts the same narrow interval and
-   x with y=2, then refuses the false y-containment proof for y=5. These
-   package tests do not establish official conformance-runner execution,
+   x with y=2, then refuses the false y-containment proof for y=5. The
+   The interval-idempotence seed and
+   `cat_numeric_interval_hull_intersect_idempotent` package test check both
+   open laws and stored values at three intervals, and isolate the false
+   equal-value-but-different-spelling claim.
+   These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
