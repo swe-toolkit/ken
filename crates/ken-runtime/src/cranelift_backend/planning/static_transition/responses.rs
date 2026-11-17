@@ -1498,6 +1498,27 @@ pub(in crate::cranelift_backend) struct RelayRoute {
     pub(in crate::cranelift_backend) relay_route: EmittedRelayMember,
 }
 
+/// A relay's source names a protocol position, not the host-effect seat shared
+/// by different positions. Both preselection and fallback use this same key.
+fn relay_members_at_source<'a>(
+    members: impl IntoIterator<Item = &'a StaticResponseContinuation>,
+    pair: &RelayDrivePair,
+) -> Result<Vec<&'a StaticResponseContinuation>, CraneliftBackendError> {
+    let mut matching = Vec::new();
+    for member in members {
+        if member.vis_origin() != pair.source {
+            continue;
+        }
+        if member.effect_origin() != pair.effect_origin || member.operation() != pair.operation {
+            return Err(planner_error(
+                "relay: minting instance member at the source records another effect seat",
+            ));
+        }
+        matching.push(member);
+    }
+    Ok(matching)
+}
+
 impl StaticTransitionPlan<'_> {
     /// The final returned-Vis protocol and checked-IH transports exist here.
     /// A pair's performing member belongs to its selected incoming call edge,
@@ -1581,10 +1602,7 @@ impl StaticTransitionPlan<'_> {
                     }
                 }
             }
-            let matching = members.values()
-                .filter(|member| member.effect_origin() == pair.effect_origin
-                    && member.operation() == pair.operation)
-                .collect::<Vec<_>>();
+            let matching = relay_members_at_source(members.values().copied(), pair)?;
             match matching.as_slice() {
                 [] => Ok(None),
                 [member] => Ok(Some(EmittedRelayMember { owner: owner.id(), member: member.id() })),
@@ -3999,13 +4017,14 @@ impl StaticTransitionPlan<'_> {
                     .find(|row| row.id() == pair.minting_row)
                     .ok_or_else(|| planner_error("relay pair has no hypothetical minting owner"))?;
                 let protocol = candidate.returned_vis_protocol(minting.vis_origin())?;
-                let already_performed =
-                    (minting.effect_origin() == pair.effect_origin
-                        && minting.operation() == pair.operation)
-                        || protocol.contexts.iter().flat_map(|context| &context.members)
-                            .filter_map(|member| member.successor.as_ref())
-                            .any(|successor| successor.effect_origin() == pair.effect_origin
-                                && successor.operation() == pair.operation);
+                let already_performed = !relay_members_at_source(
+                    std::iter::once(minting).chain(
+                        protocol.contexts.iter().flat_map(|context| &context.members)
+                            .filter(|member| !member.relay)
+                            .filter_map(|member| member.successor.as_ref()),
+                    ),
+                    pair,
+                )?.is_empty();
                 if already_performed {
                     continue;
                 }
