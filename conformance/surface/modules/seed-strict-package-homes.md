@@ -833,10 +833,12 @@ per-name identity inventory. Run each source through fresh Strict roots.
 - promise class: **durable invariant** — the safe ABI narrowing rejects the
   first value above the target manifest's `USize` maximum
 - spec: `35 §5`; `30-taxonomy §4`; `33 §3.3`
-- given: for a target manifest whose `USize` maximum is `m`, a fresh Strict
-  source imports `RangeError` and `intToUSize` from
+- given: for a target manifest whose inclusive `USize` bounds are `min`
+  (lower) and `m` (upper), a fresh Strict source imports `RangeError` and
+  `intToUSize` from
   `Data.Numeric.FixedWidth`. The fixture substitutes `m` and `m + 1` as
-  arbitrary-precision `Int` literals in these calls:
+  arbitrary-precision `Int` literals in these calls and derives `min` from
+  the same manifest:
 
   ```ken
   import Data.Numeric.FixedWidth (RangeError, intToUSize)
@@ -845,19 +847,21 @@ per-name identity inventory. Run each source through fresh Strict roots.
   const above_limit : Result RangeError USize = intToUSize (m + 1)
   ```
 
-- measured: the `Result RangeError USize` value at the inclusive maximum
-  and its immediate successor
-- claimed: the manifest maximum is representable, while the first greater
-  `Int` returns the `Err` variant
+- measured: the exact `Result RangeError USize` values at the inclusive
+  maximum and its immediate successor, including the error payload fields
+- claimed: `m` maps to `Ok m`; `m + 1` maps to `Err` with target `USize`,
+  input `m + 1`, and the manifest's inclusive bounds
 - the gap: a fixed host-width literal could test a different boundary than
-  the selected target manifest. The fixture derives both literals from that
-  manifest.
-- expect: the source accepts; `at_limit` reduces to `Ok` and
-  `above_limit` reduces to `Err` with the `USize` range error.
+  the selected target manifest. The fixture derives both inputs and the
+  payload bounds from that manifest.
+- expect: the source accepts; `at_limit` reduces to `Ok m` and
+  `above_limit` reduces to `Err (MkRangeError "USize" (m + 1) min m)`,
+  where `min` and `m` are the manifest's inclusive lower and upper bounds.
 - controls: `at_limit` is the positive boundary control for the
-  `above_limit` refusal; both calls use the same import and target manifest.
-- why: §35 §5 specifies `intToUSize` with the target manifest's bounds and
-  an explicit `Result RangeError USize` outcome.
+  `above_limit` case; both inputs and the exact payload use the same target
+  manifest.
+- why: §35 §5 specifies `intToUSize` with target-manifest bounds and an
+  explicit `MkRangeError target_name input min max` payload.
 
 ### surface/modules/nonhome-decimal-product-is-exact-without-import
 
@@ -920,22 +924,24 @@ per-name identity inventory. Run each source through fresh Strict roots.
   import Data.Numeric.FixedWidth (saturatingAddInt8)
 
   const saturated : Int8 = saturatingAddInt8 127 1
+  const in_range : Int8 = saturatingAddInt8 2 3
   ```
 
   The second client is identical except that it omits the
   `saturatingAddInt8` import.
-- measured: acceptance and the result value for the imported client, and
+- measured: acceptance and both result values for the imported client, and
   the name-resolution diagnostic for the omission client
-- claimed: the imported home supplies the operation and clamps overflow at
-  the `Int8` maximum; omitting that import leaves the name unbound
-- the gap: a rejected source by itself would not show the home is usable.
-  The paired imported source uses the same operation and operands.
-- expect: the imported client accepts and `saturated` reduces to `127`;
-  the omission client rejects with `UnboundName` naming
+- claimed: the imported home supplies the operation, returns the sum when
+  it is in range, and clamps overflow at the `Int8` maximum; omission leaves
+  the name unbound
+- the gap: a constant-`127` implementation passes the overflow example
+  alone. The in-range call to the same operation distinguishes that stub.
+- expect: the imported client accepts; `saturated` reduces to `127` and
+  `in_range` to `5`. The omission client rejects with `UnboundName` naming
   `saturatingAddInt8`.
-- controls: the accepted import client is the positive control for the
-  same-use omission; both inputs are within `Int8` and the sum exceeds its
-  maximum.
+- controls: `2 + 3 → 5` is the positive control against the constant-`127`
+  stub; the accepted client controls the same-use omission. Both `2` and
+  `3` are in range, and their sum does not overflow.
 - why: §35 §5 distinguishes saturating operations from checked operations
   and requires an explicit import from `Data.Numeric.FixedWidth`.
 
