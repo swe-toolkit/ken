@@ -538,7 +538,7 @@ The split matches Agda (`record` has η, `data` does not) and Lean's structure-�
 
 ## 5. Primitive types
 
-Machine types — `Int`, `Decimal`, `Float`, `Bytes`, …
+Machine types — `Int`, `Float`, `Bytes`, …
 (`../30-surface/35-numbers.md`, `../40-runtime/41-values.md`) — are **not**
 inductive declarations (you cannot enumerate every `Int` with constructors).
 They attach as **primitives** (`11 §4`):
@@ -547,6 +547,10 @@ They attach as **primitives** (`11 §4`):
 Σ, (Int : Type 0 := prim …)               -- an opaque primitive type
 Σ, (add : Int → Int → Int := prim …)      -- an opaque primitive operation
 ```
+
+`Decimal` and `Char` are not primitives; each is a checked transparent
+definition, derived as specified in `18a §5.6` and §5.9
+(`../30-surface/35-numbers.md §2`).
 
 - A primitive type is an **opaque type constant**; it has no kernel-level
   constructors or eliminator. Its inhabitants are **literals** (introduced by
