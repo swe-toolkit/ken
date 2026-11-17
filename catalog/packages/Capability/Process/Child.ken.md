@@ -31,6 +31,9 @@ export ChildStdio,
   wait_child,
   take_stdout,
   read_pipe,
+  write_pipe,
+  close_pipe_write,
+  close_pipe_read,
   SpawnPlan,
   with_stderr,
   take_stdin,
@@ -52,8 +55,12 @@ Import `spawn_plan` and `SpawnPlan` to build and name a plan. `ChildStdio`
 selects its streams, including the `with_stderr` setting. `withChild` acquires
 the child in a resource bracket; `take_stdin` obtains its writable pipe and
 `take_stdout` or `take_stderr` obtains a readable pipe. `read_pipe` transfers
-from a readable pipe. The program still needs the Process and full FS grants
-required by the [checked process contract](../../../../spec/30-surface/38-ffi-io.md).
+from a readable pipe. `write_pipe` transfers a `BufferSpan` through the
+`PipeWrite` returned by `take_stdin`; a short write leaves its suffix for the
+caller. `close_pipe_write` sends EOF to a child reading stdin before the
+parent waits, and `close_pipe_read` closes a readable end early. The program
+still needs the Process and full FS grants required by the
+[checked process contract](../../../../spec/30-surface/38-ffi-io.md).
 
 ## Laws & proofs
 

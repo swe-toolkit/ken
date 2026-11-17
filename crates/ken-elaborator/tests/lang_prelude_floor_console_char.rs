@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 105] = [
+const PACKAGED: [(&str, &str); 108] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -111,6 +111,9 @@ const PACKAGED: [(&str, &str); 105] = [
     ("Capability.Process.Child", "wait_child"),
     ("Capability.Process.Child", "take_stdout"),
     ("Capability.Process.Child", "read_pipe"),
+    ("Capability.Process.Child", "write_pipe"),
+    ("Capability.Process.Child", "close_pipe_write"),
+    ("Capability.Process.Child", "close_pipe_read"),
     ("Capability.Process.Child", "SpawnPlan"),
     ("Capability.Process.Child", "with_stderr"),
     ("Capability.Process.Child", "take_stdin"),

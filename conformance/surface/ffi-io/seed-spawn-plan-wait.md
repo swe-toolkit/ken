@@ -1,7 +1,8 @@
 # Process spawn and wait conformance — PX10 seed cases
 
 Format: `../../README.md`.
-Spec: `spec/30-surface/38-ffi-io.md §1.11`.
+Spec: `spec/30-surface/38-ffi-io.md` §1.11,
+child `f5e714239eb27a3ffd12ba31207fbfc4f0900b3d`.
 Frame: `docs/program/issues/PX10-SPAWN-PLAN-WAIT.md`.
 
 Section 1.11 specifies interpreter behavior and the native Process
@@ -10,7 +11,9 @@ The seed has not been Ken-checked or run by the official conformance runner.
 No CI, publication, landing, or trust measurement is claimed.
 The cases describe surface clients using only the public forms in §1.11 and
 related existing buffer contract; they do not freeze host syscall mechanics.
-They use the exact §1.11.2 signatures, including the Auth/type parameters,
+This update adds only Strict import-home cases for the three existing pipe
+names; the existing §1.11.2 rows continue to cover their behavior. These
+clients use the exact signatures, including the Auth/type parameters,
 `withChild`'s `Cap a`, plan, and child-resource body, and each operation's
 specified typed resource arguments. No second Process capability argument or
 raw descriptor form is introduced.
@@ -246,6 +249,64 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 - why: direction and single-use behavior are isolated independently. The
   typed API prevents raw fd selection; the accepted first take prevents a
   broken resource setup from masquerading as the specified refusal.
+
+### surface/ffi-io/process-child-pipe-operations-have-explicit-home
+
+- promise class: durable invariant.
+- spec: §1.11.1–§1.11.2; §1.12.
+- given: in a fresh pre-source environment, snapshot the existing
+  `GlobalId` for each name before loading any catalog source. Run the
+  type-correct pipe clients from `process-spawn-pipe-progress-and-early-close`
+  in Strict isolated source. In the full-import control, import
+  `write_pipe`, `close_pipe_write`, and `close_pipe_read` from
+  `Capability.Process.Child` and use each at its specified type. Keep this
+  complete non-target import set fixed in that control:
+  `ChildPipe`, `spawn_plan`, `with_stdin`, `with_stdout`, `with_stderr`,
+  `withChild`, `wait_child`, `take_stdin`, `take_stdout`, `take_stderr`, and
+  `read_pipe` from `Capability.Process.Child`; `withBuffer` from
+  `Capability.System.Resource`; `BufferHandle`, `BufferWindow`, and
+  `MkBufferWindow` from `Capability.System.Buffer`; and `readAt` and
+  `spanBytes` from `Capability.System.IO`. `take_stdin` supplies `PipeWrite`,
+  while `take_stdout` and `take_stderr` supply `PipeRead`.
+- expect: the client typechecks and each of the three target names resolves
+  to its pre-source identity: `write_pipe` and `close_pipe_write` take
+  `Resource ResourceKind.PipeWrite`, while `close_pipe_read` takes
+  `Resource ResourceKind.PipeRead`.
+- measured: the early-close client's uses and the three resolved
+  `GlobalId`s, compared with the independent pre-source snapshot.
+- claimed: the home adds an explicit import path, not a new declaration
+  or operation.
+- gap: this case does not measure the operations' runtime behavior.
+- why: an accepted source alone would also pass if each package export
+  were copied into a new declaration; checking identity distinguishes
+  that from the specified home.
+
+### surface/ffi-io/process-child-pipe-operations-require-explicit-import
+
+- promise class: durable invariant.
+- spec: §1.11.1–§1.11.2; §1.12.
+- given: use the same type-correct pipe clients from
+  `process-spawn-pipe-progress-and-early-close`. The full-import control
+  imports `write_pipe`, `close_pipe_write`, and `close_pipe_read` from
+  `Capability.Process.Child`, plus the same
+  complete non-target set in every run: `ChildPipe`, `spawn_plan`,
+  `with_stdin`, `with_stdout`, `with_stderr`, `withChild`, `wait_child`,
+  `take_stdin`, `take_stdout`, `take_stderr`, and `read_pipe` from
+  `Capability.Process.Child`; `withBuffer` from `Capability.System.Resource`;
+  `BufferHandle`, `BufferWindow`, and `MkBufferWindow` from
+  `Capability.System.Buffer`; and `readAt` and `spanBytes` from
+  `Capability.System.IO`. In separate runs, remove only the `write_pipe`,
+  `close_pipe_write`, or `close_pipe_read` import while leaving its use and
+  every other import unchanged.
+- expect: each run refuses with `UnboundName` naming only the omitted
+  name. Its matching full-import client is the accepting control.
+- measured: three individually omitted-import refusals and three
+  corresponding accepting imports of those names.
+- claimed: each homed pipe operation requires its explicit package
+  import in Strict isolated source.
+- gap: this does not pin Legacy-root resolution or CLI routing.
+- why: every refusal changes only its own import; the paired accepted
+  source establishes the name and its use are otherwise valid.
 
 ### surface/ffi-io/process-spawn-pipe-progress-and-early-close
 

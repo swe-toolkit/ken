@@ -1032,16 +1032,19 @@ payloads, not bare `Exited` or `Signaled`. This does not make the
 separate `ChildStdio` family a floor admission.
 
 **Child-process package home (Increment 2b, extended in Increment 3a).**
-`Capability.Process.Child` is the explicit-import home for twenty-five
+`Capability.Process.Child` is the explicit-import home for twenty-eight
 checked pre-source names: `ChildStdio`, `ChildPipe`, `ChildNull`,
 `ChildInherit`, `SpawnPlan`, `spawn_plan`, `with_environment`,
 `with_stdin`, `with_stdout`, `with_stderr`, `withChild`, `wait_child`,
-`take_stdin`, `take_stdout`, `take_stderr`, `read_pipe`, `ChildSignal`,
-`SignalHangup`, `SignalInterrupt`, `SignalQuit`, `SignalKill`,
-`SignalUser1`, `SignalUser2`, `SignalTerminate` and `signal_child`.
+`take_stdin`, `take_stdout`, `take_stderr`, `read_pipe`, `write_pipe`,
+`close_pipe_write`, `close_pipe_read`, `ChildSignal`, `SignalHangup`,
+`SignalInterrupt`, `SignalQuit`, `SignalKill`, `SignalUser1`,
+`SignalUser2`, `SignalTerminate` and `signal_child`.
 The first twelve were homed in Increment 2b; Increment 3a added
 `SpawnPlan`, `with_stderr`, `take_stdin` and `take_stderr` at their
 existing IDs. The nine signal names are the §1.11.4 addition.
+The three pipe names reuse their existing prelude IDs, with no
+change to §1.11.2's types, lowering or native availability.
 The `ChildStdio` export carries its complete three-constructor public
 family; `ChildSignal` carries the seven §1.11.4 constructors, and the
 `SpawnPlan` export exposes the type without its private constructor.
