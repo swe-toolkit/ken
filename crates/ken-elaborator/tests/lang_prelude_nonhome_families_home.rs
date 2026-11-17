@@ -71,9 +71,9 @@ fn fixed_width_and_char_homes_use_old_ids_and_require_imports() {
 }
 
 /// Promise class: durable checked-identity and privacy invariant. MEASURED:
-/// ClockIO's action result and a host_clock client's argument binder each
-/// retain the pre-source alias head; dropping only its import refuses at
-/// ClockIO. Even after selection, ClockOp and clock_resp refuse. CLAIMED:
+/// the stored now_action result and lift_clock action-binder type each have
+/// a Const head at ClockIO's pre-source id; dropping only its import refuses
+/// at ClockIO. Even after selection, ClockOp and clock_resp refuse. CLAIMED:
 /// homing the alias leaves the representation private and makes typed clock
 /// actions writable. THE GAP: checking does not observe wall time.
 #[test]
@@ -93,15 +93,11 @@ fn clock_io_alias_homes_only_its_existing_checked_type() {
         panic!("now_action must be a checked declaration")
     };
     let clock_id = bootstrap.globals["ClockIO"];
-    if !matches!(ty, Term::App(head, _)
-        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)) {
-        // C1-unfolded: the checked client still imported the original alias,
-        // even when storing the unfolded ITree type in its declaration.
-        assert_eq!(imported.globals["ClockIO"], clock_id);
-        assert!(matches!(ty, Term::App(..) | Term::Pi(..)),
-            "unexpected clock action result type: {ty:?}");
-        eprintln!("C1a stored unfolded action type: {ty:?}");
-    }
+    assert!(
+        matches!(ty, Term::App(head, _)
+        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)),
+        "now_action result must retain the pre-source ClockIO head; stored type: {ty:?}"
+    );
     unbound(&format!("import {owner} (wall_now)\n{action}"), "ClockIO");
     for representation in ["ClockOp", "clock_resp"] {
         unbound(&format!("{source}const escaped = {representation}\n"), representation);
@@ -120,13 +116,9 @@ fn clock_io_alias_homes_only_its_existing_checked_type() {
     let Term::Pi(action_type, _) = action_binder.as_ref() else {
         panic!("missing action binder: {action_binder:?}")
     };
-    if !matches!(action_type.as_ref(), Term::App(head, _)
-        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)) {
-        assert_eq!(lifted_env.globals["ClockIO"], clock_id);
-        assert!(matches!(action_type.as_ref(), Term::App(..) | Term::Pi(..)),
-            "unexpected unfolded clock argument type: {action_type:?}");
-        eprintln!("C1b stored unfolded argument type: {action_type:?}");
-    }
+    assert!(matches!(action_type.as_ref(), Term::App(head, _)
+        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)),
+        "lift_clock action binder must retain the pre-source ClockIO head; stored type: {action_type:?}");
     unbound(&format!("import Capability.Process.Exit (host_clock)\n{lifted}"), "ClockIO");
 }
 
