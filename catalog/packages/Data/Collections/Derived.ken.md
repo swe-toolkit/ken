@@ -4406,7 +4406,7 @@ reference implementation.
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
    `eq_from_ord`, `filter`, `length`, `list_append`, `list_concat`, `list_all`,
-   `map`, `nth`, `reverse`, `take`.
+   `map`, `nth`, `reverse`, `take`, `zip`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
    `list_append::right_unit`, `list_append::length`, `list_append::count`,
    `map::append`,
