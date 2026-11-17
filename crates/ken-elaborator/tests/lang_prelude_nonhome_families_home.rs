@@ -16,7 +16,15 @@ fn strict(source: &str) -> Result<ElabEnv, ElabError> {
 
 fn unbound(source: &str, name: &str) {
     match strict(source) {
-        Err(ElabError::UnboundName { name: missing, .. }) => assert_eq!(missing, name),
+        Err(ElabError::UnboundName { name: missing, span }) => {
+            assert_eq!(missing, name);
+            let start = source.find(name).expect("the missing spelling is in source");
+            // `export name` reports the entire export clause as its span;
+            // a declaration's unresolved use reports the name token itself.
+            let expected_start = if source == format!("export {name}\n") { 0 } else { start };
+            assert_eq!((span.start, span.end), (expected_start, start + name.len()),
+                "refusal must land on the intended spelling or export clause");
+        },
         Err(error) => panic!("{name}: wrong refusal: {error:?}"),
         Ok(_) => panic!("{name}: missing import was accepted"),
     }
@@ -63,18 +71,18 @@ fn fixed_width_and_char_homes_use_old_ids_and_require_imports() {
 }
 
 /// Promise class: durable checked-identity and privacy invariant. MEASURED:
-/// ClockIO's declared type head is the pre-source checked alias; without its
-/// import it refuses. Even after selecting ClockIO, spelling its ClockOp and
-/// clock_resp representation refuses. CLAIMED: homing the alias does not
-/// accidentally make its body or constructors writable. THE GAP: client
-/// typing does not measure a clock's wall-time observation.
+/// ClockIO's action result and a host_clock client's argument binder each
+/// retain the pre-source alias head; dropping only its import refuses at
+/// ClockIO. Even after selection, ClockOp and clock_resp refuse. CLAIMED:
+/// homing the alias leaves the representation private and makes typed clock
+/// actions writable. THE GAP: checking does not observe wall time.
 #[test]
 fn clock_io_alias_homes_only_its_existing_checked_type() {
     let bootstrap = ElabEnv::new().expect("clock alias before selection");
     let owner = "Capability.Time.WallClock";
-    let client = "const now_action : ClockIO Instant = wall_now\n";
-    let source = format!("import {owner} (ClockIO, wall_now)\n{client}");
-    let imported = strict(&source).expect("selected ClockIO and wall_now");
+    let action = "proc now_action : ClockIO Instant visits [Clock] = wall_now\n";
+    let source = format!("import {owner} (ClockIO, wall_now)\n{action}");
+    let imported = strict(&source).expect("selected ClockIO and wall_now in an effectful proc");
     let owners = PRELUDE_PACKAGE_HOMES.iter()
         .filter_map(|(home, member)| (*member == "ClockIO").then_some(*home))
         .collect::<Vec<_>>();
@@ -84,13 +92,42 @@ fn clock_io_alias_homes_only_its_existing_checked_type() {
     let Some(Decl::Transparent { ty, .. }) = imported.env.lookup(imported.globals["now_action"]) else {
         panic!("now_action must be a checked declaration")
     };
-    assert!(matches!(ty, Term::App(head, _)
-        if matches!(head.as_ref(), Term::Const { id, .. } if *id == bootstrap.globals["ClockIO"])),
-        "declared type must keep the exact alias head: {ty:?}");
-    unbound(&format!("import {owner} (wall_now)\n{client}"), "ClockIO");
+    let clock_id = bootstrap.globals["ClockIO"];
+    if !matches!(ty, Term::App(head, _)
+        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)) {
+        // C1-unfolded: the checked client still imported the original alias,
+        // even when storing the unfolded ITree type in its declaration.
+        assert_eq!(imported.globals["ClockIO"], clock_id);
+        assert!(matches!(ty, Term::App(..) | Term::Pi(..)),
+            "unexpected clock action result type: {ty:?}");
+        eprintln!("C1a stored unfolded action type: {ty:?}");
+    }
+    unbound(&format!("import {owner} (wall_now)\n{action}"), "ClockIO");
     for representation in ["ClockOp", "clock_resp"] {
         unbound(&format!("{source}const escaped = {representation}\n"), representation);
     }
+
+    let lifted = "proc lift_clock (r : Type) (action : ClockIO r) \
+                  : HostIO AFull r visits [Clock] = host_clock AFull r action\n";
+    let lift_source = format!("import {owner} (ClockIO)\n\
+        import Capability.Process.Exit (host_clock)\n{lifted}");
+    let lifted_env = strict(&lift_source).expect("selected ClockIO in host_clock argument");
+    assert_eq!(lifted_env.globals["ClockIO"], clock_id);
+    let Some(Decl::Transparent { ty, .. }) = lifted_env.env.lookup(lifted_env.globals["lift_clock"]) else {
+        panic!("lift_clock must be a checked declaration")
+    };
+    let Term::Pi(_, action_binder) = ty else { panic!("missing r binder: {ty:?}") };
+    let Term::Pi(action_type, _) = action_binder.as_ref() else {
+        panic!("missing action binder: {action_binder:?}")
+    };
+    if !matches!(action_type.as_ref(), Term::App(head, _)
+        if matches!(head.as_ref(), Term::Const { id, .. } if *id == clock_id)) {
+        assert_eq!(lifted_env.globals["ClockIO"], clock_id);
+        assert!(matches!(action_type.as_ref(), Term::App(..) | Term::Pi(..)),
+            "unexpected unfolded clock argument type: {action_type:?}");
+        eprintln!("C1b stored unfolded argument type: {action_type:?}");
+    }
+    unbound(&format!("import Capability.Process.Exit (host_clock)\n{lifted}"), "ClockIO");
 }
 
 /// Promise class: durable representation-privacy invariant. MEASURED: a
