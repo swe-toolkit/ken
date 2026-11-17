@@ -10,6 +10,9 @@ fn roots() -> [std::path::PathBuf; 1] {
     [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
 }
 
+/// SOURCE: spec/30-surface/38-ffi-io.md §1.11.2 (taken PipeRead lifetime,
+/// release before child settlement); spec/40-runtime/42-evaluation.md §5,
+/// §6.4 and §6.6 (interpreter oracle and ordered, comparable effect traces).
 /// Promise class: durable invariant. MEASURED: identical reference/native
 /// terminal observations and complete ordered canonical effects, including
 /// exact PipeRead settlement before ProcessWait. CLAIMED: transporting an
