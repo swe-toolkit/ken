@@ -1,7 +1,7 @@
 ---
 id: LANG-PROCESS-CHILD-PIPE-WRITE-HOME
 title: "The prelude defines write_pipe, close_pipe_write and close_pipe_read and spec 38 §1.11.2 types them, but §1.11.1 gives Capability.Process.Child only sixteen exports and no package homes the three, so Strict source cannot write a child's stdin or close a pipe early, and ResourceStreamWrite has no reaching witness in either engine. Home the three in Capability.Process.Child at their existing IDs, with the roster at nineteen and seed rows"
-status: active
+status: merged
 owner: language
 size: S
 tier: T2

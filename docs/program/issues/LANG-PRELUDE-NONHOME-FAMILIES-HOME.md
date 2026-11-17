@@ -62,25 +62,34 @@ A public catalog export whose checked type names a pre-source former
 with no home can be called from Strict source, but the types of its
 arguments cannot be written there. This node homes those formers too.
 
-- **Census.** Every type-former identity reachable in the checked type
-  of a public catalog export with no `PRELUDE_PACKAGE_HOMES` row.
-  Reachable is transitive, through argument positions (ResourceKind
-  inside Resource) and through the bodies of transparent type-level
-  definitions (HostIO). It reports each member with the exports that
-  reach it. Measured so far: `Cap` and `Resource` (`withResource`,
-  `prelude.rs` :2984-2986). `FSOp` is expected, not assumed.
-- **Form.** A name-only home row that keeps the existing id. `Cap` and
-  `Resource` are opaque primitives (`prelude.rs` :2007, :2144), so the
-  export is abstract by construction. An inductive member exports the
-  former alone: its constructors (for example `PrivateFsOpen`) and its
-  eliminator stay unreachable.
-- **Granularity pin, per homed member.** A client that imports the
-  former still gets `UnboundName` at each constructor's spelling and at
-  the eliminator's. If a home row cannot export an inductive former
-  without its constructors, stop to the Architect before adding any row.
-- **Owner.** The Architect rules each member's home module on the
-  census; the default is the module that already homes the reaching
-  exports, the lowest in the import graph if several do.
+- **Census (Architect `evt_1hkvqvwcwcfy`, replacing the earlier rule).**
+  A former is a homing obligation when it occurs in the checked type of
+  a public catalog export. The walk is transitive through argument
+  positions. It unfolds a transparent definition only when that
+  definition's head is not Strict-writable, which means a floor member, a
+  strict native builtin or a `PRELUDE_PACKAGE_HOMES` row. A head that is
+  not Strict-writable is itself the obligation and is homed as that
+  alias, not as its body. Formers reached only beneath a Strict-writable
+  alias, such as HostIO's body (`FSOp`, `AmbientOp` and their response
+  families), are representation formers: private by design, with no
+  home. `Cap` and `Resource` are strict native builtins and already
+  have a Strict route; one probe confirms it.
+- **Form.** The amended delta is exactly one row,
+  `("Capability.Time.WallClock", "ClockIO")`, a name-only home at the
+  existing id that adds `ClockIO` to WallClock's export line. `ClockIO`
+  (`prelude.rs:1888`) is a transparent alias, so the guard admits it as
+  it is. Its body formers (`ClockOp`, `clock_resp`, `MonotonicInstant`,
+  `Deadline`) stay unhomed. No `FSOp` row and no former-only granularity
+  mechanism is added, and `private_ids` is not edited.
+- **Pins (rows C1 to C3 of `evt_1hkvqvwcwcfy`).** C1: a Strict client
+  importing `ClockIO` and `wall_now` is accepted, with the declared head
+  Const at the pre-source `ClockIO` GlobalId, and the same source without
+  the import refuses `UnboundName`. C2: in that environment, `ClockOp`
+  and `clock_resp` each refuse `UnboundName`. C3: a client importing
+  every package that reaches `FSOp` still refuses `UnboundName` at
+  `FSOp`, and separately at `AmbientOp`. The re-census arms N1 and N2,
+  and the held rows' HR-i, HR-ii and HR-iii disposition, are as ruled
+  there.
 - **Rows inherited from LANG-DELETE I1b-b**, held there by identity:
   `cat_system_resource_laws`
   `resource_laws_have_exact_independent_checked_clients` (carry patch
@@ -90,17 +99,19 @@ arguments cannot be written there. This node homes those formers too.
   `px8f_buffer_io_surface` rows (Architect `evt_2ps81n9eenrsn`: PX-H on
   `write_all_checked_step_preserves_the_exact_first_error`, and the
   FSOp hold on `checked_surface_is_public_but_proof_carrying_constructors_stay_private`),
-  and `lang_let_hostio_action` (on `random_bytes`). Once homed, their
-  clients import the homed formers. ken-interp `px8p_checked_buffer.rs`
-  :20-29 is not held here: it is an I4 carry that takes the internal
-  kernel-term route for its two private identities and imports the homed
-  `FSOp`.
+  and `lang_let_hostio_action`. These rows take the HR-i or HR-ii
+  disposition of `evt_1hkvqvwcwcfy`. The `lang_let_hostio_action`
+  `clock_entropy_and_multilabel_inclusions_use_checked_helpers` row (on
+  `random_bytes`) is held out of this node whole and unchanged. It waits
+  on `LANG-PRELUDE-ENTROPY-SURFACE-ROUTE` (Architect `evt_2kb4r05x2dc1y`).
+  ken-interp `px8p_checked_buffer.rs` :20-29 is not held here: it is an
+  I4 carry that binds `FSOp` on the internal kernel-term route.
 
 ## Scope
 
 Spec taxonomy rows and the 35 §2.3, 35 §5 and 37 §4/§9 sentences (Spec
 enclave); the three catalog export lists and their prose; in
-`crates/ken-elaborator`, `PRELUDE_PACKAGE_HOMES` (+55 pairs), the Strict
+`crates/ken-elaborator`, `PRELUDE_PACKAGE_HOMES` (+56 pairs), the Strict
 floor entry for Decimal and the two Decimal dispatch entries; the
 consumer renames; CV seed rows. No new law, identity or kernel change.
 The I1 rows that wait on this node migrate in I4, not here.
