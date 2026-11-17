@@ -475,6 +475,34 @@ pub theorem walk_reverse_involutive
           (walk_reverse_involutive q step s prev prefix))
   }
 
+pub theorem graph_reachable_reverse_swap
+      (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q)
+    : Equal Bool
+        (graph_reachable q fq g s (d.eq t))
+        (graph_reachable q fq (graph_reverse q g) t (d.eq s)) =
+  bool_eq_from_iff
+    (graph_reachable q fq g s (d.eq t))
+    (graph_reachable q fq (graph_reverse q g) t (d.eq s))
+    (graph_reachable_reverse_swap_true q fq d g s t)
+    (λback.
+      trans
+        Bool
+        (graph_reachable q fq g s (d.eq t))
+        (graph_reachable q fq (graph_reverse q (graph_reverse q g)) s (d.eq t))
+        True
+        (cong
+          (Graph q)
+          Bool
+          g
+          (graph_reverse q (graph_reverse q g))
+          (λh. graph_reachable q fq h s (d.eq t))
+          (sym
+            (Graph q)
+            (graph_reverse q (graph_reverse q g))
+            g
+            (graph_reverse_involutive q g)))
+        (graph_reachable_reverse_swap_true q fq d (graph_reverse q g) t s back))
+
 pub fn graph_union (q : Type) (g : Graph q) (h : Graph q) : Graph q =
   MkGraph q (λs. λt. bool_or (edge q g s t) (edge q h s t))
 
@@ -952,6 +980,12 @@ constructor. The walk law fixes a `MkGraph` representation and inducts on the
 walk: `WalkHere` closes through `walk_reverse_involutive_here`, and each step
 uses `walk_reverse_prepend` to expose the original last edge before lifting
 the prefix induction hypothesis under `WalkStep`.
+`graph_reachable_reverse_swap` lifts walk-taking reversal to both endpoint
+decisions: private `graph_reachable_reverse_swap_true` extracts the witness
+as transitivity does, moves its end to the decided target, and applies
+`graph_reachable_reverse` with `d.complete s s Refl`. The converse applies
+that helper to `graph_reverse q g`, carries the result back along
+`graph_reverse_involutive` by `cong`, and closes with `bool_eq_from_iff`.
 
 The union's edge equation reduces to `bool_or` at the two input edges.
 Left and right inclusion reuse `or_left` and `or_right` at those edge terms.
@@ -1285,6 +1319,30 @@ fn walk_transport_end
       (walk : Walk q g s t)
     : Walk q g s u =
   J (λpoint _. Walk q g s point) walk same
+
+theorem graph_reachable_reverse_swap_true
+      (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q)
+    : Equal Bool (graph_reachable q fq g s (d.eq t)) True
+      → Equal Bool (graph_reachable q fq (graph_reverse q g) t (d.eq s)) True =
+  λreach.
+    let witness =
+      require_some
+        (ReachWitness q g s (d.eq t))
+        (graph_find_walk q fq g s (d.eq t))
+        (graph_find_walk_some q fq g s (d.eq t) reach)
+    in
+      match witness {
+        MkReach u hit walk ↦
+          graph_reachable_reverse
+            q
+            fq
+            g
+            s
+            t
+            (d.eq s)
+            (walk_transport_end q g s u t (sym q t u (d.sound t u hit)) walk)
+            (d.complete s s Refl)
+      }
 
 theorem walks_antisymmetric
       (q : Type)
@@ -2955,7 +3013,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–17](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–18](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -2992,7 +3050,7 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors`. Thirty-two kernel-checked theorems expose their laws,
+`graph_from_successors`. Thirty-three kernel-checked theorems expose their laws,
 including successor-list soundness and completeness. Every other helper is
 private to this package.
 
@@ -3038,5 +3096,8 @@ where `g_only` does, and confirms both proof helpers remain private.
 The union-grouping package test checks the open law and both closed groupings,
 refuses the claim that the three-way union reaches only where
 `graph_union g_only h_only` does, and confirms both regroup lemmas remain
-private. These package tests do not stand in for official conformance-runner
-execution or CI, and do not establish execution of the §2 seed.
+private. The reverse-swap package test checks the open law and both closed
+endpoint pairs on a directed chain, refuses swapping without graph reversal,
+and confirms the one-direction helper remains private. These package tests do
+not stand in for official conformance-runner execution or CI, and do not
+establish execution of the §2 seed.
