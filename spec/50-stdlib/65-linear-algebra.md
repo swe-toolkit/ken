@@ -1658,3 +1658,70 @@ at its own appended `Proved` theorem after a fresh accepted prefix.
 These finite observations distinguish the diagonal sum and
 multiplicative scaling from the two alternatives, but do not prove
 the generic laws or execute CV's separate seed.
+
+## 19. Exchanging product factors under a trace
+
+> Section 19 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-TRACE-PRODUCT-COMM). Architect AC-0
+> `evt_643c3q2targa0` checked the law and its private helpers in
+> scratch on base `760b8eccd42a5e3161b00c42eb51b731d1be8976`:
+> `ken check` and `ken fmt --check` returned rc 0, with no new
+> `Axiom` or premise. An isolated open client and closed rectangular
+> and square applications checked; two proof-body mutations refused
+> within the declarations they changed. The probe binary had the
+> same crate source as the assigned base. Architect did **not**
+> measure `trusted_base()` as an identity set; the separate package
+> test owes that gate. These are scratch results, not checks of this
+> Spec child, a catalog or seed child, assembled candidate, official
+> conformance, CI, publication, landing or measured landed trust.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export one public Transparent
+checked theorem immediately after `trace_identity` and before the
+private `matrix_add_assoc_cons`, as the final public law:
+
+```ken
+pub theorem trace_product_comm
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat m) n)
+    : Equal Nat (trace m (matrix_product m n m a b)) (trace n (matrix_product n m n b a))
+```
+
+Both factors and both dimensions are bound before the colon. The
+product `a b` has shape `m × m`, while `b a` has shape `n × n`;
+each trace is therefore taken at its own dimension. The law is
+premise-free for all dimensions, including zero and rectangular
+factors. It concludes `Equal Nat` of trace values, not structural
+matrix equality or commutativity of `matrix_product`. Unlike §18's
+four dimension-inductive laws, this public theorem does not match
+on a dimension: all required induction stays in private helpers.
+It adds one law and no operation, taking the §19 roster to **twelve
+operations, fifty-six laws and sixty-eight public names**. The §18
+roster of twelve operations, fifty-five laws and sixty-seven public
+names remains historical; no §§1–18 declaration or law type changes.
+
+The checked route uses a private `row_dot_sum` that sums the dots of
+corresponding rows. A private bridge `trace_row_dot_sum` expresses
+`trace m (a b)` as `row_dot_sum m n a (transpose n m b)`.
+`row_dot_sum_transpose` exchanges both row-paired arguments for
+their transposes; public `transpose_invol` then removes the double
+transpose of `b`. `row_dot_sum_comm` swaps the paired arguments,
+using the existing `dot_comm` per row. Applying the trace bridge
+backwards to `b a` closes the equality. The nine new helpers, two
+functions and seven theorems, remain private; they introduce no
+additional public operation or axiom. The square-matrix
+`trace_transpose` and `transpose_product` do not by themselves
+bridge the dimensions: transposing `a b` still gives an `m × m`
+product, not the `n × n` product `b a` when `m ≠ n`.
+
+For rectangular `a = [[1,2,0],[0,1,3]]` of shape `2 × 3` and
+`b = [[1,0],[2,1],[0,1]]` of shape `3 × 2`, the product `a b`
+is the `2 × 2` matrix `[[5,2],[2,4]]`, while `b a` is `3 × 3`.
+Both traces are **9**, despite the unequal matrix shapes. For
+square `c = [[1,1],[0,1]]` and `d = [[1,0],[1,1]]`, the products
+are `c d = [[2,1],[1,1]]` and `d c = [[1,1],[1,2]]`; they differ
+structurally, yet both traces are **3**. The accepted closed
+matrix-value claims use `Refl`, and their trace-value claims use
+`Proved`. On a fresh accepted prefix, a same-form `Refl` claim
+that `c d` equals `d c` is refused at its own proof term with
+elaborator `TypeMismatch` (E0038), “Refl expects an `Eq`-shaped
+goal”. This discriminator rules out matrix commutativity; it does
+not replace the generic checked proof or run the separate CV seed.
