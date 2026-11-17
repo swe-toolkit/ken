@@ -4281,9 +4281,10 @@ const derived_example_string_key_order_alpha_beta : Bool =
     (list_compare Char compare_char (string_to_list_char "alpha") (string_to_list_char "beta"))
 ```
 
-The checked length examples use the private `range` and public `zip` operations inside
-this package. The range rejection changes only the claimed endpoint: the same
-proof that establishes length `n` cannot establish length `Suc n`.
+The checked length examples use the private `range` and public `zip`
+operations inside this package. The range rejection changes only the claimed
+endpoint: the same proof that establishes length `n` cannot establish length
+`Suc n`.
 
 ```ken example
 theorem derived_example_range_length (n : Nat) : Equal Nat (length Nat (range n)) n =
