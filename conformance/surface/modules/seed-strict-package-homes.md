@@ -795,3 +795,175 @@ the eight `Data.Numeric.FixedWidth` names.
   wrapping raw cast.
 - why: all eight definitions share one home but have distinct checked IDs and
   target ranges; no representative width stands for the remaining seven.
+
+## LANG-PRELUDE-NONHOME-FAMILIES-HOME AC-4 rows
+
+These C2/C3 cases are authored but unexecuted. The code-side AC-1 remains the
+per-name identity inventory. Run each source through fresh Strict roots.
+
+### surface/modules/nonhome-checked-add-overflow-returns-none
+
+- promise class: **durable invariant** — the checked operation reports
+  overflow as `None`, rather than wrapping or saturating
+- spec: `35 §5`; `35 §4.1`; `30-taxonomy §4`; `33 §3.3`
+- given: a fresh Strict source explicitly imports `checkedAddInt8` from
+  `Data.Numeric.FixedWidth` and evaluates:
+
+  ```ken
+  import Data.Numeric.FixedWidth (checkedAddInt8)
+
+  const overflow : Option Int8 = checkedAddInt8 127 1
+  const in_range : Option Int8 = checkedAddInt8 126 1
+  ```
+
+- measured: the results of the overflowing and in-range calls
+- claimed: representable `Int8` operands whose sum is out of range yield
+  `None`; an in-range sum yields `Some`
+- the gap: a lone `None` could be an always-`None` stub. The in-range call
+  exercises the same imported operation on a valid sum.
+- expect: the source accepts; `overflow` reduces to `None Int8` and
+  `in_range` reduces to `Some Int8 127`.
+- controls: the in-range result is the positive control for the checked
+  operation; `127` and `1` are individually in range.
+- why: §35 §5 requires checked fixed-width operations to return `None` on
+  overflow rather than fault or wrap.
+
+### surface/modules/nonhome-int-to-usize-reports-manifest-overflow
+
+- promise class: **durable invariant** — the safe ABI narrowing rejects the
+  first value above the target manifest's `USize` maximum
+- spec: `35 §5`; `30-taxonomy §4`; `33 §3.3`
+- given: for a target manifest whose `USize` maximum is `m`, a fresh Strict
+  source imports `RangeError` and `intToUSize` from
+  `Data.Numeric.FixedWidth`. The fixture substitutes `m` and `m + 1` as
+  arbitrary-precision `Int` literals in these calls:
+
+  ```ken
+  import Data.Numeric.FixedWidth (RangeError, intToUSize)
+
+  const at_limit : Result RangeError USize = intToUSize m
+  const above_limit : Result RangeError USize = intToUSize (m + 1)
+  ```
+
+- measured: the `Result RangeError USize` value at the inclusive maximum
+  and its immediate successor
+- claimed: the manifest maximum is representable, while the first greater
+  `Int` returns the `Err` variant
+- the gap: a fixed host-width literal could test a different boundary than
+  the selected target manifest. The fixture derives both literals from that
+  manifest.
+- expect: the source accepts; `at_limit` reduces to `Ok` and
+  `above_limit` reduces to `Err` with the `USize` range error.
+- controls: `at_limit` is the positive boundary control for the
+  `above_limit` refusal; both calls use the same import and target manifest.
+- why: §35 §5 specifies `intToUSize` with the target manifest's bounds and
+  an explicit `Result RangeError USize` outcome.
+
+### surface/modules/nonhome-decimal-product-is-exact-without-import
+
+- promise class: **durable invariant** — ambient `Decimal` multiplication
+  computes the exact base-10 product
+- spec: `30-taxonomy §4`; `35 §2.3–2.4`; `18a §5.6.1`
+- given: a fresh Strict source with no imports:
+
+  ```ken
+  const product : Decimal = 0.1d * 0.2d
+  const product_is_exact : Bool = product == 0.02d
+  ```
+
+- measured: whether the source resolves `Decimal` without an import and
+  whether the exact product compares equal to its known base-10 value
+- claimed: `Decimal` is a floor identity and its `*` operation computes
+  exact decimal arithmetic without a package import
+- the gap: a small integer product would also pass through a Float-rounded
+  path. The `0.1d * 0.2d` vector distinguishes that path from exact `0.02d`.
+- expect: the source accepts and `product_is_exact` reduces to `True`
+- controls: `0.1d` and `0.2d` make the expected `True` sensitive to
+  Float-style rounding; no import supplies `Decimal`.
+- why: §30 §4 places `Decimal` in the floor and §35 §2.3 specifies its
+  exact arithmetic operations.
+
+### surface/modules/nonhome-is-scalar-has-an-imported-use
+
+- promise class: **durable invariant** — the checked scalar predicate is
+  usable from its explicit package home
+- spec: `18a §5.9.1`; `30-taxonomy §4`; `33 §3.3`
+- given: a fresh Strict source explicitly imports `isScalar` from
+  `Core.Classes.LawfulClasses`:
+
+  ```ken
+  import Core.Classes.LawfulClasses (isScalar)
+
+  fn scalar_predicate (n : Int) : Ω = isScalar n
+  ```
+
+- measured: acceptance of the imported function use at its specified type
+  `Int → Ω`
+- claimed: the home makes the checked predicate usable in Strict source
+- the gap: this is an import-and-use case; it makes no separate claim that
+  a scalar proof or runtime computation was measured
+- expect: the source accepts with the declared `Int → Ω` type
+- controls: the body calls the explicitly imported name, rather than merely
+  mentioning it in an import list
+- why: §18a §5.9.1 gives the `isScalar : Int → Ω` contract; §30 §4 places
+  its checked home in `Core.Classes.LawfulClasses`.
+
+### surface/modules/nonhome-saturating-operation-requires-import
+
+- promise class: **durable invariant** — the saturating operation is
+  available from its explicit home, not ambient Strict scope
+- spec: `35 §5`; `35 §4.1`; `30-taxonomy §4`; `33 §3.3`
+- given: compare two fresh Strict clients. The first imports
+  `saturatingAddInt8` from `Data.Numeric.FixedWidth` and both clients use:
+
+  ```ken
+  import Data.Numeric.FixedWidth (saturatingAddInt8)
+
+  const saturated : Int8 = saturatingAddInt8 127 1
+  ```
+
+  The second client is identical except that it omits the
+  `saturatingAddInt8` import.
+- measured: acceptance and the result value for the imported client, and
+  the name-resolution diagnostic for the omission client
+- claimed: the imported home supplies the operation and clamps overflow at
+  the `Int8` maximum; omitting that import leaves the name unbound
+- the gap: a rejected source by itself would not show the home is usable.
+  The paired imported source uses the same operation and operands.
+- expect: the imported client accepts and `saturated` reduces to `127`;
+  the omission client rejects with `UnboundName` naming
+  `saturatingAddInt8`.
+- controls: the accepted import client is the positive control for the
+  same-use omission; both inputs are within `Int8` and the sum exceeds its
+  maximum.
+- why: §35 §5 distinguishes saturating operations from checked operations
+  and requires an explicit import from `Data.Numeric.FixedWidth`.
+
+### surface/modules/nonhome-clockio-requires-wallclock-import
+
+- promise class: **durable invariant** — the checked `ClockIO` identity is
+  available through its explicit home only
+- spec: `30-taxonomy §4`; `33 §3.3`
+- given: compare two fresh Strict clients. The first imports `ClockIO` from
+  `Capability.Time.WallClock` and both clients use:
+
+  ```ken
+  import Capability.Time.WallClock (ClockIO)
+
+  fn keep_clock_io (action : ClockIO) : ClockIO = action
+  ```
+
+  The second client is identical except that it omits the `ClockIO` import.
+- measured: acceptance of the imported type use and the name-resolution
+  diagnostic for the omission client
+- claimed: the home makes `ClockIO` type-usable in Strict source; without
+  that import, the same type occurrence is unbound
+- the gap: this checks name visibility and type use, not the runtime behavior
+  of a clock operation
+- expect: the imported client accepts; the omission client rejects with
+  `UnboundName` naming `ClockIO`.
+- controls: the accepted import client is the positive control for the
+  same-use omission; `ClockIO` is the only import and occurs in both the
+  function's argument and result types.
+- why: §30 §4 makes `ClockIO` a name-only home in
+  `Capability.Time.WallClock`; §33 §3.3 requires its explicit import.
