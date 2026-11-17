@@ -22,8 +22,8 @@ spelling; equality of values is instead stated by equality of cross products.
 No normal form, quotient, rounding, or floating comparison is required.
 `rational_sub` truncates at zero: subtracting a larger value never introduces a
 signed result. `rational_min` and `rational_max` select one stored rational by
-exact value order; their six checked bounds support interval hull and
-intersection.
+exact value order; six checked bounds and two self laws support interval hull
+and intersection.
 
 ## 2. Definition
 
@@ -758,6 +758,12 @@ pub proof least for rational_max
       → IsTrue (rational_leq (rational_max x y) k) =
   λhx. λhy. pick_least (rational_leq x y) y x k hy hx
 
+pub proof idempotent for rational_min (x : Rational) : Equal Rational (rational_min x x) x =
+  pick_self (rational_leq x x) x
+
+pub proof idempotent for rational_max (x : Rational) : Equal Rational (rational_max x x) x =
+  pick_self (rational_leq x x) x
+
 fn rational_pick (b : Bool) (x : Rational) (y : Rational) : Rational =
   match b {
     True ↦ x;
@@ -815,6 +821,12 @@ theorem pick_least
     True ↦ λhx. λhy. hx;
     False ↦ λhx. λhy. hy
   }
+
+theorem pick_self (b : Bool) (x : Rational) : Equal Rational (rational_pick b x x) x =
+  match b {
+    True ↦ Refl;
+    False ↦ Refl
+  }
 ```
 
 ## 3. Using it
@@ -860,6 +872,9 @@ false-comparison converse, or the caller's hypotheses. A private Boolean pick
 binds the computed comparison explicitly, so a dependent match refines that
 exact occurrence. The six public attached proofs expose both operand bounds
 and the greatest-lower/least-upper properties without adding assumptions.
+The two idempotent proofs apply private `pick_self`, which matches on the
+comparison and returns the stored operand in both arms: min and max of an
+operand with itself return it as stored, whatever the comparison computes.
 
 Commutativity and multiplicative associativity lift the matching natural-number
 algebra to both numerator and denominator. Additive associativity expands the
@@ -2000,7 +2015,8 @@ min/max when argument order changes; no structural commutativity is claimed.
    checked equations and order laws of specification §§1–2.2 appear above.
    `rational_add_mono` and `rational_mul_mono` supply checked two-input
    monotonicity. `rational_min` and `rational_max` add six attached order
-   proofs required by interval hull and intersection. `rational_sub` adds
+   proofs and two attached self laws required by interval hull and
+   intersection. `rational_sub` adds
    self-zero, ordered add-cancellation and ordered two-input distribution
    under spec 68 §15; `rational_sub_mono` supplies the two-sided order law.
    Public `rational_add_cancel_r` cancels a common right summand of a
