@@ -62,10 +62,12 @@ design rests on three commitments, each load-bearing for a *verified* language:
 | `Bool` | boolean | `true`/`false` | may use `i1` |
 | `Char` | Unicode scalar value | `'a'` | may use `u32` (U+0000–U+10FFFF, surrogates excluded) |
 
-Every row is a **primitive type** in the kernel's sense (`14 §5`, §6): an opaque
-type constant whose inhabitants are literals and the results of registered
-primitive operations. The fast paths are permissions, not observable
-representations; `41` is the authority for the private representation boundary.
+The integer, fixed-width and `Float`/`Float32` rows are opaque primitive
+types in `14 §5`'s sense. `Decimal` and `Char` are checked transparent
+definitions, derived as specified in `../10-kernel/18a §5.6` and §5.9;
+`Bool` is a checked inductive. The fast paths are permissions, not
+observable representations; `41` is the authority for the private
+representation boundary.
 
 ### 2.1 `Int` — arbitrary-precision (`OQ-int` DECIDED)
 
@@ -100,9 +102,17 @@ computation where binary floating point is wrong by construction; **not** an
 **arbitrary-precision coefficient** and a bounded `i32` base-10 exponent. A
 runtime may use a small coefficient/exponent pair as a fast path; the durable
 big-`Decimal` encoding uses tag `0x0A` (`41 §3a`). Boxing and promotion are
-private (`41 §5`). Literal suffix `d`. Because the coefficient is exact,
-`0.1d + 0.2d == 0.3d` holds exactly (AC6) — the property the `Float` analog
-cannot offer.
+private (`41 §5`). Literal suffix `d`. The pre-source checked
+transparent `Decimal` identity is always present in the closed
+prelude floor (§30 §4): a client writes `Decimal` and `d` literals
+without an import. The public arithmetic surface is `+`, `-`, `*`
+and `==` at `Decimal`, resolving to the existing `decimalAdd`,
+`decimalSub`, `decimalMul` and `decimalEq` identities, respectively;
+none of those internal operation spellings needs a separate package
+home. Its representation is internal, not a second public
+Decimal carrier. Because the coefficient is exact,
+`0.1d + 0.2d == 0.3d` holds exactly (AC6) — the property the `Float`
+analog cannot offer.
 
 > **Reconcile note (don't cite the frame's struct).** An earlier draft and the
 > WP frame floated a flat `{i128 coeff, i32 exp}`. The semantic requirement is
@@ -292,19 +302,54 @@ Decimal.toFloat : Decimal → Float         -- documented-lossy; named
 Float.toDecimal : Float → Option Decimal  -- partial (NaN/∞ have no Decimal)
 ```
 
-For the eight already checked fixed-width types, source uses the safe
+`Data.Numeric.FixedWidth` is the explicit-import home for the complete
+safe fixed-width family at its existing checked pre-source identities.
+For each target `T` in `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`,
+`UInt16`, `UInt32` and `UInt64`, it exports `intTo{T} : Int → Option T`:
 `intToInt8`, `intToInt16`, `intToInt32`, `intToInt64`, `intToUInt8`,
-`intToUInt16`, `intToUInt32` and `intToUInt64` definitions with an
-explicit `Data.Numeric.FixedWidth` import (§30 §4). Each has type
-`Int → Option T` for its named target `T`, returns `Some` exactly when
-the input is in that target's range, and returns `None` otherwise
+`intToUInt16`, `intToUInt32` and `intToUInt64`. Each returns `Some`
+exactly in the target's range and `None` outside it
 (`../10-kernel/18a §5.7`). These are checked range-guarded definitions,
-not aliases for the native unchecked `int_to_*_raw` casts. The module
-exports the complete eight-name family at its existing pre-source
-checked identities; it does not invent a new conversion, intrinsic,
-trusted fact or floor member. The `Int64.toInt` examples above describe
-the general explicit-conversion contract; they are not additional
-FixedWidth exports by implication.
+not aliases for unchecked `int_to_*_raw` casts.
+
+The same module exports six arithmetic names for **each** of those
+eight targets, 48 operations in total. Every entry below has the
+corresponding existing checked pre-source identity, requires an explicit
+import, and names the operation and width rather than a new primitive:
+
+| Target `T` | `T → T → Option T` | `T → T → T` |
+|---|---|---|
+| `Int8` | `checkedAddInt8`, `checkedSubInt8`, `checkedMulInt8` | `saturatingAddInt8`, `saturatingSubInt8`, `saturatingMulInt8` |
+| `Int16` | `checkedAddInt16`, `checkedSubInt16`, `checkedMulInt16` | `saturatingAddInt16`, `saturatingSubInt16`, `saturatingMulInt16` |
+| `Int32` | `checkedAddInt32`, `checkedSubInt32`, `checkedMulInt32` | `saturatingAddInt32`, `saturatingSubInt32`, `saturatingMulInt32` |
+| `Int64` | `checkedAddInt64`, `checkedSubInt64`, `checkedMulInt64` | `saturatingAddInt64`, `saturatingSubInt64`, `saturatingMulInt64` |
+| `UInt8` | `checkedAddUInt8`, `checkedSubUInt8`, `checkedMulUInt8` | `saturatingAddUInt8`, `saturatingSubUInt8`, `saturatingMulUInt8` |
+| `UInt16` | `checkedAddUInt16`, `checkedSubUInt16`, `checkedMulUInt16` | `saturatingAddUInt16`, `saturatingSubUInt16`, `saturatingMulUInt16` |
+| `UInt32` | `checkedAddUInt32`, `checkedSubUInt32`, `checkedMulUInt32` | `saturatingAddUInt32`, `saturatingSubUInt32`, `saturatingMulUInt32` |
+| `UInt64` | `checkedAddUInt64`, `checkedSubUInt64`, `checkedMulUInt64` | `saturatingAddUInt64`, `saturatingSubUInt64`, `saturatingMulUInt64` |
+
+A checked operation returns `None` on overflow instead of faulting or
+wrapping; a saturating operation clamps at the target's range boundary.
+These explicit operations are distinct from the bare infix operators'
+no-overflow obligation (§3.2).
+
+`Data.Numeric.FixedWidth` also exports `RangeError` with its public
+`MkRangeError` constructor and the three target-ABI-scalar conversions
+`intToUSize : Int → Result RangeError USize`,
+`intToISize : Int → Result RangeError ISize`, and
+`intToCInt : Int → Result RangeError CInt`. The scalar types and their
+reverse `*_to_int` operations already have their own Strict routes;
+this module homes the three safe narrowing functions, not new scalar
+types. Each returns `Ok` for an in-range input or
+`Err (MkRangeError target_name input min max)` for an out-of-range
+input, using the target manifest's bounds and naming the missed target.
+This `Result RangeError` payload differs intentionally from the eight
+fixed widths' `Option` shape: the ABI-scalar caller receives the target
+name and manifested bounds rather than only absence. The unchecked
+`int_to_*_raw` casts remain unexported. These names introduce no new
+checked identity, conversion, intrinsic or floor member. The
+`Int64.toInt` examples above describe the general conversion contract;
+they are not additional FixedWidth exports by implication.
 
 The rule: a conversion that **always succeeds without loss** is `total`
 (`Int64.toInt`, narrow→wide same-signedness); one that **may not fit** returns
@@ -325,12 +370,16 @@ operands agree.
 
 ### 6.1 Registered runtime operations and the literal-order exception
 
-Numeric types are **primitive types** (`14 §5`): opaque type constants with
-registered, audited `PrimReduction::Op` symbols. The interpreter evaluates
-`2 + 3` to `5` at runtime, but kernel conversion does not execute that
-interpreter reducer: `2 + 3 ≡ 5 : Int` is not definitional and does not close
-by `Refl` even on literal operands. Separately, registered `leq_int` on two
-WHNF `IntLit` operands reduces in the kernel by its own `BigInt <=` rule
+The primitive numeric types (`Int`, the eight fixed widths, `Float` and
+`Float32`) are opaque type constants (`14 §5`) with registered, audited
+`PrimReduction::Op` symbols. `Decimal` is a checked transparent
+definition whose arithmetic operations are checked definitions
+(`../10-kernel/18a §5.6.1`), not primitive Op symbols. The
+interpreter evaluates `2 + 3` to `5` at runtime, but kernel
+conversion does not execute that interpreter reducer: `2 + 3 ≡ 5 : Int`
+is not definitional and does not close by `Refl` even on literal
+operands. Separately, registered `leq_int` on two WHNF `IntLit`
+operands reduces in the kernel by its own `BigInt <=` rule
 (`../10-kernel/16 §2.2`); other numeric Ops remain conversion-opaque.
 
 The primitive declarations and symbols are **small, audited, and listed by

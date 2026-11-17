@@ -415,10 +415,17 @@ elements, never pointer or slot identity. Mutable cells exist only in a
 other inductives (`34 §3`); it is what the verification layer reasons over. The
 higher-order combinators — `map`, `filter`, `fold`/`reduce`, `zip` — are
 collection-interface operations (`../50-stdlib/`), **not** a kernel iteration
-protocol. `map` and `filter` are imported package functions from
-`Data.Collections.Derived`, not prelude `view`s; this does not reclassify
-`fold`/`reduce` or `zip`. Comprehensions / `for`, if included, are **sugar**
-over the combinators (`OQ-syntax`); the semantic core is combinators + recursion.
+protocol. `map`, `filter` and `zip` are imported package functions from
+`Data.Collections.Derived`, not prelude `view`s. The public
+`zip (a : Type) (b : Type) (xs : List a) (ys : List b)` returns
+`List (Pair a b)`, stopping when either input ends. The existing
+`zip_length`, `zip_fst` and `zip_snd` proofs remain package-private.
+A Strict isolated source must import `zip` explicitly; an unimported
+bare use refuses `UnboundName`. This package operation is distinct
+from the pre-source `zip` over `Prod`, which this placement does not
+expose or rename. The location of `fold`/`reduce` is not settled by
+this change. Comprehensions / `for`, if included, are **sugar** over
+the combinators (`OQ-syntax`); the semantic core is combinators + recursion.
 
 The **laws are propositions** (`14 §5`, `21 §3`), stated and proved in Ken
 source, usable by the verification layer — they add **no kernel rule**. Laws
@@ -778,11 +785,13 @@ packages, each where specified (lowering to the landed `41`): UTF-8 `String`
 (persistent abstract carrier), `Option`/`Result` (L2); the
 `map`/`filter`/`fold`/`zip` combinators with their laws as propositions; the
 fuel-bounded-unfold infinitude idiom; structural equality + `DecEq`/`Ord`
-(built-in instances now); and the verified `sort`. Here `map` and `filter` are
-`Data.Collections.Derived` exports requiring explicit import (`33 §3.3`), not
-prelude operations; this sentence does not settle the placement of `fold` or
-`zip`. L8 extends this to the full lawful stdlib; L3 **unblocks T3** (the
-test/property framework).
+(built-in instances now); and the verified `sort`. Here `map`,
+`filter` and `zip` are `Data.Collections.Derived` exports requiring
+explicit import (`33 §3.3`), not prelude operations; `zip` returns
+`List (Pair a b)` and truncates at the shorter input (§4). This
+sentence does not settle the placement of `fold`/`reduce`. L8 extends
+this to the full lawful stdlib; L3 **unblocks T3** (the test/property
+framework).
 
 **Testable acceptance criteria.**
 
