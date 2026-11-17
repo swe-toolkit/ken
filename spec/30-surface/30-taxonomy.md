@@ -605,6 +605,8 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `read` | H | `Capability.Console.Text` with `write`. |
 | `wall_now` | H | `Capability.Time.WallClock` with clock helpers. |
 | `writeAll` | H | `Capability.System.IO` with positioned transfer operations. |
+| `write_all_advance_start_prop` | H | `Capability.System.IO`; import its checked proposition at the existing pre-source identity to state the start-offset advance for any span and count. |
+| `write_all_advance_start` | H | `Capability.System.IO`; import and apply its checked proof to that proposition at generic span and count. |
 | `Chunk` | B | `ReadResult.Chunk`, not bare. |
 | `DirEntry` | B | `DirEntry.MkDirEntry`, no H row. |
 | `Eof` | B | `ReadResult.Eof`, not bare. |
@@ -625,6 +627,17 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `remove_file` | H | `Capability.Filesystem.Authority`. |
 | `rename_file` | H | `Capability.Filesystem.Authority`. |
 | `FileOperation` | B, pre-existing H home withdrawn | Complete scoped sixteen-case family; remove its seventeen H rows. |
+
+The two IO advance-start H rows are beyond the historical Increment 3a
+ninety-six-row roster and the later fifty-six non-home additions; neither
+changes those historical counts or the fifty-two-identity floor. They use
+existing checked pre-source identities, not copied package definitions or
+new bare Strict names. A usable home requires the same Strict client to
+state a generic law in imported vocabulary and apply the checked proof;
+import acceptance and no-import `UnboundName` alone test nameability, not
+whether a law's statement is writable. The 21 other IO/Resource equations
+listed in the [ledger](30-intrinsic-ledger.md) stay checked but internal:
+no H row, helper export, or Resource law follows from them.
 
 The `And` quartet rewrites the four measured users by importing
 `Core.Logic.Conjunction`; its exported `And` is an alias for that
