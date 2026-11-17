@@ -11,11 +11,12 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 51] = [
+const TYPE_FLOOR: [&str; 52] = [
     "Auth",
     "Bool",
     "Bottom",
     "BufferSpan",
+    "Decimal",
     "Char",
     "ChildExit",
     "ConsoleOp",
@@ -66,12 +67,13 @@ const TYPE_FLOOR: [&str; 51] = [
 ];
 
 const COMPANIONS: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
-const INTERNAL_FLOOR: [&str; 43] = [
+const INTERNAL_FLOOR: [&str; 44] = [
     "Nat",
     "Pair",
     "Coproduct",
     "ConsoleStream",
     "eqChar",
+    "Decimal",
     "Instant",
     "ITree",
     "Unit",
