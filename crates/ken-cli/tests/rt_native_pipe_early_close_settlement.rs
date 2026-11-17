@@ -1,5 +1,5 @@
-//! Native/interpreter parity for a taken child stdout end closed in the body
-//! before waiting, compared with the same source's no-close control.
+//! Native/interpreter parity for both child pipe ends closed in the body
+//! before waiting, compared with their no-close controls.
 
 #![cfg(all(target_os = "linux", target_env = "gnu"))]
 
@@ -9,14 +9,22 @@ use ken_host::{
     ResourceSettlementOutcomeV1 as Settlement,
 };
 
-const EARLY_CLOSE: &str = include_str!("fixtures/rt_native_pipe_early_close_read.ken");
-const NO_CLOSE: &str = include_str!("fixtures/rt_native_pipe_no_close_read.ken");
+const EARLY_CLOSE_READ: &str = include_str!("fixtures/rt_native_pipe_early_close_read.ken");
+const NO_CLOSE_READ: &str = include_str!("fixtures/rt_native_pipe_no_close_read.ken");
+const EARLY_CLOSE_WRITE: &str = include_str!("fixtures/rt_native_pipe_early_close_write.ken");
+const NO_CLOSE_WRITE: &str = include_str!("fixtures/px10_take_stdin_no_close.ken");
 
 fn checked_catalog_roots() -> Vec<std::path::PathBuf> {
     vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
 }
 
-fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: bool) {
+fn compare_pipe_end(
+    source: &str,
+    case: &str,
+    expected_kind: Kind,
+    expected_fd: u64,
+    closes_before_wait: bool,
+) {
     let root = tempfile::tempdir().expect("isolated early-close root");
     let mut host = ken_interp::PosixHost::new_at(root.path());
     let reference = ken_cli::run_program_effect_observation(
@@ -91,15 +99,15 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
             (
                 Op::ProcessTakePipe,
                 Outcome::Success(Reply::ResourceAcquired {
-                    resource_kind: Kind::PipeRead,
+                    resource_kind,
                     identity,
                     ..
                 }),
-            ) => Some((index, *identity)),
+            ) if *resource_kind == expected_kind => Some((index, *identity)),
             _ => None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(acquired.len(), 1, "{case}: one acquired stdout end");
+    assert_eq!(acquired.len(), 1, "{case}: one acquired pipe end");
     assert_eq!(
         trace
             .iter()
@@ -111,13 +119,13 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
     let (take_index, pipe_identity) = acquired[0];
     let take = &trace[take_index];
     assert!(
-        matches!(take.request, Request::ProcessTakePipe { fd: 1 }),
-        "{case}: take the child's stdout end: {take:?}"
+        matches!(&take.request, Request::ProcessTakePipe { fd } if *fd == expected_fd),
+        "{case}: take the requested child pipe end: {take:?}"
     );
     assert!(
         take.resource_bindings
             .contains(&(Role::Buffer, pipe_identity)),
-        "{case}: acquisition binds the same stdout identity: {take:?}"
+        "{case}: acquisition binds the same pipe-end identity: {take:?}"
     );
     let child_identity = take
         .resource_bindings
@@ -161,10 +169,10 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
     assert!(
         matches!(&release.outcome,
         Outcome::Success(Reply::ResourceSettlement(observed))
-            if observed.resource_kind == Kind::PipeRead
+            if observed.resource_kind == expected_kind
                 && observed.identity == pipe_identity
                 && observed.outcome == Settlement::Released),
-        "{case}: exact stdout-end settlement: {release:?}"
+        "{case}: exact pipe-end settlement: {release:?}"
     );
     assert_eq!(
         release_index < wait_index,
@@ -192,6 +200,10 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
         "{case}: bracket settles the child after the body's wait"
     );
     assert!(
+        release_index < child_release_index,
+        "{case}: pipe-end release precedes ChildProcess settlement"
+    );
+    assert!(
         matches!(&child_release.outcome,
         Outcome::Success(Reply::ResourceSettlement(observed))
             if observed.resource_kind == Kind::ChildProcess
@@ -206,8 +218,7 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
 /// canonical effects and terminal observations on both engines. CLAIMED: an
 /// early close is performed once, and the bracket accepts its already-closed
 /// end instead of releasing it again or returning a release error. THE GAP:
-/// this exercises the read end only; write-end parity awaits the separate
-/// stdin increment's landing. The test does not witness a repeated body close.
+/// this one-child fixture does not witness a repeated body close.
 #[test]
 fn early_closed_stdout_settles_once_and_matches_interpreter() {
     // Existing PX10 Process smoke measured a 2308 KiB resident worker stack;
@@ -215,7 +226,15 @@ fn early_closed_stdout_settles_once_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("rt-pipe-close-read".to_owned())
         .stack_size(16 * 1024 * 1024)
-        .spawn(|| compare_early_close_to_control(EARLY_CLOSE, "early-close-read", true))
+        .spawn(|| {
+            compare_pipe_end(
+                EARLY_CLOSE_READ,
+                "early-close-read",
+                Kind::PipeRead,
+                1,
+                true,
+            )
+        })
         .expect("stated early-close worker")
         .join()
         .expect("early-close worker completed");
@@ -225,14 +244,65 @@ fn early_closed_stdout_settles_once_and_matches_interpreter() {
 /// the same checked child stdout acquisition and wait have native/interpreter
 /// parity and the bracket releases the end exactly once after the wait.
 /// CLAIMED: narrowing the relay key does not break the positive no-close
-/// route. THE GAP: this fixture covers one read end, not every child endpoint.
+/// route. THE GAP: this fixture covers one child, not every endpoint context.
 #[test]
 fn no_close_stdout_settles_at_bracket_and_matches_interpreter() {
     std::thread::Builder::new()
         .name("rt-pipe-no-close-read".to_owned())
         .stack_size(16 * 1024 * 1024)
-        .spawn(|| compare_early_close_to_control(NO_CLOSE, "no-close-read", false))
+        .spawn(|| compare_pipe_end(NO_CLOSE_READ, "no-close-read", Kind::PipeRead, 1, false))
         .expect("stated no-close worker")
         .join()
         .expect("no-close worker completed");
+}
+
+/// Promise class: durable invariant. MEASURED: one checked child stdin end is
+/// acquired as PipeWrite with fd 0 and closed before the wait. Both engines
+/// agree on the entire ordered canonical trace and terminal result, including
+/// the released pipe identity before the child's bracket settlement. CLAIMED:
+/// an early close does not lose ownership or duplicate settlement. THE GAP:
+/// this does not test a write after closing the pipe or a repeated body close.
+/// Contract: spec/30-surface/38-ffi-io.md §1.11.2.
+#[test]
+fn early_closed_stdin_settles_before_child_and_matches_interpreter() {
+    // This row's worker stack sampled at a 2324 KiB resident peak (3300
+    // /proc/<pid>/task/<tid>/smaps samples at 25 ms). The fixed 16 MiB
+    // (16384 KiB) leaves 14060 KiB headroom to that observed peak; this
+    // provisions the parity workload rather than testing a depth limit.
+    std::thread::Builder::new()
+        .name("rt-pipe-close-write".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            compare_pipe_end(
+                EARLY_CLOSE_WRITE,
+                "early-close-write",
+                Kind::PipeWrite,
+                0,
+                true,
+            )
+        })
+        .expect("stated write-end early-close worker")
+        .join()
+        .expect("write-end early-close worker completed");
+}
+
+/// Promise class: durable invariant. MEASURED: without explicit close, the
+/// checked stdin PipeWrite end is settled once after the wait and before the
+/// child, with interpreter/native full-trace parity. CLAIMED: narrowing the
+/// relay key does not break the stdin no-close control. THE GAP: no write is
+/// issued, so this does not witness ResourceStreamWrite or post-close use.
+/// Contract: spec/30-surface/38-ffi-io.md §1.11.2.
+#[test]
+fn no_close_stdin_settles_at_bracket_and_matches_interpreter() {
+    // This row's separate worker stack sampled at a 2324 KiB resident peak
+    // (3178 /proc/<pid>/task/<tid>/smaps samples at 25 ms). The fixed 16 MiB
+    // (16384 KiB) leaves 14060 KiB headroom to this row's observed peak;
+    // it provisions the parity workload, not a depth-bound instrument.
+    std::thread::Builder::new()
+        .name("rt-pipe-no-close-write".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| compare_pipe_end(NO_CLOSE_WRITE, "no-close-write", Kind::PipeWrite, 0, false))
+        .expect("stated write-end no-close worker")
+        .join()
+        .expect("write-end no-close worker completed");
 }
