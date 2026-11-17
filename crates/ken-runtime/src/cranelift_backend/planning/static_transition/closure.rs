@@ -40,7 +40,8 @@ use super::aggregates::{
     build_aggregate_ownership_plan, lifetime_referent_affinity, validate_aggregate_ownership_plan,
     validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
     validate_checked_ih_generated_entry_accesses,
-    validate_checked_ih_generated_entry_confluences, AggregateOccurrenceId,
+    validate_checked_ih_generated_entry_confluences,
+    validate_checked_ih_transport_application_inputs, AggregateOccurrenceId,
     AggregateOccurrenceProducer,
     PlannedAggregateAllocation, PlannedAggregateOwnership, PlannedAggregateShape,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,
@@ -2082,6 +2083,9 @@ impl<'src> StaticTransitionPlan<'src> {
             self,
             &self.checked_ih_generated_entry_confluences,
             &self.checked_ih_generated_entry_accesses,
+        )?;
+        validate_checked_ih_transport_application_inputs(
+            self, &self.checked_ih_transport_application_inputs,
         )?;
         validate_host_effect_seat_plan(self, &self.host_effect_seats)?;
         validate_substrate_preallocation_closure(

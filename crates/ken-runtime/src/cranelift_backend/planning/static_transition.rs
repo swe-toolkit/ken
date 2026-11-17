@@ -269,6 +269,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhGeneratedEntryProjection, CheckedIhGeneratedEntryRoute,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
+    CheckedIhTransportConsumerSeat, CheckedIhTransportApplicationInputs,
     PlannedAggregateAllocation, PlannedAggregateOwnership, RecursiveResidualDisposition,
     PlannedAggregateShape, RecursiveCarrierBoxedStore, RecursiveCarrierChild, RecursiveCarrierEdge,
     RecursiveCarrierMemberSchema, RecursiveCarrierRole, RecursiveCarrierSlot,
@@ -807,6 +808,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// can clone one into function-local compile-time state.
     checked_ih_generated_entry_accesses:
         BTreeMap<ContinuationContextId, CheckedIhGeneratedEntryAccess>,
+    /// Published after total generated-entry admissions, keyed by the exact
+    /// source transport and admitted application seat; never used as a route.
+    checked_ih_transport_application_inputs: CheckedIhTransportApplicationInputs,
     /// `RT-DECL-CLOSURE-PORT` `D7`. One record per capability/argument seat of
     /// every admitted host effect occurrence. Read by lowering, which claims
     /// exactly one of these per seat it consumes.

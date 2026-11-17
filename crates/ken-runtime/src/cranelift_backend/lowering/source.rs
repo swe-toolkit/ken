@@ -781,6 +781,7 @@ impl<'a> Lowering<'a> {
         current_checked_ih_projection: Option<&(
             CheckedIhGeneratedEntryProjection, PendingCheckedIhCall, StaticOriginId,
         )>,
+        consumer_seat: Option<CheckedIhTransportConsumerSeat>,
         #[cfg(feature = "px8-ds-test-support")]
         current_forward_ret_role_witness: Option<(
             StaticOriginId, StaticOriginId, StaticOriginId, &'static str,
@@ -887,8 +888,7 @@ impl<'a> Lowering<'a> {
                     self.pending_computational_ih_call.take();
                     let result = self
                         .call_tail_checked_ih_transport_from_case_environment(
-                            builder, &transport, &env,
-                        )?;
+                            builder, &transport, &env, consumer_seat,)?;
                     #[cfg(feature = "px8-ds-test-support")]
                     record_settlement_consumed_tail(settlement, proof.source_call_identity());
                     return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
@@ -919,8 +919,7 @@ impl<'a> Lowering<'a> {
                         self.pending_computational_ih_call.take();
                         let result = self
                             .call_tail_checked_ih_transport_from_case_environment(
-                                builder, &transport, &env,
-                            )?;
+                                builder, &transport, &env, consumer_seat,)?;
                         return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                     }
                     // Pure Ret{Match} -- the funded READ half. At a
@@ -990,8 +989,7 @@ impl<'a> Lowering<'a> {
                     }
                     return Ok(SelectedCheckedIhTransportExit::Complete(
             self.emit_composed_return_ret_kmatch_closeout(
-                            builder, authority, &transport, &env,
-                        )?,
+                            builder, authority, &transport, &env, consumer_seat,)?,
         ));
                 }
                 // MUTANT NOTE: replacing call_tail by a captured
@@ -1019,8 +1017,7 @@ impl<'a> Lowering<'a> {
                     self.pending_computational_ih_call.take();
                     let result = self
                         .call_tail_checked_ih_transport_from_case_environment(
-                            builder, &transport, &env,
-                        )?;
+                            builder, &transport, &env, consumer_seat,)?;
                     return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                 }
                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
@@ -1042,8 +1039,7 @@ impl<'a> Lowering<'a> {
                     self.pending_computational_ih_call.take();
                     let result = self
                         .call_tail_checked_ih_transport_from_case_environment(
-                            builder, &transport, &env,
-                        )?;
+                            builder, &transport, &env, consumer_seat,)?;
                     return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                 }
                 #[cfg(feature = "px8-ds-test-support")]
@@ -1110,8 +1106,7 @@ impl<'a> Lowering<'a> {
                         self.pending_computational_ih_call.take();
                         let result = self
                             .call_tail_checked_ih_transport_from_case_environment(
-                                builder, &transport, &env,
-                            )?;
+                                builder, &transport, &env, consumer_seat,)?;
                         #[cfg(feature = "px8-ds-test-support")]
                         record_settlement_consumed_tail(settlement, proof.source_call_identity());
                         return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
@@ -1137,8 +1132,7 @@ impl<'a> Lowering<'a> {
                             self.pending_computational_ih_call.take();
                             let result = self
                                 .call_tail_checked_ih_transport_from_case_environment(
-                                    builder, &transport, &env,
-                                )?;
+                                    builder, &transport, &env, consumer_seat,)?;
                             return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                         }
                         // Pure Ret{Match}: the governed generated-entry
@@ -1148,8 +1142,7 @@ impl<'a> Lowering<'a> {
                         // Take the forward SSA edge.
                         return Ok(SelectedCheckedIhTransportExit::Complete(
             self.emit_composed_return_ret_kmatch_closeout(
-                                builder, authority, &transport, &env,
-                            )?,
+                                builder, authority, &transport, &env, consumer_seat,)?,
         ));
                     }
                     ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
@@ -1168,8 +1161,7 @@ impl<'a> Lowering<'a> {
                         self.pending_computational_ih_call.take();
                         let result = self
                             .call_tail_checked_ih_transport_from_case_environment(
-                                builder, &transport, &env,
-                            )?;
+                                builder, &transport, &env, consumer_seat,)?;
                         return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                     }
                     ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
@@ -1187,8 +1179,7 @@ impl<'a> Lowering<'a> {
                         self.pending_computational_ih_call.take();
                         let result = self
                             .call_tail_checked_ih_transport_from_case_environment(
-                                builder, &transport, &env,
-                            )?;
+                                builder, &transport, &env, consumer_seat,)?;
                         return Ok(SelectedCheckedIhTransportExit::Value(RoutedAnswer::checked(result)));
                     }
                     #[cfg(feature = "px8-ds-test-support")]
@@ -1230,6 +1221,7 @@ impl<'a> Lowering<'a> {
             StaticOriginId,
         )>,
         env: &[LoweringEnvironmentBinding],
+        consumer_seat: Option<CheckedIhTransportConsumerSeat>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let authority = match self
             .function_local
@@ -1279,12 +1271,11 @@ impl<'a> Lowering<'a> {
                     // A labelled arm returns a value;
                     // no forward-Ret collapse inside the switch.
                     return self.call_tail_checked_ih_transport_from_case_environment(
-                        builder, transport, env,
-                    );
+                        builder, transport, env, consumer_seat,);
                 }
             }
         }
-        self.call_tail_checked_ih_transport_from_case_environment(builder, transport, env)
+        self.call_tail_checked_ih_transport_from_case_environment(builder, transport, env, consumer_seat,)
     }
 
     pub(super) fn lower_source_machine(
@@ -4947,6 +4938,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // the later transport consumer can exhaustively select Direct versus
         // Tail without a runtime discriminator.
         let mut current_checked_ih_projection = None;
+        let mut current_consumer_seat = None;
         #[cfg(feature = "px8-ds-test-support")]
         let mut current_forward_ret_role_witness = None;
         // Total generated-entry admission, before `specialized_at` and every
@@ -4967,6 +4959,10 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 pending.application_origin,
                 callee_origin,
             );
+            current_consumer_seat = Some(CheckedIhTransportConsumerSeat::application(
+                access.context(), pending.invocation_origin,
+                pending.application_origin, callee_origin,
+            ));
             let admission = access
                 .admission_for(
                     pending.invocation_origin,
@@ -5296,6 +5292,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                             )?;
                                             this.lower_labelled_checked_ih_transport_arm(
                                                 builder, &transport, projection.as_ref(), &env,
+                                                current_consumer_seat,
                                             )
                                         } else {
                                             // S4 has no transport; None is the
@@ -5380,6 +5377,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 if let Some(transport) = transport {
                     return Ok(match self.lower_selected_checked_ih_transport(
                         builder, &transport, current_checked_ih_projection.as_ref(),
+                        current_consumer_seat,
                         #[cfg(feature = "px8-ds-test-support")] current_forward_ret_role_witness,
                         &env,
                     )? {
@@ -5406,6 +5404,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         builder, &set, &members, word,
                         |this, builder, transport| this.lower_selected_checked_ih_transport(
                             builder, transport, current_checked_ih_projection.as_ref(),
+                            current_consumer_seat,
                             #[cfg(feature = "px8-ds-test-support")] current_forward_ret_role_witness,
                             &env,
                         ),

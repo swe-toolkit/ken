@@ -35,6 +35,7 @@ pub(in crate::cranelift_backend) enum TransportCarriedClaim {
     WorkerCapture { seat: StaticOriginId, ordinal: u32 },
     ContinuationInput {
         ordinal: u32,
+        seat: StaticOriginId,
         destination: CheckedIhTransportInputDestination,
     },
 }
@@ -400,12 +401,14 @@ pub(super) fn build_per_emitter_availability(
                     });
                 }
                 for input in &unit.key.continuation_inputs {
-                    let destination = context_ready.then(|| transport
-                        .continuation_input_index(input.ordinal, input.coordinate)).flatten();
+                    let destination = context_ready.then(|| plan.continuation_input_index(
+                        transport, input.ordinal, input.coordinate,
+                        super::CheckedIhTransportConsumerSeat::Assembly(emission_origin),
+                    )).flatten();
                     let claim = match destination {
                         Some(destination) => PerEmitterCaptureClaim::FinalizedTransport(
                             TransportCarriedClaim::ContinuationInput {
-                                ordinal: input.ordinal, destination,
+                                ordinal: input.ordinal, seat: emission_origin, destination,
                             },
                         ),
                         None => PerEmitterCaptureClaim::Unfinalizable {

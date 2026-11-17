@@ -9817,6 +9817,36 @@ impl<'a> Lowering<'a> {
         }
     }
 
+    /// Recheck a lexical index against the same consumer-seat source walk
+    /// before reading any value. A corrupted plan refuses at this boundary.
+    fn verify_checked_ih_transport_consumer_index(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+        seat: CheckedIhTransportConsumerSeat,
+        destination: CheckedIhTransportInputDestination,
+    ) -> Result<(), CraneliftBackendError> {
+        let CheckedIhTransportInputDestination::LexicalEnvironment(index) = destination else {
+            return Ok(()); // EntryFrame already names its validated ABI frame.
+        };
+        let origin = match seat {
+            CheckedIhTransportConsumerSeat::Assembly(origin) => origin,
+            CheckedIhTransportConsumerSeat::Application { coordinate, .. } =>
+                coordinate.invocation_origin(),
+        };
+        let derived = self.static_transition_plan.derive_checked_ih_transport_input_at(
+            transport, ordinal, coordinate, origin,
+        )?;
+        if index != derived {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "CheckedIhTransportConsumerSeat",
+                "a checked-IH transport input disagrees with its consumer-seat walk",
+            ));
+        }
+        Ok(())
+    }
+
     /// Apply one carried Direct checked-IH environment through its exact
     /// planner-issued continuation call. The only runtime selector is the
     /// already-validated Direct route variant.
@@ -10073,15 +10103,24 @@ impl<'a> Lowering<'a> {
                 "the Direct continuation-input morphism has the wrong arity",
             ));
         }
+        let access = self.function_local.checked_ih_generated_entry_access.as_ref()
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                "CheckedIhTransportConsumerSeat", "the Direct consumer has no generated-entry access"))?;
+        let seat = CheckedIhTransportConsumerSeat::application(
+            access.context(), pending.invocation_origin, pending.application_origin, callee_origin,
+        );
         for input in continuation_inputs {
-            let destination = transport
-                .continuation_input_index(input.ordinal, input.coordinate)
+            let destination = self.static_transition_plan
+                .continuation_input_index(transport, input.ordinal, input.coordinate, seat)
                 .ok_or_else(|| {
                     unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhApplicationResult",
-                        "the Direct transport has no destination for one continuation input",
+                        "the Direct transport has no destination for one continuation input at its application seat",
                     )
                 })?;
+            self.verify_checked_ih_transport_consumer_index(
+                transport, input.ordinal, input.coordinate, seat, destination,
+            )?;
             let operand = match destination {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
@@ -10269,6 +10308,7 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         transport: &CheckedIhEnvironmentTransport,
         env: &[LoweringEnvironmentBinding],
+        consumer_seat: Option<CheckedIhTransportConsumerSeat>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let identity = transport.source_call_identity().clone();
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
@@ -10429,16 +10469,21 @@ impl<'a> Lowering<'a> {
                 "the transport continuation-input morphism has the wrong arity",
             ));
         }
+        let seat = consumer_seat.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+            "CheckedIhTransportConsumerSeat", "the Tail consumer has no admitted current-call seat"))?;
         let mut continuation_inputs = Vec::with_capacity(inputs_view.len());
         for input in inputs_view {
-            let destination = transport
-                .continuation_input_index(input.ordinal, input.coordinate)
+            let destination = self.static_transition_plan
+                .continuation_input_index(transport, input.ordinal, input.coordinate, seat)
                 .ok_or_else(|| {
                     unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
-                        "the transport has no destination for one declared continuation input",
+                        "the transport has no destination for one declared input at its Tail seat",
                     )
                 })?;
+            self.verify_checked_ih_transport_consumer_index(
+                transport, input.ordinal, input.coordinate, seat, destination,
+            )?;
             let operand = match destination {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
@@ -10588,12 +10633,13 @@ impl<'a> Lowering<'a> {
         authority: ComposedReturnForwardRetAuthority,
         transport: &CheckedIhEnvironmentTransport,
         env: &[LoweringEnvironmentBinding],
+        consumer_seat: Option<CheckedIhTransportConsumerSeat>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         self.pending_computational_ih_call.take();
         // The InlineNoCall carried-environment return IS the captured-environment
         // carrier; this call also settles the continuation candidate exactly once.
         let captured = self.call_tail_checked_ih_transport_from_case_environment(
-            builder, transport, env,
+            builder, transport, env, consumer_seat,
         )?;
         let captured_word = match captured {
             LoweringOperand::Residual(residual) => self.checked_ih_transport_child(
@@ -10664,15 +10710,20 @@ impl<'a> Lowering<'a> {
                 "the transport continuation-input morphism has the wrong arity",
             ));
         }
+        let seat = consumer_seat.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+            "CheckedIhTransportConsumerSeat", "the closeout has no admitted current-call seat"))?;
         for input in &inputs_view {
-            let destination = transport
-                .continuation_input_index(input.ordinal, input.coordinate)
+            let destination = self.static_transition_plan
+                .continuation_input_index(transport, input.ordinal, input.coordinate, seat)
                 .ok_or_else(|| {
                     unsupported(LoweringCause::PlannerInvariant,
                         "ComposedReturnRetKMatch",
-                        "the transport has no destination for one declared continuation input",
+                        "the transport has no destination for one declared input at its closeout seat",
                     )
                 })?;
+            self.verify_checked_ih_transport_consumer_index(
+                transport, input.ordinal, input.coordinate, seat, destination,
+            )?;
             let operand = match destination {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
@@ -12172,8 +12223,11 @@ impl<'a> Lowering<'a> {
                         )?,
                     )
                 }
-                ContinuationOperandEnvironment::CheckedIhTransport(transport) => transport
-                    .continuation_input_index(input.ordinal, input.coordinate)
+                ContinuationOperandEnvironment::CheckedIhTransport(transport) => self
+                    .static_transition_plan.continuation_input_index(
+                        transport, input.ordinal, input.coordinate,
+                        CheckedIhTransportConsumerSeat::Assembly(unit.producer_construct_origin()),
+                    )
                     .ok_or_else(|| {
                         unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
@@ -12214,6 +12268,13 @@ impl<'a> Lowering<'a> {
                 }
             }
             resolved_slots.push((input.coordinate, destination));
+            if let ContinuationOperandEnvironment::CheckedIhTransport(transport) = &operand_environment {
+                self.verify_checked_ih_transport_consumer_index(
+                    transport, input.ordinal, input.coordinate,
+                    CheckedIhTransportConsumerSeat::Assembly(unit.producer_construct_origin()),
+                    destination,
+                )?;
+            }
             let operand = match (&operand_environment, destination) {
                 (
                     ContinuationOperandEnvironment::DirectEmission,
