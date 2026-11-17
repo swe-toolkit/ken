@@ -9,6 +9,7 @@
 const SMOKE: &str = include_str!("fixtures/px10_child_wait_smoke.ken");
 const ARGV_ENV_PIPE: &str = include_str!("fixtures/px10_argv_env_pipe.ken");
 const LIVE_CHILD: &str = include_str!("fixtures/px10_live_child.ken");
+const TAKE_STDIN_NO_CLOSE: &str = include_str!("fixtures/px10_take_stdin_no_close.ken");
 
 #[test]
 fn declared_process_smoke_executes_and_reaps_in_interpreter() {
@@ -119,6 +120,108 @@ fn check_ac1_native_process_smoke_matches_fresh_interpreter() {
     assert_exported_resource_lifetime_template_holds(&native.effect_trace);
 }
 
+/// Promise class: durable invariant. MEASURED: the checked no-close stdin
+/// fixture builds natively, takes exactly one fd-0 PipeWrite, waits for Exited 0,
+/// and agrees with the interpreter on the full ordered canonical observation.
+/// CLAIMED: the stdin constructor has the host's canonical operand shape
+/// without requiring an explicit close. THE GAP: this checks only the
+/// stdin constructor; early close and writing remain separately held work.
+/// The template's use-after-settlement arm is vacuous in this no-write row.
+#[test]
+fn native_take_stdin_no_close_matches_fresh_interpreter() {
+    // This no-close worker sampled 2320 KiB resident stack on its completed
+    // native build/run at 16 MiB; 14064 KiB of stated headroom remains.
+    std::thread::Builder::new()
+        .name("px10-take-stdin-no-close".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(check_native_take_stdin_no_close_matches_fresh_interpreter)
+        .expect("stated Process fixture worker")
+        .join()
+        .expect("Process fixture worker completed");
+}
+
+fn check_native_take_stdin_no_close_matches_fresh_interpreter() {
+    use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+    use ken_host::{CanonicalRequestV1 as Request, HostOpV1 as Op};
+    use ken_host::{ResourceBindingRole as Role, ResourceKindV1 as Kind};
+
+    let root = tempfile::tempdir().expect("isolated Process root");
+    let mut host = ken_interp::PosixHost::new_at(root.path());
+    let reference = ken_cli::run_program_effect_observation(
+        TAKE_STDIN_NO_CLOSE,
+        ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
+        &[],
+        &[],
+        root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("fresh checked take_stdin interpreter run");
+    assert_eq!(reference.exit_status, 0, "{reference:?}");
+    let built = ken_cli::build_native_program_with_roots(
+        TAKE_STDIN_NO_CLOSE,
+        ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
+        "px10_take_stdin_no_close",
+        root.path().join("native"),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+    .expect("native take_stdin must build with canonical fd-0 operand");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &built.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: root.path().to_owned(),
+            plan_hash: built.plan_transport_hash,
+        },
+    )
+    .expect("native take_stdin executes");
+    assert_eq!(native.exit_status, reference.exit_status);
+    assert_eq!(native.terminal_exit, reference.terminal_exit);
+    assert_eq!(native.terminal_error, reference.terminal_error);
+    assert_eq!(native.effect_trace, reference.effect_trace);
+    assert_eq!(native.exit_status, 0, "{native:?}");
+    let takes = native
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == Op::ProcessTakePipe)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        takes.len(),
+        1,
+        "one ProcessTakePipe: {:?}",
+        native.effect_trace
+    );
+    assert_eq!(takes[0].request, Request::ProcessTakePipe { fd: 0 });
+    assert!(
+        matches!(&takes[0].outcome,
+            Outcome::Success(Reply::ResourceAcquired {
+                resource_kind: Kind::PipeWrite, identity, ..
+            }) if takes[0].resource_bindings.contains(&(Role::Buffer, *identity))
+        ),
+        "stdin acquires a bound PipeWrite: {takes:?}"
+    );
+    let waits = native
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == Op::ProcessWait)
+        .collect::<Vec<_>>();
+    assert_eq!(waits.len(), 1, "one wait: {:?}", native.effect_trace);
+    assert!(
+        matches!(
+            &waits[0].outcome,
+            Outcome::Success(Reply::ChildExit(ken_host::ChildExitV1::Exited(0)))
+        ),
+        "wait returned Exited 0: {waits:?}"
+    );
+    assert_exported_resource_lifetime_template_holds_for(
+        &native.effect_trace,
+        TAKE_STDIN_NO_CLOSE,
+        true,
+    );
+}
+
 /// Promise class: durable invariant; `Signaled 15` is the specified UInt8
 /// compatibility value. MEASURED: checked Ken `withChild`/`wait_child` returns
 /// the typed signal constructor after the fixture sends SIGTERM to itself.
@@ -198,7 +301,7 @@ fn ac1_checked_interpreter_stdout_pipe_preserves_argv_and_environment() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -303,7 +406,7 @@ fn ac1b_interpreter_settles_plan_pipe_and_child_once_by_identity() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_encoded_bytes(),
@@ -736,7 +839,7 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
             ken_cli::run_program_effect_observation(
                 &source,
                 ken_cli::SourceFormat::Ken,
-        &checked_catalog_roots(),
+                &checked_catalog_roots(),
                 &[],
                 &[],
                 root.path().as_os_str().as_bytes(),
@@ -871,25 +974,34 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
     );
 }
 
-/// The resource-lifetime obligation from live_child's own target export.
-/// That program reaches every Process acquisition the template plans (plan,
-/// child, read pipe), and each plan is the global per-kind inventory restricted
-/// to the program's alphabet, so applying it to a trace whose program reaches a
-/// subset of those sites is no weaker than that program's own specialization.
-/// The smoke program cannot supply its own: its export refuses with
-/// `PerformedEffectOutsideDeclaredRow { effect: "FS" }`, because it declares
-/// `visits [Process]` only.
-fn exported_process_resource_lifetime_obligation(
+/// Export the supplied source's own target-specialized resource obligation.
+/// The smoke cannot export its own: it refuses with
+/// `PerformedEffectOutsideDeclaredRow { effect: "FS" }` because it declares
+/// `visits [Process]` only. Its callers use LIVE_CHILD instead; the no-close
+/// stdin row exports its own source, so its PipeWrite plan is not borrowed
+/// from a different fixture.
+fn exported_process_resource_lifetime_obligation_for(
+    source: &str,
 ) -> ken_elaborator::export::ResourceLifetimeObligation {
     // The checked-target export API is not an isolated CLI route. It still
     // elaborates standalone in Legacy without catalog roots; remove only the
     // route's import directives, leaving the program body and effects intact.
-    let source = LIVE_CHILD
-        .split_inclusive('\n')
-        .filter(|line| !line.starts_with("import "))
-        .collect::<String>();
-    // Elaborating the program needs the fixture stack the interpreter runs use:
-    // 3292 KiB resident on AC-1, provisioned at 16 MiB.
+    let mut source_without_imports = String::new();
+    let mut skipping_import = false;
+    for line in source.split_inclusive('\n') {
+        if line.starts_with("import ") {
+            skipping_import = true;
+            continue;
+        }
+        if skipping_import && (line.starts_with(' ') || line.starts_with('\t')) {
+            continue;
+        }
+        skipping_import = false;
+        source_without_imports.push_str(line);
+    }
+    let source = source_without_imports;
+    // The earlier LIVE_CHILD fixture sampled 3292 KiB resident on 16 MiB;
+    // this dedicated export uses that stated provisioning for both sources.
     std::thread::Builder::new()
         .name("px10-lifetime-template-export".to_owned())
         .stack_size(16 * 1024 * 1024)
@@ -917,7 +1029,7 @@ fn exported_process_resource_lifetime_obligation(
 }
 
 /// Promise: durable invariant. MEASURED: the exported resource-lifetime
-/// obligation applied to one interpreter trace: every identity a plan binds on
+/// obligation applied to the supplied trace: every identity a plan binds on
 /// successful acquisition settles exactly once, and no listed use of it
 /// succeeds after that settlement. CLAIMED: the exported Ward template's two
 /// settlement criteria hold for the trace, so the template is tested here
@@ -925,10 +1037,18 @@ fn exported_process_resource_lifetime_obligation(
 /// state over one trace; the terminal live-identity check and the monitor
 /// itself remain external Ward behavior.
 fn assert_exported_resource_lifetime_template_holds(trace: &[ken_host::EffectEvent]) {
+    assert_exported_resource_lifetime_template_holds_for(trace, LIVE_CHILD, false);
+}
+
+fn assert_exported_resource_lifetime_template_holds_for(
+    trace: &[ken_host::EffectEvent],
+    source: &str,
+    require_pipe_write: bool,
+) {
     use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
     use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role, ResourceErrorV1};
 
-    let obligation = exported_process_resource_lifetime_obligation();
+    let obligation = exported_process_resource_lifetime_obligation_for(source);
     assert!(
         obligation
             .monitor_template
@@ -951,6 +1071,32 @@ fn assert_exported_resource_lifetime_template_holds(trace: &[ken_host::EffectEve
             .any(|site| { site.operation == Op::ProcessSpawn && site.role == Role::Target }),
         "the spawn must be a listed plan use, or this check cannot see it: {spawn_plan:?}"
     );
+    if require_pipe_write {
+        let pipe = obligation
+            .plans
+            .iter()
+            .find(|plan| plan.resource_kind == ken_host::ResourceKindV1::PipeWrite)
+            .expect("the source exports its PipeWrite lifetime plan");
+        assert_eq!(pipe.bind_at.operation, Op::ProcessTakePipe);
+        assert_eq!(pipe.bind_at.role, Role::Buffer);
+        assert!(
+            trace
+                .iter()
+                .any(|event| event.operation == pipe.bind_at.operation
+                    && matches!(
+                        &event.outcome,
+                        Outcome::Success(Reply::ResourceAcquired {
+                            resource_kind: ken_host::ResourceKindV1::PipeWrite,
+                            ..
+                        })
+                    )
+                    && event
+                        .resource_bindings
+                        .iter()
+                        .any(|(role, _)| *role == pipe.bind_at.role)),
+            "a successful PipeWrite acquisition must reach the plan bind site: {trace:?}"
+        );
+    }
     for plan in &obligation.plans {
         for (acquired_at, event) in trace.iter().enumerate() {
             let acquired = event.operation == plan.bind_at.operation
@@ -1007,6 +1153,5 @@ fn assert_exported_resource_lifetime_template_holds(trace: &[ken_host::EffectEve
 }
 
 fn checked_catalog_roots() -> [std::path::PathBuf; 1] {
-    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../catalog/packages")]
+    [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
 }

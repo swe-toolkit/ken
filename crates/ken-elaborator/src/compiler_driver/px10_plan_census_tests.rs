@@ -225,7 +225,7 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_argv",
         ARGV_ENV_PIPE,
         "Predeclared(PredeclaredFunctionId(17))",
-        1787,
+        1789,
         &[1, 2, 3],
     );
 }
@@ -236,7 +236,7 @@ fn px10_live_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_live",
         LIVE_CHILD,
         "Predeclared(PredeclaredFunctionId(15))",
-        1295,
+        1296,
         &[2, 3, 4],
     );
 }
@@ -392,7 +392,7 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 632 resumes through fold 12 and is returned by Vis 667.
+/// settlement 633 resumes through fold 12 and is returned by Vis 668.
 /// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
 /// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
 /// settlement Construct 647→623 preserved producer and order before I2.
@@ -426,7 +426,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 632, 12), (ReturnedVisSettlement, 632, 667)],
+            &[(ReturnFold, 633, 12), (ReturnedVisSettlement, 633, 668)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -447,10 +447,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1178, 580),
-                (ReturnFold, 1423, 1183),
-                (ReturnedVisSettlement, 1178, 1801),
-                (ReturnedVisSettlement, 1423, 1518),
+                (ReturnFold, 1180, 581),
+                (ReturnFold, 1425, 1185),
+                (ReturnedVisSettlement, 1180, 1803),
+                (ReturnedVisSettlement, 1425, 1520),
             ][..],
             None,
         ),
@@ -458,10 +458,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 610, 12),
-                (ReturnFold, 855, 615),
-                (ReturnedVisSettlement, 610, 1309),
-                (ReturnedVisSettlement, 855, 1028),
+                (ReturnFold, 611, 12),
+                (ReturnFold, 856, 616),
+                (ReturnedVisSettlement, 611, 1310),
+                (ReturnedVisSettlement, 856, 1029),
             ][..],
             None,
         ),
@@ -581,11 +581,11 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 }
 
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1241 and 1010 and live's relays 673 and 442 are relay members of
+/// relays 1243 and 1012 and live's relays 674 and 443 are relay members of
 /// their owners' returned-Vis protocols, numbered once per emitting copy
 /// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1241 and 673 resume at the rows
-/// whose Vis are 1466 and 917; copies of 1010 and 442 resume by their planned
+/// kept in the settled member set. Copies of 1243 and 674 resume at the rows
+/// whose Vis are 1468 and 918; copies of 1012 and 443 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
 /// census does not prove that every emitting owner minted a copy or that
@@ -596,20 +596,21 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 /// (SHA256 2b45cce5e87da7f616767ea12772d28abdbb74143000f014853e907546babc06),
 /// which found equal owner/relay/resume/successor structure under that mapping.
 /// I2's checked ChildSignal prelude shifts argv origins by 18 and live origins
-/// by nine; the returned-Vis protocols and settled relays were re-observed on
-/// the merged tree before repinning their identities.
+/// by nine; F2's extra take_stdin operand shifts the argv origins by two and
+/// live origins by one more. The returned-Vis protocols and settled relays were
+/// re-observed on the F2 tree before repinning their identities.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
         (
             "px10_census_relay_argv_env_pipe",
             ARGV_ENV_PIPE,
-            [(1241, 1705, Some(1466)), (1010, 1801, None)],
+            [(1243, 1707, Some(1468)), (1012, 1803, None)],
         ),
         (
             "px10_census_relay_live_child",
             LIVE_CHILD,
-            [(673, 1213, Some(917)), (442, 1309, None)],
+            [(674, 1214, Some(918)), (443, 1310, None)],
         ),
     ] {
         in_census_thread(name, move || {

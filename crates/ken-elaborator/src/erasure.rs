@@ -1017,6 +1017,9 @@ pub(crate) struct CheckedHostSpineV1 {
     /// PX10 checked resource kinds and typed wait constructors.
     pub px10_kind_symbols: [StableSymbol; 4],
     pub px10_exit_symbols: [StableSymbol; 2],
+    /// Checked constructor for the parent write end of child stdin. Both take
+    /// constructors share ProcessTakePipe but have different source arities.
+    pub process_take_pipe_write_constructor: StableSymbol,
     /// The checked constructor identity, independent of its host-op mapping.
     pub bracket_finalizer_constructor: Option<StableSymbol>,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
@@ -4780,6 +4783,7 @@ fn lower_checked_host_computation(
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let args = normalize_take_stdin_args(&decoded.constructor.symbol, spine, args);
             return Ok(RuntimeExpr::Let {
                 value: Box::new(RuntimeExpr::Effect {
                     family: decoded.constructor.family_symbol.to_string(),
@@ -4843,6 +4847,20 @@ fn lower_checked_host_computation(
         "unrecognized_checked_host_computation",
         "normalized HostIO body is neither identity-checked Ret nor Vis",
     ))
+}
+
+/// Canonical ProcessTakePipe has a child and a pipe index. The checked stdin
+/// constructor carries only the child; unlike the read constructor it supplies
+/// the fixed index at erasure, while constructor identity is still available.
+fn normalize_take_stdin_args(
+    constructor: &StableSymbol,
+    spine: &CheckedHostSpineV1,
+    mut args: Vec<RuntimeExpr>,
+) -> Vec<RuntimeExpr> {
+    if constructor == &spine.process_take_pipe_write_constructor {
+        args.push(RuntimeExpr::Value(RuntimeValue::Int(0.into())));
+    }
+    args
 }
 
 #[derive(Debug)]
@@ -5139,6 +5157,7 @@ fn lower_runtime_selected_host_operation(
                 } else {
                     (None, runtime_args)
                 };
+            let args = normalize_take_stdin_args(&constructor.symbol, spine, args);
             cases.push(RuntimeMatchCase {
                 constructor: constructor.symbol.to_string(),
                 binders: argument_count,
@@ -9692,6 +9711,10 @@ mod px7l_tests {
                 .map(|name| StableSymbol::constructor(&family("ResourceKind"), name)),
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| StableSymbol::constructor(&family("ChildExit"), name)),
+            process_take_pipe_write_constructor: StableSymbol::constructor(
+                &family("FSOp"),
+                "PrivateProcessTakePipeWrite",
+            ),
             io_errors: Vec::new(),
             resource_host_io: StableSymbol::constructor(&family("ResourceError"), "ResourceHostIO"),
             resource_closed: StableSymbol::constructor(&family("ResourceError"), "Closed"),
@@ -10157,6 +10180,7 @@ mod d1b_role_b_decoder_alignment {
             resource_kind_mapping: sentinel("resource_kind_mapping"),
             px10_kind_symbols: [0, 1, 2, 3].map(|i| sentinel(&format!("px10_kind_{i}"))),
             px10_exit_symbols: [0, 1].map(|i| sentinel(&format!("px10_exit_{i}"))),
+            process_take_pipe_write_constructor: sentinel("take_stdin"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
