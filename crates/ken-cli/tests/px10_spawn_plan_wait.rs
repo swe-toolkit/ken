@@ -974,14 +974,12 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
     );
 }
 
-/// The resource-lifetime obligation from live_child's own target export.
-/// That program reaches every Process acquisition the template plans (plan,
-/// child, read pipe), and each plan is the global per-kind inventory restricted
-/// to the program's alphabet, so applying it to a trace whose program reaches a
-/// subset of those sites is no weaker than that program's own specialization.
-/// The smoke program cannot supply its own: its export refuses with
-/// `PerformedEffectOutsideDeclaredRow { effect: "FS" }`, because it declares
-/// `visits [Process]` only.
+/// Export the supplied source's own target-specialized resource obligation.
+/// The smoke cannot export its own: it refuses with
+/// `PerformedEffectOutsideDeclaredRow { effect: "FS" }` because it declares
+/// `visits [Process]` only. Its callers use LIVE_CHILD instead; the no-close
+/// stdin row exports its own source, so its PipeWrite plan is not borrowed
+/// from a different fixture.
 fn exported_process_resource_lifetime_obligation_for(
     source: &str,
 ) -> ken_elaborator::export::ResourceLifetimeObligation {
@@ -1002,8 +1000,8 @@ fn exported_process_resource_lifetime_obligation_for(
         source_without_imports.push_str(line);
     }
     let source = source_without_imports;
-    // Elaborating the program needs the fixture stack the interpreter runs use:
-    // 3292 KiB resident on AC-1, provisioned at 16 MiB.
+    // The earlier LIVE_CHILD fixture sampled 3292 KiB resident on 16 MiB;
+    // this dedicated export uses that stated provisioning for both sources.
     std::thread::Builder::new()
         .name("px10-lifetime-template-export".to_owned())
         .stack_size(16 * 1024 * 1024)
@@ -1031,7 +1029,7 @@ fn exported_process_resource_lifetime_obligation_for(
 }
 
 /// Promise: durable invariant. MEASURED: the exported resource-lifetime
-/// obligation applied to one interpreter trace: every identity a plan binds on
+/// obligation applied to the supplied trace: every identity a plan binds on
 /// successful acquisition settles exactly once, and no listed use of it
 /// succeeds after that settlement. CLAIMED: the exported Ward template's two
 /// settlement criteria hold for the trace, so the template is tested here
