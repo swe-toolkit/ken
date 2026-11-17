@@ -1625,3 +1625,76 @@ full-union and two-graph controls establish why this exact false
 claim is discriminating; the generic proof and its trust boundary
 are separately checked. The CV seed, catalog test and assembled
 candidate retain their own independent gates.
+
+## 18. Reachability is preserved by reversing the graph and swapping the endpoints
+
+> **Section 18 status: DRAFT v0
+> (SPEC-GRAPHS-REACHABLE-REVERSE-SWAP).** The Foundation-run AC-0 D0
+> was disposable scratch development on `5fc1929a1`, not a check of a
+> subsequently landed §18 package. The ruled generic proof and formatter
+> checked there without an added `Axiom` or postulate; root-loading the
+> patched dependency preserved the exact trusted `GlobalId` set
+> (114 → 114). Four named existing graph test binaries passed 21/21.
+> The closed accepted client checked, the no-reversal claim refused at
+> its own theorem span, and a changed-conclusion mutant refused within
+> the new law before byte-identical restoration. These observations
+> establish neither this Spec child nor a separate catalog or CV seed
+> child, assembled-tip approval, official conformance, CI, publication,
+> landing or a measured landed trust result.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent checked
+law after `walk_reverse_involutive` and before `graph_union`. Its exact
+name, binder order and result type are:
+
+```ken
+pub theorem graph_reachable_reverse_swap
+      (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q)
+    : Equal Bool
+        (graph_reachable q fq g s (d.eq t))
+        (graph_reachable q fq (graph_reverse q g) t (d.eq s))
+```
+
+For every finite decidable carrier and directed graph, the Boolean
+reachability decision from `s` to target `t` equals the decision from
+`t` to target `s` in the **reversed** graph. The forward graph is on
+the left. No true-reachability, walk, edge symmetry or endpoint-order
+premise is needed beyond the `Finite q` and `DecEq q` arguments.
+This is equality of Boolean decisions, not structural graph equality
+or reachability with endpoints swapped in the original graph. The
+§15.2, §16 and §17 rosters remain historical; §18 adds one public
+theorem and no function, giving **17 public functions and 33 public
+theorems** through §18. No §§1–17 operation or law type changes.
+
+One new private helper, `graph_reachable_reverse_swap_true`, placed
+after `walk_transport_end` and before `walks_antisymmetric`, derives
+the reversed decision's truth from the forward decision's truth. As in
+§11's transitivity proof, `graph_find_walk_some` and `require_some`
+extract a `MkReach u hit walk` witness from the true forward result.
+The `d.sound t u hit` equality is symmetrized to transport the walk's
+end from `u` to `t` with `walk_transport_end`. The public
+`graph_reachable_reverse` then uses the reversed walk from `t` to `s`
+and the target hit `d.complete s s Refl` to prove the reversed result
+true. Its reversal is §8's `walk_reverse`, not an independent second
+reachability search. For the converse, apply the same helper at
+`graph_reverse q g` with `s` and `t` exchanged. Use `cong` over the
+reachability decision and `graph_reverse_involutive` to transport the
+result from the twice-reversed graph back to `g`; `bool_eq_from_iff`
+closes the displayed Boolean equality from both directions. The
+helper stays private: a client can obtain the true-result implication
+by rewriting with the public Boolean equality, so exporting it would
+duplicate one fact under two names. No other helper, import, assumption
+or kernel rule is required.
+
+The closed discriminator reuses §8's directed `Vertex3` chain
+V0 → V1 → V2 and a checked `DecEq Vertex3` instance. At `(s, t) =
+(V0, V2)`, reachability is `True` in both the original forward chain
+and the reversed chain with endpoints exchanged. At `(V2, V0)`, it is
+`False` on both sides: neither graph supplies the corresponding walk.
+The accepted client also applies the law at open `s` and `t` and checks
+these closed cases independently. On a fresh accepted prefix, the
+same-form claim that swaps the endpoints **without reversing the graph**
+must refuse at its own `Proved`: the original chain reaches V2 from V0
+(`True`) but does not reach V0 from V2 (`False`). The accepted
+with-reversal equality is its control. This closed refusal is not a
+proof of the generic law; the checked proof, separately owned CV seed
+and package test, and assembled-tip gates remain distinct.
