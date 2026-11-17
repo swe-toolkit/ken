@@ -346,10 +346,12 @@ witness to assert. Overlapping `[1/2,2]` and `[1,3]` intersect to
 their intersection.
 
 These laws do **not** assert structural `Equal Interval` for
-commutativity, idempotence or associativity of either operation.
-The §5 endpoint-value swap inclusions do not strengthen this to
-structural equality; §6 separately states arithmetic associativity
-by endpoint-value inclusion, not structural interval equality. In particular,
+commutativity or associativity of either operation. §19 separately
+states structural idempotence when the **same stored interval** is
+combined with itself. The §5 endpoint-value swap inclusions do not
+strengthen commutativity to structural equality; §6 separately states
+arithmetic associativity by endpoint-value inclusion, not structural
+interval equality. In particular,
 the hull of the points at `half` and `two_quarters` stores
 `half` as its lower bound and `two_quarters` as its upper bound;
 swapping the arguments stores the reverse. Here `half = 1/2`
@@ -1765,3 +1767,101 @@ must refuse at that missing premise on a fresh accepted prefix;
 an independent closed false-conclusion check is a separate
 scratch observation. These closed checks distinguish the stated
 bound but do not prove its generic checked body.
+
+## 19. Hull and intersection are idempotent as stored
+
+> **Section 19 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT).** The
+> Foundation-run AC-0 D0 was disposable scratch development on
+> `3477e1cd1`, not a check of a subsequently landed §19 package.
+> Both generic catalog packages and their formatter checked with no
+> new `Axiom` or postulate; root-loading Rational then RationalInterval
+> preserved the exact trusted `GlobalId` set (114 → 114). Seven named
+> existing test binaries passed 38/38. The accepted client checked,
+> the equal-value/different-spelling claim refused at its own theorem,
+> and replacing the hull proof by `Refl` refused within the law before
+> byte-identical restoration. These observations do not check this
+> Spec child, the separate catalog or CV seed children, an assembled
+> candidate, official conformance, CI, publication, landing or a
+> measured landed-trust result.
+
+`Data.Numeric.Rational` must export two public **attached proofs** after
+`least for rational_max` and before the private `rational_pick`. Their
+exact names, binder and types are:
+
+```ken
+pub proof idempotent for rational_min (x : Rational)
+    : Equal Rational (rational_min x x) x
+
+pub proof idempotent for rational_max (x : Rational)
+    : Equal Rational (rational_max x x) x
+```
+
+These laws recover the **same stored** `Rational` operand, not merely
+one with an equivalent value. For an open `x`, both selectors unfold
+to the private `rational_pick (rational_leq x x) x x`; the comparison
+need not reduce, so a direct `Refl` cannot prove either law. The six
+existing public min/max order bounds establish `rational_equiv`, not
+structural `Equal Rational`. A caller cannot case on the comparison
+with the needed motive without naming private `rational_pick`; making
+that selector or a parallel pick law public would duplicate its
+interface. The two attached self proofs are the smallest public
+boundary that supports the interval laws. One private `pick_self`
+follows `pick_least`, with type
+`(b : Bool) → (x : Rational) → Equal Rational (rational_pick b x x) x`.
+It matches on the bound `b`, returning `Refl` for either Boolean.
+Both public proofs apply `pick_self (rational_leq x x) x`, without a
+new assumption.
+
+`Algorithm.Numeric.RationalInterval` must export two public
+Transparent checked theorems after `interval_intersect_assoc_rev_inside`
+and before `interval_add_zero_l_inside`, together at the end of the
+hull/intersection algebra. Their exact types are:
+
+```ken
+pub theorem interval_hull_idempotent (i : Interval)
+    : Equal Interval (interval_hull i i) i
+
+pub theorem interval_intersect_idempotent (i : Interval)
+    : Equal Interval (interval_intersect i i) i
+```
+
+Both are premise-free for every stored interval, including inverted
+bounds and non-normal rational endpoints. The first unfolds on
+`i = MkInterval a b` to endpoints `rational_min a a` and
+`rational_max b b`; the second uses `rational_max a a` and
+`rational_min b b`. Each theorem matches on its binder `i` and
+uses `trans` at `Interval` of two `cong` steps over `MkInterval`:
+rewrite the lower endpoint using the corresponding Rational self
+proof, then the upper endpoint using the other. The only new import
+is `cong` from `Core.Logic.Transport`; no new premise, `Axiom`,
+primitive, kernel or surface rule is required. The Rational proofs
+are not replaceable by their existing value-order bounds. The two
+interval theorems add to the earlier fifty-seven public theorems,
+yielding fifty-nine; they do not change an operation or law type
+from §§1–18. They establish self-combination as **stored** equality,
+not structural commutativity or associativity for distinct inputs.
+
+The closed discriminator takes `half_two = [1/2, 2]` with lower
+endpoint `MkRational 1 1`, `quarters_two = [2/4, 2]` with lower
+endpoint `MkRational 2 3`, and the inverted interval `[2, 1/2]`.
+Each of the three accepts an application of **both** interval laws.
+`half_two` and `quarters_two` are mutually inside each other by
+endpoint-value comparison, but have different stored lower endpoints.
+The mixed `interval_hull half_two quarters_two` retains the first
+operand's `1/2` spelling, not the second's `2/4` spelling. On a fresh
+accepted prefix, this same-form application must refuse at its own
+theorem because it substitutes value equivalence for stored identity:
+
+```ken
+theorem hull_equal_value_claim
+    : Equal Interval (interval_hull half_two quarters_two) quarters_two =
+  interval_hull_idempotent quarters_two
+```
+
+The accepted `interval_hull_idempotent quarters_two` is its control;
+the law applies only when **both** hull operands are that same stored
+interval. The scratch refusal distinguishes this boundary, not a
+proof of the open law. The checked generic proofs and their trust
+boundary, the CV seed and package test, and the assembled-tip gates
+remain separate.
