@@ -4,8 +4,9 @@
 #![cfg(all(target_os = "linux", target_env = "gnu"))]
 
 use ken_host::{
-    CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply, HostOpV1 as Op,
-    ResourceBindingRole as Role, ResourceKindV1 as Kind, ResourceSettlementOutcomeV1 as Settlement,
+    CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply, CanonicalRequestV1 as Request,
+    HostOpV1 as Op, ResourceBindingRole as Role, ResourceKindV1 as Kind,
+    ResourceSettlementOutcomeV1 as Settlement,
 };
 
 const EARLY_CLOSE: &str = include_str!("fixtures/rt_native_pipe_early_close_read.ken");
@@ -99,7 +100,30 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
         })
         .collect::<Vec<_>>();
     assert_eq!(acquired.len(), 1, "{case}: one acquired stdout end");
+    assert_eq!(
+        trace
+            .iter()
+            .filter(|event| event.operation == Op::ProcessTakePipe)
+            .count(),
+        1,
+        "{case}: no other take may be hidden by the successful-acquisition filter"
+    );
     let (take_index, pipe_identity) = acquired[0];
+    let take = &trace[take_index];
+    assert!(
+        matches!(take.request, Request::ProcessTakePipe { fd: 1 }),
+        "{case}: take the child's stdout end: {take:?}"
+    );
+    assert!(
+        take.resource_bindings
+            .contains(&(Role::Buffer, pipe_identity)),
+        "{case}: acquisition binds the same stdout identity: {take:?}"
+    );
+    let child_identity = take
+        .resource_bindings
+        .iter()
+        .find_map(|(role, identity)| (*role == Role::Target).then_some(*identity))
+        .expect("stdout take must carry its child target");
     let waits = trace
         .iter()
         .enumerate()
@@ -147,6 +171,34 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
         closes_before_wait,
         "{case}: body close precedes wait, bracket-only settlement follows it"
     );
+    let child_releases = trace
+        .iter()
+        .enumerate()
+        .filter(|(_, event)| {
+            event.operation == Op::ResourceRelease
+                && event
+                    .resource_bindings
+                    .contains(&(Role::Target, child_identity))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        child_releases.len(),
+        1,
+        "{case}: bracket must also settle its child exactly once"
+    );
+    let (child_release_index, child_release) = child_releases[0];
+    assert!(
+        child_release_index > wait_index,
+        "{case}: bracket settles the child after the body's wait"
+    );
+    assert!(
+        matches!(&child_release.outcome,
+        Outcome::Success(Reply::ResourceSettlement(observed))
+            if observed.resource_kind == Kind::ChildProcess
+                && observed.identity == child_identity
+                && observed.outcome == Settlement::Released),
+        "{case}: bracket's exact child settlement: {child_release:?}"
+    );
 }
 
 /// Promise class: durable invariant. MEASURED: one checked child stdout end
@@ -154,7 +206,8 @@ fn compare_early_close_to_control(source: &str, case: &str, closes_before_wait: 
 /// canonical effects and terminal observations on both engines. CLAIMED: an
 /// early close is performed once, and the bracket accepts its already-closed
 /// end instead of releasing it again or returning a release error. THE GAP:
-/// this exercises the read end only; write-end parity awaits the stdin fix.
+/// this exercises the read end only; write-end parity awaits the separate
+/// stdin increment's landing. The test does not witness a repeated body close.
 #[test]
 fn early_closed_stdout_settles_once_and_matches_interpreter() {
     // Existing PX10 Process smoke measured a 2308 KiB resident worker stack;
