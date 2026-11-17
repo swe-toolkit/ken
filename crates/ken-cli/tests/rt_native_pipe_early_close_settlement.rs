@@ -262,8 +262,13 @@ fn no_close_stdout_settles_at_bracket_and_matches_interpreter() {
 /// the released pipe identity before the child's bracket settlement. CLAIMED:
 /// an early close does not lose ownership or duplicate settlement. THE GAP:
 /// this does not test a write after closing the pipe or a repeated body close.
+/// Contract: spec/30-surface/38-ffi-io.md §1.11.2.
 #[test]
 fn early_closed_stdin_settles_before_child_and_matches_interpreter() {
+    // This row's worker stack sampled at a 2324 KiB resident peak (3300
+    // /proc/<pid>/task/<tid>/smaps samples at 25 ms). The fixed 16 MiB
+    // (16384 KiB) leaves 14060 KiB headroom to that observed peak; this
+    // provisions the parity workload rather than testing a depth limit.
     std::thread::Builder::new()
         .name("rt-pipe-close-write".to_owned())
         .stack_size(16 * 1024 * 1024)
@@ -286,8 +291,13 @@ fn early_closed_stdin_settles_before_child_and_matches_interpreter() {
 /// child, with interpreter/native full-trace parity. CLAIMED: narrowing the
 /// relay key does not break the stdin no-close control. THE GAP: no write is
 /// issued, so this does not witness ResourceStreamWrite or post-close use.
+/// Contract: spec/30-surface/38-ffi-io.md §1.11.2.
 #[test]
 fn no_close_stdin_settles_at_bracket_and_matches_interpreter() {
+    // This row's separate worker stack sampled at a 2324 KiB resident peak
+    // (3178 /proc/<pid>/task/<tid>/smaps samples at 25 ms). The fixed 16 MiB
+    // (16384 KiB) leaves 14060 KiB headroom to this row's observed peak;
+    // it provisions the parity workload, not a depth-bound instrument.
     std::thread::Builder::new()
         .name("rt-pipe-no-close-write".to_owned())
         .stack_size(16 * 1024 * 1024)
