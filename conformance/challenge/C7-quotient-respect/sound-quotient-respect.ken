@@ -3,7 +3,7 @@
 --
 -- The K2 kernel form is `A / R / e` with `Term::Quot`/`QuotElim`;
 -- the frontend has no quotient production and `/` is integer division.
--- Decimal-as-quotient is the intended fix to C1's non-canonical carrier.
+-- The DecimalModel quotient is the intended fix to C1's non-canonical carrier.
 
 data DPair = MkDPair Int Int
 
@@ -17,7 +17,7 @@ fn denoteEq (x : DPair) (y : DPair) : Prop =
 
 -- Intended quotient carrier; this file omits the required `e` and does not
 -- form a quotient under the post-P0 rule.
-const Decimal : Type = DPair / denoteEq
+const DecimalModel : Type = DPair / denoteEq
 
 -- Intended law: isZeroPair respects denotational equality. This sketch has
 -- no checked proof and is not a current C7 conformance result.
@@ -31,7 +31,7 @@ fn isZeroRespect (x : DPair) (y : DPair) (h : denoteEq x y)
   : Equal Bool (isZeroPair x) (isZeroPair y) = Axiom
 
 -- Lift to the quotient: elim_/ motive method respect scrut.
-fn isZeroDecimal (d : Decimal) : Bool =
+fn isZeroDecimal (d : DecimalModel) : Bool =
   elim_/ (λ _ . Bool) isZeroPair isZeroRespect d
 
 -- Current status: no C7 respect verdict. As written, the missing e prevents

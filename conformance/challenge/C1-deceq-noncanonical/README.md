@@ -15,8 +15,8 @@ inhabits `Bottom` (ADR 0010; the Decimal/Char DEMOTE arc). VAL2 used `Ord`/
 existing machinery (`51 §5`, "laws PROVED not postulated") **guards deception,
 not falsehood**: it checks that a postulate's proof-chain reaches an honest
 audited leaf, never whether the *statement being postulated is even true*. So a
-naive lawful `DecEq Decimal { sound = Axiom }` is exactly the construction that
-slips through.
+naive lawful `DecEq DecimalModel { sound = Axiom }` is the construction this
+fixture aims to test, once it reaches the law boundary.
 
 ## The pair
 
@@ -27,14 +27,17 @@ slips through.
   exactly like the landed `DecEq Int` (also `Axiom`, also sound — `Int` is a
   primitive with no induction principle, so its true laws are honest visible
   postulates).
-- **Unsound arm — `unsound-deceq-decimal.ken` — should-REJECT.** `DecEq Decimal`
-  over `Decimal = MkDecimalPair Int Int` (non-canonical: `MkDecimalPair 10 (-1)`
-  and `MkDecimalPair 1 0` both denote `1`). `decimalEq` returns `True` on those
-  two structurally-distinct pairs, so `sound` would yield
-  `Equal Decimal (MkDecimalPair 10 (-1)) (MkDecimalPair 1 0)`; `MkDecimalPair`
-  injectivity (K7 no-confusion) refutes it: `Equal Int 10 1 → Bottom`. The arm
-  **includes the exploit** (derives `Bottom` from the instance's `sound`) so the
-  hole is concrete, not hypothetical.
+- **Unsound arm — `unsound-deceq-decimal.ken` — should-REJECT, currently
+  non-oracular.** `DecEq DecimalModel` over the local
+  `DecimalModel = MkDecimalPair Int Int` is non-canonical:
+  `MkDecimalPair 10 (-1)` and `MkDecimalPair 1 0` both denote `1`.
+  `decimalEq` returns `True` on those structurally distinct pairs, so
+  `sound` would yield
+  `Equal DecimalModel (MkDecimalPair 10 (-1)) (MkDecimalPair 1 0)`;
+  `MkDecimalPair` injectivity (K7 no-confusion) refutes it:
+  `Equal Int 10 1 → Bottom`. The source sketches the exploit up to its
+  `falseEqDecimal` claim, but the constructor collision rejects the data
+  declaration before the law or exploit is checked.
 
 ## Expected behavior (exact)
 
@@ -42,23 +45,24 @@ slips through.
   visible `Axiom`s over a canonical carrier (grounded: `lawful_classes.ken`
   `DecEq Int` is the identical honest-`Axiom` shape; `Char` canonicity per ADR
   0010 §2).
-- Unsound arm: **should-REJECT** — the correct outcome is that the lawful
-  `DecEq Decimal` instance is **not deliverable** (ADR 0010 decision pt1/§90
-  `OQ-decimal-eq`). **Predicted actual result on a first run: ACCEPT** (the
-  instance elaborates and the exploit type-checks), because the machinery guards
-  deception not falsehood (`51 §5`) — the `es4_classes` precedent shows this
-  class of Bottom-inhabiting law was caught by *review*, then re-deferred, **not
-  by a machinery check.** **If it accepts, that is the headline finding** — a
-  `declare_postulate`-able false law is a soundness hole the canonicity gate
-  (ADR 0010 pt4: "construct the two-representations counterexample before
-  accepting the instance") is meant to close.
+- Unsound arm: **should-REJECT at the `DecEq` law boundary** — the intended
+  outcome is that the lawful `DecEq DecimalModel` instance is **not
+  deliverable** (ADR 0010 decision pt1/§90 `OQ-decimal-eq`). Under the
+  current prelude, the source instead refuses with E0030
+  `DuplicateConstructorSpelling` at `MkDecimalPair`, before `DecEq.sound`.
+  This pre-existing collision makes the arm non-oracular for the `DecEq` law:
+  its rejection is **not credited** as evidence of canonicity enforcement.
+  Repairing the constructor so the arm reaches the law is a carry, not work
+  in this node.
 
 ## Discriminates
 
-Does the lawful-class machinery **enforce carrier canonicity**, or admit a
-Bottom-inhabiting `sound = Axiom` over a non-canonical carrier? Char (canonical,
-PASS) vs Decimal (non-canonical, must REJECT) is the flip — a single accept on
-Char alone would be green-vs-green.
+The intended discriminator asks whether lawful-class machinery **enforces
+carrier canonicity**, or admits a Bottom-inhabiting `sound = Axiom` over a
+non-canonical carrier. Char (canonical, PASS) vs DecimalModel (non-canonical,
+must REJECT at the law) is the intended flip. The current E0030 constructor
+refusal does not reach that boundary; the unsound arm supplies no live
+`DecEq`-law oracle.
 
 ## Surface-expressibility note
 
@@ -66,5 +70,6 @@ The `sound` field type (`IsTrue (eq x y) → Equal a x y`) and `Axiom` fields ar
 landed surface (`lawful_classes.ken`). The exploit's final step needs
 `MkDecimalPair` injectivity (K7 no-confusion, landed) and `Bottom`-elim
 (`absurd`, K5, landed). If the surface cannot yet *state* the injectivity
-projection, document that step as reached-but-not-surface-expressible — the
-instance's acceptance is already the finding; the exploit only sharpens it.
+projection after the constructor carry, document that step as
+reached-but-not-surface-expressible. An instance accepted at the law boundary
+would itself be the finding; the current E0030 refusal makes no such claim.

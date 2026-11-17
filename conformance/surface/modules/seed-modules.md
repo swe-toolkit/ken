@@ -576,7 +576,7 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the thirty pre-existing
   floor members are closed in this fixture's two directions
-- spec: `30-taxonomy §4` (current 51-name floor; this fixture tests the
+- spec: `30-taxonomy §4` (current 52-name floor; this fixture tests the
   thirty pre-existing members), `33 §3.3` (the exact floor, three Pair
   companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -642,7 +642,7 @@ sentinel beside the current contract.
   thirty-name subset and each constructor's scope are contract values; reuse
   of checked identities, allocator accounting, and trust remain durable
   relations
-- spec: `30-taxonomy §4` (current 51-name floor; this vector covers the
+- spec: `30-taxonomy §4` (current 52-name floor; this vector covers the
   original thirty-member subset), `33 §3.3`, `39 §2.0`,
   `38 §1.11.1–§1.11.2`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
@@ -739,7 +739,7 @@ sentinel beside the current contract.
   and unchanged `trusted_base()` identities.
   A change to these thirty identities or their constructor scopes is a
   **contract change**, not routine test maintenance. A change to the complete
-  51-name roster is also a contract change and belongs in the full inventory
+  52-name roster is also a contract change and belongs in the full inventory
   case in `minimality.md` plus the dedicated increment cases below; do not
   broaden this historical subset silently. Never refresh a roster or
   constructor table merely because the implementation reports a new value.
@@ -755,7 +755,7 @@ sentinel beside the current contract.
   FS/resource additions and their constructor dispositions. The later scoped
   families, State, Console/Char, and Inc3a additions are covered by dedicated
   route cases and
-  the exact 51-name inventory in `minimality.md`. This is a conformance
+  the exact 52-name inventory in `minimality.md`. This is a conformance
   expectation, not a
   measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
@@ -2185,8 +2185,8 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 51-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
-| current floor inventory | the signature traversal and internal-provision set close to 51 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 43 internal-provision identities and adds no trust | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
+| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 52-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
+| current floor inventory | the signature traversal and internal-provision set close to 52 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 44 internal-provision identities and adds no trust | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
 | Inc3a direct-tree vocabulary | three source routes resolve ConsoleOp's four cases, four response reductions, itree_bind and resp_coproduct; twelve ConsoleOp same-kind controls reach exact parents | the new scoped families and operation names are the source contract; Strict bare cases and bare-bind refusal are separate arms | same-route qualified positives, local-family controls, captured bind identity; Legacy bare-constructor outcomes are not claimed |
 | State direct operations | three routes use typed state_get, state_put, and run_state references; Strict collision controls and free get/put names | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
 | Inc3a package homes | each of 24 ordinary H names has its own import/omission pair; eight FixedWidth conversions have separate range vectors | the target home set is 96: 81 base rows minus 17 retired FileOperation rows plus 32 additions | `seed-strict-package-homes.md` covers the exact new names and ranges; the counts are normative targets, not test-run measurements |

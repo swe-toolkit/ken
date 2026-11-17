@@ -513,6 +513,8 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "bool_or".to_owned(),
             "bool_or::eq_true_of_or".to_owned(),
             "bool_or::left_false_elim".to_owned(),
+            "inRangeBool".to_owned(),
+            "isScalar".to_owned(),
             "leqChar".to_owned(),
             "leq_nat".to_owned(),
             "leq_nat::antisym".to_owned(),

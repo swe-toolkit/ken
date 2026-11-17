@@ -100,15 +100,15 @@ The loader proceeds as follows:
    retain the pre-flip resolution mode of `33 §3.3`. The exact prelude-floor
    name set in either mode is `{Auth, Bool,
    Bottom, BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream,
-   Coproduct, CreatePolicy, DirEntry, Equal, ExitCode, FileError,
+   Coproduct, CreatePolicy, Decimal, DirEntry, Equal, ExitCode, FileError,
    FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
    Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
    ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
    ResourceKind, ResourceOpenMode, Result, StateOp, Top, TransferCount,
    Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
    resp_coproduct, resp_state, run_state, state_get, state_put}`
-   (`30-taxonomy §4`; `33 §3.3`). These fifty-one checked identities
-   are ambiently nameable in Strict roots, not fifty-one types: `Top`
+   (`30-taxonomy §4`; `33 §3.3`). These fifty-two checked identities
+   are ambiently nameable in Strict roots, not fifty-two types: `Top`
    and `Bottom` are proposition constants, `Proved` is a proof binding,
    `HostIO` is a type-level function, and `console_resp`, `eqChar`,
    `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -140,7 +140,7 @@ The loader proceeds as follows:
    spelling do not enter B. `ConsoleOp` is scoped as four exact paths:
    `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
    `ConsoleOp.IsTerminal`; their bare cases do not enter B. Scoped
-   constructors do not increase the fifty-one-name count. `IOError`'s
+   constructors do not increase the fifty-two-name count. `IOError`'s
    complete thirteen-cause family, `CreatePolicy`'s three cases and
    `ResourceError`'s complete
    twelve-case family are scoped: their public constructor paths are
@@ -189,7 +189,7 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing a floor member or Pair companion is a resolution operation over
-declarations that already exist. The loader reuses all fifty-one exact
+declarations that already exist. The loader reuses all fifty-two exact
 checked prelude-floor identities, including `Top` and `Bottom` as
 proposition constants, `Proved`'s proof-term identity, the registered
 `eqChar` comparator ID, the three prior State-operation IDs, and the

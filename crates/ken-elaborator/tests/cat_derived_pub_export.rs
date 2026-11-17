@@ -8,8 +8,9 @@
 //! `list_append::length`, and `list_append::count`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
 //! their subjects.
-//! Generic `Perm`, `insert`, `sort`, public `take` and their attached proofs
-//! are exported; proof helpers and the `List Bool` carrier remain private.
+//! Generic `Perm`, `insert`, `sort`, public `take`, and `zip`, with their
+//! attached proofs where applicable, are exported; proof helpers and the
+//! `List Bool` carrier remain private.
 //! Generic Ω-list membership and its nine checked lift/transport laws are
 //! public beside their Derived-owned providers, including filter soundness
 //! and completeness. Structural `is_sorted` is Derived-owned and public.
@@ -338,7 +339,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their six attached sort proofs,
 /// structural `is_sorted`, public `take` and its four attached laws, the
-/// generic insert/sort laws, and Ω-list membership with checked lemmas.
+/// generic insert/sort laws, public `zip`, and Ω-list membership with checked
+/// lemmas.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -353,20 +355,46 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
     .expect("Derived proof dependencies must elaborate for publication queries");
     let published = top_level_publication_queries()
         .into_iter()
-        .filter(|query| match env.elaborate_file(&checked_is_true::selected_source(&query.source)) {
-            Ok(_) => true,
-            Err(ElabError::UnboundName { name: rejected, .. }) => {
-                assert!(
-                    query.unpublished_names.contains(&rejected),
-                    "publication query for {} failed at unrelated name {rejected}",
-                    query.surface
-                );
-                false
+        .filter(|query| {
+            // `zip` is an R-home rather than a pre-source alias: the Legacy
+            // loader retains the unrelated old prelude zip and reports an
+            // ambiguity. Ask Strict resolution to select Derived's checked
+            // export, and verify removing that selection refuses zip itself.
+            if query.surface == "zip" {
+                let consumer = "fn cat_derived_imported_zip (xs : List Bool) (ys : List Bool) \
+                    : List (Pair Bool Bool) = zip Bool Bool xs ys\n";
+                let mut strict = ElabEnv::new().expect("Strict zip publication environment");
+                strict
+                    .elaborate_isolated_file_strict_v1(
+                        &[catalog_root()],
+                        &format!("{}\n{consumer}", query.source),
+                    )
+                    .expect("Derived zip must have a Strict publication route");
+                let provider = strict.globals["Data.Collections.Derived.zip"];
+                assert_transparent_body_mentions(&strict, "cat_derived_imported_zip", provider);
+                let mut absent = ElabEnv::new().expect("Strict zip absent-import environment");
+                match absent.elaborate_isolated_file_strict_v1(&[catalog_root()], consumer) {
+                    Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "zip"),
+                    Err(error) => panic!("zip absent-import refusal: {error:?}"),
+                    Ok(_) => panic!("zip resolved without the Derived import"),
+                }
+                return true;
             }
-            Err(other) => panic!(
-                "loader publication query for {} failed: {other:?}\n{}",
-                query.surface, query.source
-            ),
+            match env.elaborate_file(&checked_is_true::selected_source(&query.source)) {
+                Ok(_) => true,
+                Err(ElabError::UnboundName { name: rejected, .. }) => {
+                    assert!(
+                        query.unpublished_names.contains(&rejected),
+                        "publication query for {} failed at unrelated name {rejected}",
+                        query.surface
+                    );
+                    false
+                }
+                Err(other) => panic!(
+                    "loader publication query for {} failed: {other:?}\n{}",
+                    query.surface, query.source
+                ),
+            }
         })
         .map(|query| query.surface)
         .collect::<BTreeSet<_>>();
@@ -435,6 +463,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "take::sorted".to_owned(),
             "take::filter_prefix".to_owned(),
             "take::prefix".to_owned(),
+            "zip".to_owned(),
             "list_sorted_cons".to_owned(),
             "list_sorted_head".to_owned(),
             "list_sorted_head_bounded".to_owned(),

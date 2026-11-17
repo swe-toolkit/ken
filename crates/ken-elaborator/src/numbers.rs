@@ -75,9 +75,8 @@ pub struct EqEntry {
 }
 
 /// Dispatch record for a type-directed `-` / `*` operation (VAL2 #11) — a
-/// total op, no overflow obligation (scoped to `Int`/`Float`, the types that
-/// already carry a `sub_*`/`mul_*` primitive; unlike `+`, fixed-width `-`/`*`
-/// obligation-generation is out of scope here).
+/// total op, no overflow obligation (for `Int`, `Float`, and the derived
+/// `Decimal`; fixed-width `-`/`*` obligation-generation is out of scope here).
 #[derive(Clone, Debug)]
 pub struct BinOpEntry {
     /// GlobalId of the op.
@@ -337,6 +336,16 @@ impl NumericEnv {
     /// Register (or replace) the `==` dispatch entry for `ty_id`.
     pub(crate) fn set_eq_entry(&mut self, ty_id: GlobalId, entry: EqEntry) {
         self.eq_table.insert(ty_id, entry);
+    }
+
+    /// Register the derived Decimal subtraction at its representation head.
+    pub(crate) fn set_sub_entry(&mut self, ty_id: GlobalId, entry: BinOpEntry) {
+        self.sub_table.insert(ty_id, entry);
+    }
+
+    /// Register the derived Decimal multiplication at its representation head.
+    pub(crate) fn set_mul_entry(&mut self, ty_id: GlobalId, entry: BinOpEntry) {
+        self.mul_table.insert(ty_id, entry);
     }
 
     /// Look up the dispatch entry for a type-directed `+` on the given type.
@@ -744,9 +753,8 @@ pub fn register_numeric_env(
     eq_table.insert(float_id,   EqEntry { op_id: eq_float_id });
     eq_table.insert(float32_id, EqEntry { op_id: eq_float32_id });
 
-    // -/* dispatch (VAL2 #11) — scoped to the types that already carry a
-    // total `sub_*`/`mul_*` primitive (`Int`, `Float`); fixed-width and
-    // `Decimal` are out of scope (no obligation-generating variant here).
+    // -/* dispatch (VAL2 #11) — Int/Float primitives and the later derived
+    // Decimal definitions. Fixed-width obligation generation remains out of scope.
     let mut sub_table = HashMap::new();
     let mut mul_table = HashMap::new();
     sub_table.insert(int_id,   BinOpEntry { op_id: sub_int_id,   result_id: int_id });

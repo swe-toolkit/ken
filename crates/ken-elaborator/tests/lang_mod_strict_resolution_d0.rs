@@ -278,6 +278,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Bool",
             "Bottom",
             "BufferSpan",
+            "Decimal",
             "Char",
             "ChildExit",
             "ConsoleOp",

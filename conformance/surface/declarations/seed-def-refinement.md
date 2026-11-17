@@ -29,11 +29,11 @@ surface keyword and `type`'s reserved-word status.
   §1`
 - given:
   ```ken
-  data DecimalPair = MkDecimalPair Int Int
-  def Decimal = DecimalPair
+  data DecimalPairT = MkDecimalPairT Int Int
+  def DecimalT = DecimalPairT
   ```
-- expect: accepts — `Decimal` elaborates as a transparent alias for
-  `DecimalPair` (unfolds by δ), the zero-condition case of a definition.
+- expect: accepts — `DecimalT` elaborates as a transparent alias for
+  `DecimalPairT` (unfolds by δ), the zero-condition case of a definition.
 - why: the plain-alias case of the renamed keyword terminal; pins that `def`
   covers both the refinement and alias RHS shapes with one production.
 

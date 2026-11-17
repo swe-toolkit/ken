@@ -358,6 +358,7 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "ChildExit",
             "Coproduct",
             "ConsoleStream",
+            "Decimal",
             "eqChar",
             "CreatePolicy",
             "Equal",

@@ -341,7 +341,7 @@ fn collections_prelude() -> String {
         "import Data.Numeric.Nat.Order (leq_nat_weaken_right, min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
         "import Data.Collections.List (length)",
-        "export length",
+        "export length, zip",
     ] {
         remove_flattened_directive(&mut collections, "Derived", import);
     }

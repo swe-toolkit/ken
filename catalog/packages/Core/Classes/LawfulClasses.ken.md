@@ -53,7 +53,7 @@ import Core.Logic.Compare
 
 import Data.Text.StringBijection (string_to_list_char_injective)
 
-export charToInt, leqChar, intToChar
+export charToInt, leqChar, intToChar, isScalar, inRangeBool
 
 pub fn IsTrue (b : Bool) : Prop = Equal Bool b True
 ```
@@ -2817,7 +2817,8 @@ Ken-native; no external reference implementation informed its source.
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
    `instance DecEq Bool`,
-   `instance Ord Char`, `instance DecEq Char`, `uint8_to_int_injective`,
+   `instance Ord Char`, `instance DecEq Char`, `charToInt`, `leqChar`,
+   `intToChar`, `isScalar`, `inRangeBool`, `uint8_to_int_injective`,
    `uint8_deceq_eq`, `uint8_deceq_sound`, `uint8_deceq_complete`,
    `bytes_to_list_injective`, `bytes_deceq_eq`, `bytes_deceq_eq::sound`,
    `bytes_deceq_eq::complete`, `string_deceq_eq`,

@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{whnf, Context, Decl, GlobalId, KernelError, Term};
+use ken_kernel::{convert_type, whnf, Context, Decl, GlobalId, KernelError, Term};
 
 /// Load the landed Buffer + IO surface as its clients load it: through the
 /// strict roots loader. IO imports Buffer, so flat fences cannot stand for the
@@ -81,8 +81,15 @@ fn checked_surface_is_public_but_proof_carrying_constructors_stay_private() {
         "checked Buffer and IO declarations must not grow the trusted base"
     );
 
-    env.elaborate_file(
-        r#"
+    // HR-i: public signatures and sequencing can be written with HostIO and
+    // checked package operations, without spelling the hidden FSOp tree.
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+    env.elaborate_isolated_file_strict_v1(
+        &[root],
+        r#"import Capability.System.Buffer (BufferHandle, BufferWindow, freeze, transfer_count_int)
+import Capability.System.IO (readAt, writeAt, writeAll)
+import Capability.Process.Exit (host_pure)
+
 proc px8f_exact_read
   (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (window : BufferWindow)
@@ -110,45 +117,18 @@ proc px8f_readsome_public_consumers
   (a : Auth) (file : Resource ResourceKind.FsHandle) (offset : Int)
   (buffer : BufferHandle) (window : BufferWindow)
   : HostIO a (Result ResourceError Unit) visits [FS] =
-  bind
-    (Coproduct (FSOp a) AmbientOp)
-    (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-    (Result ResourceError ReadProgress)
-    (Result ResourceError Unit)
-    (readAt a file offset buffer window)
-    (\read_outcome.
-      match read_outcome {
-        Err error ↦
-          ITree.Ret
-            (Coproduct (FSOp a) AmbientOp)
-            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-            (Result ResourceError Unit)
-            (Err ResourceError Unit error);
-        Ok progress ↦
-          match progress {
-            ReadProgress.ReadEof ↦
-              ITree.Ret
-                (Coproduct (FSOp a) AmbientOp)
-                (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                (Result ResourceError Unit)
-                (Ok ResourceError Unit MkUnit);
-            ReadProgress.ReadSome span count ↦
-              bind
-                (Coproduct (FSOp a) AmbientOp)
-                (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                (Result ResourceError WriteProgress)
-                (Result ResourceError Unit)
-                (writeAt a file (add_int offset (transfer_count_int count)) buffer span)
-                (\_written.
-                  bind
-                    (Coproduct (FSOp a) AmbientOp)
-                    (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-                    (Result ResourceError Bytes)
-                    (Result ResourceError Unit)
-                    (freeze a buffer span)
-                    (\_frozen. writeAll a file offset buffer span))
-          }
-      })
+  let read_outcome = readAt a file offset buffer window in
+  match read_outcome {
+    Err error ↦ host_pure a (Result ResourceError Unit) (Err ResourceError Unit error);
+    Ok progress ↦ match progress {
+      ReadProgress.ReadEof ↦
+        host_pure a (Result ResourceError Unit) (Ok ResourceError Unit MkUnit);
+      ReadProgress.ReadSome span count ↦
+        let written = writeAt a file (add_int offset (transfer_count_int count)) buffer span in
+        let frozen = freeze a buffer span in
+        writeAll a file offset buffer span
+    }
+  }
 "#,
     )
     .expect("exact PX8-F public signatures elaborate");
@@ -271,13 +251,13 @@ proc px8f_readsome_public_consumers
 }
 
 /// Promise class: durable invariant (`38 §1.7.3`). MEASURED: the actual
-/// checked step referenced by the public loop law returns the very first
-/// response error. The test-only alias lets the kernel check both twins while
-/// production still hides the step from source. CLAIMED: a writeAt error
-/// cannot turn into a different ResourceError. THE GAP: the separately
-/// checked `write_all_request` statement must bind the loop's continuation to
-/// this same step; this twin does not test host dispatch or file-side effects.
-/// The write-partition conformance row checks the latter.
+/// checked step referenced by the public loop law has the independently
+/// written first-error proposition. A Strict identity theorem abstracts the
+/// representation and private step; kernel substitution binds the checked
+/// identities without source access. CLAIMED: a writeAt error cannot turn
+/// into a different ResourceError. THE GAP: the separately checked
+/// `write_all_request` must bind its continuation to this step; this test
+/// does not drive file-side effects. Write-partition conformance does.
 #[test]
 fn write_all_checked_step_preserves_the_exact_first_error() {
     let mut env = ElabEnv::empty().expect("checked prelude");
@@ -316,37 +296,100 @@ fn write_all_checked_step_preserves_the_exact_first_error() {
     assert!(env.env.transparent_body(*private_step).is_some());
     assert!(!env.globals.values().any(|id| id == private_step));
     assert!(!env.globals.contains_key("private_write_all_step"));
-    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
-    env.globals
-        .insert("private_write_all_step".to_string(), *private_step);
-
-    let true_twin = r#"
-theorem first_error_is_no_progress
+    let private_step = *private_step;
+    let law_type = ty.clone();
+    // HR-ii representation: FSOp, AmbientOp, fs_resp, ambient_resp and the
+    // hidden checked step are parameters of the Strict source theorem. None
+    // becomes a source-accessible prelude or package name.
+    let fs_op = Term::indformer(env.prelude_env.runtime_roles.fs_family, vec![]);
+    let ambient_id = env.globals["AmbientOp"];
+    let ambient = if env.env.inductive(ambient_id).is_some() {
+        Term::indformer(ambient_id, vec![])
+    } else {
+        Term::const_(ambient_id, vec![])
+    };
+    let no_progress = Term::constructor(env.globals["ResourceError.NoProgress"], vec![]);
+    let hidden = [
+        fs_op,
+        ambient,
+        Term::const_(env.globals["fs_resp"], vec![]),
+        Term::const_(env.globals["ambient_resp"], vec![]),
+        Term::const_(private_step, vec![]),
+    ];
+    let header = r#"theorem first_error_is_no_progress
+  (FSOp : Auth -> Type) (AmbientOp : Type)
+  (fs_resp : (a : Auth) -> FSOp a -> Type)
+  (ambient_resp : AmbientOp -> Type)
+  (private_write_all_step : (a : Auth) -> Int -> BufferSpan ->
+    (Int -> BufferSpan -> HostIO a (Result ResourceError Unit)) ->
+    Result ResourceError WriteProgress -> HostIO a (Result ResourceError Unit))
   (a : Auth) (file : Resource ResourceKind.FsHandle)
   (offset : Int) (buffer : BufferHandle) (span : BufferSpan)
-  (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit))
-  : Equal (HostIO a (Result ResourceError Unit))
+  (next : Int -> BufferSpan -> HostIO a (Result ResourceError Unit))"#;
+    let proposition = r#"Equal (HostIO a (Result ResourceError Unit))
       (private_write_all_step a offset span next
         (Err ResourceError WriteProgress ResourceError.NoProgress))
       (ITree.Ret (Coproduct (FSOp a) AmbientOp)
         (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
-        (Result ResourceError Unit) (Err ResourceError Unit ResourceError.NoProgress)) =
-  write_all_first_error_step a file offset buffer span next ResourceError.NoProgress
-"#;
-    env.elaborate_decl(true_twin)
-        .expect("the actual error must check against the named loop step");
+        (Result ResourceError Unit) (Err ResourceError Unit ResourceError.NoProgress))"#;
+    // HostIO's concrete body does not convert while FSOp is abstract.
+    // State its unfolded tree in this private-by-design proposition; after
+    // substitution it converts back to the checked HostIO law type.
+    let tree = "ITree (Coproduct (FSOp a) AmbientOp) \
+        (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+        (Result ResourceError Unit)";
+    let header = header.replace("HostIO a (Result ResourceError Unit)", tree);
+    let proposition = proposition.replace("HostIO a (Result ResourceError Unit)", tree);
+    let witness = format!("{header}\n  (h : {proposition}) : {proposition} = h");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+    let checked = env.elaborate_isolated_file_strict_v1(
+        &[root.clone()],
+        &format!("import Capability.System.Buffer (BufferHandle)\n{witness}"),
+    ).expect("Strict identity theorem over private representation checks");
+    let checked_id = checked.last().expect("identity theorem declaration").def_id;
+    let Some(Decl::Transparent { ty: checked_type, .. }) = env.env.lookup(checked_id) else {
+        panic!("independent client theorem must have a checked body")
+    };
+    let mut statement = checked_type.clone();
+    for identity in &hidden {
+        let Term::Pi(_, tail) = statement else { panic!("hidden binder missing") };
+        statement = ken_kernel::subst::subst0(&tail, identity);
+    }
+    fn without_witness(ty: Term) -> Term {
+        match ty {
+            Term::Pi(domain, tail) => match *tail {
+                next @ Term::Pi(..) => Term::Pi(domain, Box::new(without_witness(next))),
+                _ => *domain,
+            },
+            other => panic!("missing final witness binder: {other:?}"),
+        }
+    }
+    fn at_no_progress(ty: Term, error: &Term) -> Term {
+        match ty {
+            Term::Pi(domain, tail) => match *tail {
+                next @ Term::Pi(..) => Term::Pi(domain, Box::new(at_no_progress(next, error))),
+                conclusion => ken_kernel::subst::subst0(&conclusion, error),
+            },
+            other => panic!("checked law lost its error binder: {other:?}"),
+        }
+    }
+    let expected_type = at_no_progress(law_type, &no_progress);
+    assert!(convert_type(&env.env, &Context::new(), &without_witness(statement), &expected_type),
+        "the independently written NoProgress tree proposition must convert to the checked HostIO law");
 
-    let wrong_error = true_twin.replace(
-        "(Err ResourceError Unit ResourceError.NoProgress)) =",
-        "(Err ResourceError Unit ResourceError.Closed)) =",
+    // Wrong-error conclusion with the *same* witness premise must fail at
+    // kernel equality; a generic parse or missing-name refusal is not enough.
+    let wrong_proposition = proposition.replace(
+        "(Err ResourceError Unit ResourceError.NoProgress))",
+        "(Err ResourceError Unit ResourceError.Closed))",
     );
-    assert_ne!(
-        wrong_error, true_twin,
-        "wrong-error twin must actually differ"
-    );
-    let rejection = env
-        .elaborate_decl(&wrong_error.replace("first_error_is_no_progress", "first_error_is_closed"))
-        .expect_err("the checked step cannot return a different error");
+    assert_ne!(wrong_proposition, proposition, "wrong-error conclusion differs");
+    let wrong = format!("{}\n  (h : {proposition}) : {wrong_proposition} = h",
+        header.replace("first_error_is_no_progress", "first_error_is_closed"));
+    let rejection = env.elaborate_isolated_file_strict_v1(
+        &[root],
+        &format!("import Capability.System.Buffer (BufferHandle)\n{wrong}"),
+    ).expect_err("a distinct error cannot be derived from the first-error witness");
     assert!(
         matches!(
             rejection,

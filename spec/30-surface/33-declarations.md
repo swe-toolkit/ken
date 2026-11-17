@@ -425,17 +425,18 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
   BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream, Coproduct,
-  CreatePolicy, DirEntry, Equal, ExitCode, FileError, FileKind,
+  CreatePolicy, Decimal, DirEntry, Equal, ExitCode, FileError, FileKind,
   FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
   MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
   Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
   ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit,
   Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
   resp_coproduct, resp_state, run_state, state_get, state_put}`.
-  This floor subset contains fifty-one exact identities: the prior
-  forty-seven plus `ConsoleOp`, `console_resp`, `itree_bind` and
-  `resp_coproduct` (`30-taxonomy §4`). It is the ambiently nameable
-  checked-identity roster, not a roster of fifty-one types. `Top`
+  This floor subset contains fifty-two exact identities: the historical
+  Increment 3a fifty-one (the prior forty-seven plus `ConsoleOp`,
+  `console_resp`, `itree_bind` and `resp_coproduct`), and `Decimal`
+  (`30-taxonomy §4`). It is the ambiently nameable checked-identity
+  roster, not a roster of fifty-two types. `Top`
   and `Bottom` are proposition constants, `Proved` is a proof binding,
   `HostIO` is a type-level function, and `console_resp`, `eqChar`,
   `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`

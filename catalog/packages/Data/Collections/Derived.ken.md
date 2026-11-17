@@ -97,7 +97,7 @@ import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.List (length)
 
-export length
+export length, zip
 
 pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
   match xs {
@@ -1489,7 +1489,7 @@ collapsed tail equality, so `Proved`/`Refl` alone both fail); lifting `Proved`
 through `Cons` via `cong` is the direct, minimal proof. The checked
 `reverse::involutive` law is available alongside `reverse` to recover a
 list from its reversed view; `reverse_snoc` remains an internal lemma.
-`zip` truncates at the shorter list (`Nil` on either empty), NOT the
+The exported `zip` truncates at the shorter list (`Nil` on either empty), NOT the
 length-indexed `Vec` zip:
 this is ordinary non-dependent recursion carrying none of the
 sibling-convoy/dependent-match capability gate that a length-indexed zip
@@ -4281,9 +4281,10 @@ const derived_example_string_key_order_alpha_beta : Bool =
     (list_compare Char compare_char (string_to_list_char "alpha") (string_to_list_char "beta"))
 ```
 
-The checked length examples use the private `range` and `zip` operations inside
-this package. The range rejection changes only the claimed endpoint: the same
-proof that establishes length `n` cannot establish length `Suc n`.
+The checked length examples use the private `range` and public `zip`
+operations inside this package. The range rejection changes only the claimed
+endpoint: the same proof that establishes length `n` cannot establish length
+`Suc n`.
 
 ```ken example
 theorem derived_example_range_length (n : Nat) : Equal Nat (length Nat (range n)) n =
@@ -4405,7 +4406,7 @@ reference implementation.
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
    `eq_from_ord`, `filter`, `length`, `list_append`, `list_concat`, `list_all`,
-   `map`, `nth`, `reverse`, `take`.
+   `map`, `nth`, `reverse`, `take`, `zip`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
    `list_append::right_unit`, `list_append::length`, `list_append::count`,
    `map::append`,
