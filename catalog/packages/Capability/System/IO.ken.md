@@ -14,9 +14,10 @@ them as implementation equations, but a Strict client cannot state them:
 their helper vocabulary is private. The private step cannot mint a public
 `BufferSpan`. `write_all_advance_start_prop` states the public offset claim;
 `write_all_advance_start` proves it, and
-`write_all_exact_prefix_prop::exact_prefix` proves the prefix claim. This
-package proves the response arithmetic needed for each `Wrote`. Errors need
-no count premise; every successful response supplies
+`write_all_exact_prefix_prop::exact_prefix` proves the prefix claim. Both
+hold by computation today; cite the named laws rather than relying on that
+reduction. This package proves the response arithmetic needed for each
+`Wrote`. Errors need no count premise; every successful response supplies
 `write_all_count_fits` for the span named by that request.
 
 | Clause | Client-usable loop law | Response arithmetic |

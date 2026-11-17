@@ -35,6 +35,9 @@ fn spine(mut term: &Term) -> (&Term, Vec<&Term>) {
 /// homes deliver a usable generic law, not merely two selectable names.
 /// THE GAP: this checks the generic checked proposition and proof reference,
 /// not physical write-loop execution; the existing runtime gates cover that.
+/// The proposition also holds definitionally: `Refl` checks the same open
+/// statement without importing the proof. This row pins the cite route at
+/// the original IDs, not that the law is the only proof.
 #[test]
 fn imported_advance_start_law_proves_its_generic_statement_at_old_ids() {
     let prelude = ElabEnv::new().expect("checked pre-source law IDs");
