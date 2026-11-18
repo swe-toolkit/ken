@@ -34,6 +34,7 @@ reserved_infix_name ::= "≤" | "<=" | "≥" | ">=" | "≠" | "/="
 
 visibility ::= "pub"
 decl ::= visibility? decl_core
+module_item ::= import | decl
 decl_core ::=
     "const" value_name binder* (":" type)? contract* constraint_clause? "=" expr  -- pure value (36 §1.6)
   | "fn"    value_name binder* (":" type)? contract* constraint_clause? "=" expr  -- pure function
@@ -42,7 +43,7 @@ decl_core ::=
   | "record" ConId tyvar* "{" field (";" field)* "}" derive?  -- product
   | "data" ConId tyvar* "=" simple_ctor ("|" simple_ctor)* derive?  -- simple sum sugar
   | "data" ConId data_param* ":" data_family data_block derive?  -- inductive family
-  | "module" ModPath "{" (decl ";"?)* "}"
+  | "module" ModPath "{" (module_item ";"?)* "}"
   | export_decl  -- facade or in-scope re-export (33 §3.2, §4)
   | "class" ConId binder* "{" class_field (";" class_field)* "}"  -- typeclass (33 §5, ADR 0008)
   | "instance" ConId atype* constraint_clause? "{" field_assign (";" field_assign)* "}"  -- instance (33 §5, §5.4)
@@ -88,6 +89,10 @@ qualified_global_ref ::= ModPath "." global_name
 prop_block ::= "where" "{" prop_intro (";" prop_intro)* "}"
 prop_intro ::= ident ":" type
 ```
+
+An inline module body admits imports declared by that child alongside its
+declarations; each such import is scoped to the child (`33 §3.1–§3.3`), and
+the child does not inherit imports declared by its enclosing module.
 
 The two `import_suffix` alternatives are mutually exclusive. One import may
 alias the module or select and rename exported names, never both.
