@@ -1045,10 +1045,17 @@ impl EnclosingLayer {
         None
     }
 
-    fn find_attached(&self, subject_id: ken_kernel::GlobalId, proof: &str) -> Option<&EnclosingAttached> {
+    fn find_attached(
+        &self,
+        subject_id: ken_kernel::GlobalId,
+        proof: &str,
+    ) -> Option<&EnclosingAttached> {
         let mut layer = Some(self);
         while let Some(enclosing) = layer {
-            if let Some(attached) = enclosing.attached_proofs.get(&(subject_id, proof.to_string())) {
+            if let Some(attached) = enclosing
+                .attached_proofs
+                .get(&(subject_id, proof.to_string()))
+            {
                 return Some(attached);
             }
             layer = enclosing.parent.as_deref();
@@ -1119,7 +1126,8 @@ struct Scope {
     local_attached_proofs: HashSet<String>,
     /// Own attached proofs admitted by the checker, keyed by the subject's
     /// checked identity and selector rather than a mutable global spelling.
-    checked_attached_proofs: HashMap<(ken_kernel::GlobalId, String), (String, ken_kernel::GlobalId)>,
+    checked_attached_proofs:
+        HashMap<(ken_kernel::GlobalId, String), (String, ken_kernel::GlobalId)>,
     /// Names mentioned by a facade export remain deliberately unavailable to
     /// the body unless a separate import/local binding supplies them. Keeping
     /// this negative fact makes the normative facade-vs-binding failure an
@@ -1134,9 +1142,10 @@ impl Scope {
         self.raw_root_ids.retain(|_, id| !removed.contains(id));
         self.exported_ids.retain(|_, id| !removed.contains(id));
         self.checked_local_ids.retain(|_, id| !removed.contains(id));
-        self.checked_attached_proofs.retain(|(subject_id, _), (_, proof_id)| {
-            !removed.contains(subject_id) && !removed.contains(proof_id)
-        });
+        self.checked_attached_proofs
+            .retain(|(subject_id, _), (_, proof_id)| {
+                !removed.contains(subject_id) && !removed.contains(proof_id)
+            });
         self.floor_type_ids.retain(|_, id| !removed.contains(id));
         self.constructor_members.retain(|parent, members| {
             members.retain(|_, id| !removed.contains(id));
@@ -1189,10 +1198,13 @@ impl Scope {
             .checked_attached_proofs
             .iter()
             .map(|((subject_id, proof), (canonical, id))| {
-                ((*subject_id, proof.clone()), EnclosingAttached {
-                    canonical: canonical.clone(),
-                    checked_id: Some(*id),
-                })
+                (
+                    (*subject_id, proof.clone()),
+                    EnclosingAttached {
+                        canonical: canonical.clone(),
+                        checked_id: Some(*id),
+                    },
+                )
             })
             .collect::<HashMap<_, _>>();
         for selector in &self.local_attached_proofs {
@@ -1211,13 +1223,15 @@ impl Scope {
                 Err(ElabError::UnboundName { .. } | ElabError::UnresolvedCon { .. }) => None,
                 Err(error) => return Err(error),
             };
-            let Some((canonical, Some(subject_id))) = selected else { continue };
-            attached_proofs.entry((subject_id, proof.to_string())).or_insert_with(|| {
-                EnclosingAttached {
+            let Some((canonical, Some(subject_id))) = selected else {
+                continue;
+            };
+            attached_proofs
+                .entry((subject_id, proof.to_string()))
+                .or_insert_with(|| EnclosingAttached {
                     canonical: format!("{canonical}::{proof}"),
                     checked_id: None,
-                }
-            });
+                });
         }
         Ok(Arc::new(EnclosingLayer {
             names,
@@ -1392,12 +1406,19 @@ fn record_checked_attached_proof(
     canonical: &str,
     proof_id: ken_kernel::GlobalId,
 ) -> Result<(), ElabError> {
-    if let Decl::AttachedProofDecl { subject, proof_name, span, .. } = decl {
-        let subject_id = resolve_checked_ref(scope, exports, subject, span)?.1
+    if let Decl::AttachedProofDecl {
+        subject,
+        proof_name,
+        span,
+        ..
+    } = decl
+    {
+        let subject_id = resolve_checked_ref(scope, exports, subject, span)?
+            .1
             .or_else(|| scope.checked_local_ids.get(subject).copied())
-            .ok_or_else(|| ElabError::Internal(
-                "checked attached proof has no subject identity".to_string()
-            ))?;
+            .ok_or_else(|| {
+                ElabError::Internal("checked attached proof has no subject identity".to_string())
+            })?;
         scope.checked_attached_proofs.insert(
             (subject_id, proof_name.clone()),
             (canonical.to_string(), proof_id),
@@ -1412,11 +1433,22 @@ fn select_enclosing_attached(
     proof_name: &str,
     span: &Span,
 ) -> Result<Option<(String, ken_kernel::GlobalId)>, ElabError> {
-    match scope.enclosing.as_ref().and_then(|layer| layer.find_attached(subject_id, proof_name)) {
-        Some(EnclosingAttached { canonical, checked_id: Some(id) }) =>
-            Ok(Some((canonical.clone(), *id))),
-        Some(EnclosingAttached { canonical, checked_id: None }) =>
-            Err(ElabError::UnresolvedCon { name: canonical.clone(), span: span.clone() }),
+    match scope
+        .enclosing
+        .as_ref()
+        .and_then(|layer| layer.find_attached(subject_id, proof_name))
+    {
+        Some(EnclosingAttached {
+            canonical,
+            checked_id: Some(id),
+        }) => Ok(Some((canonical.clone(), *id))),
+        Some(EnclosingAttached {
+            canonical,
+            checked_id: None,
+        }) => Err(ElabError::UnresolvedCon {
+            name: canonical.clone(),
+            span: span.clone(),
+        }),
         None => Ok(None),
     }
 }
@@ -6118,7 +6150,8 @@ fn expand_scope(
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
                 if scope.mode == ResolutionMode::Strict {
-                    child_scope.enclosing = Some(scope.snapshot_enclosing(&elab.module_state.exports)?);
+                    child_scope.enclosing =
+                        Some(scope.snapshot_enclosing(&elab.module_state.exports)?);
                     child_scope
                         .prop_intro_members
                         .clone_from(&scope.prop_intro_members);
@@ -6658,7 +6691,8 @@ fn expand_scope(
                             ),
                         )?;
                         let mut footprinted = Vec::new();
-                        for ((&index, rdecl), result) in scc.iter().zip(members.iter()).zip(results) {
+                        for ((&index, rdecl), result) in scc.iter().zip(members.iter()).zip(results)
+                        {
                             register_obligation_holes(elab, &result);
                             register_effect_row(elab, rdecl, &result);
                             if crate::elab::registers_body_footprint(rdecl) {
@@ -7174,8 +7208,12 @@ mod inline_enclosing_identity_tests {
         let decoy = env.globals["Decoy"];
         assert_ne!(ord, decoy);
         let mut child = Scope::with_mode(ResolutionMode::Strict, HashSet::new());
-        child.enclosing = Some(env.module_state.root_scope.snapshot_enclosing(&env.module_state.exports)
-            .expect("real checked parent snapshot"));
+        child.enclosing = Some(
+            env.module_state
+                .root_scope
+                .snapshot_enclosing(&env.module_state.exports)
+                .expect("real checked parent snapshot"),
+        );
         env.globals.insert("Ord".to_string(), decoy);
         assert_eq!(env.globals["Ord"], decoy, "the decoy must really occupy globals");
         let (canonical, selected) = resolve_checked_ref(
