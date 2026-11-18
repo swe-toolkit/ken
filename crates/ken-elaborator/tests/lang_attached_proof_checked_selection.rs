@@ -17,15 +17,25 @@ fn mentions(term: &Term, id: GlobalId) -> bool {
     match term {
         Term::Const { id: found, .. }
         | Term::IndFormer { id: found, .. }
-        | Term::Constructor { id: found, .. } if *found == id => true,
+        | Term::Constructor { id: found, .. }
+            if *found == id =>
+        {
+            true
+        }
         Term::Elim { fam, .. } if *fam == id => true,
         _ => term.children().into_iter().any(|child| mentions(child, id)),
     }
 }
 
 fn body_mentions(env: &ElabEnv, name: &str, id: GlobalId) {
-    let (_, body) = env.env.transparent_body(env.globals[name]).expect("checked body");
-    assert!(mentions(&body, id), "{name} must select checked proof {id:?}: {body:?}");
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals[name])
+        .expect("checked body");
+    assert!(
+        mentions(&body, id),
+        "{name} must select checked proof {id:?}: {body:?}"
+    );
 }
 
 fn catalog() -> PathBuf {
@@ -33,8 +43,11 @@ fn catalog() -> PathBuf {
 }
 
 fn provider(root: &Path, name: &str) {
-    fs::write(root.join(format!("{name}.ken")),
-        "pub fn f (x : Int) : Int = x\n").expect("write a checked f provider");
+    fs::write(
+        root.join(format!("{name}.ken")),
+        "pub fn f (x : Int) : Int = x\n",
+    )
+    .expect("write a checked f provider");
 }
 
 /// MEASURED: both reference forms in a Strict inline child retain the
@@ -44,14 +57,17 @@ fn provider(root: &Path, name: &str) {
 #[test]
 fn prior_enclosing_proof_selected_by_both_reference_forms_at_checked_id() {
     let mut env = ElabEnv::new().expect("base");
-    strict(&mut env, &[],
+    strict(
+        &mut env,
+        &[],
         "fn f (x : Int) : Int = x\n\
          proof p for f (x : Int) : Equal Int (f x) x = Refl\n\
          module Child {\n\
            pub theorem by_atom (x : Int) : Equal Int (f x) x = f::p x\n\
            pub theorem by_proof (x : Int) : Equal Int (f x) x = (proof p for f) x\n\
-         }\n")
-        .expect("both child selectors use the checked enclosing proof");
+         }\n",
+    )
+    .expect("both child selectors use the checked enclosing proof");
     let proof = env.globals["f::p"];
     body_mentions(&env, "Child.by_atom", proof);
     body_mentions(&env, "Child.by_proof", proof);
@@ -92,12 +108,17 @@ fn imported_same_subject_selects_root_proof_but_other_identity_refuses() {
     let root = "import Provider (f)\n\
                 proof q for f (x : Int) : Equal Int (f x) x = Refl\n";
     let mut same = ElabEnv::new().expect("base");
-    strict(&mut same, &roots, &format!(
-        "{root}module Child {{\n\
+    strict(
+        &mut same,
+        &roots,
+        &format!(
+            "{root}module Child {{\n\
            import Provider (f)\n\
            pub theorem use_q (x : Int) : Equal Int (f x) x = f::q x\n\
          }}\n"
-    )).expect("child's same provider identity selects enclosing proof");
+        ),
+    )
+    .expect("child's same provider identity selects enclosing proof");
     body_mentions(&same, "Child.use_q", same.globals["Provider.f::q"]);
 
     let mut different = ElabEnv::new().expect("base");
@@ -163,21 +184,28 @@ fn middle_import_shadow_prevents_grandchild_attached_proof_selection() {
                     }\n\
                   }\n";
     let mut env = ElabEnv::new().expect("base");
-    assert!(matches!(strict(&mut env, &roots, source), Err(ElabError::UnboundName { .. })),
-        "subject f must refuse before idp is considered");
+    assert!(
+        matches!(
+            strict(&mut env, &roots, source),
+            Err(ElabError::UnboundName { .. })
+        ),
+        "subject f must refuse before idp is considered"
+    );
 }
 
-/// MEASURED: the Legacy ES3 source, with a catalog import of cong in each
-/// scope that uses it, retains its kind, privacy and trust assertions under
-/// Strict. CLAIMED: the enclosing checked list_append::assoc survives the
-/// lexical boundary.
-/// THE GAP: the untouched Legacy row is the adjacent route comparison; the
-/// layer-route mutant must refuse at list_append::assoc in this Strict twin.
+/// MEASURED: the ES3 owner source checks under Strict with cong imported in
+/// both using scopes; M's associativity proof names the checked root assoc,
+/// its kind is unchanged, and the trusted base stays equal. CLAIMED: an
+/// inherited attached proof crosses the inline boundary by checked identity.
+/// THE GAP: the Legacy client block uses mixed routes, remains in the Legacy
+/// original, and its wholly Strict restatement belongs to LANG-DELETE I4.
 #[test]
 fn strict_parameterized_abstract_export_preserves_kind_and_owner_proof() {
     let mut env = ElabEnv::new().expect("base env construction failed");
     let trusted_before = env.env.trusted_base();
-    strict(&mut env, &[catalog()],
+    strict(
+        &mut env,
+        &[catalog()],
         r#"
         import Core.Logic.Transport (cong)
         fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
@@ -254,31 +282,27 @@ fn strict_parameterized_abstract_export_preserves_kind_and_owner_proof() {
     )
     .expect("the exact NonEmpty owner definition and associativity proof elaborate");
 
+    let root_assoc = env.globals["list_append::assoc"];
+    assert!(
+        env.globals.contains_key("M.nonempty_append::assoc"),
+        "the Strict route must register M's attached proof by its owner"
+    );
+    body_mentions(&env, "M.nonempty_append::assoc", root_assoc);
+
     let nonempty_id = env.globals["M.NonEmpty"];
-    let (_, exported_kind) = env.env.const_type(nonempty_id)
+    let (_, exported_kind) = env
+        .env
+        .const_type(nonempty_id)
         .expect("parameterized abstract type has a kind");
     let expected_kind = Term::pi(Term::ty(Level::Zero), Term::ty(Level::Zero));
-    assert_eq!(exported_kind, expected_kind,
-        "the abstract export must retain the hand-written opaque Pi kind");
+    assert_eq!(
+        exported_kind, expected_kind,
+        "the abstract export must retain the hand-written opaque Pi kind"
+    );
 
-    env.elaborate_file("import M")
-        .expect("client explicitly imports the qualified interface");
-    env.elaborate_decl("const one : M.NonEmpty Nat = M.nonempty_singleton Nat Zero")
-        .expect("a client may construct through the public smart constructor");
-    env.elaborate_decl("const first : Nat = M.nonempty_head Nat one")
-        .expect("a client may consume the same exposed type through a public operation");
-
-    match env.elaborate_decl("const forbidden : M.NonEmpty Nat = M.NonEmptyCons Nat Zero (Nil Nat)") {
-        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "M.NonEmptyCons"),
-        other => panic!("client construction with the hidden constructor must reject: {other:?}"),
-    }
-    match env.elaborate_decl(
-        "fn forbidden_match (xs : M.NonEmpty Nat) : Nat = \
-           match xs { NonEmptyCons x rest |-> x }",
-    ) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "NonEmptyCons"),
-        other => panic!("client match with the hidden constructor must reject: {other:?}"),
-    }
-    assert_eq!(env.env.trusted_base(), trusted_before,
-        "the real inductive and module visibility add no trust");
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before,
+        "the catalog import and owner declarations add no trust"
+    );
 }
