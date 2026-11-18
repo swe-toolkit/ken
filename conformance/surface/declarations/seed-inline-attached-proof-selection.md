@@ -61,7 +61,7 @@ landing, or trust measurements.
 
 ## surface/declarations/inline-descendant-shadow-does-not-select-parent-proof
 
-- promise class: discriminating.
+- promise class: durable invariant.
 - spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The positive input is:
 
@@ -114,7 +114,7 @@ landing, or trust measurements.
 
 ## surface/declarations/inline-descendant-canonical-shadow-refuses-parent-proof
 
-- promise class: discriminating.
+- promise class: durable invariant.
 - spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The positive input is:
 
@@ -165,7 +165,7 @@ landing, or trust measurements.
 
 ## surface/declarations/inline-descendant-enclosing-proof-position-boundary
 
-- promise class: discriminating.
+- promise class: durable invariant.
 - spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The accepted control declares
   the enclosing proof before the nested child:
