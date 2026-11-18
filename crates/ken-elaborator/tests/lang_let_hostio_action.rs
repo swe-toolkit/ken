@@ -221,43 +221,88 @@ fn ambient_non_tree_results_use_clock_entropy_and_multilabel_signatures() {
     }
 }
 
-/// Promise class: durable invariant (36 §2.4). MEASURED: a ClockIO,
-/// EntropyIO, or ClockIO-to-ambient RHS appears beneath its checked injection
-/// helper in the bound action's core. CLAIMED: each supported inclusion is
-/// applied before sequencing, without reinterpreting the source signature.
-/// THE GAP: these checked-core trees do not run host observations; the CLI
-/// Console pin separately observes action order through a live host.
+/// Assert the checked result signature, not the surface spelling of its row.
+fn assert_non_tree_signature(
+    env: &ElabEnv,
+    name: &str,
+    operation: &str,
+    response: &str,
+    result: &str,
+) {
+    let (ty, _) = checked_def(env, env.globals[name]);
+    let (head, args) = spine(ty);
+    assert!(
+        matches!(head, Term::IndFormer { id, .. } if *id == env.prelude_env.itree_id),
+        "{name}: checked type must be one ITree"
+    );
+    assert_eq!(
+        args.len(),
+        3,
+        "{name}: ITree takes operation, response, result"
+    );
+    let (operation_head, _) = spine(args[0]);
+    assert!(
+        matches!(operation_head, Term::IndFormer { id, .. } | Term::Const { id, .. }
+            if *id == env.globals[operation]),
+        "{name}: checked operation signature must be {operation}"
+    );
+    assert_eq!(
+        args[1],
+        &Term::const_(env.globals[response], vec![]),
+        "{name}: checked response signature must be {response}"
+    );
+    assert!(
+        matches!(args[2], Term::IndFormer { id, .. } | Term::Const { id, .. }
+            if *id == env.globals[result]),
+        "{name}: checked result type must be {result}"
+    );
+}
+
+/// Promise class: durable invariant (36 §2.4). MEASURED: three Strict source
+/// clients have their checked host_clock, host_entropy and ambient_clock
+/// inclusion heads beneath bind; entropy_value has the EntropyOp/entropy_resp
+/// signature, and clock_to_ambient has the AmbientOp/ambient_resp signature.
+/// CLAIMED: each supported inclusion is applied before sequencing, without
+/// reinterpreting the source signature. THE GAP: these checked-core trees do
+/// not run host observations; the CLI Console pin separately observes order.
 #[test]
 fn clock_entropy_and_multilabel_inclusions_use_checked_helpers() {
-    let mut env = selected_env(&[
-        ("Capability.Time.WallClock", "wall_now"),
-        ("Capability.Process.Exit", "host_pure"),
-    ]);
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
     for (name, source, inject) in [
         (
             "clock_to_host",
-            "proc clock_to_host : HostIO APartial Instant visits [Clock] = \
+            "import Capability.Time.WallClock (wall_now)\n\
+             import Capability.Process.Exit (host_pure)\n\
+             proc clock_to_host : HostIO APartial Instant visits [Clock] = \
              let x = wall_now in host_pure APartial Instant x",
             "host_clock",
         ),
         (
             "entropy_to_host",
-            "proc entropy_to_host : HostIO APartial (Result IOError Bytes) \
-             visits [Entropy] = let x = random_bytes 1 in \
-             host_pure APartial (Result IOError Bytes) x",
+            "import Capability.Process.Exit (host_pure)\n\
+             proc entropy_value : Int visits [Entropy] = 1\n\
+             proc entropy_to_host : HostIO APartial Int visits [Entropy] = \
+             let x = entropy_value in host_pure APartial Int x",
             "host_entropy",
         ),
         (
             "clock_to_ambient",
-            "proc clock_to_ambient : ITree AmbientOp ambient_resp Instant \
-             visits [Console, Clock] = let x = wall_now in \
-             ITree.Ret AmbientOp ambient_resp Instant x",
+            "import Capability.Time.WallClock (wall_now)\n\
+             proc clock_to_ambient : Instant visits [Console, Clock] = \
+             let x = wall_now in x",
             "ambient_clock",
         ),
     ] {
-        let id = env
-            .elaborate_decl(source)
+        let mut env = ElabEnv::new().expect("checked prelude");
+        env.elaborate_isolated_file_strict_v1(&[root.clone()], source)
             .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+        let id = env.globals[name];
+        if name == "entropy_to_host" {
+            assert_non_tree_signature(&env, "entropy_value", "EntropyOp", "entropy_resp", "Int");
+        }
+        if name == "clock_to_ambient" {
+            assert_non_tree_signature(&env, name, "AmbientOp", "ambient_resp", "Instant");
+        }
         let (_, core) = checked_def(&env, id);
         let args = assert_bind(&env, core);
         let (head, _) = spine(args[4]);
