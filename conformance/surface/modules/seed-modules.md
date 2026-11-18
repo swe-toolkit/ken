@@ -264,6 +264,67 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   scope. A resolver that over-applies the new clash rule into lexical binders
   rejects and fails this case.
 
+### surface/modules/inline-child-local-import-shadow-enclosing-local
+
+- spec: `33 §3.2` (imports within a module), `33 §3.3`
+  (SH-shadow clause in approved Spec child
+  `888f10512c2214c730c2823e6f39dd9b8c0b3b0e`)
+- given: two fresh Strict-root programs. `scopeProbe` is a non-B spelling.
+  The local arm:
+
+  ```ken
+  module LocalOuter {
+    const scopeProbe : Nat = Zero;
+    module InheritedChild {
+      const inheritedUse : Nat = scopeProbe
+    };
+    module Child {
+      const scopeProbe : Bool = True;
+      const childUse : Bool = scopeProbe
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+
+  The import arm:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    const scopeProbe : Nat = Zero;
+    module InheritedChild {
+      const inheritedUse : Nat = scopeProbe
+    };
+    module Child {
+      import Provider (scopeProbe);
+      const childUse : Bool = scopeProbe
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+- expect: Both programs accept without `AmbiguousReference`. In
+  `LocalOuter.InheritedChild` and `LocalOuter.outerUse`, the reference
+  resolves to `LocalOuter.scopeProbe`; in `LocalOuter.Child`, it
+  resolves to `LocalOuter.Child.scopeProbe`. In
+  `ImportOuter.InheritedChild` and `ImportOuter.outerUse`, it resolves
+  to `ImportOuter.scopeProbe`; in `ImportOuter.Child`, it resolves to
+  `Provider.scopeProbe`. The `Nat`/`Bool` annotations check these
+  choices at both scope boundaries.
+- controls: Each unshadowed `InheritedChild` proves that the enclosing
+  local is available in a child scope. If the local/import is omitted
+  from `Child`, `childUse : Bool = scopeProbe` sees the inherited `Nat`
+  and rejects. If the child binding leaks outward, `outerUse : Nat`
+  rejects.
+- why: The baseline child makes the inherited `scopeProbe` observable;
+  the same-name child declaration or import must select its distinct
+  target locally, while the later parent use still selects the outer
+  binding. This pins both AC-3 SH-shadow forms without making a
+  same-scope clash acceptable; `top-level-local-import-clash-rejected`
+  remains the same-scope control.
+- staging: RED UNTIL `LANG-INLINE-MODULE-ENCLOSING-SCOPE`.
+
 ### surface/modules/protected-name-binding-rejected-renamed-local-resolves
 - spec: `33 §3.3` (no source binding may introduce a name in B)
 - given: paired clients: (a) declare `def Bool = Nat`; (b) instead declare
@@ -635,6 +696,57 @@ unrelated `ElabEnv` does not satisfy them.
 The fifteen-name floor realization, including the three Pair companions, is
 historical evidence from `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`, not a
 sentinel beside the current contract.
+
+### surface/modules/inline-child-does-not-inherit-enclosing-import
+
+- spec: `32 §1` (inline-body imports), `33 §3.2` (module imports),
+  `33 §3.3` (Strict resolution and `UnboundName`)
+- given: two fresh Strict-root programs with the same provider and outer
+  import. The reject arm contains:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    import Provider (scopeProbe);
+    const outerUse : Bool = scopeProbe;
+    module UnimportedChild {
+      const childUse : Bool = scopeProbe
+    };
+  }
+  ```
+
+  The accept control keeps the provider and outer import/use, and gives a
+  sibling child its own selective import:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    import Provider (scopeProbe);
+    const outerUse : Bool = scopeProbe;
+    module ExplicitSibling {
+      import Provider (scopeProbe);
+      const childUse : Bool = scopeProbe
+    };
+  }
+  ```
+- expect: In the reject arm, `ImportOuter.outerUse` resolves through the
+  parent import, but `ImportOuter.UnimportedChild.childUse` is rejected
+  at the surface with `UnboundName`. The accept control accepts; its outer
+  use and `ImportOuter.ExplicitSibling.childUse` resolve through their
+  respective explicit imports to `Provider.scopeProbe`.
+- controls: The parent use proves the provider and enclosing import are
+  valid. The sibling's explicit import is the child-scope acceptance
+  control. Both arms are Strict roots, and `scopeProbe` is outside B.
+- why: Both arms hold `Provider`, the parent import, and `outerUse` fixed.
+  If a child incorrectly inherits the enclosing import, the reject arm
+  accepts instead of producing the specified `UnboundName`. The sibling
+  control shows that a child-local import is usable. This tests nested
+  inline scope, not separate-unit dependency closure.
+- staging: **RED UNTIL** `LANG-INLINE-MODULE-ENCLOSING-SCOPE`.
 
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
