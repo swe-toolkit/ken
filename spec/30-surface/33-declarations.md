@@ -320,6 +320,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
   without altering the enclosing scope, while same-spelled local/import
   bindings naming distinct canonical declarations in one scope remain
   **`AmbiguousReference`**.
+  An unqualified name bound by a selective import (including a per-name
+  rename) in an inline scope shadows any farther enclosing local with
+  that non-B spelling throughout the scope and its inline descendants:
+  those descendants inherit neither the import nor the local it shadows.
 - **Checked package homes for the Strict catalog route.** The four catalog
   units below that otherwise fail at resolution under Strict roots have the
   following explicit-import homes for their already-checked pre-source
