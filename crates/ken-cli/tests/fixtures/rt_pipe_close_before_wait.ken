@@ -1,0 +1,100 @@
+program capabilities FS AFull, Process, RootExecution Allow
+
+import Capability.Process.Child
+  (ChildPipe, close_pipe_write, spawn_plan, take_stdin, wait_child, withChild, with_stdin)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyErr,
+    ResourceBodyOk,
+    ResourceBodyResult,
+    ResourceBracketOk,
+    ResourceBracketResult)
+
+const failed : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+
+fn after_wait
+      (outcome : Result ResourceError ChildExit)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Ok (ChildExit.Exited code) ↦
+      match code {
+        0 ↦ host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+        _ ↦ failed
+      };
+    Ok _ ↦ failed;
+    Err _ ↦ failed
+  }
+
+proc after_close
+      (child : Resource ResourceKind.ChildProcess) (outcome : Result ResourceError Unit)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok _ ↦
+      host_bind
+        AFull
+        (Result ResourceError ChildExit)
+        (ResourceBodyResult Unit Unit)
+        (wait_child AFull child)
+        (λwaited. after_wait waited);
+    Err _ ↦ failed
+  }
+
+proc child_body
+      (child : Resource ResourceKind.ChildProcess)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  host_bind
+    AFull
+    (Result ResourceError (Resource ResourceKind.PipeWrite))
+    (ResourceBodyResult Unit Unit)
+    (take_stdin AFull child)
+    (λtaken.
+      match taken {
+        Ok pipe ↦
+          host_bind
+            AFull
+            (Result ResourceError Unit)
+            (ResourceBodyResult Unit Unit)
+            (close_pipe_write AFull pipe)
+            (λclosed. after_close child closed);
+        Err _ ↦ failed
+      })
+
+proc main
+      (_input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      host_bind
+        AFull
+        (Result ResourceError (ResourceBracketResult Unit Unit))
+        ExitCode
+        (withChild
+          AFull
+          Unit
+          Unit
+          cap
+          (with_stdin
+            (spawn_plan
+              (bytes_encode "/bin/sh")
+              (Cons
+                Bytes
+                (bytes_encode "caller-zero")
+                (Cons
+                  Bytes
+                  (bytes_encode "-c")
+                  (Cons Bytes (bytes_encode "test -z \"$(/bin/cat)\"") (Nil Bytes)))))
+            ChildPipe)
+          child_body)
+        (λoutcome.
+          match outcome {
+            Ok (ResourceBracketOk _) ↦ host_pure AFull ExitCode ExitCode.Success;
+            Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 74)
+          })
+  }
