@@ -697,6 +697,57 @@ The fifteen-name floor realization, including the three Pair companions, is
 historical evidence from `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`, not a
 sentinel beside the current contract.
 
+### surface/modules/inline-child-does-not-inherit-enclosing-import
+
+- spec: `32 §1` (inline-body imports), `33 §3.2` (module imports),
+  `33 §3.3` (Strict resolution and `UnboundName`)
+- given: two fresh Strict-root programs with the same provider and outer
+  import. The reject arm contains:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    import Provider (scopeProbe);
+    const outerUse : Bool = scopeProbe;
+    module UnimportedChild {
+      const childUse : Bool = scopeProbe
+    };
+  }
+  ```
+
+  The accept control keeps the provider and outer import/use, and gives a
+  sibling child its own selective import:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    import Provider (scopeProbe);
+    const outerUse : Bool = scopeProbe;
+    module ExplicitSibling {
+      import Provider (scopeProbe);
+      const childUse : Bool = scopeProbe
+    };
+  }
+  ```
+- expect: In the reject arm, `ImportOuter.outerUse` resolves through the
+  parent import, but `ImportOuter.UnimportedChild.childUse` is rejected
+  at the surface with `UnboundName`. The accept control accepts; its outer
+  use and `ImportOuter.ExplicitSibling.childUse` resolve through their
+  respective explicit imports to `Provider.scopeProbe`.
+- controls: The parent use proves the provider and enclosing import are
+  valid. The sibling's explicit import is the child-scope acceptance
+  control. Both arms are Strict roots, and `scopeProbe` is outside B.
+- why: Both arms hold `Provider`, the parent import, and `outerUse` fixed.
+  If a child incorrectly inherits the enclosing import, the reject arm
+  accepts instead of producing the specified `UnboundName`. The sibling
+  control shows that a child-local import is usable. This tests nested
+  inline scope, not separate-unit dependency closure.
+- staging: **RED UNTIL** `LANG-INLINE-MODULE-ENCLOSING-SCOPE`.
+
 ### surface/modules/prelude-floor-reuses-exact-types-and-constructors
 
 - promise class: **normative compatibility vector** — the original
