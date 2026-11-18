@@ -58,6 +58,27 @@ mkdir -p "$lockdir"
 
 run() { cargo "$@" 9>&-; }
 
+# RT-NATIVE-RUNTIME-STATICLIB-EXPLICIT-BUILD: native packaging reads the
+# support archive from KEN_RUNTIME_SUPPORT_STATICLIB. Produce it on purpose
+# for commands that can build or run native rows, unless a parent already
+# did. The profile and lock flags of this invocation are forwarded.
+ensure_support_archive() {
+  [[ -n "${KEN_RUNTIME_SUPPORT_STATICLIB:-}" ]] && return 0
+  case "$sub" in build|test|nextest|run|bench) ;; *) return 0 ;; esac
+  local forward=() previous=""
+  for arg in "$@"; do
+    [[ "$arg" == "--" ]] && break
+    case "$arg" in
+      --release|--locked|--offline|--frozen|--profile=*) forward+=("$arg") ;;
+    esac
+    [[ "$previous" == "--profile" ]] && forward+=("--profile" "$arg")
+    previous="$arg"
+  done
+  local archive
+  archive=$("$(dirname "$0")/build-runtime-support-archive" "${forward[@]}" 9>&-)
+  export KEN_RUNTIME_SUPPORT_STATICLIB="$archive"
+}
+
 # Reentrancy. A test may itself need to invoke cargo (e.g. an artifact-level
 # feature-gate control that must build two differently-featured binaries and
 # compare them). Without this, such a nested call DEADLOCKS AGAINST ITS OWN
@@ -84,6 +105,7 @@ export KEN_CARGO_LOCK_HELD=1
 
 # Preferred: GNU `sem` gives a correct counting semaphore for slots > 1.
 if [[ "$slots" -gt 1 ]] && command -v sem >/dev/null 2>&1; then
+  ensure_support_archive "$@"
   exec sem --id ken-build --fg -j "$slots" -- cargo "$@"
 fi
 
@@ -112,4 +134,5 @@ if [[ -d "$ken_tmpdir" && "$reap_minutes" -gt 0 ]]; then
       done
   } || true
 fi
+ensure_support_archive "$@"
 run "$@"
