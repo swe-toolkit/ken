@@ -1,0 +1,235 @@
+program capabilities FS AFull, Process, RootExecution Allow
+
+import Capability.Process.Child
+  (ChildPipe,
+    close_pipe_write,
+    read_pipe,
+    spawn_plan,
+    take_stdin,
+    take_stdout,
+    wait_child,
+    withChild,
+    with_stdin,
+    with_stdout,
+    write_pipe)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+
+import Capability.System.Resource
+  (ResourceBodyErr,
+    ResourceBodyOk,
+    ResourceBodyResult,
+    ResourceBracketOk,
+    ResourceBracketResult,
+    withBuffer)
+
+const failed : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+
+fn after_wait
+      (outcome : Result ResourceError ChildExit)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Ok (ChildExit.Exited code) ↦
+      match code {
+        0 ↦ host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+        _ ↦ failed
+      };
+    Ok _ ↦ failed;
+    Err _ ↦ failed
+  }
+
+proc after_close
+      (child : Resource ResourceKind.ChildProcess) (outcome : Result ResourceError Unit)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok _ ↦
+      host_bind
+        AFull
+        (Result ResourceError ChildExit)
+        (ResourceBodyResult Unit Unit)
+        (wait_child AFull child)
+        (λwaited. after_wait waited);
+    Err _ ↦ failed
+  }
+
+proc after_write_1
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (writable : Resource ResourceKind.PipeWrite)
+      (child : Resource ResourceKind.ChildProcess)
+      (outcome : Result ResourceError WriteProgress)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok (WriteProgress.Wrote _) ↦
+      host_bind
+        AFull
+        (Result ResourceError WriteProgress)
+        (ResourceBodyResult Unit Unit)
+        (write_pipe AFull writable buffer span)
+        (λwritten. after_write_2 buffer span writable child written);
+    Err _ ↦ failed
+  }
+
+proc after_write_2
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (writable : Resource ResourceKind.PipeWrite)
+      (child : Resource ResourceKind.ChildProcess)
+      (outcome : Result ResourceError WriteProgress)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok (WriteProgress.Wrote _) ↦
+      host_bind
+        AFull
+        (Result ResourceError WriteProgress)
+        (ResourceBodyResult Unit Unit)
+        (write_pipe AFull writable buffer span)
+        (λwritten. after_write_3 buffer span writable child written);
+    Err _ ↦ failed
+  }
+
+proc after_write_3
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (writable : Resource ResourceKind.PipeWrite)
+      (child : Resource ResourceKind.ChildProcess)
+      (outcome : Result ResourceError WriteProgress)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok (WriteProgress.Wrote _) ↦
+      host_bind
+        AFull
+        (Result ResourceError WriteProgress)
+        (ResourceBodyResult Unit Unit)
+        (write_pipe AFull writable buffer span)
+        (λwritten. after_write_last writable child written);
+    Err _ ↦ failed
+  }
+
+proc after_write_last
+      (writable : Resource ResourceKind.PipeWrite)
+      (child : Resource ResourceKind.ChildProcess)
+      (outcome : Result ResourceError WriteProgress)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  match outcome {
+    Ok (WriteProgress.Wrote _) ↦
+      host_bind
+        AFull
+        (Result ResourceError Unit)
+        (ResourceBodyResult Unit Unit)
+        (close_pipe_write AFull writable)
+        (λclosed. after_close child closed);
+    Err _ ↦ failed
+  }
+
+proc write_to_child
+      (buffer : BufferHandle)
+      (child : Resource ResourceKind.ChildProcess)
+      (readable : Resource ResourceKind.PipeRead)
+      (span : BufferSpan)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  host_bind
+    AFull
+    (Result ResourceError (Resource ResourceKind.PipeWrite))
+    (ResourceBodyResult Unit Unit)
+    (take_stdin AFull child)
+    (λtaken.
+      match taken {
+        Ok writable ↦
+          host_bind
+            AFull
+            (Result ResourceError WriteProgress)
+            (ResourceBodyResult Unit Unit)
+            (write_pipe AFull writable buffer span)
+            (λwritten. after_write_3 buffer span writable child written);
+        Err _ ↦ failed
+      })
+
+proc read_from_child
+      (buffer : BufferHandle) (child : Resource ResourceKind.ChildProcess)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Process] =
+  host_bind
+    AFull
+    (Result ResourceError (Resource ResourceKind.PipeRead))
+    (ResourceBodyResult Unit Unit)
+    (take_stdout AFull child)
+    (λtaken.
+      match taken {
+        Ok readable ↦
+          host_bind
+            AFull
+            (Result ResourceError ReadProgress)
+            (ResourceBodyResult Unit Unit)
+            (read_pipe AFull readable buffer (MkBufferWindow (0 : Int) (7 : Int)))
+            (λread_result.
+              match read_result {
+                Ok (ReadProgress.ReadSome span _) ↦ write_to_child buffer child readable span;
+                Ok ReadProgress.ReadEof ↦ failed;
+                Err _ ↦ failed
+              });
+        Err _ ↦ failed
+      })
+
+proc buffer_body
+      (cap : Cap AFull) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Process] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withChild
+      AFull
+      Unit
+      Unit
+      cap
+      (with_stdin
+        (with_stdout
+          (spawn_plan
+            (bytes_encode "/bin/sh")
+            (Cons
+              Bytes
+              (bytes_encode "caller-zero")
+              (Cons
+                Bytes
+                (bytes_encode "-c")
+                (Cons Bytes (bytes_encode "printf payload; /bin/cat >/dev/null") (Nil Bytes)))))
+          ChildPipe)
+        ChildPipe)
+      (λchild. read_from_child buffer child))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦
+          host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+        Ok _ ↦ failed;
+        Err _ ↦ failed
+      })
+
+proc main
+      (_input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Process] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      host_bind
+        AFull
+        (Result ResourceError (ResourceBracketResult Unit Unit))
+        ExitCode
+        (withBuffer AFull Unit Unit (7 : Int) (buffer_body cap))
+        (λoutcome.
+          match outcome {
+            Ok (ResourceBracketOk _) ↦ host_pure AFull ExitCode ExitCode.Success;
+            Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 74)
+          })
+  }

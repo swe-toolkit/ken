@@ -422,6 +422,32 @@ pub unsafe extern "C" fn ken_selected_call_v1_consume(
     }
 }
 
+/// Record both regions' published counts in the bound host context, once,
+/// after the generated entry returns and before any host finish. The counts
+/// are read from the published headers, the same words the emitted allocator
+/// bumps, so they are the activation's high-water marks.
+///
+/// # Safety
+/// `activation` is a live handle whose process frame is bound to a host
+/// context that no finish or destroy has consumed yet.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ken_activation_v1_record_region_end(
+    activation: *const KenActivationV1,
+) -> i64 {
+    if activation.is_null() { return KEN_ACTIVATION_ERR_NULL; }
+    let activation = unsafe { &*activation };
+    let (Some(end), Some(context)) = (
+        activation.activation.published_region_end(),
+        activation.activation.bound_host_context(),
+    ) else {
+        return KEN_ACTIVATION_ERR_FINISHED;
+    };
+    match unsafe { ken_host::ken_host_invocation_v1_record_region_end(context, end) } {
+        0 => KEN_ACTIVATION_OK,
+        _ => KEN_ACTIVATION_ERR_EXPORT,
+    }
+}
+
 /// Move the authentic in-flight failure from the active owner to C. Return 0
 /// with a null out pointer if no generated fault occurred.
 ///
@@ -495,6 +521,7 @@ pub unsafe extern "C" fn ken_activation_v1_write_starter_selected_call_failure(
         terminal_error: Some(terminal),
         effect_trace: Vec::new(),
         terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+        region_end: None,
     };
     let Ok(bytes) = ken_host::encode_linked_effect_trace(&trace) else {
         return KEN_ACTIVATION_ERR_EXPORT;
@@ -631,6 +658,7 @@ pub unsafe extern "C" fn ken_activation_v1_write_starter_capacity_failure(
         terminal_error: Some(ken_host::TerminalErrorV1::CapacityExhausted(fault)),
         effect_trace: Vec::new(),
         terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+        region_end: None,
     };
     let Ok(bytes) = ken_host::encode_linked_effect_trace(&trace) else {
         return KEN_ACTIVATION_ERR_EXPORT;
@@ -842,7 +870,7 @@ pub unsafe extern "C" fn ken_activation_v1_destroy(activation: *mut KenActivatio
 /// ⭐ `D1`'s own warning is that a `crate-type` line is a **build-system**
 /// claim and not a **link** one. ⇒ The archive is checked against *this* list.
 /// ⛔ Pinned as the exact permitted set, so an addition reddens too.
-pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 17] = [
+pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 18] = [
     "ken_boundary_store_v1_open",
     "ken_boundary_store_v1_destroy",
     "ken_activation_v1_begin",
@@ -851,6 +879,7 @@ pub const KEN_ACTIVATION_ABI_SYMBOLS: [&str; 17] = [
     "ken_selected_call_v1_issue",
     "ken_activation_v1_record_region_capacity",
     "ken_selected_call_v1_consume",
+    "ken_activation_v1_record_region_end",
     "ken_activation_v1_take_selected_call_failure",
     "ken_activation_v1_finish_selected_call_failure",
     "ken_activation_v1_write_starter_selected_call_failure",

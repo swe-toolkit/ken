@@ -437,6 +437,7 @@ struct ProcessContext {
     observation: Option<std::fs::File>,
     plan_hash: u64,
     capability: CapabilityTokenV1,
+    region_end: Option<crate::ActivationRegionEndV1>,
 }
 
 struct ProcessHost;
@@ -1086,6 +1087,7 @@ fn initialize_process_context_with_lookup(
         observation,
         plan_hash,
         capability,
+        region_end: None,
     }))
 }
 
@@ -1128,6 +1130,7 @@ fn write_startup_terminal_observation(
         terminal_error: Some(terminal_error),
         effect_trace: Vec::new(),
         terminal_exit,
+        region_end: None,
     })
     .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
     sink.write_all(&bytes)?;
@@ -1159,6 +1162,27 @@ pub unsafe extern "C" fn ken_host_invocation_v1_finish(
             return -1;
         }
     }
+    0
+}
+
+/// Record the activation's region counts once, after the generated entry
+/// returns and before any finish writes the observation.
+///
+/// # Safety
+/// `context` is the unique live handle returned by host invocation init and
+/// not yet consumed by a finish or destroy.
+pub unsafe fn ken_host_invocation_v1_record_region_end(
+    context: *mut c_void,
+    end: crate::ActivationRegionEndV1,
+) -> i64 {
+    if context.is_null() || !context.cast::<ProcessContext>().is_aligned() {
+        return -1;
+    }
+    let context = unsafe { &mut *context.cast::<ProcessContext>() };
+    if context.region_end.is_some() {
+        return -1;
+    }
+    context.region_end = Some(end);
     0
 }
 
@@ -1277,6 +1301,7 @@ fn write_observation_with_terminal(
         terminal_error,
         effect_trace: context.effect_trace.clone(),
         terminal_exit,
+        region_end: context.region_end,
     })
     .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
     sink.write_all(&bytes)?;
@@ -2269,6 +2294,7 @@ mod tests {
             observation: None,
             plan_hash: 7,
             capability: CapabilityTokenV1::from_erased_identity(0),
+            region_end: None,
         };
         let (_, identity) = context
             .resources
@@ -2356,6 +2382,7 @@ mod tests {
             observation: Some(observation_file),
             plan_hash: 11, // arbitrary, unasserted
             capability: CapabilityTokenV1::from_erased_identity(0), // arbitrary, unasserted
+            region_end: None,
         });
         let (_, identity) = context
             .resources
@@ -2424,6 +2451,7 @@ mod tests {
             observation: Some(observation_file),
             plan_hash: 33,
             capability: CapabilityTokenV1::from_erased_identity(0),
+            region_end: None,
         });
         let (_, identity) = context.resources.insert_fs_handle_without_provenance_for_test(
             owner, crate::RightSet::METADATA,

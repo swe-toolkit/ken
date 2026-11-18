@@ -117,8 +117,9 @@ use crate::boundary_resource_profile::{
     BoundaryCapacityExhaustedV1, BoundaryResource, BoundaryResourceProfileV3, BoundaryResourceScope,
 };
 use crate::boundary_value::{
-    ARENA_DATA_CAPACITY, ARENA_LIMB_CAPACITY, ARENA_NATIVE_INT, ARENA_NODE_CAPACITY,
-    ARENA_PERSISTENT, ARENA_WORD_CAPACITY, BoundaryArenaBuilder, BoundaryArenaV1,
+    ARENA_DATA_CAPACITY, ARENA_DATA_COUNT, ARENA_LIMB_CAPACITY, ARENA_LIMB_COUNT,
+    ARENA_NATIVE_INT, ARENA_NODE_CAPACITY, ARENA_NODE_COUNT, ARENA_PERSISTENT,
+    ARENA_WORD_CAPACITY, ARENA_WORD_COUNT, BoundaryArenaBuilder, BoundaryArenaV1,
     BoundaryReservationFailureV1, BoundaryValueStore, BoundaryWord,
 };
 
@@ -410,6 +411,35 @@ impl BoundaryActivationV1 {
                 header_word(base, ARENA_LIMB_CAPACITY),
             ))
         }
+    }
+
+    /// Both regions' live counts **as generated code left them**, read from the
+    /// published headers on the same rule as [`Self::published_capacities`].
+    ///
+    /// # Safety
+    ///
+    /// As [`Self::published_capacities`].
+    pub fn published_region_end(&self) -> Option<ken_host::ActivationRegionEndV1> {
+        if !self.is_published() {
+            return None;
+        }
+        let counts = |base: *mut u64| unsafe {
+            ken_host::RegionCountsV1 {
+                nodes: header_word(base, ARENA_NODE_COUNT),
+                words: header_word(base, ARENA_WORD_COUNT),
+                data_bytes: header_word(base, ARENA_DATA_COUNT),
+                native_int_limbs: header_word(base, ARENA_LIMB_COUNT),
+            }
+        };
+        Some(ken_host::ActivationRegionEndV1 {
+            invocation: counts(self.published_boundary_base),
+            persistent: counts(self.published_persistent_base),
+        })
+    }
+
+    /// The host dispatch context bound by [`Self::bind_process_frame`].
+    pub fn bound_host_context(&self) -> Option<*mut c_void> {
+        self.frame.as_ref().map(|frame| frame.host_dispatch_context)
     }
 
     /// The two pointers the published boundary header carries — the persistent
@@ -824,6 +854,7 @@ mod tests {
             terminal_error: Some(ken_host::TerminalErrorV1::CapacityExhausted(err)),
             effect_trace: Vec::new(),
             terminal_exit: ken_host::TerminalExitClass::ControlledTrap,
+            region_end: None,
         };
         let encoded = ken_host::encode_linked_effect_trace(&linked).expect("real fault encodes");
         assert_eq!(ken_host::decode_linked_effect_trace(&encoded), Ok(linked));
