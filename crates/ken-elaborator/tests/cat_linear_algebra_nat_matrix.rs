@@ -11,7 +11,7 @@ use ken_elaborator::{
     extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
     Type as SourceType,
 };
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::{Decl, GlobalId, KernelError, Term};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
 const VECTOR: &str = "Data.Vector.Vector";
@@ -23,6 +23,89 @@ const SHIPPED_SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../conformance/stdlib/linear-algebra/seed-nat-matrix.md"
 ));
+
+// The accepted client stands alone under selective public imports. The
+// rejected variant keeps its same 2-vector fixtures and proof form and
+// changes only the right-hand operand from v12 to v21.
+const CANCEL_ACCEPTED: &str = r#"
+import Data.Vector.Vector (Vec, VNil, VCons)
+import Algorithm.LinearAlgebra.NatMatrix
+  (vector_add, matrix_add, vector_add_cancel_right, matrix_add_cancel_right)
+
+const one : Nat = Suc Zero
+const two : Nat = Suc one
+fn pair (x : Nat) (y : Nat) : Vec Nat two =
+  VCons Nat one x (VCons Nat Zero y (VNil Nat))
+const v12 : Vec Nat two = pair one two
+const v21 : Vec Nat two = pair two one
+const v00 : Vec Nat two = pair Zero Zero
+const m : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one v12
+    (VCons (Vec Nat two) Zero v21 (VNil (Vec Nat two)))
+const z : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one v00
+    (VCons (Vec Nat two) Zero v00 (VNil (Vec Nat two)))
+const empty_vector : Vec Nat Zero = VNil Nat
+const empty_rows : Vec (Vec Nat two) Zero = VNil (Vec Nat two)
+const empty_cols : Vec (Vec Nat Zero) two =
+  VCons (Vec Nat Zero) one (VNil Nat)
+    (VCons (Vec Nat Zero) Zero (VNil Nat) (VNil (Vec Nat Zero)))
+
+theorem v12_fixture : Equal (Vec Nat two) v12
+  (VCons Nat one one (VCons Nat Zero two (VNil Nat))) = Refl
+theorem v21_fixture : Equal (Vec Nat two) v21
+  (VCons Nat one two (VCons Nat Zero one (VNil Nat))) = Refl
+theorem v00_fixture : Equal (Vec Nat two) v00
+  (VCons Nat one Zero (VCons Nat Zero Zero (VNil Nat))) = Refl
+
+theorem vector_same_value : Equal (Vec Nat two) (vector_add two v12 v00) v12 = Refl
+theorem matrix_same_value : Equal (Vec (Vec Nat two) two) (matrix_add two two m z) m = Refl
+
+theorem vector_cancel_closed : Equal (Vec Nat two) v12 v12 =
+  vector_add_cancel_right two v12 v12 v00 Refl
+theorem matrix_cancel_closed : Equal (Vec (Vec Nat two) two) m m =
+  matrix_add_cancel_right two two m m z Refl
+
+theorem vector_cancel_zero : Equal (Vec Nat Zero) empty_vector empty_vector =
+  vector_add_cancel_right Zero empty_vector empty_vector empty_vector Proved
+theorem matrix_cancel_zero_rows : Equal (Vec (Vec Nat two) Zero) empty_rows empty_rows =
+  matrix_add_cancel_right Zero two empty_rows empty_rows empty_rows Proved
+theorem matrix_cancel_zero_cols : Equal (Vec (Vec Nat Zero) two) empty_cols empty_cols =
+  matrix_add_cancel_right two Zero empty_cols empty_cols empty_cols Refl
+
+theorem vector_cancel_open
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
+      (sum_eq : Equal (Vec Nat n) (vector_add n xs zs) (vector_add n ys zs))
+    : Equal (Vec Nat n) xs ys =
+  vector_add_cancel_right n xs ys zs sum_eq
+
+theorem matrix_cancel_open
+      (rows : Nat) (cols : Nat)
+      (a : Vec (Vec Nat cols) rows)
+      (b : Vec (Vec Nat cols) rows)
+      (c : Vec (Vec Nat cols) rows)
+      (sum_eq : Equal
+        (Vec (Vec Nat cols) rows)
+        (matrix_add rows cols a c)
+        (matrix_add rows cols b c))
+    : Equal (Vec (Vec Nat cols) rows) a b =
+  matrix_add_cancel_right rows cols a b c sum_eq
+"#;
+
+const CANCEL_FALSE_SUM: &str = r#"theorem cancel_false_sum : Equal (Vec Nat two) v12 v21 =
+  vector_add_cancel_right two v12 v21 v00 Refl
+"#;
+
+fn term_contains_const(term: &Term, owner: GlobalId) -> bool {
+    let mut pending = vec![term];
+    while let Some(term) = pending.pop() {
+        if matches!(term, Term::Const { id, .. } if *id == owner) {
+            return true;
+        }
+        pending.extend(term.children());
+    }
+    false
+}
 
 fn shipped_seed_sources() -> Vec<&'static str> {
     extract_ken_md(SHIPPED_SEED)
@@ -159,7 +242,7 @@ fn matrix_env() -> ElabEnv {
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of sixty-eight public identities is selectively
+/// MEASURED: the exact set of seventy public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
 /// the §14 law has a separate exact generic client in its named test;
@@ -245,6 +328,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_scale_one",
         "vector_add_zero_left",
         "vector_add_zero_right",
+        "vector_add_cancel_right",
         "vector_scale_zero",
         "dot_zero_left",
         "dot_zero_right",
@@ -253,6 +337,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "matrix_vector_zero",
         "matrix_add_zero_left",
         "matrix_add_zero_right",
+        "matrix_add_cancel_right",
         "matrix_vector_zero_matrix",
         "matrix_product_zero_left",
         "matrix_product_zero_right",
@@ -292,7 +377,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has sixty-eight checked names and no private helper"
+        "the exact public set has seventy checked names and no private helper"
     );
     env.elaborate_file(
         r#"
@@ -796,5 +881,79 @@ fn wrong_inner_dimension_rejects_at_the_index_boundary() {
             ..
         }) => {}
         other => panic!("a two-row right operand cannot satisfy a three-row index: {other:?}"),
+    }
+}
+
+/// SOURCE: Architect AC-0 D0 and spec/50-stdlib/65-linear-algebra.md §20
+/// (assembled by the Spec owner separately).
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the provider-first exact trusted GlobalId set and checked public
+/// owner bodies are tested in the package roster above. A separate module
+/// imports both laws, proves open applications at variable dimensions, checks
+/// independently constructed nonempty values, and applies the laws at a
+/// nonempty vector, 2-by-2 matrix, zero vector, zero-row and zero-column matrix.
+/// CLAIMED: right cancellation is public, generic, checked, and zero-trust.
+/// THE GAP: selected closed values cannot replace generic kernel-checked proofs;
+/// no local check attests that the separate Spec/CV children or CI have run.
+#[test]
+fn vector_and_matrix_add_right_cancel_public_clients_check() {
+    let mut env = matrix_env();
+    let vector_owner = env.globals[&format!("{MATRIX}.vector_add_cancel_right")];
+    let matrix_owner = env.globals[&format!("{MATRIX}.matrix_add_cancel_right")];
+    for (name, id) in [
+        ("vector_add_cancel_right", vector_owner),
+        ("matrix_add_cancel_right", matrix_owner),
+    ] {
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} is a checked NatMatrix declaration"
+        );
+    }
+    env.elaborate_file(CANCEL_ACCEPTED)
+        .expect("all closed and open right-cancellation clients check together");
+    for (client, owner) in [
+        ("vector_cancel_open", vector_owner),
+        ("matrix_cancel_open", matrix_owner),
+    ] {
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[client])
+            .unwrap_or_else(|| panic!("{client} has a checked body"));
+        assert!(
+            term_contains_const(&body, owner),
+            "{client} cites its exact provider law owner"
+        );
+    }
+}
+
+/// SOURCE: Architect AC-0 D0 and spec/50-stdlib/65-linear-algebra.md §20.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: a fresh complete accepted prefix proves the same-form true
+/// premise at (v12,v12,v00); changing only ys to v21 is rejected by precisely
+/// ElabError::TypeMismatch at the appended premise's Refl, not at the result.
+/// CLAIMED: a false sum equality cannot supply right cancellation.
+/// THE GAP: the premise's finite values do not prove all distinct vectors;
+/// the kernel-checked generic theorem and open client cover that obligation.
+#[test]
+fn false_sum_premise_refuses_at_its_own_refl_after_fresh_accepted_prefix() {
+    let declarations = parse_decls(CANCEL_FALSE_SUM).expect("isolated refusal Ken parses");
+    let [SourceDecl::TheoremDecl { span, .. }] = declarations.as_slice() else {
+        panic!("negative client is exactly one theorem");
+    };
+    let refl = CANCEL_FALSE_SUM
+        .rfind("Refl")
+        .expect("negative premise uses Refl");
+    assert!(refl >= span.start && refl + "Refl".len() <= span.end);
+    let mut env = matrix_env();
+    env.elaborate_file(CANCEL_ACCEPTED)
+        .expect("fresh whole accepted client, including same-form true premise, checks");
+    match env.elaborate_file(CANCEL_FALSE_SUM) {
+        Err(ElabError::TypeMismatch {
+            reason,
+            span: failure,
+        }) if reason == "Refl expects an `Eq`-shaped goal"
+            && failure.start == refl
+            && failure.end == refl + "Refl".len() => {}
+        other => panic!("false sum premise must reject at its Refl: {other:?}"),
     }
 }
