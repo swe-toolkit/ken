@@ -10,6 +10,9 @@ const SMOKE: &str = include_str!("fixtures/px10_child_wait_smoke.ken");
 const ARGV_ENV_PIPE: &str = include_str!("fixtures/px10_argv_env_pipe.ken");
 const LIVE_CHILD: &str = include_str!("fixtures/px10_live_child.ken");
 const TAKE_STDIN_NO_CLOSE: &str = include_str!("fixtures/px10_take_stdin_no_close.ken");
+const CHILD_STDIN_WRITE: &str = include_str!("fixtures/lang_process_child_pipe_write_home.ken");
+const WRITE_AFTER_CLOSE: &str = include_str!("fixtures/rt_pipe_write_after_close.ken");
+const CLOSE_STDIN_BEFORE_WAIT: &str = include_str!("fixtures/rt_pipe_close_before_wait.ken");
 
 #[test]
 fn declared_process_smoke_executes_and_reaps_in_interpreter() {
@@ -1028,6 +1031,41 @@ fn exported_process_resource_lifetime_obligation_for(
         .expect("export thread completes")
 }
 
+// D2 on c1b4b19bf completed all three unstripped Strict exports at 16 MiB.
+// In M2 each rooted export sampled 1524 KiB resident on a 64 MiB probe;
+// this stated 16 MiB leaves 14860 KiB headroom on each of the three sources.
+fn exported_rooted_process_resource_lifetime_obligation_for(
+    source: &str,
+    export_stack: usize,
+) -> ken_elaborator::export::ResourceLifetimeObligation {
+    let source = source.to_owned();
+    std::thread::Builder::new()
+        .name("px10-rooted-lifetime-template-export".to_owned())
+        .stack_size(export_stack)
+        .spawn(move || {
+            let denotation = ken_elaborator::compiler_driver::compile_checked_target_denotation(
+                "px10_resource_lifetime_template",
+                ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", source)
+                    .with_roots(checked_catalog_roots().to_vec()),
+                "main",
+            )
+            .expect("rooted checked Process program denotation");
+            ken_elaborator::export::emit_checked_target_export(
+                &denotation,
+                &[],
+                &std::collections::BTreeSet::new(),
+                vec![],
+                vec![],
+            )
+            .expect("rooted checked Process program export")
+            .resource_lifetime_obligation
+            .expect("a rooted Process program exports a resource-lifetime obligation")
+        })
+        .expect("stated rooted export stack")
+        .join()
+        .expect("rooted export thread completes")
+}
+
 /// Promise: durable invariant. MEASURED: the exported resource-lifetime
 /// obligation applied to the supplied trace: every identity a plan binds on
 /// successful acquisition settles exactly once, and no listed use of it
@@ -1045,10 +1083,36 @@ fn assert_exported_resource_lifetime_template_holds_for(
     source: &str,
     require_pipe_write: bool,
 ) {
+    assert_exported_resource_lifetime_template_holds_obligation(
+        trace,
+        exported_process_resource_lifetime_obligation_for(source),
+        require_pipe_write,
+        false,
+    );
+}
+
+fn assert_exported_rooted_resource_lifetime_template_holds_for(
+    trace: &[ken_host::EffectEvent],
+    source: &str,
+    export_stack: usize,
+    require_write_use: bool,
+) {
+    assert_exported_resource_lifetime_template_holds_obligation(
+        trace,
+        exported_rooted_process_resource_lifetime_obligation_for(source, export_stack),
+        true,
+        require_write_use,
+    );
+}
+
+fn assert_exported_resource_lifetime_template_holds_obligation(
+    trace: &[ken_host::EffectEvent],
+    obligation: ken_elaborator::export::ResourceLifetimeObligation,
+    require_pipe_write: bool,
+    require_write_use: bool,
+) {
     use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
     use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role, ResourceErrorV1};
-
-    let obligation = exported_process_resource_lifetime_obligation_for(source);
     assert!(
         obligation
             .monitor_template
@@ -1079,6 +1143,14 @@ fn assert_exported_resource_lifetime_template_holds_for(
             .expect("the source exports its PipeWrite lifetime plan");
         assert_eq!(pipe.bind_at.operation, Op::ProcessTakePipe);
         assert_eq!(pipe.bind_at.role, Role::Buffer);
+        if require_write_use {
+            assert!(
+                pipe.require_same_at.iter().any(|site| {
+                    site.operation == Op::ResourceStreamWrite && site.role == Role::File
+                }),
+                "the writing source must export its PipeWrite use: {pipe:?}"
+            );
+        }
         assert!(
             trace
                 .iter()
@@ -1150,6 +1222,278 @@ fn assert_exported_resource_lifetime_template_holds_for(
             }
         }
     }
+}
+
+/// SOURCE: spec/30-surface/38-ffi-io.md §1.11.2; spec/40-runtime/42-evaluation.md
+/// §5, §6.4–§6.6. Promise class: durable invariant.
+/// MEASURED: on be58665f9 the starter first refused at Invocation Words
+/// (limit 256, requested 259) before the write; the words-only run then
+/// refused at Invocation Nodes (limit 64, requested 65) after it. Under the
+/// stated parity ceiling, a read-minted span is written to the child's stdin,
+/// then closed/waited, with identical full native/reference observations.
+/// CLAIMED: native ResourceStreamWrite delivers bytes and preserves the owned
+/// PipeWrite lifetime. THE GAP: this row measures no capacity; a change in
+/// the write's arena cost is not detected here. It tests one fixed span.
+#[test]
+fn ac1_native_child_stdin_write_matches_interpreter() {
+    // M2 sampled this row worker at 2736 KiB resident on a 64 MiB probe;
+    // the stated 16 MiB leaves 13648 KiB headroom on this source.
+    std::thread::Builder::new()
+        .name("rsw-inc2-ac1-write".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let (reference, native) = observe_child_stdin_source(CHILD_STDIN_WRITE, "ac1", true);
+            assert_eq!(
+                reference.exit_status, 0,
+                "child receives payload: {reference:?}"
+            );
+            assert_eq!(reference.terminal_error, None);
+            assert_eq!(
+                reference.terminal_exit,
+                ken_host::TerminalExitClass::NormalReturn
+            );
+            let writes = native
+                .effect_trace
+                .iter()
+                .filter(|event| event.operation == ken_host::HostOpV1::ResourceStreamWrite)
+                .collect::<Vec<_>>();
+            assert_eq!(writes.len(), 1, "one successful pipe write: {native:?}");
+            assert!(matches!(
+                writes[0].outcome,
+                ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::WriteProgress(_))
+            ));
+            assert_exported_rooted_resource_lifetime_template_holds_for(
+                &native.effect_trace,
+                CHILD_STDIN_WRITE,
+                16 * 1024 * 1024,
+                true,
+            );
+        })
+        .expect("stated AC-1 native worker")
+        .join()
+        .expect("AC-1 worker completes");
+}
+
+/// SOURCE: spec/30-surface/38-ffi-io.md §1.11.2; spec/40-runtime/42-evaluation.md
+/// §5, §6.4–§6.6. Promise class: durable invariant.
+/// MEASURED: on be58665f9 the AC-1 starter write fixture refused at
+/// Invocation Words (limit 256, requested 259) before the write; its words-only run then
+/// refused at Invocation Nodes (limit 64, requested 65) after it. Under the
+/// stated parity ceiling, a successful write, close, and second write return
+/// Resource(Closed), with complete native/reference parity.
+/// CLAIMED: a closed PipeWrite cannot be reused by native code. THE GAP:
+/// this row measures no capacity; a change in the write's arena cost is not
+/// detected here. Other error classes need their own sources.
+#[test]
+fn ac1b_native_write_after_close_matches_interpreter() {
+    // M2 sampled this row worker at 2856 KiB resident on a 64 MiB probe;
+    // the stated 16 MiB leaves 13528 KiB headroom on this source.
+    std::thread::Builder::new()
+        .name("rsw-inc2-ac1b-write-closed".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+            use ken_host::{ResourceErrorV1 as ResourceError, SemanticErrorV1 as Error};
+            let (reference, native) = observe_child_stdin_source(WRITE_AFTER_CLOSE, "ac1b", true);
+            assert_eq!(
+                reference.exit_status, 0,
+                "child sees first write and EOF: {reference:?}"
+            );
+            assert_eq!(reference.terminal_error, None);
+            let writes = native
+                .effect_trace
+                .iter()
+                .filter(|event| event.operation == ken_host::HostOpV1::ResourceStreamWrite)
+                .collect::<Vec<_>>();
+            assert_eq!(
+                writes.len(),
+                2,
+                "one write followed by a closed write: {native:?}"
+            );
+            assert!(matches!(
+                writes[0].outcome,
+                Outcome::Success(Reply::WriteProgress(_))
+            ));
+            assert!(matches!(
+                writes[1].outcome,
+                Outcome::Error(Error::Resource(ResourceError::Closed))
+            ));
+            assert_exported_rooted_resource_lifetime_template_holds_for(
+                &native.effect_trace,
+                WRITE_AFTER_CLOSE,
+                16 * 1024 * 1024,
+                true,
+            );
+        })
+        .expect("stated AC-1b native worker")
+        .join()
+        .expect("AC-1b worker completes");
+}
+
+/// SOURCE: spec/30-surface/38-ffi-io.md §1.11.2; spec/40-runtime/42-evaluation.md
+/// §5, §6.4–§6.6. Promise class: durable invariant.
+/// MEASURED: an explicitly closed stdin end reaches the child as EOF before
+/// wait, and its acquired PipeWrite identity settles once before ProcessWait.
+/// CLAIMED: early close and bracket settlement preserve ownership on native.
+/// THE GAP: no write is issued; this is not a ResourceStreamWrite label pin.
+#[test]
+fn ac2_native_early_close_stdin_matches_interpreter() {
+    // M2 sampled this row worker at 2324 KiB resident on a 64 MiB probe;
+    // the stated 16 MiB leaves 14060 KiB headroom on this source.
+    std::thread::Builder::new()
+        .name("rsw-inc2-ac2-close-stdin".to_owned())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            use ken_host::{CanonicalOutcomeV1 as Outcome, CanonicalReplyV1 as Reply};
+            use ken_host::{HostOpV1 as Op, ResourceBindingRole as Role};
+            use ken_host::{ResourceKindV1 as Kind, ResourceSettlementOutcomeV1 as Settlement};
+            let (reference, native) =
+                observe_child_stdin_source(CLOSE_STDIN_BEFORE_WAIT, "ac2", false);
+            assert_eq!(
+                reference.exit_status, 0,
+                "child sees early EOF: {reference:?}"
+            );
+            assert_eq!(reference.terminal_error, None);
+            assert!(!native
+                .effect_trace
+                .iter()
+                .any(|event| event.operation == Op::ResourceStreamWrite));
+            let acquired = native
+                .effect_trace
+                .iter()
+                .filter_map(|event| match (&event.operation, &event.outcome) {
+                    (
+                        Op::ProcessTakePipe,
+                        Outcome::Success(Reply::ResourceAcquired {
+                            resource_kind: Kind::PipeWrite,
+                            identity,
+                            ..
+                        }),
+                    ) if event.resource_bindings.contains(&(Role::Buffer, *identity)) => {
+                        Some(*identity)
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(acquired.len(), 1, "one bound stdin acquisition: {native:?}");
+            let settlements = native
+                .effect_trace
+                .iter()
+                .filter(|event| {
+                    event.operation == Op::ResourceRelease
+                        && event
+                            .resource_bindings
+                            .contains(&(Role::Target, acquired[0]))
+                        && matches!(&event.outcome,
+                        Outcome::Success(Reply::ResourceSettlement(result))
+                        if result.resource_kind == Kind::PipeWrite
+                            && result.identity == acquired[0]
+                            && result.outcome == Settlement::Released)
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                settlements.len(),
+                1,
+                "settle the acquired stdin identity once: {native:?}"
+            );
+            let wait = native
+                .effect_trace
+                .iter()
+                .find(|event| event.operation == Op::ProcessWait)
+                .expect("wait after early stdin close");
+            assert!(settlements[0].sequence < wait.sequence);
+            assert_exported_rooted_resource_lifetime_template_holds_for(
+                &native.effect_trace,
+                CLOSE_STDIN_BEFORE_WAIT,
+                16 * 1024 * 1024,
+                false,
+            );
+        })
+        .expect("stated AC-2 native worker")
+        .join()
+        .expect("AC-2 worker completes");
+}
+
+fn observe_child_stdin_source(
+    source: &str,
+    name: &str,
+    provision_write_ceiling: bool,
+) -> (ken_host::EffectObservation, ken_host::EffectObservation) {
+    let root = tempfile::tempdir().expect("isolated Process root");
+    let mut host = ken_interp::PosixHost::new_at(root.path());
+    let reference = ken_cli::run_program_effect_observation(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
+        &[],
+        &[],
+        root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("fresh interpreter executes checked Process source");
+    let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+    if provision_write_ceiling {
+        // Parity ceiling, not a capacity claim. On be58665f9 the AC-1 starter
+        // fixture refused one limit at a time: Invocation Words (limit 256,
+        // requested 259) before the write, then Invocation Nodes (limit 64,
+        // requested 65)
+        // after it. This row observes the write's availability and trace parity,
+        // so every region limit is set to four times the starter, where none is
+        // expected to bind. The row does not pin or bound this program's capacity.
+        for region in [&mut profile.invocation, &mut profile.persistent] {
+            region.nodes *= 4;
+            region.words *= 4;
+            region.data_bytes *= 4;
+            region.native_int_limbs *= 4;
+        }
+    }
+    let built = ken_cli::build_native_program_with_roots(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &checked_catalog_roots(),
+        &format!("rsw_inc2_{name}"),
+        root.path().join("native"),
+        profile,
+    )
+    .expect("native Process program builds");
+    let native = match ken_runtime::run_bound_process_effect_observation(
+        &built.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: root.path().to_owned(),
+            plan_hash: built.plan_transport_hash,
+        },
+    ) {
+        Ok(observation) => observation,
+        Err(error) => panic!("native {name} run failed before parity: {error:?}"),
+    };
+    assert_eq!(native.exit_status, reference.exit_status, "{name} exit");
+    assert_eq!(
+        native.terminal_exit, reference.terminal_exit,
+        "{name} terminal exit"
+    );
+    assert_eq!(
+        native.terminal_error, reference.terminal_error,
+        "{name} terminal error"
+    );
+    assert_eq!(
+        native.effect_trace.len(),
+        reference.effect_trace.len(),
+        "{name} trace length"
+    );
+    for (index, (actual, expected)) in native
+        .effect_trace
+        .iter()
+        .zip(&reference.effect_trace)
+        .enumerate()
+    {
+        assert_eq!(
+            actual, expected,
+            "{name} first differing event index {index}"
+        );
+    }
+    (reference, native)
 }
 
 fn checked_catalog_roots() -> [std::path::PathBuf; 1] {

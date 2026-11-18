@@ -2,8 +2,8 @@
 //! MEASURED: each F fixture executes on both real engines with the same
 //! terminal result and complete ordered canonical requests, outcomes and
 //! bindings; seven plan pushes precede Buffer1's final settlement. B2
-//! promotes ResourceStreamRead and five Process operations; ResourceStreamWrite
-//! remains native-unavailable until its checked source home and follow-on.
+//! promotes ResourceStreamRead and five Process operations; the separately
+//! checked ResourceStreamWrite write/error rows pin its native promotion.
 //! CLAIMED: B1a's native Process route preserves the interpreter's checked
 //! effects, bracket release order and result on argv, null and live paths.
 //! THE GAP: these three checked inputs do not cover every Process program.
