@@ -408,6 +408,7 @@ fn bounded_epoch_refuses_before_the_checked_program_issues_an_effect() {
                     terminal_error: fault.map(ken_runtime::TerminalErrorV1::CapacityExhausted),
                     effect_trace: Vec::new(),
                     terminal_exit: ken_runtime::TerminalExitClass::ControlledTrap,
+                    region_end: None,
                 };
                 let mut bytes = ken_runtime::encode_linked_effect_trace(&trace).unwrap();
                 if token != -7 {
