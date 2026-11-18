@@ -22,6 +22,7 @@ fn loaded() -> (
     BTreeSet<GlobalId>,
     BTreeSet<GlobalId>,
     BTreeSet<GlobalId>,
+    BTreeSet<GlobalId>,
 ) {
     let mut env = ElabEnv::new().expect("compiler base");
     for provider in [
@@ -31,7 +32,6 @@ fn loaded() -> (
         "Core.Logic.Transport",
         "Data.Numeric.Nat.Arithmetic",
         "Data.Collections.List",
-        "Data.Collections.NonEmpty",
         "Data.Numeric.Nat.Order",
     ] {
         env.elaborate_module_from_roots(&[root()], provider)
@@ -42,6 +42,11 @@ fn loaded() -> (
         .elaborate_module_from_roots(&[root()], DERIVED)
         .expect("Derived roots-loads");
     let after_derived = env.env.trusted_base().into_iter().collect();
+    // NonEmpty imports Derived. Loading it as a provider before `before`
+    // would make the Derived trust comparison vacuous.
+    env.elaborate_module_from_roots(&[root()], "Data.Collections.NonEmpty")
+        .expect("NonEmpty roots-loads after Derived");
+    let after_nonempty = env.env.trusted_base().into_iter().collect();
     let argmin_owned = env
         .elaborate_module_from_roots(&[root()], ARGMIN)
         .expect("Argmin roots-loads");
@@ -58,7 +63,7 @@ fn loaded() -> (
             "{qualified} has a checked transparent proof"
         );
     }
-    (env, before, after_derived, after_argmin)
+    (env, before, after_derived, after_nonempty, after_argmin)
 }
 
 fn has_const(body: &Term, owner: GlobalId) -> bool {
@@ -155,8 +160,9 @@ const X_BOUND: &str = r#"theorem r_short_bound
 
 /// SOURCE: spec/50-stdlib/72-optimization.md §4.6; Architect AC-0 D0.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: eight providers load first, exact trusted GlobalId sets agree
-/// before/after both Derived and Argmin, both checked laws are owner-local
+/// MEASURED: seven providers without a Derived dependency load first; NonEmpty,
+/// which imports Derived, loads next; exact trusted GlobalId sets agree at
+/// every stage, and both checked laws are owner-local
 /// and Transparent, and open selective-import clients use each owner's Const.
 /// CLAIMED: generic saturation adds no trust and consumers can apply both
 /// public laws with precisely the specified bound.
@@ -164,9 +170,16 @@ const X_BOUND: &str = r#"theorem r_short_bound
 /// replace the catalog proof's kernel check.
 #[test]
 fn both_saturation_laws_are_public_generic_and_zero_new_trust() {
-    let (mut env, before, after_derived, after_argmin) = loaded();
+    let (mut env, before, after_derived, after_nonempty, after_argmin) = loaded();
     assert_eq!(after_derived, before, "Derived adds no trusted identity");
-    assert_eq!(after_argmin, before, "Argmin adds no trusted identity");
+    assert_eq!(
+        after_nonempty, after_derived,
+        "NonEmpty adds no trusted identity"
+    );
+    assert_eq!(
+        after_argmin, after_nonempty,
+        "Argmin adds no trusted identity"
+    );
     env.elaborate_file(OPEN)
         .expect("both generic selective-import clients check");
     for (client, owner) in [
@@ -196,7 +209,7 @@ fn both_saturation_laws_are_public_generic_and_zero_new_trust() {
 /// THE GAP: a finite fixture supplements but cannot prove the generic law.
 #[test]
 fn sorted_saturation_values_and_both_bound_cases_accept() {
-    let (mut env, _, _, _) = loaded();
+    let (mut env, _, _, _, _) = loaded();
     env.elaborate_file(ACCEPTED)
         .expect("whole accepted sorted/least-k client checks");
     for name in [
@@ -232,7 +245,7 @@ fn input_order_and_short_bound_refuse_at_their_own_claims() {
         ("r_law_input", X_LAW, "Proved"),
         ("r_short_bound", X_BOUND, "Proved"),
     ] {
-        let (mut fresh, _, _, _) = loaded();
+        let (mut fresh, _, _, _, _) = loaded();
         fresh
             .elaborate_file(ACCEPTED)
             .unwrap_or_else(|error| panic!("{name} whole accepted prefix: {error:?}"));
