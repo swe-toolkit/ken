@@ -13,7 +13,8 @@ landing, or trust measurements.
 ## surface/declarations/inline-child-selects-own-provider-and-enclosing-proofs
 
 - promise class: durable invariant.
-- spec: `32 §1`, `33 §3.1`, `33 §3.2`, `33 §3.3`, `33 §8.2`.
+- spec: `32 §1`, `33 §3.1`, `33 §3.2`, `33 §3.3`, `33 §4.1`,
+  `33 §8.2`.
 - given: in one fresh Strict-root input, define a provider and an outer
   subject, then use all three proof homes from an inline child:
 
@@ -61,7 +62,7 @@ landing, or trust measurements.
 ## surface/declarations/inline-descendant-shadow-does-not-select-parent-proof
 
 - promise class: discriminating.
-- spec: `33 §3.1`, `33 §3.3`, `33 §8.2`.
+- spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The positive input is:
 
   ```ken
@@ -114,7 +115,7 @@ landing, or trust measurements.
 ## surface/declarations/inline-descendant-canonical-shadow-refuses-parent-proof
 
 - promise class: discriminating.
-- spec: `33 §3.1`, `33 §3.3`, `33 §8.2`.
+- spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The positive input is:
 
   ```ken
@@ -165,7 +166,7 @@ landing, or trust measurements.
 ## surface/declarations/inline-descendant-enclosing-proof-position-boundary
 
 - promise class: discriminating.
-- spec: `33 §3.1`, `33 §3.3`, `33 §8.2`.
+- spec: `32 §1`, `33 §3.1`, `33 §3.3`, `33 §8.2`.
 - given: compare two fresh Strict-root inputs. The accepted control declares
   the enclosing proof before the nested child:
 
