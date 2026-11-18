@@ -521,6 +521,29 @@ pub theorem least_k_prefix
       (sort a (cost_le a cost) xs)
       (leq_nat_add_left_bound k m))
 
+pub theorem least_k_saturated
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : Equal Bool (leq_nat (length a xs) k) True
+      → Equal (List a) (least_k a cost k xs) (sort a (cost_le a cost) xs) =
+  λcovered.
+    (proof saturated for take)
+      a
+      k
+      (sort a (cost_le a cost) xs)
+      (trans
+        Bool
+        (leq_nat (length a (sort a (cost_le a cost) xs)) k)
+        (leq_nat (length a xs) k)
+        True
+        (cong
+          Nat
+          Bool
+          (length a (sort a (cost_le a cost) xs))
+          (length a xs)
+          (λn. leq_nat n k)
+          ((proof length for sort) a (cost_le a cost) xs))
+        covered)
+
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
 
@@ -1917,7 +1940,9 @@ The cheaper-class law selects an entire class whenever a more costly result
 has been selected, and separation bounds selected costs against excluded
 ones. The zero and singleton laws agree with `argmin` on a nonempty input.
 `least_k_prefix` is `sym` of the public `take::prefix` on the one sorted list,
-with `leq_nat_add_left_bound` supplying k ≤ k + m. Private helpers carry the
+with `leq_nat_add_left_bound` supplying k ≤ k + m. `least_k_saturated`
+applies `take::saturated` to the sorted list, moving the input-length bound
+through `length for sort` with `cong` and `trans`. Private helpers carry the
 head-order and Boolean comparisons; none decides candidate equality or adds an
 assumption.
 
@@ -1984,11 +2009,11 @@ which members survive without promising a complexity bound.
 
 ## Trust & derivation
 
-**Public API:** `cost_le`, `least_k` and its ten declarations for nine
+**Public API:** `cost_le`, `least_k` and its eleven declarations for ten
 law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
 `least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
-`least_k_cost_order_invariant`, `least_k_prefix`);
+`least_k_cost_order_invariant`, `least_k_prefix`, `least_k_saturated`);
 `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:
@@ -2040,8 +2065,14 @@ records the two-of-three prefix on a tied fixture, the generic take-composition
 law, and the equal-list, last-two and violated-bound refusals. The
 `cat_optimization_least_k_prefix` package test roots-loads both laws, checks
 exact trusted-base identities, and isolates each refusal in its own theorem.
+The [§4.6 saturation seed][saturation-seed] distinguishes full sorted input
+from input order, at equal and greater bounds, and refuses a short bound. The
+`cat_optimization_least_k_saturated` package test applies both open laws,
+checks exact trusted-base identities and the sorted closed result, and rejects
+input-order and short-bound claims on separate accepted prefixes.
 
 [prefix-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-prefix.md
+[saturation-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-saturated.md
 
 `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
