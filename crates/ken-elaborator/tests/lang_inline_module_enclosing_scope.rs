@@ -1,6 +1,7 @@
 //! Inline modules inherit checked enclosing declarations, not enclosing imports.
 //! An ancestor import blocks a farther same-spelled local even for descendants.
-//! Promise class: durable Strict lexical-resolution invariants (spec 33 §3.1).
+//! Promise class: durable Strict lexical-resolution invariants
+//! (spec 33 §§3.1, 3.3).
 //! Forward-reference ordering is intentionally not pinned in this child WP.
 
 use std::fs;

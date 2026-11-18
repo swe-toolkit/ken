@@ -1153,9 +1153,9 @@ impl Scope {
                 ))
             })
             .collect::<Result<HashMap<_, _>, ElabError>>()?;
-        // Every other binding is an import. `checked_enclosing` lets each
-        // binding of this scope shadow an ancestor; a descendant's walk
-        // stops at the same set.
+        // Every non-local binding (an import or a file-root package home)
+        // stops the walk. `checked_enclosing` shadows on the same keys;
+        // file roots have no farther enclosing layer to block.
         for bare in self.bindings.keys() {
             names.entry(bare.clone()).or_insert(EnclosingName::Shadow);
         }
