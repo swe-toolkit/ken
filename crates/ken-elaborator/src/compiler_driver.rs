@@ -1082,8 +1082,9 @@ fn collect_checked_perform_nodes(
             &self,
             term: &Term,
         ) -> Result<Option<GlobalId>, CheckedTargetDenotationError> {
-            let normalized =
-                ken_kernel::normalize(&self.env.env, &ken_kernel::Context::new(), term);
+            let head_normal =
+                |term: &Term| ken_kernel::whnf(&self.env.env, &ken_kernel::Context::new(), term);
+            let normalized = head_normal(term);
             if matches!(normalized, Term::Var(_)) {
                 return self.dynamic_operation();
             }
@@ -1106,16 +1107,17 @@ fn collect_checked_perform_nodes(
                 )));
             };
             let leaf = if *outer_id == self.in_l {
-                outer_args.last().copied()
+                outer_args.last().map(|leaf| head_normal(leaf))
             } else if *outer_id == self.in_r {
                 let ambient = outer_args
                     .last()
                     .copied()
                     .ok_or_else(|| Self::fail("ambient coproduct arm is empty"))?;
+                let ambient = head_normal(ambient);
                 if matches!(ambient, Term::Var(_)) {
                     return self.dynamic_operation();
                 }
-                let (inner, inner_args) = term_application_spine(ambient)
+                let (inner, inner_args) = term_application_spine(&ambient)
                     .ok_or_else(|| Self::fail("ambient op is not a constructor application"))?;
                 let Term::Constructor { id: inner_id, .. } = inner else {
                     return Err(Self::fail("ambient op has dynamic coproduct identity"));
@@ -1123,7 +1125,7 @@ fn collect_checked_perform_nodes(
                 if *inner_id != self.in_l && *inner_id != self.in_r {
                     return Err(Self::fail("ambient coproduct identity is not admitted"));
                 }
-                inner_args.last().copied()
+                inner_args.last().map(|leaf| head_normal(leaf))
             } else {
                 // A closed target can expose the operation at either the final
                 // HostIO injection or the source effect's own `Vis`.  Both are
@@ -1140,10 +1142,10 @@ fn collect_checked_perform_nodes(
                 // that is inventoried at its source `Vis`.
                 return self.dynamic_operation();
             }
-            match leaf {
+            match &leaf {
                 Term::Constructor { id, .. } => Ok(Some(*id)),
                 _ => {
-                    let (head, args) = term_application_spine(leaf).ok_or_else(|| {
+                    let (head, args) = term_application_spine(&leaf).ok_or_else(|| {
                         Self::fail(format!(
                             "perform operation is not a constructor application: {leaf:?}"
                         ))
@@ -6397,6 +6399,106 @@ mod tests {
         ClassInstanceMetadata, ObligationMetadata, ObligationStatus,
     };
     use crate::erasure::erase_checked_core_package_for_target;
+
+    /// Promise class: durable invariant. MEASURED: one closed source with a
+    /// symbolic recursive call inside a Vis operation's discarded payload
+    /// exports at stated 16 MiB on both rooted Strict and rootless Legacy.
+    /// CLAIMED: reading a checked operation head never forces that payload.
+    /// THE GAP: this pins a direct L5 head on both routes and the rooted InL
+    /// pipe head; existing B1/PX8 rows cover other arms and obligations.
+    #[test]
+    fn rooted_and_rootless_recursive_payload_keep_exact_operation_heads() {
+        const PACKAGE: &str = "head_decode";
+        const SOURCE: &str = r#"
+            data LocalOp = Ping Nat | Pong
+            fn response (_op : LocalOp) : Type = Unit
+            fn descend (n : Nat) : Nat =
+              match n { Zero |-> Zero; Suc k |-> descend k }
+            proc target (n : Nat)
+              : ITree LocalOp response Unit visits [Local] =
+              ITree.Vis LocalOp response Unit (Ping (descend n))
+                (\_response. ITree.Ret LocalOp response Unit MkUnit)
+        "#;
+        // Fixed by AC-1 as an instrument: unlike the ambient runner's stack,
+        // this stated 16 MiB bound distinguishes finite head reduction from
+        // the full-normalization overflow in AC-2. Builder::stack_size takes
+        // precedence over an inherited RUST_MIN_STACK for this thread.
+        const DECODE_STACK_BYTES: usize = 16 * 1024 * 1024;
+
+        // The sole source operation is Ping. Pong is declared but never
+        // performed, and the recursive Nat payload is not an operation.
+        let family = StableSymbol::declaration(PACKAGE, &[], "LocalOp");
+        let expected = BTreeSet::from([CheckedPerformNodeV1::L5 {
+            family_symbol: family.clone(),
+            operation_symbol: StableSymbol::constructor(&family, "Ping"),
+        }]);
+        std::thread::Builder::new()
+            .name("checked-operation-head-decode".into())
+            .stack_size(DECODE_STACK_BYTES)
+            .spawn(move || {
+                let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../catalog/packages");
+                for (route, source) in [
+                    (
+                        "rooted Strict",
+                        CompilerSource::new("recursive-payload.ken", SOURCE)
+                            .with_roots(vec![root.clone()]),
+                    ),
+                    (
+                        "rootless Legacy",
+                        CompilerSource::new("recursive-payload.ken", SOURCE),
+                    ),
+                ] {
+                    let denotation = compile_checked_target_denotation(PACKAGE, source, "target")
+                        .unwrap_or_else(|error| panic!("{route} export failed: {error:?}"));
+                    assert_eq!(
+                        denotation.perform_nodes, expected,
+                        "{route} operation identities"
+                    );
+                }
+
+                // The landed Process fixture reaches the same defect through
+                // InL (PrivateResourceStreamWrite ...) and a recursive span
+                // projection. Its imports require catalog roots; the separate
+                // import-free L5 source above probes both dispatch routes with
+                // textually identical source.
+                const PIPE: &str = include_str!(
+                    "../../ken-cli/tests/fixtures/lang_process_child_pipe_write_home.ken"
+                );
+                let pipe = compile_checked_target_denotation(
+                    PACKAGE,
+                    CompilerSource::new("pipe-write.ken", PIPE).with_roots(vec![root]),
+                    "main",
+                )
+                .expect("rooted Strict pipe-write fixture exports at stated stack");
+                let fs_family = StableSymbol::declaration(PACKAGE, &[], "FSOp");
+                let pipe_operations = [
+                    ken_host::HostOpV1::BufferAllocate,
+                    ken_host::HostOpV1::ResourceRelease,
+                    ken_host::HostOpV1::ProcessPlanOpen,
+                    ken_host::HostOpV1::ProcessPlanPush,
+                    ken_host::HostOpV1::ProcessSpawn,
+                    ken_host::HostOpV1::ProcessTakePipe,
+                    ken_host::HostOpV1::ProcessWait,
+                    ken_host::HostOpV1::ResourceStreamRead,
+                    ken_host::HostOpV1::ResourceStreamWrite,
+                ];
+                let expected_pipe = pipe_operations
+                    .into_iter()
+                    .map(|operation| CheckedPerformNodeV1::Host {
+                        family_symbol: fs_family.clone(),
+                        operation,
+                    })
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(
+                    pipe.perform_nodes, expected_pipe,
+                    "rooted pipe operation identities"
+                );
+            })
+            .expect("spawn stated-stack denotation export")
+            .join()
+            .expect("denotation export thread completed");
+    }
 
     /// Promise class: durable checked-ID-to-host-op validation. The negative
     /// map changes the actual private finalizer entry, not the identity used
