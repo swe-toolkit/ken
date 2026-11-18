@@ -997,15 +997,21 @@ reset SIGPIPE rather than relying on a particular Rust runtime's spawn choice.
 > ruled the public contract. The checked interpreter implements the
 > plan, spawn, pipe and wait operations. The landed
 > `effect_abi_v1.catalog` marks all six Process operations and both
-> `ResourceStreamRead` and `ResourceStreamWrite` native; the seed does
-> not call `ProcessSignal` or `ResourceStreamWrite`. Its Process/pipe
-> path also uses native `BufferAllocate`, `BufferFreeze` and
+> `ResourceStreamRead` and `ResourceStreamWrite` native. The PX10 seed's
+> `process-spawn-passes-argv-and-environment` client calls neither
+> `ProcessSignal` nor `ResourceStreamWrite`; its Process and pipe path
+> also uses native `BufferAllocate`, `BufferFreeze` and
 > `ResourceRelease`, and invokes no unavailable clock, entropy or FS
 > operation. A `Process` declaration alone no longer entails a
 > typed native-build availability refusal. The named
 > `rt_native_settlement_placement_key.rs::f_argv_env_pipe_matches_fresh_interpreter`
 > row compares native and fresh-interpreter exit, terminal and effect
 > observations on its own generated child-probe argv-env pipe input.
+> That row uses a stated deployment profile raising Invocation Nodes
+> from the starter's 64 to 80; at the starter profile,
+> `r_nodes_starter_argv_refuses_on_invocation_nodes` measures the same
+> program building and running natively, then ending in typed
+> Invocation Nodes capacity exhaustion.
 > Its fixture and argument list differ from the `px10-argv-env` seed,
 > so this is bounded parity evidence for the same operation path, not
 > execution of that exact seed or parity for all Process programs.
