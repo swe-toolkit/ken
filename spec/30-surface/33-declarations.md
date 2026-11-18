@@ -1392,7 +1392,13 @@ same `subject::ident` global, where `ident` is the proof name. Parentheses are
 optional grouping, not part of the selector atom.
 
 Subject resolution runs first; attached lookup runs only after the subject is
-resolved. A bare `appends` never resolves to the attached proof. This
+resolved. Attached lookup selects by the resolved subject's checked identity
+and the proof name and, in an inline child, ranges over the child's own
+attached proofs, the subject provider's exported attached proofs, and
+attached proofs declared in an enclosing scope and checked before the
+child's position (§3.1), so a child-scope subject shadowing an enclosing
+subject with a different checked identity selects none of that enclosing
+subject's proofs. A bare `appends` never resolves to the attached proof. This
 expression-position atom does not change the declaration-position `proof`
 head described above.
 
