@@ -1002,8 +1002,9 @@ enum ResolutionMode {
 /// local/import collision is fail-closed regardless of source order (`33
 /// §3.3`); narrower lexical binders remain innermost-wins.
 /// One enclosing module's own declarations at the child's textual position.
-/// Imports and export aliases are deliberately absent. The checked identity
-/// is captured before a later unit can replace its canonical globals key.
+/// Imports are never granted and export aliases are absent. The checked
+/// identity is captured before a later unit can replace its canonical
+/// globals key.
 struct EnclosingLocal {
     canonical: String,
     checked_id: Option<ken_kernel::GlobalId>,
@@ -1011,8 +1012,16 @@ struct EnclosingLocal {
     pending_class: bool,
 }
 
+/// A spelling one enclosing scope binds. An import grants a descendant
+/// nothing (`32 §1`), but within that scope's text it shadows every farther
+/// local of its spelling (`33 §3.3`), so the walk stops at it.
+enum EnclosingName {
+    Local(EnclosingLocal),
+    Shadow,
+}
+
 struct EnclosingLayer {
-    locals: HashMap<String, EnclosingLocal>,
+    names: HashMap<String, EnclosingName>,
     parent: Option<Arc<EnclosingLayer>>,
 }
 
@@ -1020,8 +1029,10 @@ impl EnclosingLayer {
     fn find(&self, bare: &str) -> Option<&EnclosingLocal> {
         let mut layer = Some(self);
         while let Some(enclosing) = layer {
-            if let Some(local) = enclosing.locals.get(bare) {
-                return Some(local);
+            match enclosing.names.get(bare) {
+                Some(EnclosingName::Local(local)) => return Some(local),
+                Some(EnclosingName::Shadow) => return None,
+                None => {}
             }
             layer = enclosing.parent.as_deref();
         }
@@ -1124,7 +1135,7 @@ impl Scope {
     }
 
     fn snapshot_enclosing(&self) -> Result<Arc<EnclosingLayer>, ElabError> {
-        let locals = self
+        let mut names = self
             .locals
             .iter()
             .map(|bare| {
@@ -1133,17 +1144,23 @@ impl Scope {
                 })?;
                 Ok((
                     bare.clone(),
-                    EnclosingLocal {
+                    EnclosingName::Local(EnclosingLocal {
                         canonical: canonical.clone(),
                         checked_id: self.checked_local_ids.get(bare).copied(),
                         current: self.current_local_names.contains(bare),
                         pending_class: self.pending_local_classes.contains(canonical),
-                    },
+                    }),
                 ))
             })
             .collect::<Result<HashMap<_, _>, ElabError>>()?;
+        // Every other binding is an import. `checked_enclosing` lets each
+        // binding of this scope shadow an ancestor; a descendant's walk
+        // stops at the same set.
+        for bare in self.bindings.keys() {
+            names.entry(bare.clone()).or_insert(EnclosingName::Shadow);
+        }
         Ok(Arc::new(EnclosingLayer {
-            locals,
+            names,
             parent: self.enclosing.clone(),
         }))
     }

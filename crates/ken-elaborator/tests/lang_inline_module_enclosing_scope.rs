@@ -1,4 +1,5 @@
 //! Inline modules inherit checked enclosing declarations, not enclosing imports.
+//! An ancestor import blocks a farther same-spelled local even for descendants.
 //! Promise class: durable Strict lexical-resolution invariants (spec 33 §3.1).
 //! Forward-reference ordering is intentionally not pinned in this child WP.
 
@@ -45,6 +46,16 @@ fn provider_with_helper(root: &Path) -> Vec<std::path::PathBuf> {
         "pub fn helper (b : Bool) : Bool = False\n",
     )
     .expect("write checked provider");
+    vec![root.to_path_buf()]
+}
+
+fn provider_with_shadow_candidates(root: &Path) -> Vec<std::path::PathBuf> {
+    fs::write(
+        root.join("Provider.ken"),
+        "pub fn helper (b : Bool) : Bool = False\n\
+         pub fn other (b : Bool) : Bool = b\n",
+    )
+    .expect("write checked provider with two spellings");
     vec![root.to_path_buf()]
 }
 
@@ -243,6 +254,177 @@ fn grandchild_does_not_inherit_immediate_parent_import() {
         }
         other => panic!("parent import must not enter grandchild: {other:?}"),
     }
+}
+
+/// MEASURED: Mid's imported `helper` selects Provider's checked ID, but
+/// Mid.G's same spelling refuses at G's reference instead of selecting the
+/// root local. CLAIMED: the ancestor import shadows the root for all of Mid's
+/// text without becoming inherited by G. THE GAP: the accept twin verifies
+/// Mid's import at its actual body, and the mutant proves G otherwise selects
+/// the farther root ID.
+#[test]
+fn grandchild_stops_at_parent_import_shadow_and_parent_keeps_provider_id() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    import Provider (helper)\n\
+                    pub fn m (b : Bool) : Bool = helper b\n\
+                    module G { pub fn g (b : Bool) : Bool = helper b }\n\
+                  }\n";
+    let twin = source.replace(
+        "pub fn g (b : Bool) : Bool = helper b",
+        "pub fn g (b : Bool) : Bool = b",
+    );
+    assert_ne!(twin, source, "the twin must remove G's reference only");
+    let mut positive = ElabEnv::new().expect("base");
+    strict(&mut positive, &roots, &twin).expect("Mid's import remains checked");
+    assert_ne!(
+        positive.globals["helper"],
+        positive.globals["Provider.helper"]
+    );
+    body_mentions(&positive, "Mid.m", positive.globals["Provider.helper"]);
+
+    let mut env = ElabEnv::new().expect("base");
+    match strict(&mut env, &roots, source) {
+        Err(ElabError::UnboundName { name, span }) => {
+            assert_eq!(name, "helper");
+            let start = source.rfind("helper b").expect("G's reference");
+            assert_eq!((span.start, span.end), (start, start + name.len()));
+        }
+        Ok(()) => {
+            body_mentions(&env, "Mid.G.g", env.globals["helper"]);
+            panic!("G must not bind the shadowed root helper");
+        }
+        Err(error) => panic!("G must refuse at its helper reference: {error:?}"),
+    }
+}
+
+/// MEASURED: an import renamed from `other` to `helper` blocks a grandchild
+/// at its own reference to `helper`. CLAIMED: shadowing keys on the bound
+/// spelling, not the exported item's old name. THE GAP: the controls below
+/// distinguish a missing Mid binding from a renamed import binding.
+#[test]
+fn renamed_parent_import_shadows_root_helper_for_grandchild() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    import Provider (other as helper)\n\
+                    module G { pub fn g (b : Bool) : Bool = helper b }\n\
+                  }\n";
+    let mut env = ElabEnv::new().expect("base");
+    match strict(&mut env, &roots, source) {
+        Err(ElabError::UnboundName { name, span }) => {
+            assert_eq!(name, "helper");
+            let start = source.rfind("helper b").expect("G's reference");
+            assert_eq!((span.start, span.end), (start, start + name.len()));
+        }
+        Ok(()) => {
+            body_mentions(&env, "Mid.G.g", env.globals["helper"]);
+            panic!("renamed Mid import must block the root helper");
+        }
+        Err(error) => panic!("G must refuse at its helper reference: {error:?}"),
+    }
+}
+
+/// MEASURED: the walk passes an empty G layer but stops at Mid's import
+/// before reaching the root helper. CLAIMED: shadowing is enforced at each
+/// ancestor, not only in the grandchild's immediate parent. THE GAP: the
+/// direct-grandchild row above separately exercises the nonempty boundary.
+#[test]
+fn import_shadow_stops_after_an_empty_intermediate_layer() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    import Provider (helper)\n\
+                    module G { module H { pub fn h (b : Bool) : Bool = helper b } }\n\
+                  }\n";
+    let mut env = ElabEnv::new().expect("base");
+    match strict(&mut env, &roots, source) {
+        Err(ElabError::UnboundName { name, span }) => {
+            assert_eq!(name, "helper");
+            let start = source.rfind("helper b").expect("H's reference");
+            assert_eq!((span.start, span.end), (start, start + name.len()));
+        }
+        Ok(()) => {
+            body_mentions(&env, "Mid.G.H.h", env.globals["helper"]);
+            panic!("H must not walk through Mid's import to the root helper");
+        }
+        Err(error) => panic!("H must refuse at its helper reference: {error:?}"),
+    }
+}
+
+/// MEASURED: an actual local in Mid is granted to G, ahead of the root
+/// local. CLAIMED: tagging imported shadows must not block checked nearer
+/// locals. THE GAP: the other controls cover an absent binding and an own
+/// import in G.
+#[test]
+fn grandchild_still_selects_mid_local_before_root_local() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let mut env = ElabEnv::new().expect("base");
+    strict(
+        &mut env,
+        &roots,
+        "fn helper (b : Bool) : Bool = b\n\
+         module Mid {\n\
+           fn helper (b : Bool) : Bool = True\n\
+           module G { pub fn g (b : Bool) : Bool = helper b }\n\
+         }\n",
+    )
+    .expect("a checked Mid local takes precedence");
+    assert_ne!(env.globals["Mid.helper"], env.globals["helper"]);
+    body_mentions(&env, "Mid.G.g", env.globals["Mid.helper"]);
+}
+
+/// MEASURED: an unrelated imported spelling in Mid does not prevent G
+/// from selecting the root's checked helper. CLAIMED: shadowing tests the
+/// *bound spelling*, not merely whether a layer holds any import. THE GAP:
+/// the renamed-import row verifies the complementary same-spelling case.
+#[test]
+fn grandchild_reaches_root_local_past_unrelated_parent_import() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let mut env = ElabEnv::new().expect("base");
+    strict(
+        &mut env,
+        &roots,
+        "fn helper (b : Bool) : Bool = b\n\
+         module Mid {\n\
+           import Provider (other)\n\
+           module G { pub fn g (b : Bool) : Bool = helper b }\n\
+         }\n",
+    )
+    .expect("a different import spelling cannot shadow helper");
+    body_mentions(&env, "Mid.G.g", env.globals["helper"]);
+}
+
+/// MEASURED: G's own import of `helper` resolves to the provider's ID,
+/// ahead of the import shadow in its parent. CLAIMED: a shadow denies only
+/// inherited visibility; it does not forbid the descendant's own import.
+/// THE GAP: the other controls cover the nearer and farther local routes.
+#[test]
+fn grandchild_own_import_wins_over_parent_shadow() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let mut env = ElabEnv::new().expect("base");
+    strict(
+        &mut env,
+        &roots,
+        "fn helper (b : Bool) : Bool = b\n\
+         module Mid {\n\
+           import Provider (helper)\n\
+           module G {\n\
+             import Provider (helper)\n\
+             pub fn g (b : Bool) : Bool = helper b\n\
+           }\n\
+         }\n",
+    )
+    .expect("G's own import may still select its provider");
+    assert_ne!(env.globals["helper"], env.globals["Provider.helper"]);
+    body_mentions(&env, "Mid.G.g", env.globals["Provider.helper"]);
 }
 
 /// MEASURED: an inline child republishes an enclosing declaration at its
