@@ -928,18 +928,23 @@ fn native_build_subcommand_reaches_the_same_public_producer() {
 /// cross-crate question rather than a proxy for it.
 fn compile_probe_against_ken_runtime(
     rlib: &std::path::Path,
-    deps: &std::path::Path,
+    deps: &[std::path::PathBuf],
     snippet: &str,
 ) -> (bool, String) {
     let dir = output_dir("vis-probe");
     let source = dir.join("probe.rs");
     std::fs::write(&source, snippet).expect("probe source is written");
-    let compiled = Command::new(std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string()))
+    let mut command = Command::new(std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string()));
+    command
         .args(["--edition", "2021", "--crate-type", "lib"])
         .arg("--extern")
-        .arg(format!("ken_runtime={}", rlib.display()))
-        .arg("-L")
-        .arg(format!("dependency={}", deps.display()))
+        .arg(format!("ken_runtime={}", rlib.display()));
+    for dep in deps {
+        command
+            .arg("-L")
+            .arg(format!("dependency={}", dep.display()));
+    }
+    let compiled = command
         .arg("--out-dir")
         .arg(&*dir)
         .arg(&source)
@@ -990,14 +995,38 @@ fn modified_at(path: &std::path::Path) -> std::time::SystemTime {
 /// the probe harness resolves against it before any negative probe is read as
 /// evidence.
 ///
-/// Returns the rlib, its `deps` directory, and a human-readable account of
-/// which candidate was chosen -- the account is returned rather than merely
+/// Returns the rlib, its dependency directories, and a human-readable account
+/// of which candidate was chosen -- the account is returned rather than merely
 /// printed so a failing assertion can name the artifact it measured.
 fn select_current_ken_runtime_rlib(
     control: &str,
-) -> (std::path::PathBuf, std::path::PathBuf, String) {
+) -> (std::path::PathBuf, Vec<std::path::PathBuf>, String) {
+    // The rlib and its dependency directories are named by
+    // scripts/locate-ken-runtime-rlib, which reads them from Cargo's own
+    // compiler-artifact messages. When the channel is set it is the only
+    // lookup: a named path that is not there is a harness failure, never a
+    // cue to search. Unset, the probe falls back to the test binary's own
+    // directory, which holds the rlibs only on Cargo releases before 1.100.
+    match (
+        std::env::var_os("KEN_RUNTIME_RLIB"),
+        std::env::var_os("KEN_RUNTIME_RLIB_DEPENDENCY_DIRS"),
+    ) {
+        (Some(rlib), Some(dirs)) => {
+            return named_ken_runtime_rlib(
+                std::path::PathBuf::from(rlib),
+                std::env::split_paths(&dirs).collect(),
+                control,
+            );
+        }
+        (None, None) => {}
+        _ => panic!(
+            "KEN_RUNTIME_RLIB and KEN_RUNTIME_RLIB_DEPENDENCY_DIRS are set together \
+             by scripts/locate-ken-runtime-rlib, or not at all"
+        ),
+    }
+
     // An integration test binary lives in `target/<profile>/deps`, alongside
-    // the rlibs it was linked against.
+    // the rlibs it was linked against on older Cargo releases.
     let deps = std::env::current_exe()
         .expect("test binary path")
         .parent()
@@ -1020,6 +1049,7 @@ fn select_current_ken_runtime_rlib(
         "no libken_runtime-*.rlib under {}",
         deps.display()
     );
+    let deps = vec![deps];
     // ⛔ NEWEST FIRST, and this is a correctness requirement rather than a
     // tidiness one. `deps` accumulates an rlib per build over the life of the
     // target directory -- there were 15 here when this was written, spanning
@@ -1086,15 +1116,16 @@ fn select_current_ken_runtime_rlib(
     }
     eprintln!("{selection}");
 
-    // ...and the fallback is made SAFE rather than merely visible, by a
-    // post-condition on the artifact that was actually selected instead of a
-    // guard keyed to how it got selected: whatever the loop chose must be at
-    // least as new as every `ken-runtime` source file. A probe compiled
-    // against an rlib older than the source it claims to report on is
-    // measuring code that no longer exists, and every other signal here --
-    // the positive control included -- stays green while it does. Cargo brings
-    // the dependency up to date before this test runs, so the current rlib
-    // always satisfies this; only a stale selection does not.
+    assert_rlib_is_not_older_than_ken_runtime_source(&rlib, &selection);
+    (rlib, deps, selection)
+}
+
+/// A named or selected rlib must reflect the current ken-runtime source.
+fn assert_rlib_is_not_older_than_ken_runtime_source(rlib: &std::path::Path, selection: &str) {
+    // The fallback is safe rather than merely visible: whatever the loop chose
+    // must be at least as new as every `ken-runtime` source file. The named
+    // channel needs the same check to reject a stale export from an earlier
+    // producer run. A stale rlib still compiles the positive control.
     let newest_source = ken_runtime_source_files()
         .iter()
         .map(|path| (modified_at(path), path.clone()))
@@ -1107,7 +1138,42 @@ fn select_current_ken_runtime_rlib(
          property under test.",
         newest_source.1.display()
     );
+}
 
+/// Compile against the one Cargo-named rlib; never fall back on lookup failure.
+fn named_ken_runtime_rlib(
+    rlib: std::path::PathBuf,
+    deps: Vec<std::path::PathBuf>,
+    control: &str,
+) -> (std::path::PathBuf, Vec<std::path::PathBuf>, String) {
+    assert!(
+        rlib.is_file(),
+        "KEN_RUNTIME_RLIB names {}, which is not a file",
+        rlib.display()
+    );
+    assert!(
+        !deps.is_empty(),
+        "KEN_RUNTIME_RLIB_DEPENDENCY_DIRS is empty"
+    );
+    for dep in &deps {
+        assert!(
+            dep.is_dir(),
+            "KEN_RUNTIME_RLIB_DEPENDENCY_DIRS names {}, which is not a directory",
+            dep.display()
+        );
+    }
+    let (compiled, stderr) = compile_probe_against_ken_runtime(&rlib, &deps, control);
+    assert!(
+        compiled,
+        "the positive control failed to compile against the named ken_runtime \
+         rlib, so this harness is what broke, not the property under test:\n{stderr}"
+    );
+    let selection = format!(
+        "ken_runtime rlib (named by KEN_RUNTIME_RLIB): {}",
+        rlib.display()
+    );
+    eprintln!("{selection}");
+    assert_rlib_is_not_older_than_ken_runtime_source(&rlib, &selection);
     (rlib, deps, selection)
 }
 
@@ -1115,7 +1181,7 @@ fn select_current_ken_runtime_rlib(
 /// visibility reason specifically.
 fn assert_probes_do_not_resolve(
     rlib: &std::path::Path,
-    deps: &std::path::Path,
+    deps: &[std::path::PathBuf],
     selection: &str,
     probes: &[&str],
 ) {

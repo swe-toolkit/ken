@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# locate-ken-runtime-rlib: build ken-runtime's rlib on purpose and print the
+# rlib and the dependency directories Cargo reports writing, as
+# KEN_RUNTIME_RLIB=<path> and KEN_RUNTIME_RLIB_DEPENDENCY_DIRS=<dirs>. The
+# px4b public-API probes compile against exactly these, so they no longer
+# depend on Cargo leaving a dependency's rlib beside a test binary
+# (RT-NATIVE-API-PROBE-RLIB-EXPLICIT-LOCATION). Extra arguments, such as
+# --profile test --locked, are passed to cargo build.
+set -euo pipefail
+cargo build -p ken-runtime --lib --message-format=json-render-diagnostics "$@" \
+  | python3 -c '
+import json, os, sys
+rlibs = []
+dirs = []
+for line in sys.stdin:
+    message = json.loads(line)
+    if message.get("reason") != "compiler-artifact":
+        continue
+    for name in message["filenames"]:
+        parent = os.path.dirname(name)
+        if parent not in dirs:
+            dirs.append(parent)
+    if message["target"]["name"] == "ken_runtime" and "rlib" in message["target"]["kind"]:
+        rlibs += [name for name in message["filenames"] if name.endswith(".rlib")]
+if len(rlibs) != 1:
+    sys.exit(f"locate-ken-runtime-rlib: expected one ken_runtime .rlib, Cargo reported {rlibs}")
+print(f"KEN_RUNTIME_RLIB={rlibs[0]}")
+print("KEN_RUNTIME_RLIB_DEPENDENCY_DIRS=" + os.pathsep.join(dirs))
+'
