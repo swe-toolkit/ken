@@ -55,6 +55,8 @@ use super::aggregates::{
     build_checked_ih_continuation_inheritances,
     build_checked_ih_environment_transports, build_checked_ih_generated_entry_accesses,
     build_checked_ih_generated_entry_confluences,
+    publish_checked_ih_transport_application_inputs,
+    validate_checked_ih_transport_application_inputs,
     lifetime_referent_affinity, validate_aggregate_ownership_plan,
     validate_checked_ih_continuation_inheritances, validate_checked_ih_environment_transports,
     validate_checked_ih_generated_entry_accesses,
@@ -313,6 +315,7 @@ impl<'src> Planner<'src> {
                 checked_ih_continuation_inheritances: Vec::new(),
                 checked_ih_generated_entry_confluences: BTreeMap::new(),
                 checked_ih_generated_entry_accesses: BTreeMap::new(),
+                checked_ih_transport_application_inputs: BTreeMap::new(),
                 host_effect_seats: Vec::new(),
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
@@ -1637,6 +1640,11 @@ impl<'src> Planner<'src> {
             &self.plan,
             &self.plan.checked_ih_generated_entry_confluences,
             &self.plan.checked_ih_generated_entry_accesses,
+        )?;
+        self.plan.checked_ih_transport_application_inputs =
+            publish_checked_ih_transport_application_inputs(&self.plan)?;
+        validate_checked_ih_transport_application_inputs(
+            &self.plan, &self.plan.checked_ih_transport_application_inputs,
         )?;
         #[cfg(feature = "px8-ds-test-support")]
         record_checked_ih_generated_entry_confluences(

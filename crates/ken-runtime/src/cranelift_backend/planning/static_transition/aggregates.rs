@@ -24,6 +24,9 @@ use super::continuations::{
     build_checked_binder_provenance, CheckedBinderProvenance, CheckedBinderResolution,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, CheckedIhBinding,
     ContinuationOrdinaryEnvelopeRole, ContinuationWorkerCaptureSource,
+    continuation_owner_entry_sources, continuation_owner_source_root,
+    probe_nearest_exact_alias, walk_continuation_value_environment,
+    ContinuationValueSourceAuthority, ExactAliasProbe,
 };
 use super::{
     inline_synthesized_seat_emission_owners, occurrence_authority,
@@ -419,6 +422,7 @@ pub(in crate::cranelift_backend) struct CheckedIhEnvironmentTransport {
     continuation_input_morphism: Vec<(
         u32,
         ContinuationSourceCoordinate,
+        StaticOriginId,
         CheckedIhTransportInputDestination,
     )>,
 }
@@ -533,6 +537,43 @@ pub(in crate::cranelift_backend) enum CheckedIhTransportInputDestination {
     LexicalEnvironment(u32),
     EntryFrame(u32),
 }
+
+/// The environment whose indices a checked-IH transport input names.
+/// A context and exact call coordinate are required for application seats;
+/// neither a source construct nor a certificate's entry can stand in for one.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum CheckedIhTransportConsumerSeat {
+    Assembly(StaticOriginId),
+    Application {
+        context: super::ContinuationContextId,
+        coordinate: CheckedIhGeneratedEntryCallCoordinate,
+    },
+}
+
+impl CheckedIhTransportConsumerSeat {
+    pub(in crate::cranelift_backend) fn application(
+        context: super::ContinuationContextId,
+        invocation_origin: StaticOriginId,
+        call_origin: StaticOriginId,
+        callee_origin: StaticOriginId,
+    ) -> Self {
+        Self::Application {
+            context,
+            coordinate: CheckedIhGeneratedEntryCallCoordinate {
+                invocation_origin, call_origin, callee_origin,
+            },
+        }
+    }
+}
+
+/// The post-access, source-specific application-seat projection. Stage 1
+/// remains on the transport; this stage cannot be consulted by per-emitter
+/// availability before total generated-entry admissions exist.
+pub(in crate::cranelift_backend) type CheckedIhTransportApplicationInputs = BTreeMap<
+    (ContinuationCallIdentity, super::ContinuationContextId, CheckedIhGeneratedEntryCallCoordinate,
+     u32, ContinuationSourceCoordinate),
+    CheckedIhTransportInputDestination,
+>;
 
 /// Which runtime environment owns an immediate checked-IH K binding.
 ///
@@ -877,6 +918,12 @@ pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryCallCoordinate {
     invocation_origin: StaticOriginId,
     call_origin: StaticOriginId,
     callee_origin: StaticOriginId,
+}
+
+impl CheckedIhGeneratedEntryCallCoordinate {
+    pub(in crate::cranelift_backend) fn invocation_origin(self) -> StaticOriginId {
+        self.invocation_origin
+    }
 }
 
 /// The total, planner-derived classification of one call-coordinate member.
@@ -1424,14 +1471,16 @@ impl CheckedIhEnvironmentTransport {
         self.recursive_position
     }
 
-    pub(in crate::cranelift_backend) fn continuation_input_index(
+    fn assembly_continuation_input_index(
         &self,
         ordinal: u32,
         coordinate: ContinuationSourceCoordinate,
+        seat: StaticOriginId,
     ) -> Option<CheckedIhTransportInputDestination> {
         self.continuation_input_morphism.iter().find_map(
-            |(held_ordinal, held_coordinate, destination)| {
-                (*held_ordinal == ordinal && *held_coordinate == coordinate).then_some(*destination)
+            |(held_ordinal, held_coordinate, held_seat, destination)| {
+                (*held_ordinal == ordinal && *held_coordinate == coordinate
+                    && *held_seat == seat).then_some(*destination)
             },
         )
     }
@@ -1444,6 +1493,25 @@ impl CheckedIhEnvironmentTransport {
         self.destination_body_origin
     }
 }
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn continuation_input_index(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+        seat: CheckedIhTransportConsumerSeat,
+    ) -> Option<CheckedIhTransportInputDestination> {
+        match seat {
+            CheckedIhTransportConsumerSeat::Assembly(origin) => transport
+                .assembly_continuation_input_index(ordinal, coordinate, origin),
+            CheckedIhTransportConsumerSeat::Application { context, coordinate: call } => self
+                .checked_ih_transport_application_inputs
+                .get(&(transport.source_call_identity.clone(), context, call, ordinal, coordinate))
+                .copied(),
+        }
+    }
+}
+
 /// Which aggregate shape one producer occurrence builds.
 ///
 /// ⛔ Deliberately its own two-member enum rather than a reuse of
@@ -6595,7 +6663,9 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                         "two checked-IH transport inputs map to one destination environment coordinate",
                     ));
                 }
-                continuation_input_morphism.push((input.ordinal, input.coordinate, destination));
+                continuation_input_morphism.push((
+                    input.ordinal, input.coordinate, parent, destination,
+                ));
             }
             transports.push(CheckedIhEnvironmentTransport {
                 source_owner,
@@ -8723,6 +8793,132 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         }
     }
     Ok(confluences)
+}
+
+/// Publish application-seat input indices only after total generated-entry
+/// admissions have classified the complete checked-IH call population.
+/// A NonGoverned admission is an index seat, never route authority: its
+/// selected transport remains the independent force-site decision.
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn derive_checked_ih_transport_input_at(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+        ordinal: u32,
+        coordinate: ContinuationSourceCoordinate,
+        application_origin: StaticOriginId,
+    ) -> Result<u32, CraneliftBackendError> {
+        let units = self.continuation_units()?;
+        let source = units.iter().find(|unit| unit.id() == transport.source_specialization)
+            .ok_or_else(|| planner_error("a transport application has no source unit"))?;
+        let input = source.continuation_inputs()?.into_iter()
+            .find(|input| input.ordinal == ordinal && input.coordinate == coordinate)
+            .ok_or_else(|| planner_error("a transport application has no declared input"))?;
+        let owner = occurrence_authority(self, application_origin)?.owner;
+        let root = continuation_owner_source_root(self, owner)?;
+        let entry = continuation_owner_entry_sources(self, owner)?.into_iter()
+            .map(ContinuationValueSourceAuthority::source).collect::<Vec<_>>();
+        let (_, reached) = walk_continuation_value_environment(
+            self, root, application_origin, &entry,
+        )?;
+        let reached = reached.ok_or_else(|| planner_error(
+            "a transport application occurrence is outside its source-authority walk",
+        ))?;
+        match probe_nearest_exact_alias(&input.requested_source_slot(), &reached)? {
+            ExactAliasProbe::Found(index) => Ok(index),
+            other => Err(planner_error(format!(
+                "a transport application at {application_origin:?} has no exact input binding: {other:?}",
+            ))),
+        }
+    }
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn publish_checked_ih_transport_application_inputs(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<CheckedIhTransportApplicationInputs, CraneliftBackendError> {
+    let resolutions = build_checked_binder_provenance(plan)?;
+    let units = plan.continuation_units()?;
+    let mut result = CheckedIhTransportApplicationInputs::new();
+    for access in plan.checked_ih_generated_entry_accesses.values() {
+        let population = checked_ih_generated_entry_call_population(
+            plan, access.worker_body_origin, &resolutions,
+        )?;
+        if population.keys().copied().collect::<BTreeSet<_>>()
+            != access.admissions.keys().copied().collect::<BTreeSet<_>>()
+        {
+            return Err(planner_error("application-seat admissions disagree with the closed checked-IH call population"));
+        }
+        for (seat, admission) in &access.admissions {
+            let binding = population.get(seat).ok_or_else(|| planner_error(
+                "an admitted application seat has no checked-IH binder provenance",
+            ))?;
+            for transport in &plan.checked_ih_environment_transports {
+                if transport.destination_owner != ContinuationEmissionOwner::Specialization(access.enclosing_specialization)
+                    || transport.destination_body_origin != access.worker_body_origin
+                    || (binding.frame_origin, binding.recursive_position)
+                        != (transport.source_continuation_origin, transport.source_recursive_position)
+                {
+                    continue;
+                }
+                if let CheckedIhGeneratedEntryAdmission::Governed(_) = admission {
+                    let governed_member = plan.checked_ih_generated_entry_confluences.iter().any(
+                        |(key, class)| key.context == access.context
+                            && key.invocation_origin == seat.invocation_origin
+                            && key.call_origin == seat.call_origin
+                            && key.callee_origin == seat.callee_origin
+                            && class.members.contains_key(&transport.source_call_identity),
+                    );
+                    if !governed_member {
+                        return Err(planner_error(
+                            "a governed application seat links to a transport outside its confluence",
+                        ));
+                    }
+                }
+                let source = units.iter().find(|unit| unit.id() == transport.source_specialization)
+                    .ok_or_else(|| planner_error("an application-seat transport has no source unit"))?;
+                if transport.destination_construct_origin != source.producer_construct_origin() {
+                    return Err(planner_error("the assembler's producer construct differs from per-emitter's destination construct"));
+                }
+                let mut seen_destinations = BTreeSet::new();
+                for input in source.continuation_inputs()? {
+                    let stage_one = transport.assembly_continuation_input_index(
+                        input.ordinal, input.coordinate, transport.destination_construct_origin,
+                    ).ok_or_else(|| planner_error(
+                        "an application-seat transport is missing a declared assembly input",
+                    ))?;
+                    let destination = match stage_one {
+                        CheckedIhTransportInputDestination::LexicalEnvironment(_) =>
+                            CheckedIhTransportInputDestination::LexicalEnvironment(
+                                plan.derive_checked_ih_transport_input_at(
+                                    transport, input.ordinal, input.coordinate,
+                                    seat.invocation_origin,
+                                )?,
+                            ),
+                        CheckedIhTransportInputDestination::EntryFrame(slot) =>
+                            CheckedIhTransportInputDestination::EntryFrame(slot),
+                    };
+                    if !seen_destinations.insert(destination) {
+                        return Err(planner_error("two inputs of one application seat resolve to one environment index"));
+                    }
+                    let key = (transport.source_call_identity.clone(), access.context,
+                        *seat, input.ordinal, input.coordinate);
+                    if result.insert(key, destination).is_some() {
+                        return Err(planner_error("an application-seat transport input was issued twice"));
+                    }
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
+pub(in crate::cranelift_backend::planning::static_transition) fn validate_checked_ih_transport_application_inputs(
+    plan: &StaticTransitionPlan<'_>,
+    published: &CheckedIhTransportApplicationInputs,
+) -> Result<(), CraneliftBackendError> {
+    if &publish_checked_ih_transport_application_inputs(plan)? != published {
+        return Err(planner_error("application-seat transport inputs differ from the complete admitted binding derivation"));
+    }
+    Ok(())
 }
 
 fn checked_ih_generated_entry_call_population(
@@ -14305,17 +14501,19 @@ mod checked_ih_captured_env_schema {
         assert_eq!(inputs.len(), transport.continuation_input_count());
         for input in &inputs {
             assert!(
-                transport
-                    .continuation_input_index(input.ordinal, input.coordinate)
-                    .is_some(),
+                plan.continuation_input_index(
+                    transport, input.ordinal, input.coordinate,
+                    CheckedIhTransportConsumerSeat::Assembly(source.producer_construct_origin()),
+                ).is_some(),
                 "every declared source input must have one destination coordinate"
             );
         }
         let first = &inputs[0];
         assert!(
-            transport
-                .continuation_input_index(first.ordinal.wrapping_add(1), first.coordinate)
-                .is_none(),
+            plan.continuation_input_index(
+                transport, first.ordinal.wrapping_add(1), first.coordinate,
+                CheckedIhTransportConsumerSeat::Assembly(source.producer_construct_origin()),
+            ).is_none(),
             "a moved ordinal must not resolve by coordinate alone"
         );
     }

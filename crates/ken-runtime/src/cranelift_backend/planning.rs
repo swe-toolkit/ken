@@ -162,6 +162,7 @@ pub(super) use static_transition::{
     CheckedIhGeneratedEntryRoute,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
+    CheckedIhTransportConsumerSeat,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     RecursiveResidualDisposition, RecursiveCarrierBoxedStore, RecursiveCarrierChild,
     RecursiveCarrierMemberSchema, RecursiveCarrierRole, RecursiveCarrierStore,
