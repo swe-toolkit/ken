@@ -1543,6 +1543,12 @@ fn link_starter_executable_with_symbols(
     Ok(())
 }
 
+/// The explicit producer's channel: the path of the support archive that
+/// `scripts/build-runtime-support-archive` built on purpose. CI and
+/// `scripts/ken-cargo` set it; the side-effect search below is only the
+/// fallback when it is unset.
+const KEN_RUNTIME_SUPPORT_STATICLIB_ENV: &str = "KEN_RUNTIME_SUPPORT_STATICLIB";
+
 /// **`RT-FNSPLIT-C3-ACTIVATION` `D1`/`§3a` — the starter's ONE runtime-support
 /// archive.**
 ///
@@ -1554,7 +1560,24 @@ fn link_starter_executable_with_symbols(
 ///
 /// ⚠ Renamed from `ken_host_staticlib` rather than pointed at a new file, so a
 /// reader who knew the old name sees which archive replaced it and why.
+/// Prefer the explicit producer's strict environment path; only when unset
+/// fall back to finding Cargo's side-effect archive beside the executable.
 fn ken_runtime_staticlib() -> Result<std::path::PathBuf, ObjectLinkerPackagingError> {
+    if let Some(named) = std::env::var_os(KEN_RUNTIME_SUPPORT_STATICLIB_ENV) {
+        let path = std::path::PathBuf::from(named);
+        return if path.is_file() {
+            Ok(path)
+        } else {
+            Err(packaging_error(
+                ObjectLinkerPackagingStage::Toolchain,
+                "ken_runtime_staticlib",
+                format!(
+                    "{KEN_RUNTIME_SUPPORT_STATICLIB_ENV} names {}, which is not a file",
+                    path.display()
+                ),
+            ))
+        };
+    }
     let executable = std::env::current_exe().map_err(|error| {
         packaging_error(
             ObjectLinkerPackagingStage::Toolchain,
@@ -1588,7 +1611,7 @@ fn ken_runtime_staticlib() -> Result<std::path::PathBuf, ObjectLinkerPackagingEr
     Err(packaging_error(
         ObjectLinkerPackagingStage::Toolchain,
         "ken_runtime_staticlib",
-        "Cargo did not materialize the required ken-runtime-support static archive",
+        "neither KEN_RUNTIME_SUPPORT_STATICLIB nor a Cargo side-effect ken-runtime-support static archive was found",
     ))
 }
 

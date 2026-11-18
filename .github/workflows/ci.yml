@@ -231,6 +231,12 @@ jobs:
           phase_timestamp workspace-test-build start
           cargo build --workspace --tests --profile test --locked --timings
           phase_timestamp workspace-test-build end
+      - name: Build the runtime support archive explicitly
+        run: |
+          archive=$(scripts/build-runtime-support-archive --profile test --locked)
+          test -f "$archive"
+          echo "CI_RUNTIME_SUPPORT_ARCHIVE path=$archive cargo=$(cargo --version)"
+          echo "KEN_RUNTIME_SUPPORT_STATICLIB=$archive" >> "$GITHUB_ENV"
       # nextest schedules every test across every binary against one global
       # thread pool. NOTE: `cargo test` was ALREADY parallel *within* each
       # binary (libtest defaults to one thread per CPU); only the 200 binaries
@@ -442,6 +448,12 @@ jobs:
       # No cache here either — see the note in the sharded job (item C8).
       - name: Build
         run: cargo build --workspace --locked
+      - name: Build the runtime support archive explicitly
+        run: |
+          archive=$(scripts/build-runtime-support-archive --locked)
+          test -f "$archive"
+          echo "CI_RUNTIME_SUPPORT_ARCHIVE path=$archive cargo=$(cargo --version)"
+          echo "KEN_RUNTIME_SUPPORT_STATICLIB=$archive" >> "$GITHUB_ENV"
       - name: Install cargo-nextest
         # SHA-PINNED, not tag-tracked. `@nextest` / `@v2` are FLOATING tags the
         # maintainer can repoint at any commit, so a compromised or moved tag
@@ -505,6 +517,12 @@ jobs:
         run: python3 scripts/ci-resource-monitor.py start
       - name: Build
         run: cargo build --workspace --locked
+      - name: Build the runtime support archive explicitly
+        run: |
+          archive=$(scripts/build-runtime-support-archive --locked)
+          test -f "$archive"
+          echo "CI_RUNTIME_SUPPORT_ARCHIVE path=$archive cargo=$(cargo --version)"
+          echo "KEN_RUNTIME_SUPPORT_STATICLIB=$archive" >> "$GITHUB_ENV"
       - name: Install cargo-nextest
         # SHA-PINNED, not tag-tracked. `@nextest` / `@v2` are FLOATING tags the
         # maintainer can repoint at any commit, so a compromised or moved tag
