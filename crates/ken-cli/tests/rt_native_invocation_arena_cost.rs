@@ -4,6 +4,8 @@ use ken_host::{ActivationRegionEndV1, RegionCountsV1};
 
 const F1: &str = include_str!("fixtures/rt_arena_write_f1.ken");
 const F2: &str = include_str!("fixtures/rt_arena_write_f2.ken");
+const VF1: &str = include_str!("fixtures/rt_arena_write_vf1.ken");
+const VF2: &str = include_str!("fixtures/rt_arena_write_vf2.ken");
 
 fn catalog_roots() -> [std::path::PathBuf; 1] {
     [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")]
@@ -14,6 +16,7 @@ fn run_source(
     name: &str,
     writes_expected: usize,
     profile_multiple: usize,
+    payload_bytes_expected: u64,
 ) -> ActivationRegionEndV1 {
     let source = source.to_owned();
     let name = name.to_owned();
@@ -60,6 +63,24 @@ fn run_source(
                 ken_host::TerminalExitClass::NormalReturn,
                 "{name}: {observation:?}"
             );
+            let reads = observation
+                .effect_trace
+                .iter()
+                .filter(|event| event.operation == ken_host::HostOpV1::ResourceStreamRead)
+                .collect::<Vec<_>>();
+            assert_eq!(reads.len(), 1, "{name}: {observation:?}");
+            let ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ReadProgress(
+                ken_host::ReadProgressV1::ReadSome { transferred, .. },
+            )) = &reads[0].outcome
+            else {
+                panic!("{name}: expected a successful stream read: {reads:?}");
+            };
+            assert_eq!(
+                transferred.get(),
+                payload_bytes_expected,
+                "{name}: read payload length"
+            );
+
             let writes = observation
                 .effect_trace
                 .iter()
@@ -67,16 +88,18 @@ fn run_source(
                 .collect::<Vec<_>>();
             assert_eq!(writes.len(), writes_expected, "{name}: {observation:?}");
             for (index, write) in writes.into_iter().enumerate() {
-                assert!(
-                    matches!(
-                        write.outcome,
-                        ken_host::CanonicalOutcomeV1::Success(
-                            ken_host::CanonicalReplyV1::WriteProgress(
-                                ken_host::WriteProgressV1::Wrote(_)
-                            )
-                        )
-                    ),
-                    "{name} write {index} did not succeed: {write:?}"
+                let ken_host::CanonicalOutcomeV1::Success(
+                    ken_host::CanonicalReplyV1::WriteProgress(ken_host::WriteProgressV1::Wrote(
+                        transferred,
+                    )),
+                ) = &write.outcome
+                else {
+                    panic!("{name} write {index} did not succeed: {write:?}");
+                };
+                assert_eq!(
+                    transferred.get(),
+                    payload_bytes_expected,
+                    "{name} write {index} payload length"
                 );
             }
             let end = region_end.expect("ordinary post-entry finish records both region ends");
@@ -116,13 +139,6 @@ fn delta(higher: ActivationRegionEndV1, lower: ActivationRegionEndV1) -> Activat
     }
 }
 
-fn short_payload(source: &str) -> String {
-    const LONG: &str = "printf payload; /bin/cat >/dev/null";
-    const SHORT: &str = "printf pay; /bin/cat >/dev/null";
-    assert_eq!(source.matches(LONG).count(), 1, "one payload substitution");
-    source.replacen(LONG, SHORT, 1)
-}
-
 /// Promise: transition sentinel for the first chain-level write cost of this
 /// lowering. `spec/40-runtime/44-capacity.md` specifies resource profiles;
 /// `spec/40-runtime/45-native-backend.md` specifies native execution. The
@@ -134,11 +150,11 @@ fn short_payload(source: &str) -> String {
 /// general rule for all payloads, write shapes, or future closure layouts.
 #[test]
 fn ac1_first_chain_level_write_d1_and_controls() {
-    let f1 = run_source(F1, "F1", 1, 4);
-    let f2 = run_source(F2, "F2", 2, 4);
-    let vf1 = run_source(&short_payload(F1), "VF1", 1, 4);
-    let vf2 = run_source(&short_payload(F2), "VF2", 2, 4);
-    let f1_eightfold = run_source(F1, "F1_8x", 1, 8);
+    let f1 = run_source(F1, "F1", 1, 4, 7);
+    let f2 = run_source(F2, "F2", 2, 4, 7);
+    let vf1 = run_source(VF1, "VF1", 1, 4, 3);
+    let vf2 = run_source(VF2, "VF2", 2, 4, 3);
+    let f1_eightfold = run_source(F1, "F1_8x", 1, 8, 7);
     eprintln!("ARENA_COST F1={f1:?}; F2={f2:?}; VF1={vf1:?}; VF2={vf2:?}; F1_8x={f1_eightfold:?}");
 
     let d1 = delta(f2, f1);
@@ -168,5 +184,5 @@ fn ac1_first_chain_level_write_d1_and_controls() {
 /// the D1 differential above, not the ceiling, detects the mutation.
 #[test]
 fn ac2_one_write_survives_fourfold_capacity_ceiling() {
-    let _ = run_source(F1, "F1_level_control", 1, 4);
+    let _ = run_source(F1, "F1_level_control", 1, 4, 7);
 }
