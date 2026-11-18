@@ -1406,6 +1406,11 @@ fn record_checked_attached_proof(
     canonical: &str,
     proof_id: ken_kernel::GlobalId,
 ) -> Result<(), ElabError> {
+    // Only a Strict scope is snapshotted for its inline children
+    // (`expand_scope`), so a Legacy scope's record would never be read.
+    if scope.mode != ResolutionMode::Strict {
+        return Ok(());
+    }
     if let Decl::AttachedProofDecl {
         subject,
         proof_name,
@@ -1413,12 +1418,14 @@ fn record_checked_attached_proof(
         ..
     } = decl
     {
-        let subject_id = resolve_checked_ref(scope, exports, subject, span)?
+        let Some(subject_id) = resolve_checked_ref(scope, exports, subject, span)?
             .1
             .or_else(|| scope.checked_local_ids.get(subject).copied())
-            .ok_or_else(|| {
-                ElabError::Internal("checked attached proof has no subject identity".to_string())
-            })?;
+        else {
+            // A subject with no checked identity here has none in any
+            // descendant either, so no child lookup could select this entry.
+            return Ok(());
+        };
         scope.checked_attached_proofs.insert(
             (subject_id, proof_name.clone()),
             (canonical.to_string(), proof_id),
