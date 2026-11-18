@@ -252,6 +252,9 @@ claim with no conformance case is a claim no one can rely on
 - `surface/declarations/seed-named-proof-claims.md` — `prop` families,
   `theorem` declarations, attached `proof` canonicalization, explicit bare/grouped/
   canonical selector identity, and the bare-name-rejects/selector-resolves pair.
+- `surface/declarations/seed-inline-attached-proof-selection.md` — inline-child
+  selection by checked subject identity, child and provider proof sources, and
+  the enclosing-proof position boundary.
 - `surface/declarations/seed-def-refinement.md` — SURF-def-refinement: the
   `type` → `def` declaration-keyword rename (refinement + alias RHS forms),
   the discriminating negative (`type` no longer parses as a declaration),
