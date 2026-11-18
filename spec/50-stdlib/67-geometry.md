@@ -17,7 +17,8 @@
 > SPEC-GEOMETRY-BOX-POINT-SINGLETON §15;
 > SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL §16;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE §17;
-> SPEC-GEOMETRY-NAT-ORIENTATION §18).** Sections 1–4,
+> SPEC-GEOMETRY-NAT-ORIENTATION §18;
+> SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1536,3 +1537,75 @@ carrier or surface rule. Signed coordinates, a signed cross-product
 value, rotation of points, segment intersection and convex hulls remain
 deferred; the cyclic permutation law above is not a point-rotation
 operation.
+
+## 19. Collinearity from a shared coordinate
+
+> Section 19 status: DRAFT v0 (SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR).
+> Architect's AC-0 on `d42f7ad28` checked both generic laws in a
+> scratch development: `ken check` and `ken fmt --check` returned 0,
+> with no `Axiom`, postulate or caller premise. The open and closed
+> clients checked, and an off-line `Eq` claim refused in each of two
+> forms. That D0 did **not** measure equality of exact `trusted_base()`
+> identity sets. Foundation QA's AC-T test
+> `shared_axis_laws_have_checked_owners_and_zero_new_trust` passed 1/1
+> on assembled candidate `a79e131911b6782357bcbd0a32eb48e84a3c620d`:
+> it found equal exact trusted `GlobalId` sets before and after loading
+> `NatOrientation` over its five providers. An unused `Axiom` mutation
+> reddened the set equality, and the restored test passed. This is
+> candidate-local zero **new** trust; provider trust is inherited.
+> Neither scratch nor candidate-local checks establish official
+> conformance, CI, publication, landing or measured landed trust.
+
+`Algorithm.Geometry.NatOrientation` must export two further public checked
+Transparent theorems directly after `orient_repeated_point` and before the
+existing private `orient_reorder`. Their exact names, binder orders and
+types are:
+
+```ken
+pub theorem orient_shared_x
+      (x : Nat) (ya : Nat) (yb : Nat) (yc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint x ya) (MkPoint x yb) (MkPoint x yc)) Eq
+
+pub theorem orient_shared_y
+      (y : Nat) (xa : Nat) (xb : Nat) (xc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint xa y) (MkPoint xb y) (MkPoint xc y)) Eq
+```
+
+The shared coordinate is bound first; the remaining coordinates follow
+the point order `a`, `b`, `c`. These are the two axis-parallel cases of
+§18.1's reading of `Eq` as collinearity. All three points may be
+distinct. Neither law requires a caller premise or says that any three
+distinct collinear points on an arbitrary line are covered by a public
+law. No choice of vertical or horizontal axis orientation is assumed.
+
+For shared `x`, the left cross sum is
+`(x·yb + x·yc) + x·ya` and the right is
+`(ya·x + yb·x) + yc·x`. The existing private
+`orient_reorder` exchanges the final two addends using associativity
+and commutativity of `add`; one further inner `comm for add` and three
+`comm for mul` proofs align both sides. For shared `y`, the left sum is
+`(xa·y + xb·y) + xc·y` and the right is
+`(y·xb + y·xc) + y·xa`. First commute the inner addends, then
+apply `orient_reorder` and commute the three products. Each proof
+uses `cong` to transport the equality of natural sums through the
+left argument of `compare`, followed by `trans` and public
+`self_eq for compare` to conclude `Eq`. The Nat addition facts are
+used directly and through `orient_reorder`. Both proofs specialize
+`orient` at explicit `MkPoint` terms, so its cross sums compute
+without a new pattern match. They add no private helper, import,
+refactor, axiom, kernel or surface rule; the four §18 laws and all
+§§1–18 operations and law types remain unchanged.
+
+On three distinct points sharing `x`, `(2,1), (2,3), (2,7)`, the
+result is `Eq`, as it is for `(1,4), (3,4), (8,4)` sharing `y`.
+The off-line triple `(2,1), (2,3), (3,7)` instead has cross sums
+`23` and `25`, so `orient` gives `Lt`, not `Eq`. A closed accepted
+`Lt` control separates evaluation of this triple from a refused
+`Eq` claim. In separate fresh accepted prefixes, the `Eq` claim
+must refuse both when asserted by `Proved` and when supplied via
+`orient_shared_x 2 1 3 7`; the latter changes only the third
+point's `x` relative to the accepted shared-`x` row. These are
+CV-owned seed discriminators, not evidence that the D0 ran that seed
+or that a generic law follows from closed examples.
