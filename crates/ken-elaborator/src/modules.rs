@@ -22,6 +22,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::ast::{
     BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, Fixity, ImportItem, ImportKind,
@@ -998,6 +999,34 @@ enum ResolutionMode {
 /// own local declarations. A top-level
 /// local/import collision is fail-closed regardless of source order (`33
 /// §3.3`); narrower lexical binders remain innermost-wins.
+/// One enclosing module's own declarations at the child's textual position.
+/// Imports and export aliases are deliberately absent. The checked identity
+/// is captured before a later unit can replace its canonical globals key.
+struct EnclosingLocal {
+    canonical: String,
+    checked_id: Option<ken_kernel::GlobalId>,
+    current: bool,
+    pending_class: bool,
+}
+
+struct EnclosingLayer {
+    locals: HashMap<String, EnclosingLocal>,
+    parent: Option<Arc<EnclosingLayer>>,
+}
+
+impl EnclosingLayer {
+    fn find(&self, bare: &str) -> Option<&EnclosingLocal> {
+        let mut layer = Some(self);
+        while let Some(enclosing) = layer {
+            if let Some(local) = enclosing.locals.get(bare) {
+                return Some(local);
+            }
+            layer = enclosing.parent.as_deref();
+        }
+        None
+    }
+}
+
 #[derive(Default, Clone)]
 struct Scope {
     mode: ResolutionMode,
@@ -1036,6 +1065,9 @@ struct Scope {
     /// has not run. A reference to one has no checked identity yet, and
     /// `globals[canonical]` may still hold another unit's class.
     pending_local_classes: HashSet<String>,
+    /// Immutable, innermost-first lexical ancestors. Their imported bindings
+    /// never enter the child, and no local is reselected by global spelling.
+    enclosing: Option<Arc<EnclosingLayer>>,
     /// Immutable pre-source floor type IDs; a later flat globals entry cannot
     /// substitute another family's constructor when resolving `T.C`.
     floor_type_ids: HashMap<String, ken_kernel::GlobalId>,
@@ -1086,6 +1118,50 @@ impl Scope {
             mode,
             kernel_names,
             ..Self::default()
+        }
+    }
+
+    fn snapshot_enclosing(&self) -> Result<Arc<EnclosingLayer>, ElabError> {
+        let locals = self.locals.iter().map(|bare| {
+            let canonical = self.bindings.get(bare).ok_or_else(|| {
+                ElabError::Internal(format!("enclosing local `{bare}` has no binding"))
+            })?;
+            Ok((bare.clone(), EnclosingLocal {
+                canonical: canonical.clone(),
+                checked_id: self.checked_local_ids.get(bare).copied(),
+                current: self.current_local_names.contains(bare),
+                pending_class: self.pending_local_classes.contains(canonical),
+            }))
+        }).collect::<Result<HashMap<_, _>, ElabError>>()?;
+        Ok(Arc::new(EnclosingLayer { locals, parent: self.enclosing.clone() }))
+    }
+
+    /// Only the current scope can shadow a lexical ancestor. An ancestor
+    /// bound but not yet checked at this textual position refuses here, before
+    /// any elaborator can consult a stale `globals[canonical]` entry.
+    fn checked_enclosing(
+        &self, bare: &str, span: &Span,
+    ) -> Result<Option<(&str, ken_kernel::GlobalId)>, ElabError> {
+        if bare.contains('.') || bare.contains("::") || self.bindings.contains_key(bare)
+            || is_prelude_floor_name(bare) || self.kernel_names.contains(bare)
+            || is_unshadowable_kernel_name(bare)
+        {
+            return Ok(None);
+        }
+        let Some(local) = self.enclosing.as_ref().and_then(|layer| layer.find(bare)) else {
+            return Ok(None);
+        };
+        match local.checked_id {
+            Some(id) if !local.pending_class => Ok(Some((&local.canonical, id))),
+            Some(_) => Err(ElabError::Internal(format!(
+                "enclosing class `{}` is pending despite a checked identity", local.canonical
+            ))),
+            None if local.current || local.pending_class => Err(ElabError::UnresolvedCon {
+                name: local.canonical.clone(), span: span.clone(),
+            }),
+            None => Err(ElabError::Internal(format!(
+                "enclosing local `{}` lacks a checked identity", local.canonical
+            ))),
         }
     }
 
@@ -1272,6 +1348,18 @@ fn resolve_ref(
                 span: span.clone(),
             });
         }
+        if let Some((canonical, type_id)) = scope.checked_enclosing(prefix_part, span)? {
+            let member = scope.constructor_members.get(&type_id)
+                .and_then(|family| family.get(leaf))
+                .or_else(|| scope.prop_intro_members.get(&type_id)
+                    .and_then(|family| family.get(leaf)));
+            if member.is_some_and(|id| !scope.private_ids.contains(id)) {
+                return Ok(format!("{canonical}.{leaf}"));
+            }
+            return Err(ElabError::UnboundName {
+                name: name.to_string(), span: span.clone(),
+            });
+        }
         if let Some(canonical_module) = scope.prefixes.get(prefix_part) {
             return scope
                 .file_prefix_exports
@@ -1311,24 +1399,23 @@ fn resolve_ref(
             span: span.clone(),
         })
     } else {
-        match scope.bindings.get(name) {
-            Some(q) => Ok(q.clone()),
-            None if scope.facade_only.contains(name) => Err(ElabError::UnboundName {
-                name: name.to_string(),
-                span: span.clone(),
-            }),
-            None if scope.mode == ResolutionMode::Strict
+        if let Some(q) = scope.bindings.get(name) {
+            return Ok(q.clone());
+        }
+        if let Some((canonical, _)) = scope.checked_enclosing(name, span)? {
+            return Ok(canonical.to_string());
+        }
+        if scope.facade_only.contains(name)
+            || (scope.mode == ResolutionMode::Strict
                 && !is_prelude_floor_name(name)
                 && !scope.kernel_names.contains(name)
-                && !is_unshadowable_kernel_name(name) =>
-            {
-                Err(ElabError::UnboundName {
-                    name: name.to_string(),
-                    span: span.clone(),
-                })
-            }
-            None => Ok(name.to_string()),
+                && !is_unshadowable_kernel_name(name))
+        {
+            return Err(ElabError::UnboundName {
+                name: name.to_string(), span: span.clone(),
+            });
         }
+        Ok(name.to_string())
     }
 }
 
@@ -1346,33 +1433,37 @@ fn resolve_constructor_path(
     let Some((type_path, leaf)) = name.rsplit_once('.') else {
         return Ok(None);
     };
+    let inherited_type = scope.checked_enclosing(type_path, span)?;
     let type_id = scope
         .checked_local_ids
         .get(type_path)
         .or_else(|| scope.binding_ids.get(type_path))
         .or_else(|| scope.qualified_ids.get(type_path))
-        .or_else(|| scope.floor_type_ids.get(type_path));
+        .or_else(|| scope.floor_type_ids.get(type_path))
+        .copied()
+        .or_else(|| inherited_type.map(|(_, id)| id));
     let Some(type_id) = type_id else {
         return Ok(None);
     };
     let intro_member = scope
         .prop_intro_members
-        .get(type_id)
+        .get(&type_id)
         .and_then(|family| family.get(leaf));
     let Some(member) = scope
         .constructor_members
-        .get(type_id)
+        .get(&type_id)
         .and_then(|family| family.get(leaf))
         .or(intro_member)
     else {
         return Ok(None);
     };
-    let owner_member = scope.checked_local_ids.get(type_path) == Some(type_id)
-        || scope.floor_type_ids.get(type_path) == Some(type_id);
+    let owner_member = scope.checked_local_ids.get(type_path) == Some(&type_id)
+        || scope.floor_type_ids.get(type_path) == Some(&type_id)
+        || inherited_type.is_some_and(|(_, id)| id == type_id);
     let selected_member = scope.qualified_ids.get(name) == Some(member)
         // A checked public family grants its own introductions even when a
         // same-spelling inline module export overwrote the flat selector.
-        || (intro_member.is_some() && scope.qualified_ids.get(type_path) == Some(type_id))
+        || (intro_member.is_some() && scope.qualified_ids.get(type_path) == Some(&type_id))
         || type_path.rsplit_once('.').is_some_and(|(module, _)| {
             scope.prefixes.contains_key(module)
                 && scope.qualified_ids.get(&format!("{module}.{leaf}")) == Some(member)
@@ -1393,7 +1484,9 @@ fn resolve_constructor_path(
     let local_prop_module =
         intro_member.is_some() && owner_member && !scope.prefixes.contains_key(type_path);
     let module_path = if local_prop_module {
-        scope.bindings.get(type_path).map_or(type_path, String::as_str)
+        scope.bindings.get(type_path).map(String::as_str)
+            .or_else(|| inherited_type.map(|(canonical, _)| canonical))
+            .unwrap_or(type_path)
     } else {
         type_path
     };
@@ -1430,11 +1523,13 @@ fn resolve_checked_ref(
         return Ok((name.to_string(), Some(id)));
     }
     let canonical = resolve_ref(scope, exports, name, span)?;
+    let inherited = scope.checked_enclosing(name, span)?;
     let selected = scope
         .qualified_ids
         .get(name)
         .or_else(|| scope.binding_ids.get(name))
-        .copied();
+        .copied()
+        .or_else(|| inherited.map(|(_, id)| id));
     let imported_bare = scope.bindings.contains_key(name) && !scope.locals.contains(name);
     let imported_qualified = name.rsplit_once('.')
         .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
@@ -2030,15 +2125,18 @@ fn select_in_scope_export(
     item: &ImportItem,
     span: &Span,
 ) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
-    if item.name.contains('.') {
-        // A written export item takes the same dual-meaning verdict as a
-        // term reference: a checked family member (data constructor or prop
-        // intro) and an authorized module export under one path are ambiguous.
-        resolve_constructor_path(scope, exports, &item.name, span)?;
-    }
-    let had_scope_binding = scope.bindings.contains_key(&item.name);
+    // A written export item takes the same dual-meaning verdict as a term
+    // reference. Preserve the exact checked family member ID as well: an
+    // inherited `T.C` must not fall back to a mutable globals spelling.
+    let constructor_id = if item.name.contains('.') {
+        resolve_constructor_path(scope, exports, &item.name, span)?
+    } else {
+        None
+    };
+    let inherited = scope.checked_enclosing(&item.name, span)?;
+    let had_scope_binding = scope.bindings.contains_key(&item.name) || inherited.is_some();
     let canonical = resolve_ref(scope, exports, &item.name, span)?;
-    if !had_scope_binding && !globals.contains_key(&canonical) {
+    if !had_scope_binding && constructor_id.is_none() && !globals.contains_key(&canonical) {
         return Err(ElabError::UnboundName {
             name: item.name.clone(),
             span: span.clone(),
@@ -2052,8 +2150,11 @@ fn select_in_scope_export(
         .get(&item.name)
         .or_else(|| scope.binding_ids.get(&item.name))
         .copied()
+        .or(constructor_id)
+        .or_else(|| inherited.map(|(_, id)| id))
         .or_else(|| {
-            // Locals checked earlier in this unit have their ID in globals.
+            // Only this scope's checked locals may use the ordinary globals
+            // route; an inherited local above selected its exact checked ID.
             // An imported binding must already have its selected ID.
             (scope.locals.contains(&item.name)
                 || (!had_scope_binding && !item.name.contains('.')))
@@ -5855,6 +5956,10 @@ fn expand_scope(
                     .require_module_path_available(&child_prefix, unit_owner, span)?;
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
+                if scope.mode == ResolutionMode::Strict {
+                    child_scope.enclosing = Some(scope.snapshot_enclosing()?);
+                    child_scope.prop_intro_members.clone_from(&scope.prop_intro_members);
+                }
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
@@ -6865,6 +6970,48 @@ pub fn expand_and_elaborate(
         elab.module_state.next_in_memory_unit += 1;
     }
     Ok(results)
+}
+
+#[cfg(test)]
+mod inline_enclosing_identity_tests {
+    use std::collections::{HashMap, HashSet};
+
+    use super::{resolve_checked_ref, select_in_scope_export, ResolutionMode, Scope};
+    use crate::ast::ImportItem;
+    use crate::error::Span;
+    use crate::ElabEnv;
+
+    /// MEASURED: a real checked class local resolves and exports at its
+    /// enclosing ID even when a distinct checked class replaces its flat
+    /// global spelling. CLAIMED: neither bare lookup nor reexport can take
+    /// an ancestor identity from globals. THE GAP: the integration tests
+    /// separately exercise both operations in actual inline source.
+    #[test]
+    fn enclosing_class_selection_ignores_same_spelled_flat_global_decoy() {
+        let mut env = ElabEnv::new().expect("checked prelude");
+        env.elaborate_isolated_file_strict_v1(&[],
+            "class Ord a { leq : a -> a -> Bool }\n\
+             class Decoy a { leq : a -> a -> Bool }\n")
+            .expect("two distinct checked local classes");
+        let ord = env.globals["Ord"];
+        let decoy = env.globals["Decoy"];
+        assert_ne!(ord, decoy);
+        let mut child = Scope::with_mode(ResolutionMode::Strict, HashSet::new());
+        child.enclosing = Some(env.module_state.root_scope.snapshot_enclosing()
+            .expect("real checked parent snapshot"));
+        env.globals.insert("Ord".to_string(), decoy);
+        assert_eq!(env.globals["Ord"], decoy, "the decoy must really occupy globals");
+        let (canonical, selected) = resolve_checked_ref(
+            &child, &HashMap::new(), "Ord", &Span::zero(),
+        ).expect("the enclosing class is checked");
+        assert_eq!(canonical, "Ord");
+        assert_eq!(selected, Some(ord), "child lookup must retain the parent identity");
+        let item = ImportItem { name: "Ord".to_string(), rename: None };
+        let (_, exported) = select_in_scope_export(
+            &child, &HashMap::new(), &env.globals, &item, &Span::zero(),
+        ).expect("ancestor export must select its checked identity");
+        assert_eq!(exported, Some(ord), "reexport must not select the flat decoy");
+    }
 }
 
 #[cfg(test)]
