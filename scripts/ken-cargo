@@ -62,6 +62,7 @@ run() { cargo "$@" 9>&-; }
 # support archive from KEN_RUNTIME_SUPPORT_STATICLIB. Produce it on purpose
 # for commands that can build or run native rows, unless a parent already
 # did. The profile and lock flags of this invocation are forwarded.
+producer_launch=()
 ensure_support_archive() {
   [[ -n "${KEN_RUNTIME_SUPPORT_STATICLIB:-}" ]] && return 0
   case "$sub" in build|test|nextest|run|bench) ;; *) return 0 ;; esac
@@ -75,7 +76,7 @@ ensure_support_archive() {
     previous="$arg"
   done
   local archive
-  archive=$("$(dirname "$0")/build-runtime-support-archive" "${forward[@]}" 9>&-)
+  archive=$("${producer_launch[@]}" "$(dirname "$0")/build-runtime-support-archive" "${forward[@]}" 9>&-)
   export KEN_RUNTIME_SUPPORT_STATICLIB="$archive"
 }
 
@@ -105,6 +106,7 @@ export KEN_CARGO_LOCK_HELD=1
 
 # Preferred: GNU `sem` gives a correct counting semaphore for slots > 1.
 if [[ "$slots" -gt 1 ]] && command -v sem >/dev/null 2>&1; then
+  producer_launch=(sem --id ken-build --fg -j "$slots" --)
   ensure_support_archive "$@"
   exec sem --id ken-build --fg -j "$slots" -- cargo "$@"
 fi
