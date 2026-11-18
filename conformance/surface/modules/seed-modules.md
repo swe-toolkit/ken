@@ -264,6 +264,67 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   scope. A resolver that over-applies the new clash rule into lexical binders
   rejects and fails this case.
 
+### surface/modules/inline-child-local-import-shadow-enclosing-local
+
+- spec: `33 §3.2` (imports within a module), `33 §3.3`
+  (SH-shadow clause in approved Spec child
+  `888f10512c2214c730c2823e6f39dd9b8c0b3b0e`)
+- given: two fresh Strict-root programs. `scopeProbe` is a non-B spelling.
+  The local arm:
+
+  ```ken
+  module LocalOuter {
+    const scopeProbe : Nat = Zero;
+    module InheritedChild {
+      const inheritedUse : Nat = scopeProbe
+    };
+    module Child {
+      const scopeProbe : Bool = True;
+      const childUse : Bool = scopeProbe
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+
+  The import arm:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    const scopeProbe : Nat = Zero;
+    module InheritedChild {
+      const inheritedUse : Nat = scopeProbe
+    };
+    module Child {
+      import Provider (scopeProbe);
+      const childUse : Bool = scopeProbe
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+- expect: Both programs accept without `AmbiguousReference`. In
+  `LocalOuter.InheritedChild` and `LocalOuter.outerUse`, the reference
+  resolves to `LocalOuter.scopeProbe`; in `LocalOuter.Child`, it
+  resolves to `LocalOuter.Child.scopeProbe`. In
+  `ImportOuter.InheritedChild` and `ImportOuter.outerUse`, it resolves
+  to `ImportOuter.scopeProbe`; in `ImportOuter.Child`, it resolves to
+  `Provider.scopeProbe`. The `Nat`/`Bool` annotations check these
+  choices at both scope boundaries.
+- controls: Each unshadowed `InheritedChild` proves that the enclosing
+  local is available in a child scope. If the local/import is omitted
+  from `Child`, `childUse : Bool = scopeProbe` sees the inherited `Nat`
+  and rejects. If the child binding leaks outward, `outerUse : Nat`
+  rejects.
+- why: The baseline child makes the inherited `scopeProbe` observable;
+  the same-name child declaration or import must select its distinct
+  target locally, while the later parent use still selects the outer
+  binding. This pins both AC-3 SH-shadow forms without making a
+  same-scope clash acceptable; `top-level-local-import-clash-rejected`
+  remains the same-scope control.
+- staging: RED UNTIL `LANG-INLINE-MODULE-ENCLOSING-SCOPE`.
+
 ### surface/modules/protected-name-binding-rejected-renamed-local-resolves
 - spec: `33 §3.3` (no source binding may introduce a name in B)
 - given: paired clients: (a) declare `def Bool = Nat`; (b) instead declare
