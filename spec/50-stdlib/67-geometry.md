@@ -1546,10 +1546,14 @@ operation.
 > with no `Axiom`, postulate or caller premise. The open and closed
 > clients checked, and an off-line `Eq` claim refused in each of two
 > forms. That D0 did **not** measure equality of exact `trusted_base()`
-> identity sets. Per the Steward's AC-0 ordering amendment, the
-> Foundation package test owes that identity-set comparison on the
-> assembled candidate before a Decision opens; a changed set is a
-> stop to the Architect. Scratch checks do not establish official
+> identity sets. Foundation QA's AC-T test
+> `shared_axis_laws_have_checked_owners_and_zero_new_trust` passed 1/1
+> on assembled candidate `a79e131911b6782357bcbd0a32eb48e84a3c620d`:
+> it found equal exact trusted `GlobalId` sets before and after loading
+> `NatOrientation` over its five providers. An unused `Axiom` mutation
+> reddened the set equality, and the restored test passed. This is
+> candidate-local zero **new** trust; provider trust is inherited.
+> Neither scratch nor candidate-local checks establish official
 > conformance, CI, publication, landing or measured landed trust.
 
 `Algorithm.Geometry.NatOrientation` must export two further public checked
