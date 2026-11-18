@@ -8,10 +8,13 @@ Frame: `docs/program/issues/PX10-SPAWN-PLAN-WAIT.md`.
 Section 1.11 specifies interpreter behavior and the current native
 availability boundary. The former native-refusal sentinel is retired: the
 argv-env pipe client's invoked ABI operations are native on the released
-base. The F row measures parity for its own child-probe argv-env input; its
-fixture and argument list differ from this seed's `px10-argv-env` client.
-This is bounded parity evidence, not an exact-seed native execution or a
-claim about all Process programs.
+base. The F row measures parity for its own child-probe argv-env input under an
+Invocation Nodes limit of 80, raised from the 64-node starter profile. At
+the starter profile, the same-source R row builds and runs natively but ends
+in typed Invocation Nodes capacity exhaustion, not an availability refusal.
+The F/R source and arguments differ from this seed's `px10-argv-env` client.
+This is bounded, profile-specific parity evidence, not an exact-seed native
+execution or a claim about all Process programs.
 
 These are acceptance cases, not execution evidence. The seed has not been
 Ken-checked or run by the official conformance runner. No CI, publication,
@@ -613,9 +616,11 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
 ## Coverage boundary
 
 These cases pin the public plan, Process grant, pipe, wait, error, descriptor,
-and signal behavior in §1.11, including AC-1 and AC-2. The F row is bounded
-parity evidence for its own fixture; it is not native-availability
-conformance coverage for this seed.
+and signal behavior in §1.11, including AC-1 and AC-2. The F-row parity
+result is for its own fixture under the raised Invocation Nodes limit of
+80; it is not native-availability conformance coverage for this seed. The
+same-source R row at the 64-node starter limit ends in a typed Invocation
+Nodes capacity fault, not an availability refusal.
 The host-side invalid or duplicate descriptor-entry check has no public input
 because builders expose no descriptor map. The exact reverse order among
 internal release actions and the absence of a post-fork callback are not
@@ -630,5 +635,5 @@ outside this slice.
 ## Clean-room provenance
 
 This correction was derived from the approved §1.11 Spec child, the AC-0
-measurement, and the named F-row test. No permissive or copyleft reference
+measurement, and the named F/R test rows. No permissive or copyleft reference
 was consulted.
