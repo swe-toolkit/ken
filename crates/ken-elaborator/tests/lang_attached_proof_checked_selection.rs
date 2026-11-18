@@ -167,9 +167,10 @@ fn middle_import_shadow_prevents_grandchild_attached_proof_selection() {
         "subject f must refuse before idp is considered");
 }
 
-/// MEASURED: the Legacy ES3 source, with only a catalog import of cong added,
-/// retains its kind, privacy and trust assertions under Strict. CLAIMED: the
-/// enclosing checked list_append::assoc survives the lexical boundary.
+/// MEASURED: the Legacy ES3 source, with a catalog import of cong in each
+/// scope that uses it, retains its kind, privacy and trust assertions under
+/// Strict. CLAIMED: the enclosing checked list_append::assoc survives the
+/// lexical boundary.
 /// THE GAP: the untouched Legacy row is the adjacent route comparison; the
 /// layer-route mutant must refuse at list_append::assoc in this Strict twin.
 #[test]
@@ -204,6 +205,7 @@ fn strict_parameterized_abstract_export_preserves_kind_and_owner_proof() {
           }
 
         module M {
+          import Core.Logic.Transport (cong)
           pub data NonEmpty a = NonEmptyCons a (List a)
 
           pub fn nonempty_singleton (a : Type) (x : a) : NonEmpty a =
