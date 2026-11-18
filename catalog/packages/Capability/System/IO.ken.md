@@ -7,21 +7,26 @@ returns a positive `WriteProgress.Wrote`, while a zero host write is the
 distinct `NoProgress` error. `spanBytes` (`freeze`)
 copies only the validated current span.
 
-`writeAll` recurses over its initial `BufferSpan` budget. Its checked prelude
-laws name the actual loop and its private response step, then establish entry,
-stop, request, first-error, done, continue, and offset advance. The private
-step cannot mint a public `BufferSpan`. This package proves the arithmetic
-facts needed to use those laws for each `Wrote` response. Errors need no count
-premise; every successful response supplies `write_all_count_fits` for the
-span named by that request.
+`writeAll` recurses over its initial `BufferSpan` budget. The checked prelude
+equations for entry, stop, request, first-error, done, and continue name the
+loop and private response step. The write-all and resource-law tests verify
+them as implementation equations, but a Strict client cannot state them:
+their helper vocabulary is private. The private step cannot mint a public
+`BufferSpan`. `write_all_advance_start_prop` states the public offset claim;
+`write_all_advance_start` proves it, and
+`write_all_exact_prefix_prop::exact_prefix` proves the prefix claim. Both
+hold by computation today; cite the named laws rather than relying on that
+reduction. This package proves the response arithmetic needed for each
+`Wrote`. Errors need no count premise; every successful response supplies
+`write_all_count_fits` for the span named by that request.
 
-| Clause | Checked loop laws | Response arithmetic |
+| Clause | Client-usable loop law | Response arithmetic |
 |---|---|---|
-| Termination at most initial budget | `write_all_entry`, `_stop`, `_request`, `_continue` | `write_all_strict_decrease` |
-| Exact prefix | `_continue`, `write_all_advance_start`, `write_all_exact_prefix_prop::exact_prefix` | `write_all_count_fits` |
-| Success completeness | `_stop`, `_done` | `write_all_fuel_sufficient`, `write_all_complete_after_wrote`, `write_all_zero_budget` |
-| First error unchanged | `_request`, `_first_error_step` | No response premise |
-| All successful writes finish | `_done`, `_continue` | `write_all_fuel_sufficient`, `write_all_complete_after_wrote` |
+| Termination at most initial budget | Internal loop equation | `write_all_strict_decrease` |
+| Exact prefix | `write_all_advance_start`, `write_all_exact_prefix_prop::exact_prefix` | `write_all_count_fits` |
+| Success completeness | Internal loop equation | `write_all_fuel_sufficient`, `write_all_complete_after_wrote`, `write_all_zero_budget` |
+| First error unchanged | Internal loop equation | No response premise |
+| All successful writes finish | Internal loop equation | `write_all_fuel_sufficient`, `write_all_complete_after_wrote` |
 
 The old observer-only helpers below remain checked utilities, but their
 claims do not establish the loop's behavior. No law adds an axiom or trusted
@@ -36,7 +41,13 @@ import Capability.System.Buffer
     transfer_count_predecessor,
     transfer_count_remaining)
 
-export write_all_exact_prefix_prop, readAt, writeAt, writeAll, spanBytes
+export write_all_exact_prefix_prop,
+  write_all_advance_start_prop,
+  write_all_advance_start,
+  readAt,
+  writeAt,
+  writeAll,
+  spanBytes
 
 import Core.Logic.Transport (cong, sym, trans)
 

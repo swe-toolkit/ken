@@ -325,7 +325,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 52] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 164] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 166] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -427,6 +427,8 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 164] = [
     ("Capability.System.IO", "writeAll"),
     ("Capability.System.IO", "write_all_exact_prefix_prop"),
     ("Capability.System.IO", "write_all_exact_prefix_prop::exact_prefix"),
+    ("Capability.System.IO", "write_all_advance_start_prop"),
+    ("Capability.System.IO", "write_all_advance_start"),
     ("Capability.System.Resource", "resourceMetadata"),
     ("Capability.System.Resource", "ResourceBodyResult"),
     ("Capability.System.Resource", "ResourceBodyOk"),

@@ -220,6 +220,14 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
         ("Core.Classes.LawfulClasses".to_string(), "isScalar".to_string()),
         ("Core.Classes.LawfulClasses".to_string(), "inRangeBool".to_string()),
         ("Capability.Time.WallClock".to_string(), "ClockIO".to_string()),
+        (
+            "Capability.System.IO".to_string(),
+            "write_all_advance_start_prop".to_string(),
+        ),
+        (
+            "Capability.System.IO".to_string(),
+            "write_all_advance_start".to_string(),
+        ),
         ("Data.Numeric.FixedWidth".to_string(), "RangeError".to_string()),
         ("Data.Numeric.FixedWidth".to_string(), "MkRangeError".to_string()),
         ("Data.Numeric.FixedWidth".to_string(), "intToUSize".to_string()),
@@ -238,7 +246,7 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     }
     let added = actual.difference(&PACKAGED.into_iter().collect()).map(|(owner, name)|
         ((*owner).to_string(), (*name).to_string())).collect::<BTreeSet<_>>();
-    assert_eq!(added, expected_added, "only the 56 ruled homes were added");
+    assert_eq!(added, expected_added, "only the ruled homes were added");
     assert_eq!(env.globals["ConsoleStream"], env.prelude_env.stream_id);
     assert!(
         !env.globals.contains_key("Stream"),

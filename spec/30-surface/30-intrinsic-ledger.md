@@ -371,10 +371,15 @@ official conformance, CI, publication or landed trust.
 ## Checked laws and helpers are not intrinsic candidates
 
 No `write_all_*`, `transfer_count_*`, or `buffer_*` lemma/helper is keyed by
-native machinery just because it reasons about a keyed carrier. The behavior
-or proof that the spec promises moves to a checked package; an unneeded pure
-helper's prelude registration is deleted. D0 still measures actual uses and
-reverse dependencies before any such move or deletion.
+native machinery just because it reasons about a keyed carrier. A checked
+law with a client-expressible generic statement can have an explicit-import
+package home at its existing identity; a law whose statement needs private
+helpers remains an internal checked implementation equation, not a client
+promise. An unneeded pure helper's prelude registration is deleted only
+after its uses and reverse dependencies are measured. The 21 IO/Resource
+entries below are internal equations under the Architect's Strict-vocabulary
+probe, **not** H rows; their existing kernel-term and write-loop tests
+check the implementation equations, not a Strict client route.
 
 | Name | Package or removal disposition |
 |---|---|
@@ -398,6 +403,27 @@ reverse dependencies before any such move or deletion.
 | `write_all_exact_prefix_prop::exact_prefix` | Attached proof in that package. |
 | `write_all_first_error` | Checked law in the capability package. |
 | `write_all_first_error::first_error` | Attached proof in that package. |
+| `write_all_entry` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `write_all_stop` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `write_all_request` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `write_all_first_error_step` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `write_all_done` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `write_all_continue` | Internal checked IO loop equation: its statement names private loop machinery; no H row. |
+| `resource_with_acquire` | Internal checked Resource acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `buffer_with_acquire` | Internal checked Resource acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `mapping_with_anonymous_acquire` | Internal checked Resource acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `mapping_with_file_acquire` | Internal checked Resource acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `resource_after_open_error` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `resource_after_open_success` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `buffer_after_allocate_error` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `buffer_after_allocate_success` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `mapping_after_allocate_error` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `mapping_after_allocate_success` | Internal checked Resource post-acquisition equation: its statement names private bracket or effect machinery; no H row. |
+| `resource_release_settles` | Internal checked Resource release equation: its statement names private settlement machinery; no H row. |
+| `resource_settle_body_ok_release_error` | Internal checked Resource settlement equation: writable only at a closed release error, where its result reduces independently; no H row. |
+| `resource_settle_body_error_release_error` | Internal checked Resource settlement equation: writable only at a closed release error, where its result reduces independently; no H row. |
+| `resource_settle_body_ok_clean` | Internal checked Resource settlement equation: the Strict-writable statement is reflexive; no H row. |
+| `resource_settle_body_error_clean` | Internal checked Resource settlement equation: the Strict-writable statement is reflexive; no H row. |
 
 ## Unused-by-catalog does not mean unpromised
 
