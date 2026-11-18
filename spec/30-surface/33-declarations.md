@@ -315,6 +315,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
   to the exact pre-source `GlobalId`; without it, an unimported bare use
   raises `UnboundName` in Strict roots.
+  In an inline child module, a child-scope local or import shadows an
+  inherited enclosing local with the same non-B spelling within that child
+  without altering the enclosing scope, while distinct local/import bindings
+  of that spelling in one scope remain **`AmbiguousReference`**.
 - **Checked package homes for the Strict catalog route.** The four catalog
   units below that otherwise fail at resolution under Strict roots have the
   following explicit-import homes for their already-checked pre-source
