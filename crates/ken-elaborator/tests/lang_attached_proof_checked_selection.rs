@@ -3,7 +3,7 @@
 //! Each refusal has an accepting neighbor; the subject resolves before proof lookup.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Level, Term};
@@ -26,6 +26,10 @@ fn mentions(term: &Term, id: GlobalId) -> bool {
 fn body_mentions(env: &ElabEnv, name: &str, id: GlobalId) {
     let (_, body) = env.env.transparent_body(env.globals[name]).expect("checked body");
     assert!(mentions(&body, id), "{name} must select checked proof {id:?}: {body:?}");
+}
+
+fn catalog() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
 }
 
 fn provider(root: &Path, name: &str) {
@@ -163,23 +167,18 @@ fn middle_import_shadow_prevents_grandchild_attached_proof_selection() {
         "subject f must refuse before idp is considered");
 }
 
-/// MEASURED: the unmodified Legacy ES3 parameterized abstract-export source
-/// and downstream kind, privacy and trust assertions also pass through Strict.
-/// CLAIMED: the enclosing checked list_append::assoc survives the boundary.
-/// THE GAP: the untouched Legacy row remains an adjacent comparison; this
-/// twin changes only the initial source's elaboration route.
+/// MEASURED: the Legacy ES3 source, with only a catalog import of cong added,
+/// retains its kind, privacy and trust assertions under Strict. CLAIMED: the
+/// enclosing checked list_append::assoc survives the lexical boundary.
+/// THE GAP: the untouched Legacy row is the adjacent route comparison; the
+/// layer-route mutant must refuse at list_append::assoc in this Strict twin.
 #[test]
 fn strict_parameterized_abstract_export_preserves_kind_and_owner_proof() {
     let mut env = ElabEnv::new().expect("base env construction failed");
-    strict(&mut env, &[],
-        "axiom cong : \
-           (a : Type) -> (b : Type) -> (x : a) -> (y : a) -> \
-           (f : a -> b) -> Equal a x y -> Equal b (f x) (f y)",
-    )
-    .expect("fixture supplies Transport.cong's public type");
     let trusted_before = env.env.trusted_base();
-    strict(&mut env, &[],
+    strict(&mut env, &[catalog()],
         r#"
+        import Core.Logic.Transport (cong)
         fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
           match xs {
             Nil |-> ys;
