@@ -301,6 +301,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
             }
             "take::filter_prefix" => "import Data.Collections.Derived (filter, length)\n",
             "take::prefix" => "import Core.Classes.LawfulClasses (leq_nat)\n",
+            "take::saturated" => {
+                "import Core.Classes.LawfulClasses (leq_nat)\n\
+                 import Data.Collections.Derived (length)\n"
+            }
             "insert::length" | "sort::length" => "import Data.Collections.Derived (length)\n",
             "insert::stable_class" | "sort::stable_class" => {
                 "import Data.Collections.Derived (filter, eq_from_ord)\n\
@@ -338,7 +342,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// bound proofs, five `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their six attached sort proofs,
-/// structural `is_sorted`, public `take` and its four attached laws, the
+/// structural `is_sorted`, public `take` and its six attached laws, the
 /// generic insert/sort laws, public `zip`, and Ω-list membership with checked
 /// lemmas.
 /// THE GAP: none
@@ -463,6 +467,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "take::sorted".to_owned(),
             "take::filter_prefix".to_owned(),
             "take::prefix".to_owned(),
+            "take::saturated".to_owned(),
             "zip".to_owned(),
             "list_sorted_cons".to_owned(),
             "list_sorted_head".to_owned(),

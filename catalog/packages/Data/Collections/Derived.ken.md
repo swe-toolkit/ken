@@ -56,7 +56,8 @@ FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `List a -> List a -> List a` op and must not shadow or be shadowed by it),
 `nth`, public `take`, and private `drop`. Public `take` retains the original
 structural recursion and has attached length, membership, sorted-prefix,
-filtered-prefix, and prefix-composition proofs. The canonical `length` comes
+filtered-prefix, prefix-composition and saturation proofs. `take::saturated`
+states `take n xs = xs` whenever `length xs ≤ n`. The canonical `length` comes
 from the trust-free `Data.Collections.List` module and is re-exported here
 with the same checked identity. `list_eq` and `list_compare` are imported from
 the canonical comparison provider; `sub` is imported from the canonical Nat
@@ -517,7 +518,8 @@ or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `take::length` delegates to the unchanged private `length_take_min`; public
 `take::member`, `take::sorted` and `take::filter_prefix` characterize its
 ordered prefix without testing value equality. `take::prefix` states that the
-k-prefix of an n-prefix is the k-prefix whenever k ≤ n. The public
+k-prefix of an n-prefix is the k-prefix whenever k ≤ n. `take::saturated`
+states that taking at least the list's length returns the same list. The public
 `list_append::length` and private `length_drop` laws hold for any element type
 and list. The append law uses the canonical addition laws because `add`
 recurses on its second argument. The private `mem_filter` theorem characterizes
@@ -1312,6 +1314,30 @@ pub proof prefix for take
                   (λrest. Cons a h rest)
                   ((proof prefix for take) a j p t bounded)
           }
+      }
+  }
+
+pub proof saturated for take
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Bool (leq_nat (length a xs) n) True → Equal (List a) (take a n xs) xs =
+  match n {
+    Zero ↦
+      match xs {
+        Nil ↦ λcovered. Proved;
+        Cons h t ↦ λcovered. absurd covered
+      };
+    Suc m ↦
+      match xs {
+        Nil ↦ λcovered. Proved;
+        Cons h t ↦
+          λcovered.
+            cong
+              (List a)
+              (List a)
+              (take a m t)
+              t
+              (λrest. Cons a h rest)
+              ((proof saturated for take) a m t covered)
       }
   }
 
@@ -4412,7 +4438,8 @@ reference implementation.
    `map::append`,
    `map::fusion`, `map::id`, `filter::append`, `filter::length`,
    `filter::empty_if_none`, `take::length`, `take::member`, `take::sorted`,
-   `take::filter_prefix`, `take::prefix`, `nth::at_or_beyond_is_none`,
+   `take::filter_prefix`, `take::prefix`, `take::saturated`,
+   `nth::at_or_beyond_is_none`,
    `nth::some_below_length`, `reverse::involutive`. Generic sorting adds
    the operations `Perm`, `insert`, and `sort`, with attached proofs
    `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
@@ -4476,6 +4503,8 @@ reference implementation.
    the bound and input, delegating length to `length_take_min` and commuting
    filtering with the selected prefix, and `take::prefix` inducts on both
    bounds and the input, refuting a longer outer bound from its premise.
+   `take::saturated` inducts on the bound and list, refuting the Zero/Cons
+   bound and lifting the Suc/Cons recursion under `cong`.
    Private decision-variable helpers rewrite applied comparator branches without
    relying on a proof-side match to refine the goal. The separate `List Bool`
    proofs case-split under `bool_leq`, closing by `Proved`/`Refl`/`cong`/

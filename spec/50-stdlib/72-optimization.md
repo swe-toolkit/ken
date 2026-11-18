@@ -13,7 +13,10 @@
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
 > SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5;
 > SPEC-OPTIMIZATION-ARGMAX-APPEND-SPLIT §3.6;
-> SPEC-OPTIMIZATION-LEAST-K §4).** Section 1 specifies
+> SPEC-OPTIMIZATION-LEAST-K §4;
+> SPEC-OPTIMIZATION-LEAST-K-COST-ORDER-INVARIANCE §4.4;
+> SPEC-OPTIMIZATION-LEAST-K-PREFIX §4.5;
+> SPEC-OPTIMIZATION-LEAST-K-SATURATED §4.6).** Section 1 specifies
 > the non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
 > four laws and seed are also present on main. Section 1.5's checked
@@ -1724,3 +1727,83 @@ the last two of the three-least (X-LAST): `[B,A]` differs from
 isolated false claims belong to CV's separate seed; the D0's
 acceptance and refusal observations do not prove the generic laws
 or run that authored seed.
+
+### 4.6 Saturation at a bound covering the whole input
+
+> **Section 4.6 status: DRAFT v0
+> (SPEC-OPTIMIZATION-LEAST-K-SATURATED).** Architect's AC-0 D0
+> checked the two generic proofs in scratch on `8cf27bd2c`:
+> Derived and Argmin passed `ken check` and `ken fmt --check` at rc 0,
+> with no new `Axiom`, postulate, primitive or foreign declaration.
+> Two mutations of the `take` proof and one bypass of the sorted-length
+> transport refused, with the sources restored and checked again.
+> The open and closed client checks and the input-order refusal used
+> a binary whose source commit was not identified. D0 did **not**
+> measure exact `trusted_base()` identity sets; the Foundation package
+> test owes that gate. These are scratch observations, not checks of
+> this Spec child, the separately owned catalog or CV seed children,
+> assembled review, official conformance, CI, publication, landing
+> or measured landed trust.
+
+`Data.Collections.Derived` must export one public checked proof attached
+to its existing `take`, immediately after `prefix for take` and before
+private `derived_take_sorted_tail`:
+
+```ken
+pub proof saturated for take
+      (a : Type) (n : Nat) (xs : List a)
+    : Equal Bool (leq_nat (length a xs) n) True
+      → Equal (List a) (take a n xs) xs
+```
+
+The sole premise says that the input's length is at most the bound.
+This is a generic `List` law, not an Argmin-specific private helper,
+and makes no assumption about order, cost or element equality.
+Induct on `n` and `xs` in the same order as `take` computes.
+Both `Nil` cases close by `Proved`. At `Zero` and `Cons h t`,
+`length (Cons h t) ≤ Zero` reduces to `False`; `absurd` refutes
+the supplied bound. At `Suc m` and `Cons h t`, the bound reduces
+to the corresponding bound on `length t` and `m`; `cong` under
+`Cons a h` lifts the recursive equality. No new helper or import
+is needed in Derived.
+
+`Algorithm.Optimization.Argmin` must export one public Transparent
+checked theorem immediately after `least_k_prefix` and before
+`argmax`:
+
+```ken
+pub theorem least_k_saturated
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a)
+    : Equal Bool (leq_nat (length a xs) k) True
+      → Equal (List a)
+        (least_k a cost k xs)
+        (sort a (cost_le a cost) xs)
+```
+
+The same sole bound premise refers to the **original** input `xs`,
+while `least_k` takes the prefix of its **stable cost sort**, not a
+prefix of `xs`. Use public `(proof length for sort)` at
+`(a, cost_le a cost, xs)` to equate the sorted length and
+`length a xs`. `cong` through `λn. leq_nat n k`, followed by
+`trans` with the supplied bound, produces the premise of public
+`(proof saturated for take)` for the sorted list. Applying that
+proof yields the stated structural `Equal (List a)` conclusion.
+There is no second induction or Argmin-local copy of the generic
+`take` law, no added premise, import, axiom, postulate, kernel rule
+or surface change, and no §§1–4.5 operation or law type changes.
+
+On §4.3's input `[A,B,C,D]` with costs `[2,1,2,3]`, both `k = 4`
+(the length) and `k = 9` (past the length) select the entire sorted
+list `[B,A,C,D]`, preserving the input-relative tie order of `A`
+and `C`. They do **not** return the original `[A,B,C,D]` order.
+The CV-owned accepted rows apply `least_k_saturated` at both
+bounds and independently check the sorted result. At `k = 3` the
+four-element bound is false and the result `[B,A,C]` is not the
+full sort; the premise cannot be dropped. A fresh accepted
+prefix with the same `k = 4` input and `Refl` form, but claiming
+the original input list as the result, must refuse at that false
+claim; the accepted sorted-result `Refl` is its control. The
+closed bound checks by `Proved`, while the closed structural list
+equalities use `Refl`. These finite observations distinguish
+sorted saturation from input identity but do not prove the generic
+laws or replace the separate CV seed and trust gates.
