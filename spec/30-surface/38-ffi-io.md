@@ -1506,9 +1506,14 @@ proc socket_local_address (a : Auth) (target : SocketTarget)
   : HostIO a (Result ResourceError SocketAddress) visits [Net]
 ```
 
-A program declares `Net` with one or more classes from `Loopback`,
-`Inet` and `Unix`. The runner mints those declared classes onto the
-existing `Cap a`, not a separate `Cap_Net` value. `Loopback` permits
+A program declares its network authority with the header form
+`program capabilities Net <class>+`, where `<class>` is exactly one of
+`Loopback`, `Inet` or `Unix`. The `+` is grammar metanotation requiring
+at least one class, not a source token. Thus
+`program capabilities Net Loopback` is a complete single-class form;
+no other class member, including `AFull`, is admitted as a `Net` class.
+The runner mints those declared classes onto the existing `Cap a`, not
+a separate `Cap_Net` value. `Loopback` permits
 IPv4 `127.0.0.0/8` and IPv6 `::1`; `Inet` covers all IPv4/IPv6
 addresses and implies `Loopback`; `Unix` covers absolute Unix paths.
 Both listen and connect use the address's class; `0.0.0.0` and `::`
