@@ -32,6 +32,23 @@ use crate::error::ElabError;
 use crate::ElabEnv;
 
 mod process;
+mod net;
+
+/// Finish checked address builders only after the safe Bytes structural views
+/// exist, and hide the raw representation before any package source can speak.
+pub(crate) fn register_postbytes_net(elab: &mut ElabEnv) -> Result<(), ElabError> {
+    net::register_postbytes_socket_address(elab)?;
+    let address_id = elab.globals["SocketAddress"];
+    elab.module_state.scope_constructor_family(
+        &elab.env, &mut elab.globals, address_id, "SocketAddress",
+    )?;
+    elab.module_state.hide_prelude_names(
+        &mut elab.globals,
+        &["SocketAddress.PrivateSocketIPv4", "SocketAddress.PrivateSocketIPv6",
+            "SocketAddress.PrivateSocketUnix", "private_socket_has_nul"],
+    )?;
+    Ok(())
+}
 
 /// Declares [`CanonicalRuntimeRoles`] and its registration-time capture from a
 /// single list, so the field set and the captured set cannot drift apart.
@@ -318,7 +335,12 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_mapping_write_view_id: z,
         private_mapping_acquire_file_id: z,
         px10_op_ids: [z; 9],
+        px11_op_ids: [z; 7],
         px10_kind_ids: [z; 4],
+        px11_kind_ids: [z; 2],
+        px11_address_ids: [z; 3],
+        px11_target_ids: [z; 2],
+        px11_how_ids: [z; 3],
         px10_exit_ids: [z; 2],
         private_buffer_handle_id: z,
         buffer_handle_resource_id: z,
@@ -490,7 +512,12 @@ pub struct PreludeEnv {
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
     pub px10_op_ids: [GlobalId; 9],
+    pub px11_op_ids: [GlobalId; 7],
     pub px10_kind_ids: [GlobalId; 4],
+    pub px11_kind_ids: [GlobalId; 2],
+    pub px11_address_ids: [GlobalId; 3],
+    pub px11_target_ids: [GlobalId; 2],
+    pub px11_how_ids: [GlobalId; 3],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_buffer_handle_id: GlobalId,
     pub buffer_handle_resource_id: GlobalId,
@@ -847,6 +874,7 @@ struct PreludeResourceSeed {
     resource_id: GlobalId,
     px10_kind_ids: [GlobalId; 4],
     px10_exit_ids: [GlobalId; 2],
+    px11_kind_ids: [GlobalId; 2],
     private_resource_trace_identity_id: GlobalId,
     resource_host_io_id: GlobalId,
     closed_id: GlobalId,
@@ -877,6 +905,7 @@ struct PreludeOperationIds {
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
     px10_op_ids: [GlobalId; 9],
+    px11_op_ids: [GlobalId; 7],
 }
 
 struct PreludeResourceIds {
@@ -893,8 +922,13 @@ struct PreludeResourceIds {
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
     px10_op_ids: [GlobalId; 9],
+    px11_op_ids: [GlobalId; 7],
     px10_kind_ids: [GlobalId; 4],
     px10_exit_ids: [GlobalId; 2],
+    px11_kind_ids: [GlobalId; 2],
+    px11_address_ids: [GlobalId; 3],
+    px11_target_ids: [GlobalId; 2],
+    px11_how_ids: [GlobalId; 3],
     private_buffer_handle_id: GlobalId,
     buffer_handle_resource_id: GlobalId,
     buffer_handle_capacity_id: GlobalId,
@@ -2056,7 +2090,7 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
     // generation-checked resource table is its sole interpreter. The trace
     // identity has one private two-u32-limb constructor so the native reply
     // can preserve all 64 bits without narrowing through signed Ken `Int`.
-    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping | SpawnPlan | ChildProcess | PipeRead | PipeWrite")
+    elab.elaborate_decl("data ResourceKind = FsHandle | Buffer | Mapping | SpawnPlan | ChildProcess | PipeRead | PipeWrite | SocketListener | SocketStream")
         .map_err(|e| ElabError::Internal(format!("prelude ResourceKind failed: {e}")))?;
     let resource_kind_id = *elab
         .globals
@@ -2135,6 +2169,10 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         "ResourceKind.SpawnPlan", "ResourceKind.ChildProcess",
         "ResourceKind.PipeRead", "ResourceKind.PipeWrite",
     ].map(|name| elab.globals[name]);
+    let px11_kind_ids = [
+        elab.globals["ResourceKind.SocketListener"],
+        elab.globals["ResourceKind.SocketStream"],
+    ];
     let px10_exit_ids = [elab.globals["Exited"], elab.globals["Signaled"]];
     let private_resource_trace_identity_id = elab
         .globals
@@ -2151,6 +2189,14 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
     )
     .map_err(|e| ElabError::Internal(format!("prelude Resource failed: {e}")))?;
     elab.globals.insert("Resource".to_string(), resource_id);
+    // Socket addresses are closed typed alternatives. The raw constructors are
+    // hidden after the checked builders and IO wrappers are registered.
+    elab.elaborate_decl("data SocketAddress = PrivateSocketIPv4 Bytes UInt16 | PrivateSocketIPv6 Bytes UInt16 | PrivateSocketUnix Bytes")
+        .map_err(|e| ElabError::Internal(format!("prelude SocketAddress failed: {e}")))?;
+    elab.elaborate_decl("data SocketShutdown = ShutdownRead | ShutdownWrite | ShutdownBoth")
+        .map_err(|e| ElabError::Internal(format!("prelude SocketShutdown failed: {e}")))?;
+    elab.elaborate_decl("data SocketTarget = ListeningSocket (Resource ResourceKind.SocketListener) | ConnectedSocket (Resource ResourceKind.SocketStream)")
+        .map_err(|e| ElabError::Internal(format!("prelude SocketTarget failed: {e}")))?;
     elab.elaborate_decl(
         "data ResourceOpenMode = ResourceRead | ResourceMetadata | ResourceWriteCreate CreatePolicy",
     )
@@ -2189,7 +2235,7 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .get("ReleaseFailed")
         .copied()
         .ok_or_else(|| ElabError::Internal("prelude: ReleaseFailed missing".into()))?;
-    Ok(PreludeResourceSeed { auth_t, bytes_t, create_policy_t, bool_t, int_t, cap_id, resource_kind_id, fs_handle_id, resource_id, px10_kind_ids, px10_exit_ids, private_resource_trace_identity_id, resource_host_io_id, closed_id, malformed_resource_id, right_not_held_id, release_failed_id })
+    Ok(PreludeResourceSeed { auth_t, bytes_t, create_policy_t, bool_t, int_t, cap_id, resource_kind_id, fs_handle_id, resource_id, px10_kind_ids, px11_kind_ids, px10_exit_ids, private_resource_trace_identity_id, resource_host_io_id, closed_id, malformed_resource_id, right_not_held_id, release_failed_id })
 }
 
 #[inline(never)]
@@ -2391,6 +2437,11 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let resource_child_t = resource_of_kind("ResourceKind.ChildProcess")?;
     let resource_pipe_read_t = resource_of_kind("ResourceKind.PipeRead")?;
     let resource_pipe_write_t = resource_of_kind("ResourceKind.PipeWrite")?;
+    let resource_socket_listener_t = resource_of_kind("ResourceKind.SocketListener")?;
+    let resource_socket_stream_t = resource_of_kind("ResourceKind.SocketStream")?;
+    let socket_address_t = Term::indformer(elab.globals["SocketAddress"], vec![]);
+    let socket_shutdown_t = Term::indformer(elab.globals["SocketShutdown"], vec![]);
+    let socket_target_t = Term::indformer(elab.globals["SocketTarget"], vec![]);
     let mapping_prot_t = elab
         .globals
         .get("MappingProt")
@@ -2481,8 +2532,15 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![resource_child_t.clone(), int_t.clone()]),
                 named(vec![resource_child_t.clone()]),
                 named(vec![resource_pipe_read_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone()]),
-                named(vec![resource_pipe_write_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone(), resource_buffer_t]),
-                named(vec![resource_child_t, int_t]),
+                named(vec![resource_pipe_write_t, resource_buffer_t.clone(), int_t.clone(), int_t.clone(), resource_buffer_t.clone()]),
+                named(vec![resource_child_t, int_t.clone()]),
+                named(vec![cap_a(), socket_address_t.clone()]),
+                named(vec![resource_socket_listener_t.clone()]),
+                named(vec![cap_a(), socket_address_t.clone()]),
+                named(vec![resource_socket_stream_t.clone(), resource_buffer_t.clone(), int_t.clone(), int_t.clone()]),
+                named(vec![resource_socket_stream_t.clone(), resource_buffer_t.clone(), int_t.clone(), int_t.clone(), resource_buffer_t]),
+                named(vec![resource_socket_stream_t.clone(), socket_shutdown_t]),
+                named(vec![socket_target_t]),
             ]
         },
     })
@@ -2528,6 +2586,13 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateResourceStreamRead",
         "PrivateResourceStreamWrite",
         "PrivateProcessSignal",
+        "PrivateNetListen",
+        "PrivateNetAccept",
+        "PrivateNetConnect",
+        "PrivateNetReceive",
+        "PrivateNetSend",
+        "PrivateNetShutdown",
+        "PrivateNetLocalAddress",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2552,6 +2617,10 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateProcessWait", "PrivateResourceStreamRead", "PrivateResourceStreamWrite",
         "PrivateProcessSignal",
     ].map(|name| elab.globals[name]);
+    let px11_op_ids = [
+        "PrivateNetListen", "PrivateNetAccept", "PrivateNetConnect", "PrivateNetReceive",
+        "PrivateNetSend", "PrivateNetShutdown", "PrivateNetLocalAddress",
+    ].map(|name| elab.globals[name]);
     Ok(PreludeOperationIds {
         private_fs_open_id,
         private_fs_handle_metadata_id,
@@ -2566,6 +2635,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         private_mapping_write_view_id,
         private_mapping_acquire_file_id,
         px10_op_ids,
+        px11_op_ids,
     })
 }
 
@@ -2591,7 +2661,15 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
         private_mapping_write_view_id: op.private_mapping_write_view_id,
         private_mapping_acquire_file_id: op.private_mapping_acquire_file_id,
         px10_op_ids: op.px10_op_ids,
+        px11_op_ids: op.px11_op_ids,
         px10_kind_ids: seed.px10_kind_ids,
+        px11_kind_ids: seed.px11_kind_ids,
+        px11_address_ids: ["PrivateSocketIPv4", "PrivateSocketIPv6", "PrivateSocketUnix"]
+            .map(|name| elab.globals[name]),
+        px11_target_ids: ["ListeningSocket", "ConnectedSocket"]
+            .map(|name| elab.globals[name]),
+        px11_how_ids: ["ShutdownRead", "ShutdownWrite", "ShutdownBoth"]
+            .map(|name| elab.globals[name]),
         px10_exit_ids: seed.px10_exit_ids,
         private_buffer_handle_id: buffer.private_buffer_handle_id,
         buffer_handle_resource_id: buffer.buffer_handle_resource_id,
@@ -2648,7 +2726,14 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateProcessWait child |-> Result ResourceError ChildExit; \
            PrivateResourceStreamRead stream buffer start length |-> Result ResourceError ReadProgress; \
            PrivateResourceStreamWrite stream buffer start length origin |-> Result ResourceError WriteProgress; \
-           PrivateProcessSignal child signo |-> Result ResourceError Unit \
+           PrivateProcessSignal child signo |-> Result ResourceError Unit; \
+           PrivateNetListen cap address |-> Result ResourceError (Resource ResourceKind.SocketListener); \
+           PrivateNetAccept listener |-> Result ResourceError (Resource ResourceKind.SocketStream); \
+           PrivateNetConnect cap address |-> Result ResourceError (Resource ResourceKind.SocketStream); \
+           PrivateNetReceive stream buffer start length |-> Result ResourceError ReadProgress; \
+           PrivateNetSend stream buffer start length origin |-> Result ResourceError WriteProgress; \
+           PrivateNetShutdown stream how |-> Result ResourceError Unit; \
+           PrivateNetLocalAddress target |-> Result ResourceError SocketAddress \
          }"
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -3086,6 +3171,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     register_resource_bracket_laws(elab)?;
     register_post_bracket_io(elab)?;
     process::register_prelude_process(elab)?;
+    net::register_prelude_net(elab)?;
 
     // Scope both private families only after the checked buffer helpers have
     // used their original bare bindings, but before their IDs are hidden.
@@ -3129,6 +3215,15 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "PrivateResourceStreamRead",
         "PrivateResourceStreamWrite",
         "PrivateProcessSignal",
+        "PrivateNetListen",
+        "PrivateNetAccept",
+        "PrivateNetConnect",
+        "PrivateNetReceive",
+        "PrivateNetSend",
+        "PrivateNetShutdown",
+        "PrivateNetLocalAddress",
+        "private_net_error",
+        "private_net_after_acquire",
         "SpawnPlan.PrivateSpawnPlan",
         "private_process_error",
         "private_process_read_result",
@@ -3567,7 +3662,12 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         private_mapping_write_view_id: fs_ids.private_mapping_write_view_id,
         private_mapping_acquire_file_id: fs_ids.private_mapping_acquire_file_id,
         px10_op_ids: fs_ids.px10_op_ids,
+        px11_op_ids: fs_ids.px11_op_ids,
         px10_kind_ids: fs_ids.px10_kind_ids,
+        px11_kind_ids: fs_ids.px11_kind_ids,
+        px11_address_ids: fs_ids.px11_address_ids,
+        px11_target_ids: fs_ids.px11_target_ids,
+        px11_how_ids: fs_ids.px11_how_ids,
         px10_exit_ids: fs_ids.px10_exit_ids,
         private_buffer_handle_id: fs_ids.private_buffer_handle_id,
         buffer_handle_resource_id: fs_ids.buffer_handle_resource_id,

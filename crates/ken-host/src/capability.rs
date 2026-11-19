@@ -220,11 +220,46 @@ pub const fn rights_for_authority(authority: Authority) -> RightSet {
     }
 }
 
+/// The three address classes in a declared Net grant. `Inet` includes
+/// loopback addresses; `Loopback` never includes wildcard or Unix addresses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NetClassV1 {
+    Loopback,
+    Inet,
+    Unix,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NetScopeV1(u8);
+
+impl NetScopeV1 {
+    pub fn from_classes(classes: &[NetClassV1]) -> Self {
+        let mut bits = 0;
+        for class in classes {
+            bits |= match class {
+                NetClassV1::Loopback => 1,
+                NetClassV1::Inet => 2,
+                NetClassV1::Unix => 4,
+            };
+        }
+        Self(bits)
+    }
+
+    pub fn admits(self, address: &crate::SocketAddressV1) -> bool {
+        match address {
+            crate::SocketAddressV1::Unix { .. } => self.0 & 4 != 0,
+            _ if address.is_loopback() => self.0 & 3 != 0,
+            _ => self.0 & 2 != 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cap {
     authority: Authority,
     effect: String,
     scope: FsScope,
+    net: NetScopeV1,
 }
 
 impl Cap {
@@ -245,6 +280,7 @@ impl Cap {
             authority,
             effect: effect.into(),
             scope,
+            net: NetScopeV1::default(),
         }
     }
     /// Called only after checked Program admission proved `Process` plus FS
@@ -254,6 +290,14 @@ impl Cap {
             self.scope.rights = self.scope.rights.union(RightSet::EXECUTE);
         }
         self
+    }
+    /// Only the runner calls this after checked Program admission.
+    pub fn with_declared_net_grant(mut self, classes: &[NetClassV1]) -> Self {
+        self.net = NetScopeV1::from_classes(classes);
+        self
+    }
+    pub fn net_scope(&self) -> NetScopeV1 {
+        self.net
     }
     pub fn authority(&self) -> Authority {
         self.authority

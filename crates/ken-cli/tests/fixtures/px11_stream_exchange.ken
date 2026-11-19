@@ -1,0 +1,452 @@
+program capabilities FS AFull, Net Loopback Unix, RootExecution Allow
+
+import Capability.Net.Stream
+  (SocketAddress,
+    socket_ipv4,
+    socket_ipv6,
+    socket_unix_path,
+    with_socket_listener,
+    with_socket_accept,
+    with_socket_connection,
+    socket_local_address,
+    ListeningSocket,
+    receive_socket,
+    send_socket,
+    shutdown_socket,
+    ShutdownWrite)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+
+import Capability.System.IO (readAt, spanBytes)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk,
+    withBuffer,
+    withResource)
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+const address4 : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      (127 : UInt8)
+      (VCons
+        UInt8
+        (Suc (Suc Zero))
+        (0 : UInt8)
+        (VCons UInt8 (Suc Zero) (0 : UInt8) (VCons UInt8 Zero (1 : UInt8) (VNil UInt8)))))
+    (0 : UInt16)
+
+fn loopback_tail (n : Nat) : Vec UInt8 (Suc n) =
+  match n {
+    Zero ↦ VCons UInt8 Zero (1 : UInt8) (VNil UInt8);
+    Suc rest ↦ VCons UInt8 (Suc rest) (0 : UInt8) (loopback_tail rest)
+  }
+
+const address6 : SocketAddress =
+  socket_ipv6
+    (loopback_tail
+      (Suc
+        (Suc
+          (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))))))
+    (0 : UInt16)
+
+fn select_address (selector : Bytes) (unix_path : Bytes) : Result IOError SocketAddress =
+  match bytes_at selector (0 : Int) {
+    None ↦ Err IOError SocketAddress IOError.InvalidInput;
+    Some first ↦
+      match eq_int (uint8_to_int first) (52 : Int) {
+        True ↦ Ok IOError SocketAddress address4;
+        False ↦
+          match eq_int (uint8_to_int first) (54 : Int) {
+            True ↦ Ok IOError SocketAddress address6;
+            False ↦ socket_unix_path unix_path
+          }
+      }
+  }
+
+const failed : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+
+const passed : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn octets_equal (left : List UInt8) (right : List UInt8) : Bool =
+  match left {
+    Nil ↦
+      match right {
+        Nil ↦ True;
+        Cons _ _ ↦ False
+      };
+    Cons first rest ↦
+      match right {
+        Nil ↦ False;
+        Cons second remaining ↦
+          match eq_int (uint8_to_int first) (uint8_to_int second) {
+            False ↦ False;
+            True ↦ octets_equal rest remaining
+          }
+      }
+  }
+
+fn matched_chunk (bytes : Bytes) : Bool =
+  octets_equal (bytes_to_list bytes) (bytes_to_list (bytes_encode "PX11ok!"))
+
+proc check_eof
+      (stream : Resource ResourceKind.SocketStream) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (ResourceBodyResult Unit Unit)
+    (receive_socket AFull stream buffer (MkBufferWindow (0 : Int) (7 : Int)))
+    (λafter_shutdown.
+      match after_shutdown {
+        Ok ReadProgress.ReadEof ↦ passed;
+        Ok _ ↦ failed;
+        Err _ ↦ failed
+      })
+
+proc drain_full
+      (stream : Resource ResourceKind.SocketStream)
+      (buffer : BufferHandle)
+      (accumulated : Bytes)
+      (fuel : Nat)
+    : HostIO AFull (Result ResourceError Bytes)
+    visits [FS, Net] =
+  match fuel {
+    Zero ↦
+      host_pure
+        AFull
+        (Result ResourceError Bytes)
+        (Err ResourceError Bytes ResourceError.NoProgress);
+    Suc remaining ↦
+      host_bind
+        AFull
+        (Result ResourceError ReadProgress)
+        (Result ResourceError Bytes)
+        (receive_socket AFull stream buffer (MkBufferWindow (0 : Int) (7 : Int)))
+        (λprogress.
+          match progress {
+            Err cause ↦
+              host_pure AFull (Result ResourceError Bytes) (Err ResourceError Bytes cause);
+            Ok ReadProgress.ReadEof ↦
+              host_pure
+                AFull
+                (Result ResourceError Bytes)
+                (Err ResourceError Bytes ResourceError.NoProgress);
+            Ok (ReadProgress.ReadSome next_span _) ↦
+              host_bind
+                AFull
+                (Result ResourceError Bytes)
+                (Result ResourceError Bytes)
+                (spanBytes AFull buffer next_span)
+                (λfrozen.
+                  match frozen {
+                    Err cause ↦
+                      host_pure
+                        AFull
+                        (Result ResourceError Bytes)
+                        (Err ResourceError Bytes cause);
+                    Ok chunk ↦
+                      let combined =
+                        bytes_concat accumulated chunk
+                      in
+                        match leq_int (bytes_length combined) (7 : Int) {
+                          False ↦
+                            host_pure
+                              AFull
+                              (Result ResourceError Bytes)
+                              (Err ResourceError Bytes ResourceError.InvalidBounds);
+                          True ↦
+                            match eq_int (bytes_length combined) (7 : Int) {
+                              True ↦
+                                host_pure
+                                  AFull
+                                  (Result ResourceError Bytes)
+                                  (Ok ResourceError Bytes combined);
+                              False ↦ drain_full stream buffer combined remaining
+                            }
+                        }
+                  })
+          })
+  }
+
+proc bounded_receive
+      (stream : Resource ResourceKind.SocketStream) (buffer : BufferHandle)
+    : HostIO AFull (Result ResourceError Bytes)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (Result ResourceError Bytes)
+    (receive_socket AFull stream buffer (MkBufferWindow (0 : Int) (4 : Int)))
+    (λfirst.
+      match first {
+        Err cause ↦
+          host_pure AFull (Result ResourceError Bytes) (Err ResourceError Bytes cause);
+        Ok ReadProgress.ReadEof ↦
+          host_pure
+            AFull
+            (Result ResourceError Bytes)
+            (Err ResourceError Bytes ResourceError.NoProgress);
+        Ok (ReadProgress.ReadSome first_span _) ↦
+          host_bind
+            AFull
+            (Result ResourceError Bytes)
+            (Result ResourceError Bytes)
+            (spanBytes AFull buffer first_span)
+            (λfrozen.
+              match frozen {
+                Err cause ↦
+                  host_pure AFull (Result ResourceError Bytes) (Err ResourceError Bytes cause);
+                Ok chunk ↦
+                  match leq_int (bytes_length chunk) (4 : Int) {
+                    False ↦
+                      host_pure
+                        AFull
+                        (Result ResourceError Bytes)
+                        (Err ResourceError Bytes ResourceError.InvalidBounds);
+                    True ↦
+                      drain_full
+                        stream
+                        buffer
+                        chunk
+                        (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))
+                  }
+              })
+      })
+
+proc check_reply
+      (stream : Resource ResourceKind.SocketStream) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError Bytes)
+    (ResourceBodyResult Unit Unit)
+    (drain_full
+      stream
+      buffer
+      (bytes_encode "")
+      (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))
+    (λreply.
+      match reply {
+        Err _ ↦ failed;
+        Ok response_bytes ↦
+          match matched_chunk response_bytes {
+            True ↦ check_eof stream buffer;
+            False ↦ failed
+          }
+      })
+
+proc finish_exchange
+      (connected : Resource ResourceKind.SocketStream)
+      (accepted : Resource ResourceKind.SocketStream)
+      (buffer : BufferHandle)
+      (received : Bytes)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  match matched_chunk received {
+    False ↦ failed;
+    True ↦
+      host_bind
+        AFull
+        (Result ResourceError Unit)
+        (ResourceBodyResult Unit Unit)
+        (shutdown_socket AFull accepted ShutdownWrite)
+        (λshut.
+          match shut {
+            Err _ ↦ failed;
+            Ok _ ↦ check_reply connected buffer
+          })
+  }
+
+proc accepted_body
+      (connected : Resource ResourceKind.SocketStream)
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (accepted : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError WriteProgress)
+    (ResourceBodyResult Unit Unit)
+    (send_socket AFull accepted buffer span)
+    (λsent_reply.
+      match sent_reply {
+        Err _ ↦ failed;
+        Ok (WriteProgress.Wrote _) ↦
+          host_bind
+            AFull
+            (Result ResourceError WriteProgress)
+            (ResourceBodyResult Unit Unit)
+            (send_socket AFull connected buffer span)
+            (λsent.
+              match sent {
+                Err _ ↦ failed;
+                Ok (WriteProgress.Wrote _) ↦
+                  host_bind
+                    AFull
+                    (Result ResourceError Bytes)
+                    (ResourceBodyResult Unit Unit)
+                    (bounded_receive accepted buffer)
+                    (λreceived.
+                      match received {
+                        Err _ ↦ failed;
+                        Ok bytes ↦ finish_exchange connected accepted buffer bytes
+                      })
+              })
+      })
+
+proc connected_body
+      (listener : Resource ResourceKind.SocketListener)
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (connected : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (with_socket_accept AFull Unit Unit listener (accepted_body connected buffer span))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ passed;
+        Ok _ ↦ failed;
+        Err _ ↦ failed
+      })
+
+proc listener_body
+      (cap : Cap AFull)
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult Unit Unit)
+    (socket_local_address AFull (ListeningSocket listener))
+    (λlocal.
+      match local {
+        Err _ ↦ failed;
+        Ok address ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult Unit Unit))
+            (ResourceBodyResult Unit Unit)
+            (with_socket_connection
+              AFull
+              Unit
+              Unit
+              cap
+              address
+              (connected_body listener buffer span))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok _ ↦ failed;
+                Err _ ↦ failed
+              })
+      })
+
+proc buffer_body
+      (cap : Cap AFull)
+      (address : SocketAddress)
+      (file : Resource ResourceKind.FsHandle)
+      (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (7 : Int)))
+    (λread_result.
+      match read_result {
+        Err _ ↦ failed;
+        Ok ReadProgress.ReadEof ↦ failed;
+        Ok (ReadProgress.ReadSome span _) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult Unit Unit))
+            (ResourceBodyResult Unit Unit)
+            (with_socket_listener AFull Unit Unit cap address (listener_body cap buffer span))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok _ ↦ failed;
+                Err _ ↦ failed
+              })
+      })
+
+proc file_body
+      (cap : Cap AFull) (address : SocketAddress) (file : Resource ResourceKind.FsHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (16 : Int) (buffer_body cap address file))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ passed;
+        Ok _ ↦ failed;
+        Err _ ↦ failed
+      })
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons selector rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons unix_path _ ↦
+              match select_address selector unix_path {
+                Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+                Ok address ↦
+                  match caps {
+                    ProgramCaps.MkProgramCaps cap ↦
+                      host_bind
+                        AFull
+                        (Result FileError (ResourceBracketResult Unit Unit))
+                        ExitCode
+                        (withResource
+                          AFull
+                          Unit
+                          Unit
+                          cap
+                          (bytes_encode "px11-payload.bin")
+                          ResourceOpenMode.ResourceRead
+                          (file_body cap address))
+                        (λoutcome.
+                          match outcome {
+                            Ok (ResourceBracketOk _) ↦
+                              host_pure AFull ExitCode ExitCode.Success;
+                            Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 71);
+                            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 72)
+                          })
+                  }
+              }
+          }
+      }
+  }

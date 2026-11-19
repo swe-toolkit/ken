@@ -328,6 +328,66 @@ mod tests {
         std::fs::remove_dir(dir).unwrap();
     }
 
+    /// Promise class: durable invariant. MEASURED: three live socket
+    /// descriptors have kernel socket inode links, but a PX10-spawned child
+    /// blocked on its stdin pipe exposes none of those links in /proc/pid/fd.
+    /// CLAIMED: a child spawned while a listener and two streams are open
+    /// inherits none of them. THE GAP: PX10's closefrom(3) also protects this
+    /// path; the independent F_GETFD row detects missing atomic CLOEXEC.
+    #[test]
+    fn px11_live_px10_child_has_no_parent_socket_descriptors() {
+        use crate::process_v1::{ChildStdioV1, SpawnPlanV1};
+
+        let listener = listen(&SocketAddressV1::Inet4 {
+            octets: [127, 0, 0, 1],
+            port: 0,
+        })
+        .unwrap();
+        let connected = connect(&local_address(&listener).unwrap()).unwrap();
+        let accepted = accept(&listener).unwrap();
+        let socket_inodes = [&listener, &connected, &accepted]
+            .into_iter()
+            .map(|fd| {
+                std::fs::read_link(format!("/proc/self/fd/{}", fd.as_raw_fd()))
+                    .expect("held socket descriptor has a proc link")
+            })
+            .collect::<Vec<_>>();
+        assert!(socket_inodes
+            .iter()
+            .all(|link| link.to_string_lossy().starts_with("socket:[")));
+        assert_eq!(
+            socket_inodes
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            3,
+            "the listener and both streams have distinct descriptors"
+        );
+
+        let mut plan = SpawnPlanV1::new(b"/bin/sh".to_vec()).unwrap();
+        plan.push_argument(b"/bin/sh".to_vec()).unwrap();
+        plan.push_argument(b"-c".to_vec()).unwrap();
+        plan.push_argument(b"read child_ready".to_vec()).unwrap();
+        plan.set_stdio(0, ChildStdioV1::Pipe).unwrap();
+        let mut child = plan.spawn().expect("PX10 child spawn");
+        let parent_pipe = child.take_pipe(0).unwrap();
+        let fds = std::fs::read_dir(format!("/proc/{}/fd", child.pid()))
+            .expect("child remains alive on its stdin pipe")
+            .map(|entry| {
+                std::fs::read_link(entry.unwrap().path())
+                    .expect("read child descriptor while blocked")
+            })
+            .collect::<Vec<_>>();
+        for inode in &socket_inodes {
+            assert!(
+                !fds.contains(inode),
+                "PX10 child inherited a parent's live socket {inode:?}"
+            );
+        }
+        drop(parent_pipe);
+        child.wait().expect("reap child after releasing stdin");
+    }
+
     #[test]
     fn invalid_unix_path_is_rejected_before_a_socket_exists() {
         for path in [

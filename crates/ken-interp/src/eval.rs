@@ -5589,6 +5589,11 @@ pub struct FSIds {
     pub private_mapping_acquire_file_id: GlobalId,
     pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
+    pub px11_kind_ids: [GlobalId; 2],
+    pub px11_op_ids: [GlobalId; 7],
+    pub px11_address_ids: [GlobalId; 3],
+    pub px11_target_ids: [GlobalId; 2],
+    pub px11_how_ids: [GlobalId; 3],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
     pub private_bracket_release_id: GlobalId,
@@ -5677,6 +5682,11 @@ impl FSIds {
             private_mapping_acquire_file_id: prelude.private_mapping_acquire_file_id,
             px10_op_ids: prelude.px10_op_ids,
             px10_kind_ids: prelude.px10_kind_ids,
+            px11_kind_ids: prelude.px11_kind_ids,
+            px11_op_ids: prelude.px11_op_ids,
+            px11_address_ids: prelude.px11_address_ids,
+            px11_target_ids: prelude.px11_target_ids,
+            px11_how_ids: prelude.px11_how_ids,
             px10_exit_ids: prelude.px10_exit_ids,
             private_resource_release_id: prelude.private_resource_release_id,
             private_bracket_release_id: prelude.private_bracket_release_id,
@@ -6480,6 +6490,8 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::ChildProcess => make_ctor(fs.px10_kind_ids[1], vec![], store),
                 ken_host::ResourceKindV1::PipeRead => make_ctor(fs.px10_kind_ids[2], vec![], store),
                 ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
+                ken_host::ResourceKindV1::SocketListener => make_ctor(fs.px11_kind_ids[0], vec![], store),
+                ken_host::ResourceKindV1::SocketStream => make_ctor(fs.px11_kind_ids[1], vec![], store),
             };
             let trace = make_ctor(
                 fs.private_resource_trace_identity_id,
@@ -6501,6 +6513,8 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::ChildProcess => make_ctor(fs.px10_kind_ids[1], vec![], store),
                 ken_host::ResourceKindV1::PipeRead => make_ctor(fs.px10_kind_ids[2], vec![], store),
                 ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
+                ken_host::ResourceKindV1::SocketListener => make_ctor(fs.px11_kind_ids[0], vec![], store),
+                ken_host::ResourceKindV1::SocketStream => make_ctor(fs.px11_kind_ids[1], vec![], store),
             };
             let expected = kind(expected, store);
             let actual = kind(actual, store);
@@ -6514,6 +6528,48 @@ fn resource_error_value_v1(
         ken_host::ResourceErrorV1::InvalidBounds => make_ctor(fs.invalid_bounds_id, vec![], store),
         ken_host::ResourceErrorV1::NoProgress => make_ctor(fs.no_progress_id, vec![], store),
         ken_host::ResourceErrorV1::MappingLimit => make_ctor(fs.mapping_limit_id, vec![], store),
+    }
+}
+
+fn decode_socket_address_v1(value: &EvalVal, fs: &FSIds) -> Option<ken_host::SocketAddressV1> {
+    let EvalVal::Ctor { id, args, .. } = value else { return None };
+    match (*id, args.as_slice()) {
+        (id, [EvalVal::Bytes(bytes), port]) if id == fs.px11_address_ids[0] => {
+            Some(ken_host::SocketAddressV1::Inet4 {
+                octets: bytes.as_slice().try_into().ok()?,
+                port: eval_to_bigint(port)?.to_u16()?,
+            })
+        }
+        (id, [EvalVal::Bytes(bytes), port]) if id == fs.px11_address_ids[1] => {
+            Some(ken_host::SocketAddressV1::Inet6 {
+                octets: bytes.as_slice().try_into().ok()?,
+                port: eval_to_bigint(port)?.to_u16()?,
+            })
+        }
+        (id, [EvalVal::Bytes(path)]) if id == fs.px11_address_ids[2] => {
+            Some(ken_host::SocketAddressV1::Unix { path: path.clone() })
+        }
+        _ => None,
+    }
+}
+
+fn socket_address_value_v1(
+    address: ken_host::SocketAddressV1,
+    fs: &FSIds,
+    store: &mut EvalStore,
+) -> EvalVal {
+    match address {
+        ken_host::SocketAddressV1::Inet4 { octets, port } => make_ctor(
+            fs.px11_address_ids[0],
+            vec![EvalVal::Bytes(octets.to_vec()), EvalVal::Int(i64::from(port))], store,
+        ),
+        ken_host::SocketAddressV1::Inet6 { octets, port } => make_ctor(
+            fs.px11_address_ids[1],
+            vec![EvalVal::Bytes(octets.to_vec()), EvalVal::Int(i64::from(port))], store,
+        ),
+        ken_host::SocketAddressV1::Unix { path } => make_ctor(
+            fs.px11_address_ids[2], vec![EvalVal::Bytes(path)], store,
+        ),
     }
 }
 
@@ -6900,6 +6956,37 @@ fn fs_dispatch<H: HostHandler>(
              ken_host::CanonicalRequestV1::ResourceStreamWrite { buffer_start, length },
              fs.op_metadata_id)
         }
+    } else if op_id == fs.px11_op_ids[0] || op_id == fs.px11_op_ids[2] {
+        let address = decode_socket_address_v1(args.get(2)?, fs)?;
+        if op_id == fs.px11_op_ids[0] {
+            (ken_host::HostOpV1::NetListen, ken_host::CanonicalRequestV1::NetListen { address }, fs.op_metadata_id)
+        } else {
+            (ken_host::HostOpV1::NetConnect, ken_host::CanonicalRequestV1::NetConnect { address }, fs.op_metadata_id)
+        }
+    } else if op_id == fs.px11_op_ids[1] {
+        (ken_host::HostOpV1::NetAccept, ken_host::CanonicalRequestV1::NetAccept, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[3] || op_id == fs.px11_op_ids[4] {
+        let buffer_start = narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        let length = narrow_host_u64(args.get(4)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        if op_id == fs.px11_op_ids[3] {
+            (ken_host::HostOpV1::NetReceive,
+             ken_host::CanonicalRequestV1::NetReceive { buffer_start, length }, fs.op_metadata_id)
+        } else {
+            (ken_host::HostOpV1::NetSend,
+             ken_host::CanonicalRequestV1::NetSend { buffer_start, length }, fs.op_metadata_id)
+        }
+    } else if op_id == fs.px11_op_ids[5] {
+        let how = match args.get(2) {
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.px11_how_ids[0] => 0,
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.px11_how_ids[1] => 1,
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.px11_how_ids[2] => 2,
+            _ => return Some(Err(())),
+        };
+        (ken_host::HostOpV1::NetShutdown,
+         ken_host::CanonicalRequestV1::NetShutdown { how }, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[6] {
+        (ken_host::HostOpV1::NetLocalAddress,
+         ken_host::CanonicalRequestV1::NetLocalAddress, fs.op_metadata_id)
     } else if op_id == fs.private_resource_release_id || op_id == fs.private_bracket_release_id {
         (
             ken_host::HostOpV1::ResourceRelease,
@@ -6929,6 +7016,11 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::ProcessTakePipe
             | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ProcessSignal
+            | ken_host::HostOpV1::NetAccept
+            | ken_host::HostOpV1::NetReceive
+            | ken_host::HostOpV1::NetSend
+            | ken_host::HostOpV1::NetShutdown
+            | ken_host::HostOpV1::NetLocalAddress
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6950,9 +7042,20 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ProcessSignal
+            | ken_host::HostOpV1::NetAccept
+            | ken_host::HostOpV1::NetShutdown
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
+            _ => None,
+        }
+    } else if operation == ken_host::HostOpV1::NetLocalAddress {
+        match args.get(1) {
+            Some(EvalVal::Ctor { id, args, .. })
+                if fs.px11_target_ids.contains(id) => match args.first() {
+                    Some(EvalVal::ResourceToken(token)) => Some(*token),
+                    _ => None,
+                },
             _ => None,
         }
     } else if operation == ken_host::HostOpV1::ResourceRelease {
@@ -6964,12 +7067,12 @@ fn fs_dispatch<H: HostHandler>(
         None
     };
     let resource_inputs = match operation {
-        ken_host::HostOpV1::ResourceStreamRead => match (args.get(1), args.get(2)) {
+        ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive => match (args.get(1), args.get(2)) {
             (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer))) =>
                 ken_host::ResourceInputsV1::FileBuffer { file: *stream, buffer: *buffer },
             _ => return Some(Err(())),
         },
-        ken_host::HostOpV1::ResourceStreamWrite => match (args.get(1), args.get(2), args.get(5)) {
+        ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend => match (args.get(1), args.get(2), args.get(5)) {
             (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer)),
              Some(EvalVal::ResourceToken(origin))) => ken_host::ResourceInputsV1::FileBufferSpan {
                 file: *stream, target_buffer: *buffer, span_origin: *origin,
@@ -7097,6 +7200,7 @@ fn validate_transfer_request_bound(
         Some(ken_host::TransferRequestBoundV1::ReadAt(transferred)) => match request {
             ken_host::CanonicalRequestV1::FsReadAt { length, .. }
             | ken_host::CanonicalRequestV1::ResourceStreamRead { length, .. }
+            | ken_host::CanonicalRequestV1::NetReceive { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -7106,6 +7210,7 @@ fn validate_transfer_request_bound(
         Some(ken_host::TransferRequestBoundV1::WriteAt(transferred)) => match request {
             ken_host::CanonicalRequestV1::FsWriteAt { length, .. }
             | ken_host::CanonicalRequestV1::ResourceStreamWrite { length, .. }
+            | ken_host::CanonicalRequestV1::NetSend { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -7181,6 +7286,9 @@ fn reify_host_reply_v1(
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceAcquired {
             ..
         }) => EvalVal::ResourceToken(resource_token.ok_or(())?),
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::SocketAddress(address)) => {
+            socket_address_value_v1(address, fs, store)
+        },
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ChildExit(exit)) => {
             let (ctor, value) = match exit {
                 ken_host::ChildExitV1::Exited(code) => (fs.px10_exit_ids[0], code),
@@ -8311,6 +8419,11 @@ mod px5b_effect_observation_tests {
             private_mapping_acquire_file_id: id(),
             px10_op_ids: std::array::from_fn(|_| id()),
             px10_kind_ids: std::array::from_fn(|_| id()),
+            px11_kind_ids: std::array::from_fn(|_| id()),
+            px11_op_ids: std::array::from_fn(|_| id()),
+            px11_address_ids: std::array::from_fn(|_| id()),
+            px11_target_ids: std::array::from_fn(|_| id()),
+            px11_how_ids: std::array::from_fn(|_| id()),
             px10_exit_ids: std::array::from_fn(|_| id()),
             private_resource_release_id: id(),
             private_bracket_release_id: id(),

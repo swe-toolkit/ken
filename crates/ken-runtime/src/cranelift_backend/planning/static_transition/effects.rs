@@ -460,7 +460,10 @@ fn host_effect_seat_contract(
                 | Op::ClockWallNow
                 | Op::ClockMonotonicNow
                 | Op::ClockSleepUntil
-                | Op::EntropyRandomBytes => None,
+                | Op::EntropyRandomBytes
+                | Op::NetListen | Op::NetAccept | Op::NetConnect
+                | Op::NetReceive | Op::NetSend | Op::NetShutdown
+                | Op::NetLocalAddress => None,
             };
         }
         EffectSeatSlot::Argument(ordinal) => ordinal,
@@ -692,7 +695,10 @@ fn host_effect_seat_contract(
             | Op::FsGetInheritance
             | Op::FsSetInheritance
             | Op::FsDuplicate
-            | Op::EntropyRandomBytes,
+            | Op::EntropyRandomBytes
+            | Op::NetListen | Op::NetAccept | Op::NetConnect
+            | Op::NetReceive | Op::NetSend | Op::NetShutdown
+            | Op::NetLocalAddress,
             _,
         ) => None,
     }

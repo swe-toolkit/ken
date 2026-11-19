@@ -115,6 +115,24 @@ private_probe!(
     "let forge_trace = ResourceTraceIdentity.PrivateResourceTraceIdentity (1 : Int) (2 : Int)",
     "ResourceTraceIdentity.PrivateResourceTraceIdentity"
 );
+private_probe!(
+    forge_socket_ipv4_file,
+    forge_socket_ipv4_decl,
+    "const fake : SocketAddress = SocketAddress.PrivateSocketIPv4 (bytes_encode \"x\") (0 : UInt16)",
+    "SocketAddress.PrivateSocketIPv4"
+);
+private_probe!(
+    forge_socket_ipv6_file,
+    forge_socket_ipv6_decl,
+    "const fake : SocketAddress = SocketAddress.PrivateSocketIPv6 (bytes_encode \"x\") (0 : UInt16)",
+    "SocketAddress.PrivateSocketIPv6"
+);
+private_probe!(
+    forge_socket_unix_file,
+    forge_socket_unix_decl,
+    "const fake : SocketAddress = SocketAddress.PrivateSocketUnix (bytes_encode \"/tmp/x\")",
+    "SocketAddress.PrivateSocketUnix"
+);
 
 /// Promise class: opacity, not only refusal. An unavailable constructor and
 /// an invented member of the same family have the same error VARIANT in
