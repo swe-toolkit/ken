@@ -17,13 +17,13 @@
 > (`../30-surface/36 §4`).
 >
 > **Surface standing.** The security requirements in this chapter remain
-> committed. Present-tense operation claims, however, extend only to the
-> authority-indexed filesystem surface landed by `38 §1.3.1`. The bounded
-> use-site authority predicate, a distinguishing pair of live authority sinks,
-> and an authority-indexed network surface are committed targets that the
-> current source language does not yet instantiate. Sections 7, 8, and H name
-> those gaps and their exit conditions; example metanotation does not make them
-> current Ken.
+> committed. The filesystem surface is landed (`38 §1.3.1`); PX11 specifies
+> a class-scoped Net grant on the existing `Cap a` and Net operations and
+> results (`38 §1.13`), interpreter-first rather than already landed.
+> The bounded use-site authority predicate, a distinguishing pair of live
+> authority sinks, and a clearance-checked labeled Net send remain gaps.
+> Sections 7, 8, and H name their exits; example metanotation does not
+> turn the remaining flow obligation into a current Ken check.
 >
 > **No new kernel rule.** No-ambient is the L5 **capability-passing
 > translation** (`36 §2.5`: a `perform_E` is ordinary Π/λ over the `Cap E`
@@ -75,9 +75,11 @@ soundness. A no-cap/no-row `view` denotes to `ITree 𝟘 ⟦B⟧ ≅ ⟦B⟧`
 
 A **capability** is an unforgeable authority token a computation must hold to
 perform the corresponding effect. Capability types are authority-indexed as
-`Cap a`; the landed source-facing instance is the filesystem family in
-`38 §1.3.1`. Declassification has its separate label-edge index (`61 §4`). No
-corresponding authority-indexed network family is yet admitted. Per
+`Cap a`; the filesystem instance is in `38 §1.3.1`, and PX11's
+specified network operations in `38 §1.13` use the same `Cap a` with a
+class-scoped `Net` grant. The Net class is checked at the host boundary,
+not a new source-level type index or a separate `Cap_Net` constructor.
+Declassification has its separate label-edge index (`61 §4`). Per
 `36 §2.5`/`§3`:
 
 - **Static + visible.** A capability is part of a function's type (a `CapParam`
@@ -390,22 +392,26 @@ every-use audit point is a static site. The *runtime emission* of records
 
 Authority and flow must compose: a capability **gates an effect**, and the sink
 that capability opens **carries a clearance label** (`61 §3`, data may flow
-only `⊑` that clearance). The landed operation-level instance is the
-authority-indexed filesystem surface in `38 §1.3.1`. The following network
-arrow states the committed composition rule but is deferred target
-metanotation: current Ken has neither an authority-indexed network capability
-nor `send`.
+only `⊑` that clearance). The landed filesystem instance is in
+`38 §1.3.1`; PX11 specifies the Net capability, operation and result
+association in `38 §1.13`. The following network arrow remains target
+metanotation for a **labeled** network sink: PX11's `send_socket` has
+no socket-clearance label or enforcing flow check.
 
 ```text
 send(capability for Net authority a, socket at κ, message at ℓ)
   is admitted only if the capability is present and ℓ ⊔ pc ⊑ κ
 ```
 
-When that surface exists, **both** concessions are required and independent:
-dropping the capability is a missing-capability error (§1); dropping the flow
-check is an `IFC-FLOW` error (`61 §3.1`). Authority does not buy clearance, and
-clearance does not buy authority. The security requirement is committed now;
-the network operation-level instance is the named `AUTH-NET-SURFACE` gap.
+For a labeled network sink, **both** concessions are required and
+independent: dropping the capability is a missing-capability error (§1);
+dropping the flow check is an `IFC-FLOW` error (`61 §3.1`). Authority does
+not buy clearance, and clearance does not buy authority. PX11 exits the
+`AUTH-NET-SURFACE` absence gap for capability/operation/result association,
+not the `AUTH-NET-FLOW-SINK` gap: no specified socket send consumes `κ`
+and checks `ℓ ⊔ pc ⊑ κ`. This is a contract-stage exit, not a claim
+that the PX11 interpreter implementation has landed. Do not read its
+class-scoped grant as an IFC proof.
 
 ## 7. Worked examples
 
@@ -417,12 +423,15 @@ definition keyword, authority index or quantification, operation, and
 effect-indexed result shape. A target spelling in this table is not an
 authorization to present it as current Ken.
 
-Three classes govern the non-current rows:
+The Net-surface absence is separated from three remaining non-current
+classes:
 
-- `AUTH-NET-SURFACE`: no authority-indexed network capability, operation, or
-  result surface is admitted. It exits when a Net surface lands with the
-  authority-indexed capability/operation/result association already used by
-  the filesystem surface in `38 §1.3.1`.
+- `AUTH-NET-SURFACE` is exited by the class-scoped Net acquisition and
+  operation/result association specified in `38 §1.13`. Its `Cap a` retains
+  the existing authority index; the Net class is checked at admission.
+- `AUTH-NET-FLOW-SINK` remains open: no labeled socket send carries the
+  clearance `κ` or enforces `ℓ ⊔ pc ⊑ κ` at a live sink. It exits only when
+  the labeled Net sink and the independent capability/flow refusals land.
 - `AUTH-BOUNDED-SINK`: v1 has no bounded authority quantification and no live
   sink that emits `a ⊑ authority c`. It exits when both the quantification and
   a real sink obligation are admitted.
@@ -435,13 +444,13 @@ Three classes govern the non-current rows:
 | Site or example | Definition keyword | Authority index or quantification | Operation | Effect-indexed result | Standing |
 |---|---|---|---|---|---|
 | §3.1 target signature (issue anchor `:173`) | `proc` target | bounded `{c : Cap a \| demand ⊑ authority c}` unavailable | sufficiency-demanding FS sink unavailable | must use the sink's `FS a (Result …)` association | `AUTH-BOUNDED-SINK`; design-committed, not instantiated |
-| §6 network arrow (issue anchor `:337`) | `proc` target | authority-indexed Net cap unavailable | `send` unavailable | no Net result association is admitted | `AUTH-NET-SURFACE`; deferred `(oracle)` |
+| §6 network arrow (issue anchor `:337`) | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
 | no-ambient family: `classify`, `save`, `save_bad` | `fn` for pure classify; `proc` for both saves | none for classify; `Cap AFull` for save; save_bad omits it | none for classify; source-facing `writeFile` for both saves | pure `Tag`; both saves use `FS AFull (Result FileError Unit)` | current positive and deliberate no-cap negative below |
 | `sandbox` | `proc` target | lower-bounded child quantification unavailable | real lower-bound sink unavailable | would follow the admitted FS sink association | `AUTH-BOUNDED-SINK`; metatheoretic target |
 | AC3 order-dual pair | no standalone definition | same attenuated cap under two demands unavailable | two real sinks unavailable | accept/reject observations, not a source result annotation | `AUTH-AC3-ORIENTATION`; metatheoretic form, orientation net live |
 | three management negatives | no definition | held capability only | names remain deliberately unbound | none | current negative contract |
 | `use_child` | `proc` | `Cap APartial` | current `readFile APartial c_child path` | `FS APartial (Result FileError Bytes)` | current source spelling below |
-| `exfil` | `proc` target | authority-indexed Net cap unavailable | `send` unavailable | no Net result association is admitted | `AUTH-NET-SURFACE`; deferred `(oracle)` |
+| `exfil` | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
 
 The current filesystem shapes below follow the checked exemplar at
 `catalog/packages/Capability/Filesystem/Authority.ken.md`, while staying at
@@ -508,20 +517,22 @@ proc use_child (c_child : Cap APartial) (path : Bytes)
   readFile APartial c_child path
 ```
 
-Finally, `exfil` is a deferred `(oracle)` `AUTH-NET-SURFACE` example, not Ken
-source. It requires an authority-indexed Net capability and a Net sink at
-`Public`; sending `Bytes @ Secret` must be rejected by `61`'s `L-SINK` even
-when the capability is present. Omitting either the capability concession or
-the flow concession must reject independently. This retains AC6 without
-inventing the absent Net operation or result surface.
+Finally, `exfil` remains a deferred `(oracle)` `AUTH-NET-FLOW-SINK`
+example, not Ken source. PX11 supplies a class-scoped Net grant and an
+unlabeled `send_socket`, **not** a sink at `Public`. A future labeled sink
+must reject `Bytes @ Secret` by `61`'s `L-SINK` even when the grant is
+present. Omitting either the capability concession or the flow
+concession must reject independently. This retains AC6 without claiming
+PX11 has already delivered an IFC-checked network sink.
 
 A CISO reads these and sees no-ambient confinement, least authority,
 non-amplifiable delegation, and audited boundaries in the typed surface, plus
 transitive, fail-visible revocation at the runtime boundary. The static controls
 over the landed filesystem surface are enforced by construction. The bounded
-sink and Net controls remain committed requirements with the explicit gaps
-above; §4 names the separate runtime-trusted guarantee without presenting it as
-a kernel theorem.
+sink and Net **flow** controls remain committed requirements with the
+explicit gaps above; §38 §1.13 supplies the separate class-scoped Net
+operation contract, and §4 names runtime-trusted revocation without
+presenting it as a kernel theorem.
 
 ## H. Honest limits — kernel-backed vs trusted vs deferred
 
@@ -546,7 +557,7 @@ excepted — it is over erased labels, §3.1) (ADR 0004 Decision 3, ADR 0001).
 | Revocation **mechanism + general space realization** | **deferred → `40-runtime` / `OQ-Space`** | representation and isolation argument are ADR-owned; no general multi-space, cross-space, transport, or distributed claim (§4.3) |
 | Audit points **statically known** | **kernel-backed** | the boundary set = the `Vis` nodes the type declares; an un-audited declared effect is impossible (`36 §1.4`, §5) |
 | Audit-record **emission** (log, tamper-evidence) | **deferred → runtime / `Ward`** | the static surface is fixed; runtime serialization is `(oracle)`-tagged (§5) |
-| Authority + flow **compose** | **committed; Net operation instance deferred** | capability and flow concessions remain independent requirements. The operation-level capability surface currently lands only for FS (`38 §1.3.1`); the Net form must follow that authority-indexed capability/operation/result association (`AUTH-NET-SURFACE`, §6) |
+| Authority + flow **compose** | **Net operation specified; labeled sink deferred** | `38 §1.13` specifies class-scoped Net admission through `Cap a` and `HostIO a`, but no clearance-checked socket sink. Independent capability and flow refusals remain required; `AUTH-NET-FLOW-SINK` remains open (§6) |
 | The **policy** (which paths/hosts/edges an authority lattice has) | **assumed** | a wrong policy ⇒ a wrong guarantee — the `64 §4.1` spec≠intent analog; the policy (`65`) is the human-reviewed boundary, exactly as for IFC (`61 §H`) |
 
 **The Sec2 vs Sec1 contrast (worth stating, the design payoff).** Sec1's IFC
@@ -585,9 +596,12 @@ mechanism, and runtime audit emission (`40-runtime`/`Ward`).
   argument for §4's bounded contract, general space realization, and runtime
   audit-record **emission** (§5) — `40-runtime`/`Ward`, riding the contracts this
   chapter pins.
-- **Deferred (`AUTH-NET-SURFACE`, `(oracle)`):** the authority-indexed Net
-  capability, operation, and result surface. It must follow the landed FS
-  association in `38 §1.3.1`; the gap exits when that Net surface exists.
+- **Specified by PX11 (`AUTH-NET-SURFACE` exited, `38 §1.13`):** the
+  class-scoped Net grant on `Cap a`, socket operations and `HostIO a`
+  results. This is the interpreter-first contract, not a native-parity or
+  IFC-flow claim.
+- **Deferred (`AUTH-NET-FLOW-SINK`, `(oracle)`):** a labeled network sink
+  with independent capability and clearance checks (`ℓ ⊔ pc ⊑ κ`, §6).
 - **Deferred (`AUTH-BOUNDED-SINK`, `(oracle)`):** the pinned use-site predicate
   `a ⊑ authority c`. The gap exits when bounded authority quantification exists
   and a real sink uses it to emit the obligation.
