@@ -13,7 +13,7 @@ fn checked_unix_program(authority: &str) -> ElabEnv {
     );
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(&source)
-        .expect("both authority variants elaborate a checked main");
+        .expect("all three authority variants elaborate a checked main");
     env
 }
 
@@ -24,6 +24,20 @@ fn checked_unix_program(authority: &str) -> ElabEnv {
 #[test]
 fn px11_net_unix_fs_anone_is_refused_at_program_admission() {
     let env = checked_unix_program("ANone");
+    assert_eq!(
+        admit_checked_main(&env).unwrap_err(),
+        ProgramAdmissionError::NetUnixRequiresFullFs,
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: a checked program with Net
+/// Unix and FS APartial passes parsing and elaboration, then the dedicated
+/// admission arm rejects it. CLAIMED: even the nearest valid authority below
+/// AFull cannot authorize a Unix socket. THE GAP: the test exercises checked
+/// admission, not the host's filesystem or socket syscall.
+#[test]
+fn px11_net_unix_fs_apartial_is_refused_at_program_admission() {
+    let env = checked_unix_program("APartial");
     assert_eq!(
         admit_checked_main(&env).unwrap_err(),
         ProgramAdmissionError::NetUnixRequiresFullFs,
