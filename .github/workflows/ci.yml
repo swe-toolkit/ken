@@ -237,6 +237,13 @@ jobs:
           test -f "$archive"
           echo "CI_RUNTIME_SUPPORT_ARCHIVE path=$archive cargo=$(cargo --version)"
           echo "KEN_RUNTIME_SUPPORT_STATICLIB=$archive" >> "$GITHUB_ENV"
+      - name: Locate the ken-runtime rlib explicitly
+        run: |
+          located=$(scripts/locate-ken-runtime-rlib --profile test --locked)
+          rlib=$(printf '%s\n' "$located" | sed -n 's/^KEN_RUNTIME_RLIB=//p')
+          test -f "$rlib"
+          echo "CI_KEN_RUNTIME_RLIB path=$rlib cargo=$(cargo --version)"
+          printf '%s\n' "$located" >> "$GITHUB_ENV"
       # nextest schedules every test across every binary against one global
       # thread pool. NOTE: `cargo test` was ALREADY parallel *within* each
       # binary (libtest defaults to one thread per CPU); only the 200 binaries
