@@ -1518,15 +1518,19 @@ IPv4 `127.0.0.0/8` and IPv6 `::1`; `Inet` covers all IPv4/IPv6
 addresses and implies `Loopback`; `Unix` covers absolute Unix paths.
 Both listen and connect use the address's class; `0.0.0.0` and `::`
 need `Inet`, not `Loopback`. A `Unix` declaration also requires
-`FS AFull`; `Loopback` and `Inet` do not. An address outside the held
-class returns `ResourceHostIO IOError.CapabilityDenied` before a
-socket syscall. A revoked grant instead returns
-`ResourceHostIO IOError.Revoked`. The listener or stream retains the
-originating grant's provenance: accept, transfer, shutdown and local
-address readback check revocation before touching the host leaf. The
-`a : Auth` argument and `HostIO a` are the existing authority-indexed
-carrier; Net-class membership is checked on the decoded address at
-admission, not inferred from a string or from the effect row alone.
+`FS AFull`; `Loopback` and `Inet` do not. At `NetListen` and
+`NetConnect` acquisition, an address outside the held class returns
+`ResourceHostIO IOError.CapabilityDenied`, and a revoked grant returns
+`ResourceHostIO IOError.Revoked`, before any socket syscall. The
+listener or stream retains the originating grant's provenance. On a
+revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
+`NetShutdown` and `NetLocalAddress` instead return the ordinary
+resource-token projection `ResourceError.Revoked` before any guarded
+host leaf. They are not Process host operations (§62 §4.1). Bracket
+settlement still uses `ResourceRelease`. The `a : Auth` argument and
+`HostIO a` are the existing authority-indexed carrier; Net-class
+membership is checked on the decoded address at admission, not
+inferred from a string or from the effect row alone.
 
 All seven operations declare `visits [Net]`; the existing §36 §1.4
 escape check rejects a caller without `Net` in its row. Acquiring a
