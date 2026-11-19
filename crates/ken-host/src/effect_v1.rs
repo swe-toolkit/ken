@@ -6317,6 +6317,92 @@ mod tests {
         }
     }
 
+    /// Spec 38 §1.13, AC-2. Promise class: durable invariant. MEASURED:
+    /// Loopback rejects non-loopback IPv4 before either acquisition backend
+    /// call; Inet reaches the same backend with the identical address.
+    /// CLAIMED: a Loopback grant does not overgrant Internet addresses.
+    /// THE GAP: the backend spy observes dispatch, not a real Linux socket;
+    /// the separate three-family test exercises actual socket acquisition.
+    fn px11_non_loopback_ipv4_requires_inet(operation: HostOpV1) {
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let grant =
+            |classes, capabilities: &mut CapabilityTableV1, revocation: &mut RevocationDomain| {
+                capabilities.insert(CapabilityGrantV1::mint_root(
+                    CapabilityTraceIdentity(format!("px11:{classes:?}:{operation:?}")),
+                    crate::Cap::mint(crate::AUTH_FULL, "Net").with_declared_net_grant(classes),
+                    revocation,
+                ))
+            };
+        let loopback = grant(
+            &[crate::NetClassV1::Loopback],
+            &mut capabilities,
+            &mut revocation,
+        );
+        let inet = grant(
+            &[crate::NetClassV1::Inet],
+            &mut capabilities,
+            &mut revocation,
+        );
+        let address = crate::SocketAddressV1::Inet4 {
+            octets: [192, 0, 2, 1],
+            port: 4242,
+        };
+        let request = match operation {
+            HostOpV1::NetListen => CanonicalRequestV1::NetListen { address },
+            HostOpV1::NetConnect => CanonicalRequestV1::NetConnect { address },
+            _ => unreachable!("only socket acquisitions are tested"),
+        };
+        let mut backend = AllOpsBackend::default();
+        let mut resources = ResourceTableV1::default();
+        let denied = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            operation,
+            Some(loopback),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .expect("class denial is a semantic outcome");
+        assert_eq!(
+            denied.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied)),
+        );
+        assert!(
+            backend.0.is_empty(),
+            "{operation:?} reached a syscall leaf on Loopback"
+        );
+
+        let permitted = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            operation,
+            Some(inet),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .expect("Inet grant reaches the same address and backend");
+        assert_eq!(
+            permitted.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported)),
+        );
+        assert_eq!(backend.0, [operation]);
+    }
+
+    #[test]
+    fn px11_non_loopback_ipv4_listen_requires_inet() {
+        px11_non_loopback_ipv4_requires_inet(HostOpV1::NetListen);
+    }
+
+    #[test]
+    fn px11_non_loopback_ipv4_connect_requires_inet() {
+        px11_non_loopback_ipv4_requires_inet(HostOpV1::NetConnect);
+    }
+
     #[test]
     fn catalog_is_closed_and_availability_is_exact() {
         // **`ABI-R3` `D3`** -- this was a length assertion over the inventory
