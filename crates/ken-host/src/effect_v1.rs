@@ -6185,6 +6185,66 @@ mod tests {
         }));
     }
 
+    /// Promise class: durable invariant. MEASURED: the real NetReceive
+    /// dispatcher sees a seven-byte queued stream and a capacity-16 buffer,
+    /// but returns at most four bytes and an effective request of four for a
+    /// bound-4 window. CLAIMED: a caller's receive bound survives dispatch.
+    /// THE GAP: a scheduler may return fewer than four; the test asserts a
+    /// maximum and checks the actual count rather than assuming TCP chunks.
+    #[test]
+    fn px11_net_receive_respects_bound_below_buffer_capacity() {
+        let listener = crate::net_v1::listen(&crate::SocketAddressV1::Inet4 {
+            octets: [127, 0, 0, 1],
+            port: 0,
+        })
+        .unwrap();
+        let connected = crate::net_v1::connect(&crate::net_v1::local_address(&listener).unwrap())
+            .unwrap();
+        let accepted = crate::net_v1::accept(&listener).unwrap();
+        assert_eq!(crate::net_v1::send(&connected, b"abcdefg").unwrap(), 7);
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let grant = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("px11:receive-grant".into()),
+            crate::Cap::mint(crate::AUTH_FULL, "Net")
+                .with_declared_net_grant(&[crate::NetClassV1::Loopback]),
+            &mut revocation,
+        ));
+        let provenance = capabilities.resolve(grant).unwrap().revocation_node;
+        let mut resources = ResourceTableV1::default();
+        let (stream, _) = resources.insert_socket(
+            accepted,
+            ResourceKindV1::SocketStream,
+            provenance,
+        );
+        let (buffer, _) = resources.insert_buffer(16).unwrap();
+        let mut backend = AllOpsBackend::default();
+        let outcome = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::NetReceive,
+            None,
+            ResourceInputsV1::FileBuffer { file: stream, buffer },
+            &CanonicalRequestV1::NetReceive { buffer_start: 0, length: 4 },
+        )
+        .expect("real bounded socket read is a valid host request");
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadProgress(
+            ReadProgressV1::ReadSome { span, transferred },
+        )) = outcome.outcome else {
+            panic!("expected a positive socket read, got {:?}", outcome.outcome);
+        };
+        assert!(
+            transferred.get() <= 4,
+            "NetReceive returned {} bytes for a bound of four",
+            transferred.get()
+        );
+        assert_eq!(span.start, 0);
+        assert_eq!(span.length, transferred.get());
+        assert_eq!(transferred.effective_request(), 4);
+    }
+
     /// Promise class: durable invariant. MEASURED: both acquisition ops
     /// return CapabilityDenied for a Unix address under Loopback and call no
     /// backend leaf; the same grant reaches each backend on an IPv4 loopback
