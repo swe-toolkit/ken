@@ -1759,7 +1759,6 @@ fn resolve_attached_ref(
     proof_name: &str,
     span: &Span,
 ) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
-    let subject_is_local = !subject.contains('.') && scope.locals.contains(subject);
     let canonical_subject = resolve_ref(scope, exports, subject, span)?;
     let selected = format!("{subject}::{proof_name}");
     if let Some(id) = scope.qualified_ids.get(&selected) {
@@ -1773,7 +1772,9 @@ fn resolve_attached_ref(
         };
         return Ok((canonical, Some(*id)));
     }
-    if subject_is_local || scope.local_attached_proofs.contains(&selected) {
+    // Own-scope selection is this scope's declared proofs only (spec 33
+    // §8.2): a local subject does not grant an inline child's private proof.
+    if scope.local_attached_proofs.contains(&selected) {
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
     }
     if let Some(subject_id) = resolve_checked_ref(scope, exports, subject, span)?.1 {
