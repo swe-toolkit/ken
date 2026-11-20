@@ -1,7 +1,7 @@
 ---
 id: LANG-INLINE-MODULE-IMPORT-SHADOW-POSITION
 title: "Spec 33 §3.3 now says a selective import shadows a farther enclosing local throughout its inline scope and that scope's descendants, but a child module's enclosing layer is snapshotted at the child's textual position, before any import written after it is applied, so moving the import line below the child flips the child from the required UnboundName to silently binding the root's same-spelled declaration. Make the shadow position-independent, or refuse the ordering that defeats it, so one spelling has one meaning across the scope"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

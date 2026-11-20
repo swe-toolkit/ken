@@ -1,7 +1,7 @@
 ---
 id: LANG-ATTACHED-PROOF-CHECKED-SELECTION
 title: "Spec 33 §8.2 resolves an attached proof's subject first and then selects the proof on it, but the elaborator selects a local subject's proof by canonical spelling, with no checked identity, so a Strict inline child cannot select an enclosing subject's attached proof and refuses UnboundName. Select attached proofs by checked identity, keyed on the resolved subject's identity and the proof name, for root-local, inherited and imported subjects alike, so a child sees an enclosing proof checked before its position, as flat elaboration would"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
