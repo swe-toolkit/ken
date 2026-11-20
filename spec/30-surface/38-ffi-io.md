@@ -991,17 +991,34 @@ reset SIGPIPE rather than relying on a particular Rust runtime's spawn choice.
 
 ### 1.11 Bracketed child spawn plans and wait (PX10-SPAWN-PLAN-WAIT)
 
-> **Section 1.11 status: interpreter slice implemented; native refused.**
+> **Section 1.11 status: Process and stream operations native.**
 > The Architect's AC-0 on `40fa3de6c` measured the host descriptor and
-> signal mechanisms; the Spec Leader ruled the public contract. This first
-> slice implements the plan, spawn, pipe and wait operations in the host
-> and the checked interpreter, where the checked acceptance programs
-> observe AC-1 to AC-3. A native build of a program that declares
-> `Process` is refused before object emission with a typed availability
-> refusal naming the operations that remain RepresentedUnavailable; native
-> parity is successor work. This section does not claim conformance-runner
-> execution, CI, publication, landing or a trust measurement. The first
-> PX10 slice adds no axiom or kernel rule; trust growth is an operator stop.
+> signal mechanisms for the first interpreter slice; the Spec Leader
+> ruled the public contract. The checked interpreter implements the
+> plan, spawn, pipe and wait operations. The landed
+> `effect_abi_v1.catalog` marks all six Process operations and both
+> `ResourceStreamRead` and `ResourceStreamWrite` native. The PX10 seed's
+> `process-spawn-passes-argv-and-environment` client calls neither
+> `ProcessSignal` nor `ResourceStreamWrite`; its Process and pipe path
+> also uses native `BufferAllocate`, `BufferFreeze` and
+> `ResourceRelease`, and invokes no unavailable clock, entropy or FS
+> operation. A `Process` declaration alone no longer entails a
+> typed native-build availability refusal. The named
+> `rt_native_settlement_placement_key.rs::f_argv_env_pipe_matches_fresh_interpreter`
+> row compares native and fresh-interpreter exit, terminal and effect
+> observations on its own generated child-probe argv-env pipe input.
+> That row uses a stated deployment profile raising Invocation Nodes
+> from the starter's 64 to 80; at the starter profile,
+> `r_nodes_starter_argv_refuses_on_invocation_nodes` measures the same
+> program building and running natively, then ending in typed
+> Invocation Nodes capacity exhaustion.
+> Its fixture and argument list differ from the `px10-argv-env` seed,
+> so this is bounded parity evidence for the same operation path, not
+> execution of that exact seed or parity for all Process programs.
+> This status correction claims no exact-seed native execution,
+> official conformance-runner execution, new CI, publication or
+> landing, or trust measurement. The first PX10 slice added no axiom
+> or kernel rule; trust growth remains an operator stop.
 
 #### 1.11.1 A pure plan and its closed initial descriptor targets
 
