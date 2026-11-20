@@ -1526,9 +1526,14 @@ listener or stream retains the originating grant's provenance. On a
 revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
 `NetShutdown` and `NetLocalAddress` instead return the ordinary
 resource-token projection `ResourceError.Revoked` before any guarded
-host leaf. They are not Process host operations (§62 §4.1). Bracket
-settlement still uses `ResourceRelease`. The `a : Auth` argument and
-`HostIO a` are the existing authority-indexed carrier; Net-class
+host leaf. They are not Process host operations (§62 §4.1). Until the
+`ResourceError.Revoked` unification lands, the delivered resource-token
+carrier for these five operations is `ResourceHostIO IOError.Revoked`,
+as for FS resource tokens; the `ResourceError.Revoked` projection above
+is the successor contract, not a claim about current checked
+constructors. Bracket settlement still uses `ResourceRelease`. The
+`a : Auth` argument and `HostIO a` are the existing authority-indexed
+carrier; Net-class
 membership is checked on the decoded address at admission, not
 inferred from a string or from the effect row alone.
 
