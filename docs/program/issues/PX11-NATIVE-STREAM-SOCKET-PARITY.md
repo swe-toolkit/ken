@@ -52,6 +52,33 @@ the interpreter. The seven `Net` operations are `NativeTested`, and
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
+## Amendment: AC-0 ruling (2026-11-20)
+
+Architect D0 `evt_4k6401k1tgy9k`, anchored on the routed PX11 SHA
+`322528a98`. Re-measure its movable-anchor list on the landed squash at
+release; a mismatch is a stop to the Architect. Steward rulings:
+
+- **Two increments, no partial promotion.** Inc1 is the host ABI plane:
+  the C request records, the factored native decode, the `SocketAddress`
+  reply arm that replaces `set_reply`'s `Success(_)` wildcard, and Net
+  grant transport as one `NetScopeV1` bit set through the plan byte and
+  native init. Inc1 changes no availability label and neither lane's
+  behaviour. Inc2 is the lowering plane, the promotion of all seven, the
+  deletion of the gate and the exception, and the parity rows.
+- **The refusal fan-in is five planes** (P1 to P5 in the D0), not the
+  two named in Settled inputs. The D0's rows I1-a to I1-e govern Inc1.
+  Its refined AC-1 governs Inc2: known answer as well as equality, an
+  Inet-bit row, an fdinfo `O_CLOEXEC` row and a stated non-binding
+  profile. So does its AC-2: mutations (a) to (d).
+- **Spec 38 §1.13's lane-status paragraph** is a status edit routed with
+  Inc2 as a Spec co-turn. It does not fire the stop on changes to spec
+  38, which concerns the contract.
+- **Arena-cost rows for Net** are out of scope. They are carried, not
+  framed, until both the arena-cost instrument and
+  `LANG-NATIVE-CLOSURE-DEAD-BINDER-CAPTURE` have landed.
+- Probe arm S-NO (B3) and the D0's other named stops return to the
+  Architect.
+
 ## Scope
 
 Native lowering and the native host leaf for the seven `Net` operations,
