@@ -8882,6 +8882,7 @@ mod px5b_effect_observation_tests {
         ));
         std::fs::create_dir_all(&root).unwrap();
         let marker = root.join("pid");
+        let pending_marker = root.join("pid.pending");
         let program = b"/bin/sh".to_vec();
         let opened = ken_host::dispatch_host_op_v1(
             &mut backend, &capabilities, &revocation, &mut resources,
@@ -8890,7 +8891,14 @@ mod px5b_effect_observation_tests {
             &ken_host::CanonicalRequestV1::ProcessPlanOpen { program },
         ).unwrap();
         let plan = opened.resource_token.expect("spawn plan token");
-        let script = format!("printf '%s' \"$$\" > {}; exec sleep 30", marker.display());
+        // Publish the PID only after the shell has written it completely.
+        // Both paths share a filesystem, so rename cannot expose an empty marker.
+        let script = format!(
+            "printf '%s' \"$$\" > {}; mv -- {} {}; exec sleep 30",
+            pending_marker.display(),
+            pending_marker.display(),
+            marker.display()
+        );
         for arg in [b"sh".as_slice(), b"-c".as_slice(), script.as_bytes()] {
             let pushed = ken_host::dispatch_host_op_v1(
                 &mut backend, &capabilities, &revocation, &mut resources,
