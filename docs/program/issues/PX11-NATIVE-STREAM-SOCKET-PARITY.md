@@ -1,0 +1,116 @@
+---
+id: PX11-NATIVE-STREAM-SOCKET-PARITY
+title: "PX11's first slice runs stream sockets only on the interpreter: the seven Net operations are RepresentedUnavailable, executor_admits carries a named exception for exactly them, and a native build of any Net-declared program refuses with host_effect_lowering_unavailable, so under the operator's bar the slice delivers no PX11 value yet. Lower the seven operations natively with interpreter parity, promote them to NativeTested and close the interpreter-admission set again"
+status: ready
+owner: runtime
+size: L
+tier: T1
+gate: architect
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT]
+blocks: [PX11]
+github: null
+origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
+---
+
+# Stream sockets run natively with interpreter parity
+
+## Objective
+
+A Ken program that listens, accepts, connects, sends, receives and shuts
+down a stream socket builds natively and behaves exactly as it does on
+the interpreter. The seven `Net` operations are `NativeTested`, and
+`executor_admits` again admits only `NativeTested` operations.
+
+## Settled inputs (PX11 candidate `6bc0cc26e`; re-measure on its landed squash)
+
+- **The interpreter-admission set.** `HostOpV1::availability` marks
+  `NetListen` to `NetLocalAddress` (`0x0701`-`0x0707`)
+  `RepresentedUnavailable`. `executor_admits` admits exactly those seven
+  besides `NativeTested` (`crates/ken-host/src/effect_v1.rs:250`-`:270`),
+  pinned by `executor_admits_exactly_native_tested_plus_px11_interpreter_set`
+  (`:6169`).
+- **The native gate.** `prepare_native_program_from_elaborated` refuses
+  on `plan.net_declared` with `host_effect_lowering_unavailable`, before
+  plan bytes and objects (`crates/ken-elaborator/src/compiler_driver.rs:2647`).
+  `net_declared` is set from `checked.net_classes` (`:4235`) and is part of
+  the canonical plan bytes (`:4745`). The Architect measured a second
+  fail-closed plane: `host_effect_wire_layout_v1` (`effect_v1.rs:492`)
+  returns `OperationUnavailable` for all seven (`evt_5mj97002r0088`).
+- **The interpreter contract.** PX11's AC-1 to AC-3 rows and fixtures
+  (`crates/ken-cli/tests/px11_stream_socket.rs`,
+  `crates/ken-cli/tests/fixtures/px11_*.ken`), the host backend
+  (`crates/ken-host/src/net_v1.rs`: `SOCK_CLOEXEC`, `accept4`,
+  `MSG_NOSIGNAL`), the `Net` grant classes and their pre-syscall refusals,
+  and spec 38 §1.13 as landed. The native build must match these; it does
+  not redefine them.
+- **The promotion precedent.** `RT-NATIVE-RESOURCE-STREAM-WRITE-PROMOTION`
+  and `PX10-NATIVE-SPAWN-PARITY` moved operations to `NativeTested` with
+  parity rows against a fresh interpreter run. Receive and send share the
+  resource buffer path (`with_pipe_and_buffer_mut`) under their own
+  codes.
+
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch; do not build around it.
+
+## Scope
+
+Native lowering and the native host leaf for the seven `Net` operations,
+the native transport of the `Net` grant classes, their availability
+labels, and the removal of the `net_declared` gate and the
+interpreter-admission exception. No change to the interpreter's
+behaviour, the `0x07xx` request and reply wire, the spec 38 contract, the
+`Net` grant classes or `System.Error`'s socket arms. Datagrams, option
+families and the resolver stay successors.
+
+## Deliverable
+
+One runtime candidate, or the increments AC-0 rules.
+
+## Acceptance
+
+- **AC-0 (D0, Architect, before code).**
+  - Rule the native lowering of the seven operations: reuse of the
+    resource stream path for receive and send, and the native form of the
+    address record.
+  - Rule how the native runtime receives the `Net` grant classes, so an
+    out-of-class or revoked grant refuses before any socket syscall, as
+    on the interpreter.
+  - Rule the split into increments, if any. An increment that promotes
+    only some operations keeps the `net_declared` gate until the last one
+    lands.
+  - Rule whether the arena-cost row family covers a promoted `Net`
+    operation here or as a successor.
+- **AC-1 (parity).**
+  - PX11's AC-1 loopback program, over `127.0.0.1`, `::1` and a Unix
+    path, builds natively. Its output and exit status equal a fresh
+    interpreter run.
+  - PX11's AC-2 typed-failure program does the same: the missing
+    listener and the out-of-class grant.
+  - PX11's `FD_CLOEXEC` row holds natively on a listener, an accepted
+    stream and a connected stream.
+- **AC-2 (the set closes, QA mutation).**
+  - `executor_admits` admits exactly the `NativeTested` set, with all
+    seven `Net` operations in it. The PX11 pin is replaced by one that
+    names that set.
+  - PX11's AC-4 native-refusal test is replaced by AC-1's positive rows.
+  - A mutant that returns one `Net` operation to
+    `RepresentedUnavailable` reddens the parity row that uses it, and no
+    other row passes in its place. Restore it byte-identically.
+- **AC-3.** Full-workspace CI is green on the exact candidate.
+
+## Stop conditions
+
+- Parity needs a change to the interpreter's behaviour, the `0x07xx`
+  wire, spec 38 or the grant classes.
+- Any trust growth or kernel change. These are operator stops.
+- A native row differs from the interpreter on output, exit status or
+  the `System.Error` value.
+
+Checks: 9 fired. Every anchor is on the unlanded PX11 candidate
+`6bc0cc26e`, so the frame says to re-measure on the landed squash. The
+availability match, `executor_admits` and the `:2647` gate were read
+there; the wire-layout plane is the Architect's measurement. 8 fired.
+AC-2's mutant reddens a parity row, which a lookup that silently
+falls back to the interpreter could not pass. 2 fired. The native
+refusal has two planes, the plan gate and the wire layout, and the frame
+removes the first and requires the second to lower.
