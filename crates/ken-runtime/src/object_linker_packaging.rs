@@ -354,6 +354,22 @@ pub fn run_bound_process_effect_observation_with_stdin(
     options: &NativeEffectRunOptionsV1,
     stdin: &[u8],
 ) -> Result<ken_host::EffectObservation, NativeEffectRunErrorV1> {
+    run_bound_process_effect_observation_with_region_end(artifact, options, stdin)
+        .map(|(observation, _)| observation)
+}
+
+/// [`run_bound_process_effect_observation_with_stdin`], also returning the
+/// activation's region counts at entry return. The counts are a native-only
+/// side record: the interpreter has no arena, so they are not part of the
+/// shared [`ken_host::EffectObservation`].
+pub fn run_bound_process_effect_observation_with_region_end(
+    artifact: &BoundProcessExecutableArtifact,
+    options: &NativeEffectRunOptionsV1,
+    stdin: &[u8],
+) -> Result<
+    (ken_host::EffectObservation, Option<ken_host::ActivationRegionEndV1>),
+    NativeEffectRunErrorV1,
+> {
     if artifact.trap_catalog.runtime_artifact != artifact.runtime_artifact {
         return Err(NativeEffectRunErrorV1::BindingMismatch);
     }
@@ -443,15 +459,35 @@ pub fn run_bound_process_effect_observation_with_stdin(
     } else {
         None
     };
-    Ok(ken_host::EffectObservation {
-        stdout: output.stdout,
-        stderr: output.stderr,
-        filesystem_delta: filesystem_delta_v1(&before, &after),
-        terminal_error,
-        effect_trace: trace.effect_trace,
-        terminal_exit: trace.terminal_exit,
-        exit_status,
-    })
+    // A count past its region's bound limit cannot come from the bump
+    // allocator, which refuses before it stores; refuse the record instead.
+    if let Some(end) = trace.region_end {
+        let profile = artifact.boundary_resource_profile;
+        for (counts, limits) in [
+            (end.invocation, profile.invocation),
+            (end.persistent, profile.persistent),
+        ] {
+            if counts.nodes > limits.nodes as u64
+                || counts.words > limits.words as u64
+                || counts.data_bytes > limits.data_bytes as u64
+                || counts.native_int_limbs > limits.native_int_limbs as u64
+            {
+                return Err(NativeEffectRunErrorV1::MalformedTrace);
+            }
+        }
+    }
+    Ok((
+        ken_host::EffectObservation {
+            stdout: output.stdout,
+            stderr: output.stderr,
+            filesystem_delta: filesystem_delta_v1(&before, &after),
+            terminal_error,
+            effect_trace: trace.effect_trace,
+            terminal_exit: trace.terminal_exit,
+            exit_status,
+        },
+        trace.region_end,
+    ))
 }
 
 pub const OBJECT_LINKER_PACKAGE_KIND: &str = "KenObjectLinkerExecutablePackage";
@@ -2438,6 +2474,7 @@ extern long long ken_boundary_store_v1_open(const struct KenBoundaryResourceProf
 extern long long ken_boundary_store_v1_destroy(void *store);
 extern long long ken_activation_v1_begin(void *store, void **out_activation, void **out_failure);
 extern long long ken_activation_v1_finish_capacity_failure(void *context, void *failure);
+extern long long ken_activation_v1_record_region_end(const void *activation);
 extern long long ken_activation_v1_take_selected_call_failure(void *activation, void **out_failure);
 extern long long ken_activation_v1_finish_selected_call_failure(void *context, void *failure);
 extern long long ken_activation_v1_services(const void *activation, const void **out_services);
@@ -2636,6 +2673,7 @@ int main(int argc, char **argv, char **envp) {
         free(pool); free(cwd); return 1;
     }
     long long value = ken_nc23_entrypoint(frame, services);
+    long long region_end_status = ken_activation_v1_record_region_end(activation);
     void *ticket_failure = NULL;
     long long ticket_status = ken_activation_v1_take_selected_call_failure(activation, &ticket_failure);
     long long finish_status;
@@ -2655,6 +2693,7 @@ int main(int argc, char **argv, char **envp) {
     free(cwd);
     free(pool);
     if (finish_status != 0) return 1;
+    if (region_end_status != 0) return 1;
     if (ticket_status != 0) return 1;
     ken_report_process_status(value);
     if (value < 0) return 1;
@@ -4898,6 +4937,7 @@ mod tests {
             terminal_error: trace.terminal_error.clone(),
             effect_trace: semantic_events,
             terminal_exit: trace.terminal_exit,
+            region_end: trace.region_end,
         };
         assert_eq!(
             ken_host::encode_linked_effect_trace(&trace).unwrap(),

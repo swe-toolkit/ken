@@ -10,7 +10,7 @@ use crate::{
     SemanticErrorV1, TerminalExitClass,
 };
 
-const MAGIC: &[u8; 8] = b"KETRACE2";
+const MAGIC: &[u8; 8] = b"KETRACE3";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LinkedEffectTrace {
@@ -21,6 +21,27 @@ pub struct LinkedEffectTrace {
     pub terminal_error: Option<crate::TerminalErrorV1>,
     pub effect_trace: Vec<EffectEvent>,
     pub terminal_exit: TerminalExitClass,
+    /// Both regions' live counts when the generated entry returned, or `None`
+    /// when no activation ran (a startup or pre-launch terminal).
+    pub region_end: Option<ActivationRegionEndV1>,
+}
+
+/// One boundary region's live counts, read from its published header. Every
+/// emitted store to a count adds a non-negative amount, so a count read at the
+/// end of an activation is also that activation's high-water mark.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RegionCountsV1 {
+    pub nodes: u64,
+    pub words: u64,
+    pub data_bytes: u64,
+    pub native_int_limbs: u64,
+}
+
+/// The invocation and persistent regions' counts at activation end.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ActivationRegionEndV1 {
+    pub invocation: RegionCountsV1,
+    pub persistent: RegionCountsV1,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -714,6 +735,18 @@ pub fn encode_linked_effect_trace(
             }
         }
     }
+    match trace.region_end {
+        None => put_u8(&mut out, 0),
+        Some(end) => {
+            put_u8(&mut out, 1);
+            for counts in [end.invocation, end.persistent] {
+                put_u64(&mut out, counts.nodes);
+                put_u64(&mut out, counts.words);
+                put_u64(&mut out, counts.data_bytes);
+                put_u64(&mut out, counts.native_int_limbs);
+            }
+        }
+    }
     Ok(out)
 }
 
@@ -1327,6 +1360,23 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
             outcome,
         });
     }
+    let region_end = match cursor.u8()? {
+        0 => None,
+        1 => {
+            let mut counts = || -> Result<RegionCountsV1, EffectTraceWireError> {
+                Ok(RegionCountsV1 {
+                    nodes: cursor.u64()?,
+                    words: cursor.u64()?,
+                    data_bytes: cursor.u64()?,
+                    native_int_limbs: cursor.u64()?,
+                })
+            };
+            let invocation = counts()?;
+            let persistent = counts()?;
+            Some(ActivationRegionEndV1 { invocation, persistent })
+        }
+        _ => return Err(EffectTraceWireError),
+    };
     if cursor.position != bytes.len()
         || terminal_exit != crate::terminal_exit_class(terminal_value, terminal_error.as_ref())
     {
@@ -1340,6 +1390,7 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
         terminal_error,
         effect_trace,
         terminal_exit,
+        region_end,
     })
 }
 
@@ -1366,6 +1417,7 @@ mod tests {
             terminal_error: Some(crate::TerminalErrorV1::CapacityExhausted(failure)),
             effect_trace: Vec::new(),
             terminal_exit: crate::TerminalExitClass::ControlledTrap,
+            region_end: None,
         };
         let encoded = encode_linked_effect_trace(&trace).expect("typed capacity encodes");
         assert_eq!(decode_linked_effect_trace(&encoded).unwrap(), trace);
@@ -1424,6 +1476,7 @@ mod tests {
             )),
             effect_trace: Vec::new(),
             terminal_exit: crate::TerminalExitClass::ControlledTrap,
+            region_end: None,
         };
         let encoded = encode_linked_effect_trace(&trace).expect("integrity wire");
         assert_eq!(decode_linked_effect_trace(&encoded), Ok(trace.clone()));
@@ -2121,6 +2174,7 @@ mod tests {
             terminal_value: 61,
             terminal_error: None,
             terminal_exit: TerminalExitClass::ReturnedError,
+            region_end: None,
             effect_trace: vec![
                 EffectEvent {
                     sequence: 0,
@@ -2386,6 +2440,49 @@ mod tests {
         assert_eq!(decode_linked_effect_trace(&root_open_wire), Ok(root_open));
     }
 
+    /// Promise: normative compatibility vector for the KETRACE3 optional
+    /// region-end suffix; durable invariant for malformed-tag and stale-version
+    /// refusal. Distinct fields pin both region order and each count's order.
+    #[test]
+    fn region_end_wire_round_trips_both_tags_and_refuses_unknown_and_old_magic() {
+        let absent = representative_trace();
+        let encoded_absent = encode_linked_effect_trace(&absent).expect("encode absent record");
+        assert_eq!(encoded_absent.last(), Some(&0));
+        assert_eq!(decode_linked_effect_trace(&encoded_absent), Ok(absent.clone()));
+
+        let end = ActivationRegionEndV1 {
+            invocation: RegionCountsV1 {
+                nodes: 11,
+                words: 22,
+                data_bytes: 33,
+                native_int_limbs: 44,
+            },
+            persistent: RegionCountsV1 {
+                nodes: 55,
+                words: 66,
+                data_bytes: 77,
+                native_int_limbs: 88,
+            },
+        };
+        let present = LinkedEffectTrace {
+            region_end: Some(end),
+            ..absent
+        };
+        let encoded_present = encode_linked_effect_trace(&present).expect("encode present record");
+        let suffix_at = encoded_absent.len() - 1;
+        assert_eq!(&encoded_present[..suffix_at], &encoded_absent[..suffix_at]);
+        assert_eq!(encoded_present[suffix_at], 1);
+        assert_eq!(encoded_present.len(), encoded_absent.len() + 8 * 8);
+        assert_eq!(decode_linked_effect_trace(&encoded_present), Ok(present));
+
+        let mut bad_tag = encoded_absent.clone();
+        bad_tag[suffix_at] = 2;
+        assert_eq!(decode_linked_effect_trace(&bad_tag), Err(EffectTraceWireError));
+        let mut stale = encoded_absent;
+        stale[..8].copy_from_slice(b"KETRACE2");
+        assert_eq!(decode_linked_effect_trace(&stale), Err(EffectTraceWireError));
+    }
+
     #[test]
     fn linked_trace_decoder_rejects_magic_truncation_trailing_and_count_drift() {
         let encoded = encode_linked_effect_trace(&representative_trace()).unwrap();
@@ -2431,6 +2528,7 @@ mod tests {
                 outcome: CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit),
             }],
             terminal_exit: TerminalExitClass::NormalReturn,
+            region_end: None,
         };
         let encoded = encode_linked_effect_trace(&trace).unwrap();
 
@@ -2491,6 +2589,7 @@ mod tests {
                 )),
             }],
             terminal_exit: TerminalExitClass::NormalReturn,
+            region_end: None,
         }
     }
 
@@ -2500,9 +2599,9 @@ mod tests {
     /// mutations below); it cannot bound `effective_request` against the
     /// caller's own raw request length without `validate_transfer_request_
     /// bound` correlating the decoded request. `effective_request` is the
-    /// trailing 8 bytes of this single-event trace's `ReadSome` payload
-    /// (the last thing `put_reply` writes), so mutating the tail exercises
-    /// exactly that field.
+    /// last 8 bytes of this single-event trace's `ReadSome` payload,
+    /// immediately before the KETRACE3 region-end tag, so mutating those
+    /// bytes exercises exactly that field.
     #[test]
     fn wire_decoder_rejects_read_some_effective_request_zero_below_count_and_above_raw() {
         let encoded = encode_linked_effect_trace(&single_read_some_trace(8)).unwrap();
@@ -2510,10 +2609,10 @@ mod tests {
             decode_linked_effect_trace(&encoded).is_ok(),
             "baseline must be valid"
         );
-        let tail = encoded.len() - 8;
+        let tail = encoded.len() - 1 - 8;
 
         let mut effective_zero = encoded.clone();
-        effective_zero[tail..].copy_from_slice(&0u64.to_le_bytes());
+        effective_zero[tail..tail + 8].copy_from_slice(&0u64.to_le_bytes());
         assert_eq!(
             decode_linked_effect_trace(&effective_zero),
             Err(EffectTraceWireError),
@@ -2521,7 +2620,7 @@ mod tests {
         );
 
         let mut effective_below_count = encoded.clone();
-        effective_below_count[tail..].copy_from_slice(&3u64.to_le_bytes());
+        effective_below_count[tail..tail + 8].copy_from_slice(&3u64.to_le_bytes());
         assert_eq!(
             decode_linked_effect_trace(&effective_below_count),
             Err(EffectTraceWireError),
@@ -2529,7 +2628,7 @@ mod tests {
         );
 
         let mut effective_above_raw = encoded;
-        effective_above_raw[tail..].copy_from_slice(&9u64.to_le_bytes());
+        effective_above_raw[tail..tail + 8].copy_from_slice(&9u64.to_le_bytes());
         assert_eq!(
             decode_linked_effect_trace(&effective_above_raw),
             Err(EffectTraceWireError),
@@ -2565,6 +2664,7 @@ mod tests {
                 )),
             }],
             terminal_exit: TerminalExitClass::NormalReturn,
+            region_end: None,
         };
         let encoded = encode_linked_effect_trace(&trace).unwrap();
         assert!(
@@ -2573,8 +2673,8 @@ mod tests {
         );
 
         let mut effective_above_raw = encoded;
-        let tail = effective_above_raw.len() - 8;
-        effective_above_raw[tail..].copy_from_slice(&9u64.to_le_bytes());
+        let tail = effective_above_raw.len() - 1 - 8;
+        effective_above_raw[tail..tail + 8].copy_from_slice(&9u64.to_le_bytes());
         assert_eq!(
             decode_linked_effect_trace(&effective_above_raw),
             Err(EffectTraceWireError),
