@@ -325,6 +325,65 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   remains the same-scope control.
 - staging: RED UNTIL `LANG-INLINE-MODULE-ENCLOSING-SCOPE`.
 
+### surface/modules/inline-child-import-shadow-before-import
+
+- promise class: durable invariant
+- spec: `32 §1` (`module_item` permits interleaved imports and declarations),
+  `33 §3.3` (position-independent selective-import shadow barrier in approved
+  Spec child `cc93461454b5ff04df13bbab022cd73f33c261d9`)
+- given: two fresh Strict-root programs with the same Provider and ImportOuter.
+  `scopeProbe` is a non-B spelling. In the refusal arm, Child uses the name
+  before importing it:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    const scopeProbe : Nat = Zero;
+    module Child {
+      const beforeImportMarker : Nat = Zero;
+      const childUse : Nat = scopeProbe;
+      import Provider (scopeProbe)
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+
+  The control keeps the import after two declarations in Child, but places the
+  matching use after the import:
+
+  ```ken
+  module Provider {
+    pub const scopeProbe : Bool = True
+  }
+  module ImportOuter {
+    const scopeProbe : Nat = Zero;
+    module Child {
+      const beforeImportMarker : Nat = Zero;
+      const filler : Nat = Zero;
+      import Provider (scopeProbe);
+      const childUse : Bool = scopeProbe
+    };
+    const outerUse : Nat = scopeProbe
+  }
+  ```
+- expect: The refusal arm rejects; do not pin an error variant. Its
+  `childUse` must not bind `ImportOuter.scopeProbe`. The control accepts:
+  `childUse` resolves to `Provider.scopeProbe`, and `outerUse` resolves to
+  `ImportOuter.scopeProbe`.
+- controls: A position-sensitive resolver that lets the before-import
+  reference fall through to the enclosing `Nat` accepts the refusal arm. The
+  control shows that the same import remains usable after earlier declarations
+  and that its selected `Bool` binding type-checks.
+- why: The pre-import `Nat` annotation makes the forbidden enclosing-local
+  fallback an observable acceptance; the imported provider has type `Bool`, so
+  the position-independent shadow contract requires refusal instead. The
+  control's filler occupies the pre-import declaration slot, keeping the import
+  after two declarations in both programs while moving the matching use across
+  it.
+- staging: RED UNTIL `LANG-INLINE-MODULE-IMPORT-SHADOW-POSITION`.
+
 ### surface/modules/protected-name-binding-rejected-renamed-local-resolves
 - spec: `33 §3.3` (no source binding may introduce a name in B)
 - given: paired clients: (a) declare `def Bool = Nat`; (b) instead declare
