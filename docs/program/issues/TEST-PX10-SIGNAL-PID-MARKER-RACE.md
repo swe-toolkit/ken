@@ -1,7 +1,7 @@
 ---
 id: TEST-PX10-SIGNAL-PID-MARKER-RACE
 title: "revoked_child_signal_dispatch_reifies_without_delivery reads its child's PID marker while the child's shell has created the file but not yet written it, so the parse of an empty file panics and a CI shard is red with no product change. Make the marker read wait for the whole PID, so the row is deterministic"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T2
