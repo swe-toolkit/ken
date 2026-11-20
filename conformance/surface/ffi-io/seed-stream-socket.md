@@ -133,6 +133,12 @@ before object emission.
 
 - promise class: durable invariant.
 - spec: §1.13 held-resource revocation; `62 §4.1`.
+- fixture: GATED on source/spec shape mismatch. The delivered
+  `ResourceError` definition in `crates/ken-elaborator/src/prelude.rs` has no
+  `Revoked` constructor; `surface/ffi-io/revoked-single-identity` in
+  `conformance/surface/ffi-io/seed-error-classification.md` is gated on the
+  same mismatch. Keep this case gated until the resource revocation carrier is
+  unified with the normative `ResourceError.Revoked` projection.
 - given: create independent, otherwise valid fixtures for each held-resource
   operation: `NetAccept` on a listener, and `NetReceive`, `NetSend`,
   `NetShutdown` and `NetLocalAddress` on a stream. A test harness revokes the
@@ -205,17 +211,18 @@ before object emission.
 
 - promise class: durable invariant.
 - spec: §1.13 atomic close-on-exec acquisition.
-- given: use a host-boundary schedule that starts a PX10 child as soon as an
-  accepted descriptor exists, before any later userspace flag-setting step.
-  Pair the tested accept path with a positive control that uses non-atomic
-  `accept` followed by `fcntl(FD_CLOEXEC)`, with the child synchronized in
-  that interval.
+- given: use a host-boundary schedule with a minimal exec child whose spawn
+  actions do not close inherited descriptors. Start the tested accept path's
+  child immediately after the accepted descriptor exists. Pair it with a
+  control that pauses after non-atomic `accept` and before
+  `fcntl(FD_CLOEXEC)`, then execs the same child.
 - expect: the specified accepted-stream path never exposes the descriptor to
   the child. The non-atomic control exposes it, proving the schedule reaches
   the inheritance window.
 - why: checking `FD_CLOEXEC` after acquisition cannot distinguish atomic
-  close-on-exec from a later flag update; the paired schedule observes the
-  interval the spec forbids.
+  close-on-exec from a later flag update. A child that closes inherited
+  descriptors would mask the control, so this harness observes the descriptor
+  across exec using `FD_CLOEXEC` alone.
 
 ### surface/ffi-io/socket-declared-native-refusal
 
