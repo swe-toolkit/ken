@@ -56,6 +56,20 @@ impl CensusEntry {
         }
         let hits = CENSUS_HITS.with(|hits| std::mem::take(&mut *hits.borrow_mut()));
         let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
+        // Count every arrived name, including ones an earlier speculative
+        // resolver attempt discarded. The terminal diagnostic alone would
+        // undercount if this entry reached more than one candidate.
+        for (index, hit) in hits.iter().enumerate() {
+            let status = if result.is_err() && index + 1 == hits.len() {
+                "terminal"
+            } else {
+                "discarded"
+            };
+            eprintln!(
+                "LEGACY_CENSUS_ARRIVAL row={row} site={} entry={} name={} root={} span={}..{} status={status}",
+                hit.site, hit.entry, hit.name, hit.root, hit.span.start, hit.span.end
+            );
+        }
         if let (Err(error), Some(hit)) = (result, hits.last()) {
             let matched = match census_error_name_span(error) {
                 Some((name, span)) if name == hit.name && span == &hit.span => "exact",
@@ -3310,10 +3324,18 @@ fn set_catalog_roots_for_mode_v1(
     roots: &[PathBuf],
     mode: ResolutionMode,
     allow_rootless_strict: bool,
+    census_flag: bool,
 ) -> Result<(), ElabError> {
     if mode == ResolutionMode::Strict {
-        require_fixed_proved_identity(&elab.env, &elab.globals)?;
-        require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
+        let fixed = require_fixed_proved_identity(&elab.env, &elab.globals).and_then(|_| {
+            require_pre_source_floor_identities(&elab.module_state, &elab.globals)
+        });
+        if let Err(error) = &fixed {
+            if census_flag {
+                census_record_error(&elab.module_state.root_scope, "S-FIXED", error);
+            }
+        }
+        fixed?;
     }
     if roots.len() != 1 && !(allow_rootless_strict && roots.is_empty()) {
         return Err(ElabError::ParseError {
@@ -3349,7 +3371,8 @@ fn set_catalog_roots_for_mode_v1(
 /// the I4 deletion.
 pub fn set_catalog_roots_v1(elab: &mut ElabEnv, roots: &[PathBuf]) -> Result<(), ElabError> {
     let mode = elab.module_state.root_scope.mode;
-    set_catalog_roots_for_mode_v1(elab, roots, mode, false)
+    let census_flag = elab.module_state.root_scope.census_was_legacy;
+    set_catalog_roots_for_mode_v1(elab, roots, mode, false, census_flag)
 }
 
 fn elaborate_module_from_roots_with_mode_v1(
@@ -3359,7 +3382,7 @@ fn elaborate_module_from_roots_with_mode_v1(
     mode: ResolutionMode,
     census_flag: bool,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
-    set_catalog_roots_for_mode_v1(elab, roots, mode, false)?;
+    set_catalog_roots_for_mode_v1(elab, roots, mode, false, census_flag)?;
     load_unit(elab, entry, &Span::zero(), mode, census_flag)
 }
 
@@ -3418,7 +3441,7 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
             });
         }
     }
-    set_catalog_roots_for_mode_v1(elab, roots, ResolutionMode::Strict, true)?;
+    set_catalog_roots_for_mode_v1(elab, roots, ResolutionMode::Strict, true, false)?;
     for (dependency, owner, span) in imports {
         if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
             load_unit(elab, &dependency, &span, ResolutionMode::Strict, false)?;
@@ -11460,5 +11483,20 @@ mod cat_numeric_interval_public_export_tests {
             actual, expected,
             "the entire public interval surface needs review"
         );
+    }
+}
+
+// Scratch-only derived membership for Architect's I4 residue ledger. Each
+// tuple is read from the compiler's actual home table, never copied by hand.
+#[cfg(test)]
+mod legacy_i4_census_home_inventory {
+    use super::PRELUDE_PACKAGE_HOMES;
+
+    #[test]
+    fn print_exact_census_base_home_inventory() {
+        println!("LEGACY_CENSUS_HOME_COUNT={}", PRELUDE_PACKAGE_HOMES.len());
+        for (index, (home, name)) in PRELUDE_PACKAGE_HOMES.iter().enumerate() {
+            println!("LEGACY_CENSUS_HOME index={index} home={home} name={name}");
+        }
     }
 }

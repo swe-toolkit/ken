@@ -777,7 +777,10 @@ impl ElabEnv {
     /// entries. Reuses the roots-entry loader and preserves this env's mode;
     /// an env without roots retains its missing-module refusal.
     pub fn set_catalog_roots_v1(&mut self, roots: &[PathBuf]) -> Result<(), ElabError> {
-        modules::set_catalog_roots_v1(self, roots)
+        let mut census = modules::census_entry("set_catalog_roots_v1");
+        let result = modules::set_catalog_roots_v1(self, roots);
+        census.finish(&result);
+        result
     }
 
     /// Elaborate an isolated literate source after extracting its Ken fences.
@@ -1222,7 +1225,7 @@ impl ElabEnv {
         let owner_label = owner_label.into();
         let result = (|| {
         let expr = parser::parse_expr(src)?;
-        let rexpr = resolve::resolve_expr_standalone(&expr, &self.globals, &owner_label)?;
+        let rexpr = resolve::census_resolve_expr_standalone(&expr, &self.globals, &owner_label)?;
         self.with_owner(owner_label.clone(), |env| {
             env.with_env_mark_rollback(|env| {
                 elab::elaborate_rexpr(

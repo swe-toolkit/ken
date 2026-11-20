@@ -1861,34 +1861,51 @@ pub(crate) fn resolve_decl_in_unit(
     }
 }
 
-pub(crate) fn resolve_expr_standalone(
+pub(crate) fn resolve_expr_standalone(expr: &Expr) -> Result<RExpr, ElabError> {
+    resolve_expr_standalone_inner(expr, None)
+}
+
+/// Scratch census entry selected only by ElabEnv::elaborate_expr. Internal
+/// resolver unit tests call the ordinary one-argument entry above unchanged.
+pub(crate) fn census_resolve_expr_standalone(
     expr: &Expr,
     globals: &HashMap<String, GlobalId>,
     owner_label: &str,
 ) -> Result<RExpr, ElabError> {
+    resolve_expr_standalone_inner(expr, Some((globals, owner_label)))
+}
+
+fn resolve_expr_standalone_inner(
+    expr: &Expr,
+    census: Option<(&HashMap<String, GlobalId>, &str)>,
+) -> Result<RExpr, ElabError> {
     let mut scope = Scope::new();
     let hits = Rc::new(RefCell::new(Vec::new()));
-    scope.standalone_hits = Some(Rc::clone(&hits));
-    let result = resolve_expr(&mut scope, expr);
-    // Count actual RCon fallthroughs, not .elaborate_expr call sites. A local
-    // binder never reaches this list. A matched flat global is the route that
-    // would be lost if I4 closed standalone resolution without a root scope.
-    let mut names = BTreeMap::<String, usize>::new();
-    for name in hits.borrow().iter() {
-        if !name.contains('.')
-            && !name.contains("::")
-            && !crate::modules::is_prelude_floor_name(name)
-            && globals.contains_key(name)
-        {
-            *names.entry(name.clone()).or_default() += 1;
-        }
+    if census.is_some() {
+        scope.standalone_hits = Some(Rc::clone(&hits));
     }
-    if !names.is_empty() {
-        let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
-        let arrivals: usize = names.values().sum();
-        panic!(
-            "LEGACY_CENSUS_STANDALONE row={row} entry=elaborate_expr owner={owner_label} arrivals={arrivals} names={names:?} matched=global"
-        );
+    let result = resolve_expr(&mut scope, expr);
+    if let Some((globals, owner_label)) = census {
+        // Count actual RCon fallthroughs, not .elaborate_expr call sites. A
+        // local binder never reaches this list. A matched flat global is the
+        // route I4 must close or re-root under Strict.
+        let mut names = BTreeMap::<String, usize>::new();
+        for name in hits.borrow().iter() {
+            if !name.contains('.')
+                && !name.contains("::")
+                && !crate::modules::is_prelude_floor_name(name)
+                && globals.contains_key(name)
+            {
+                *names.entry(name.clone()).or_default() += 1;
+            }
+        }
+        if !names.is_empty() {
+            let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
+            let arrivals: usize = names.values().sum();
+            panic!(
+                "LEGACY_CENSUS_STANDALONE row={row} entry=elaborate_expr owner={owner_label} arrivals={arrivals} names={names:?} matched=global"
+            );
+        }
     }
     result
 }
@@ -2891,7 +2908,10 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
     match ty {
         Type::TUniv(l, span) => Ok(RType::RUniv(*l, span.clone())),
 
-        Type::TCon(name, span) => Ok(RType::RCon(name.clone(), span.clone())),
+        Type::TCon(name, span) => {
+            scope.census_standalone_fallthrough(name);
+            Ok(RType::RCon(name.clone(), span.clone()))
+        }
 
         Type::TVar(name, span) => {
             if let Some(slot) = scope.pattern_alias(name) {
@@ -2899,6 +2919,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             } else if let Some(i) = scope.index_of(name) {
                 Ok(RType::RVarTy(i, name.clone(), span.clone()))
             } else {
+                scope.census_standalone_fallthrough(name);
                 Ok(RType::RCon(name.clone(), span.clone()))
             }
         }

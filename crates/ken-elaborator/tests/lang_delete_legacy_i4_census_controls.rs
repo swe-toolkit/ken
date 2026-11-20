@@ -35,3 +35,30 @@ fn bare_not_elaborate_expr_registers_a_standalone_arrival() {
         "wrong census route: {report}"
     );
 }
+
+/// MEASURED: a type-only bare name in a standalone ascription reaches the
+/// same flat-global counter, without an expression-level RCon for that name.
+/// CLAIMED: the census covers both value and type lookup positions within an
+/// elaborate_expr call. THE GAP: later type-checking is deliberately bypassed
+/// by the measurement panic; no type correctness is inferred from this row.
+#[test]
+fn bare_not_in_standalone_ascription_registers_a_type_arrival() {
+    let mut env = ElabEnv::new().expect("pre-source environment");
+    let caught = catch_unwind(AssertUnwindSafe(|| {
+        env.elaborate_expr("not-type-owner", "0 : Not")
+    }))
+    .expect_err("type-only Not must reach standalone resolution");
+    let report = caught
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| caught.downcast_ref::<&str>().copied())
+        .expect("census panic is a string");
+    assert!(
+        report.contains("LEGACY_CENSUS_STANDALONE")
+            && report.contains("row=bare_not_in_standalone_ascription_registers_a_type_arrival")
+            && report.contains("owner=not-type-owner")
+            && report.contains("arrivals=1")
+            && report.contains("\"Not\": 1"),
+        "type-only name did not reach the matched standalone counter: {report}"
+    );
+}
