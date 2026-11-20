@@ -324,6 +324,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
   rename) in an inline scope shadows any farther enclosing local with
   that non-B spelling throughout the scope and its inline descendants:
   those descendants inherit neither the import nor the local it shadows.
+  The selective-import shadow barrier applies regardless of the import's
+  position among that scope's declarations and inline child modules: a
+  matching unqualified use in that scope or an inline descendant, before
+  or after the import, cannot select the farther enclosing local.
 - **Checked package homes for the Strict catalog route.** The four catalog
   units below that otherwise fail at resolution under Strict roots have the
   following explicit-import homes for their already-checked pre-source

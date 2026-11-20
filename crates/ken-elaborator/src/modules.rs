@@ -1133,6 +1133,11 @@ struct Scope {
     /// this negative fact makes the normative facade-vs-binding failure an
     /// attributed surface `UnboundName` rather than a later global miss.
     facade_only: HashSet<String>,
+    /// Bare spellings this scope's selective imports bind, collected before
+    /// its ordered pass. Imports still apply in textual order, but the shadow
+    /// they cast on farther enclosing locals holds throughout the scope
+    /// (`33 §3.3`), so it cannot wait for the import line to be reached.
+    import_shadows: HashSet<String>,
 }
 
 impl Scope {
@@ -1191,7 +1196,7 @@ impl Scope {
         // Every non-local binding (an import or a file-root package home)
         // stops the walk. `checked_enclosing` shadows on the same keys;
         // file roots have no farther enclosing layer to block.
-        for bare in self.bindings.keys() {
+        for bare in self.bindings.keys().chain(&self.import_shadows) {
             names.entry(bare.clone()).or_insert(EnclosingName::Shadow);
         }
         let mut attached_proofs = self
@@ -1251,6 +1256,7 @@ impl Scope {
         if bare.contains('.')
             || bare.contains("::")
             || self.bindings.contains_key(bare)
+            || self.import_shadows.contains(bare)
             || is_prelude_floor_name(bare)
             || self.kernel_names.contains(bare)
             || is_unshadowable_kernel_name(bare)
@@ -6099,6 +6105,18 @@ fn expand_scope(
         &mut exports_here,
     )?;
     let declared_fixities = collect_scope_fixities(elab, decls, scope)?;
+    scope.import_shadows = decls
+        .iter()
+        .filter_map(|decl| match decl {
+            Decl::ImportDecl {
+                kind: ImportKind::Selective(items),
+                ..
+            } => Some(items),
+            _ => None,
+        })
+        .flatten()
+        .map(|item| item.rename.clone().unwrap_or_else(|| item.name.clone()))
+        .collect();
 
     let mut ids = Vec::new();
     let mut i = 0;
@@ -6983,6 +7001,7 @@ fn expand_scope(
     }
     scope.current_local_names.clear();
     scope.pending_local_classes.clear();
+    scope.import_shadows.clear();
     Ok((ids, exports_here))
 }
 
