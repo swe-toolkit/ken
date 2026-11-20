@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-INVOCATION-ARENA-COST-OBSERVATION
 title: "A native run reports a capacity fault only as the count at the first allocation past a limit, so a promoted operation's arena cost can be found only by bisecting builds against raised profiles, and no row can detect a change in that cost. Report each activation's end-of-run invocation-region counts in the native effect observation, which are its high-water marks because the arena only grows, and pin ResourceStreamWrite's per-operation cost by an operation-count differential"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
