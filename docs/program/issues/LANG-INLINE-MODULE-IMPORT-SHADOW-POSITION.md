@@ -70,15 +70,17 @@ here.
 ## Scope
 
 The shadow population or an ordering refusal in `modules.rs`, rows in
-`lang_inline_module_enclosing_scope.rs`, and a spec 33 §3.3 sentence if
-AC-0 rules one owed. No change to import resolution order for module
+`lang_inline_module_enclosing_scope.rs`, a spec 33 §3.3 sentence if
+AC-0 rules one owed, and one CV-owned seed case in
+`conformance/surface/modules/seed-modules.md`: a matching use before the
+selective import, with its control (CV `evt_7c9hz2egy7mk1`). No change to import resolution order for module
 availability, to what a child inherits, or to kernel or trust.
 
 ## Deliverable
 
 One candidate on the Language ring, after
 `LANG-ATTACHED-PROOF-CHECKED-SELECTION`, with a Spec enclave half if
-AC-0 rules spec text owed.
+AC-0 rules spec text owed, and the CV seed child folded into the same tip.
 
 ## Acceptance
 
