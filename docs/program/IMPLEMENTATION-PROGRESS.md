@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-11-20 14:15:21Z — from 1293 issue file(s) in `docs/program/issues/`.
+2026-11-20 14:17:45Z — from 1293 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -1265,7 +1265,7 @@ the committed file matches the generator's output.
 | `TEST-CHAR-CONSTRUCTION-ROUTES-SCALAR` | Pin that every surface route that builds a Char refuses a surrogate: a Char literal, an integer literal at an expected Char, and an Int-typed expression at Char. Two rows no test pins today; a route that admits D800 stops to the Architect as a Language design fork | merged | verify | S | architect | — |
 | `TEST-ENVIRONMENT-PIN-LINT` | Tests pin values that are functions of the whole compiler prelude (absolute GlobalId and vis_origin numbers, absolute semantic-hash literals, whole-environment member counts), so every lawful prelude extension breaks pins outside the extending WP and they surface one CI round at a time: PX10 hit three such stops. Re-key the latent pins by role or relative equality, and add a test-source lint over the three value shapes with an allowed inventory and a seeded-positive control | merged | verify | M | architect | — |
 | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | merged | doc | S | none | — |
-| `TEST-PX10-SIGNAL-PID-MARKER-RACE` | revoked_child_signal_dispatch_reifies_without_delivery reads its child's PID marker while the child's shell has created the file but not yet written it, so the parse of an empty file panics and a CI shard is red with no product change. Make the marker read wait for the whole PID, so the row is deterministic | active | verify | S | verify-qa | — |
+| `TEST-PX10-SIGNAL-PID-MARKER-RACE` | revoked_child_signal_dispatch_reifies_without_delivery reads its child's PID marker while the child's shell has created the file but not yet written it, so the parse of an empty file panics and a CI shard is red with no product change. Make the marker read wait for the whole PID, so the row is deterministic | active | runtime | S | runtime-qa | — |
 | `TEST-SOURCE-TEXT-ORACLE-RETIRE` | Retire the remaining source-text test oracles: 22 test functions in 16 files read Rust source with include_str! and assert on its text, so behaviour-neutral edits redden them; the Architect disposes each function first, then each is dropped, replaced by a behavioural control, or retired to review | merged | verify | M | architect | — |
 | `TEST-STATED-STACK-SITE-RECONCILE` | Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken | ready | runtime | M | none | — |
 | `V3-D-OPEN-GOAL-WITNESS-ROUTE` | The z3 round-trip's own stated population -- linear arithmetic over Int with universally-quantified parameters -- appears to reach neither fragment D nor FO, because is_first_order_intuit excludes Term::Eq outright and is_ground_decidable demands both sides be IntLit; the first obstacle to the round-trip is the classifier, not the solver | merged | verify | S | none | — |
@@ -1397,10 +1397,11 @@ for every item, gated or not):
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
 - **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-RECORD-INDEX-REFINEMENT` (merged)
 - **runtime**: `RT-MAPPING-MULTIOP-DISPATCH` (merged)
+- **runtime-qa**: `TEST-PX10-SIGNAL-PID-MARKER-RACE` (active)
 - **runtime-qa+architect**: `RT-COMPOSED-RETURN-ATOMIC-CLOSEOUT` (closed) `RT-COMPOSED-RETURN-RUNTIME-CLOSURE` (draft) `RT-COMPOSED-RETURN-SSA-SPECIALIZATION` (merged)
 - **spec-leader**: `CONF-GEOMETRY-BOX-SEED-ISTRUE-IMPORT` (merged)
 - **steward**: `CI-Z3-SCOPE-AND-FORMATTER-CORPUS-GATE` (merged)
-- **verify-qa**: `CI-TEST-BUILD-PER-SHARD` (closed) `TEST-PX10-SIGNAL-PID-MARKER-RACE` (active)
+- **verify-qa**: `CI-TEST-BUILD-PER-SHARD` (closed)
 
 ## Archive & diary
 

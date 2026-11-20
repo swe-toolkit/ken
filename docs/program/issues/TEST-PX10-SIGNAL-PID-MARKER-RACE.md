@@ -2,14 +2,14 @@
 id: TEST-PX10-SIGNAL-PID-MARKER-RACE
 title: "revoked_child_signal_dispatch_reifies_without_delivery reads its child's PID marker while the child's shell has created the file but not yet written it, so the parse of an empty file panics and a CI shard is red with no product change. Make the marker read wait for the whole PID, so the row is deterministic"
 status: active
-owner: verify
+owner: runtime
 size: S
 tier: T2
-gate: verify-qa
+gate: runtime-qa
 depends_on: []
 blocks: []
 github: null
-origin: "Steward attribution evt_3mvhjd13q7a97 on SPEC-FFI-IO-PROCESS-NATIVE-STATUS PR #5410, run 44742686943 shard 2/7. Operator 2026-09-29: flaky tests go to the Verify ring (L2). Steward-filed per COORDINATION section 2."
+origin: "Steward attribution evt_3mvhjd13q7a97 on SPEC-FFI-IO-PROCESS-NATIVE-STATUS PR #5410, run 44742686943 shard 2/7. Runtime-owned PX10 test; the Runtime ring is idle until PX11 lands, and no Verify seat is running. Steward-filed per COORDINATION section 2."
 ---
 
 # The signal-dispatch row reads a complete PID
@@ -45,7 +45,7 @@ child's identity is unchanged), or to other tests.
 
 ## Deliverable
 
-One Verify-ring candidate. The repair hypothesis: the child writes to a
+One Runtime-ring candidate. The repair hypothesis: the child writes to a
 temporary name and renames it onto the marker, which is atomic on one
 filesystem. Alternatively, the reader treats an empty or partial read as
 not yet ready, until the deadline.
