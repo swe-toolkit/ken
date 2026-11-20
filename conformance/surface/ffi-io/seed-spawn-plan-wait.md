@@ -5,18 +5,28 @@ Spec: `spec/30-surface/38-ffi-io.md` §1.11,
 child `f5e714239eb27a3ffd12ba31207fbfc4f0900b3d`.
 Frame: `docs/program/issues/PX10-SPAWN-PLAN-WAIT.md`.
 
-Section 1.11 specifies interpreter behavior and the native Process
-availability boundary. These are acceptance cases, not execution evidence.
-The seed has not been Ken-checked or run by the official conformance runner.
-No CI, publication, landing, or trust measurement is claimed.
-The cases describe surface clients using only the public forms in §1.11 and
-related existing buffer contract; they do not freeze host syscall mechanics.
-This update adds only Strict import-home cases for the three existing pipe
-names; the existing §1.11.2 rows continue to cover their behavior. These
-clients use the exact signatures, including the Auth/type parameters,
-`withChild`'s `Cap a`, plan, and child-resource body, and each operation's
-specified typed resource arguments. No second Process capability argument or
-raw descriptor form is introduced.
+Section 1.11 specifies interpreter behavior and the current native
+availability boundary. The former native-refusal sentinel is retired: the
+argv-env pipe client's invoked ABI operations are native on the released
+base. The F row measures parity for its own child-probe argv-env input under an
+Invocation Nodes limit of 80, raised from the 64-node starter profile. At
+the starter profile, the same-source R row builds and runs natively but ends
+in typed Invocation Nodes capacity exhaustion, not an availability refusal.
+The F/R source and arguments differ from this seed's `px10-argv-env` client.
+This is bounded, profile-specific parity evidence, not an exact-seed native
+execution or a claim about all Process programs.
+
+These are acceptance cases, not execution evidence. The seed has not been
+Ken-checked or run by the official conformance runner. No CI, publication,
+landing, or trust measurement is claimed. The cases describe surface clients
+using only the public forms in §1.11 and related existing buffer contract;
+they do not freeze host syscall mechanics. The seed includes Strict
+import-home cases for the three existing pipe names; the §1.11.2 rows
+continue to cover their behavior. These clients use the exact signatures,
+including the Auth/type parameters, `withChild`'s `Cap a`, plan, and
+child-resource body, and each operation's specified typed resource
+arguments. No second Process capability argument or raw descriptor form is
+introduced.
 
 Source clients use `ChildInherit ConsoleStream` and the qualified
 `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr`
@@ -161,7 +171,7 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   `Exited 0`. The caller-supplied first argument is `argv[0]`. The final
   environment contains the selected key and neither the replaced key nor the
   parent's sentinel. The checked interpreter yields the expected bytes and
-  `Exited 0`; native behavior is addressed separately below.
+  `Exited 0`. This seed makes no native-execution claim for this exact source.
 - why: one accepted child pins argv, exact environment replacement, no parent
   environment overlay, a stdout `PipeRead`, bounded pipe reads, and normal
   exit. It does not pin read chunk sizes or environment iteration order.
@@ -603,34 +613,14 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   observes public results and process liveness, not the host's identity
   mechanism or a specific signal syscall.
 
-## Native Process availability
-
-### surface/ffi-io/process-native-build-refuses-before-object-emission
-
-- promise class: transition sentinel.
-- spec: §1.11 status and §§1.11.2–1.11.3.
-- given: request a native build of the exact checked program in
-  `surface/ffi-io/process-spawn-passes-argv-and-environment`. Use the same
-  `px10-argv-env` fixture with no source changes and a fresh output
-  destination with no preexisting artifact. Its interpreter case is the
-  positive control. The program
-  declares `Process` and `FS AFull`; its pipe client uses `[FS, Process]`.
-- expect: the interpreter control accepts with the specified bytes and
-  `Exited 0`. Native build stops before object emission with a typed
-  availability refusal naming the operations that remain
-  `RepresentedUnavailable`; no native artifact is emitted. An unrelated
-  parse, type, or build failure does not satisfy this case.
-- why: the accepted interpreter run controls source validity. Native Process
-  remains unavailable in this slice; an emitted object would overclaim parity.
-  The transition ends when `PX10-NATIVE-SPAWN-PARITY` lands. That successor
-  must replace this refusal with native Process observations and update this
-  seed's opening status paragraph. This row is a contract case, not executed
-  by Ken or the official runner.
-
 ## Coverage boundary
 
 These cases pin the public plan, Process grant, pipe, wait, error, descriptor,
-signal, and native-availability behavior in §1.11, including AC-1 and AC-2.
+and signal behavior in §1.11, including AC-1 and AC-2. The F-row parity
+result is for its own fixture under the raised Invocation Nodes limit of
+80; it is not native-availability conformance coverage for this seed. The
+same-source R row at the 64-node starter limit ends in a typed Invocation
+Nodes capacity fault, not an availability refusal.
 The host-side invalid or duplicate descriptor-entry check has no public input
 because builders expose no descriptor map. The exact reverse order among
 internal release actions and the absence of a post-fork callback are not
@@ -641,3 +631,9 @@ settlement behavior without exposing the host's identity mechanism. Explicit
 pidfd signalling and the other successor attachments—cwd, credentials,
 namespaces, cgroups, rlimits, process groups, and non-blocking wait—remain
 outside this slice.
+
+## Clean-room provenance
+
+This correction was derived from the approved §1.11 Spec child, the AC-0
+measurement, and the named F/R test rows. No permissive or copyleft reference
+was consulted.
