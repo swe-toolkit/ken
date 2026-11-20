@@ -1,7 +1,7 @@
 ---
 id: SPEC-FFI-IO-PROCESS-NATIVE-STATUS
 title: "Spec 38 §1.11's status says a native build of a Process program is refused, and the spawn-plan-wait seed pins that refusal as a transition sentinel, but every Process and pipe operation is now native (ResourceStreamWrite last, at e5177f7c1) and a crates row already gives the argv-env pipe program native parity with the interpreter. Bring the §1.11 status and the seed case to the landed availability, so the contract no longer requires a refusal the product does not make"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
