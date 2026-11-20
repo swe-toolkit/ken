@@ -86,5 +86,5 @@ Checks: 2 fired. I read `resolve_attached_ref` on `8da54fbc1`: the own-scope
 arm at `:1776` is the only arm that returns no checked ID for a non-declared
 proof; the enclosing arm selects by checked identity. 8 fired. AC-2's
 mutant is the reported mechanism; the merged rows have no
-parent-reads-child source, which is why the leak passed them. 9 fired. Every anchor was read on current main,
-not the Adversary's worktree.
+parent-reads-child source, which is why the leak passed them. 9 fired.
+Every anchor was read on current main, not the Adversary's worktree.
