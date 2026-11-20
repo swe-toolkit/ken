@@ -5,6 +5,16 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use ken_elaborator::ElabEnv;
 
+/// MEASURED: this census test always panics with the unique safety marker.
+/// CLAIMED: no measurement-only commit can be published by a merge-on-green
+/// path. THE GAP: the CI planner must include this test in its exact-once shard
+/// union and the publisher must stop on a red result; the named local run
+/// validates the refusal, not the future CI selection.
+#[test]
+fn census_commit_never_lands() {
+    panic!("LEGACY_CENSUS_SENTINEL measurement-only commit; close, never land");
+}
+
 /// MEASURED: a bare pre-source, non-floor `Not` goes through
 /// resolve_expr_standalone and registers one matched flat-global arrival.
 /// CLAIMED: an I4 deletion cannot overlook the standalone expression route.
