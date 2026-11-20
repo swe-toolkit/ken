@@ -1,5 +1,5 @@
 //! Inline modules inherit checked enclosing declarations, not enclosing imports.
-//! An ancestor import blocks a farther same-spelled local even for descendants.
+//! An ancestor import blocks a farther same-spelled local regardless of its line position.
 //! Promise class: durable Strict lexical-resolution invariants
 //! (spec 33 §§3.1, 3.3).
 //! Forward-reference ordering is intentionally not pinned in this child WP.
@@ -625,4 +625,199 @@ fn held_membership_missing_role_reaches_its_strict_certification_gate() {
         Err(ElabError::StandardOperatorRoleUnfilled { role, .. }) => assert_eq!(role, "∈"),
         other => panic!("missing ∈ must reach the held role refusal: {other:?}"),
     }
+}
+
+/// Assert the first named reference, not merely any rejection. On the wrong
+/// binding this also checks that the accepted body really selected the root ID.
+fn shadow_refuses_at(
+    roots: &[std::path::PathBuf],
+    source: &str,
+    first_reference: &str,
+    wrong_body: &str,
+) {
+    let mut env = ElabEnv::new().expect("base");
+    let start = source.find(first_reference).expect("reference marker")
+        + first_reference
+            .find("helper b")
+            .expect("helper reference in marker");
+    match strict(&mut env, roots, source) {
+        Err(ElabError::UnboundName { name, span }) => {
+            assert_eq!(name, "helper");
+            assert_eq!((span.start, span.end), (start, start + name.len()));
+        }
+        Ok(()) => {
+            body_mentions(&env, wrong_body, env.globals["helper"]);
+            panic!("{wrong_body} must not select the farther root helper");
+        }
+        Err(error) => panic!("the earliest helper reference must refuse: {error:?}"),
+    }
+}
+
+/// MEASURED: moving Mid's selective import after G still refuses G's helper
+/// at G's exact reference; the child-free twin admits the late import at its
+/// provider ID. CLAIMED: a later import shadows a farther root local for an
+/// earlier inline child. THE GAP: M1 removes just the snapshot shadow and
+/// would accept G bound to the root, which the wrong-binding arm checks.
+#[test]
+fn import_after_grandchild_still_blocks_the_root_helper() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    module G { pub fn g (b : Bool) : Bool = helper b }\n\
+                    import Provider (helper)\n\
+                    pub fn m (b : Bool) : Bool = helper b\n\
+                  }\n";
+    let twin = source.replace(
+        "pub fn g (b : Bool) : Bool = helper b",
+        "pub fn g (b : Bool) : Bool = b",
+    );
+    assert_ne!(twin, source);
+    let mut positive = ElabEnv::new().expect("base");
+    strict(&mut positive, &roots, &twin).expect("later import still applies in textual order");
+    body_mentions(&positive, "Mid.m", positive.globals["Provider.helper"]);
+    shadow_refuses_at(
+        &roots,
+        source,
+        "module G { pub fn g (b : Bool) : Bool = helper b",
+        "Mid.G.g",
+    );
+}
+
+/// MEASURED: with G before and G2 after the same import, the first error is
+/// at G; removing G's helper reference moves the refusal to G2. CLAIMED:
+/// position changes neither sibling's ability to select the farther root.
+/// THE GAP: a one-sided snapshot would refuse only at G2; M1 does exactly
+/// that while R1 independently catches acceptance of the earlier G alone.
+#[test]
+fn import_between_siblings_blocks_both_at_their_own_references() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    module G { pub fn g (b : Bool) : Bool = helper b }\n\
+                    import Provider (helper)\n\
+                    module G2 { pub fn g2 (b : Bool) : Bool = helper b }\n\
+                  }\n";
+    shadow_refuses_at(
+        &roots,
+        source,
+        "module G { pub fn g (b : Bool) : Bool = helper b",
+        "Mid.G.g",
+    );
+    let twin = source.replace(
+        "pub fn g (b : Bool) : Bool = helper b",
+        "pub fn g (b : Bool) : Bool = b",
+    );
+    assert_ne!(twin, source);
+    shadow_refuses_at(
+        &roots,
+        &twin,
+        "module G2 { pub fn g2 (b : Bool) : Bool = helper b",
+        "Mid.G2.g2",
+    );
+}
+
+/// MEASURED: a later selective import that renames `other` to `helper` blocks
+/// the earlier G at its helper, while a child-free twin selects Provider.other
+/// from Mid. CLAIMED: the shadow set uses the bound rename, not the source
+/// spelling. THE GAP: the unrenamed R1 and unrelated-import R5 distinguish
+/// a mistaken blanket import shadow from this exact key.
+#[test]
+fn renamed_import_after_grandchild_blocks_its_bound_spelling() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    module G { pub fn g (b : Bool) : Bool = helper b }\n\
+                    import Provider (other as helper)\n\
+                    pub fn m (b : Bool) : Bool = helper b\n\
+                  }\n";
+    let twin = source.replace(
+        "pub fn g (b : Bool) : Bool = helper b",
+        "pub fn g (b : Bool) : Bool = b",
+    );
+    assert_ne!(twin, source);
+    let mut positive = ElabEnv::new().expect("base");
+    strict(&mut positive, &roots, &twin).expect("renamed later import still applies");
+    body_mentions(&positive, "Mid.m", positive.globals["Provider.other"]);
+    shadow_refuses_at(
+        &roots,
+        source,
+        "module G { pub fn g (b : Bool) : Bool = helper b",
+        "Mid.G.g",
+    );
+}
+
+/// MEASURED: Mid.early before an import refuses at its exact helper, while
+/// the twin without that reference accepts Mid.late at Provider.helper's ID.
+/// CLAIMED: the same scope cannot select root helper before its import and
+/// Provider.helper afterward under one spelling. THE GAP: M2 removes only
+/// the checked_enclosing set check and makes early select the root again.
+#[test]
+fn before_import_use_in_the_same_scope_refuses_without_moving_the_import() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let source = "fn helper (b : Bool) : Bool = b\n\
+                  module Mid {\n\
+                    pub fn early (b : Bool) : Bool = helper b\n\
+                    import Provider (helper)\n\
+                    pub fn late (b : Bool) : Bool = helper b\n\
+                  }\n";
+    let twin = source.replace(
+        "pub fn early (b : Bool) : Bool = helper b",
+        "pub fn early (b : Bool) : Bool = b",
+    );
+    assert_ne!(twin, source);
+    let mut positive = ElabEnv::new().expect("base");
+    strict(&mut positive, &roots, &twin).expect("later same-scope import still binds");
+    body_mentions(&positive, "Mid.late", positive.globals["Provider.helper"]);
+    shadow_refuses_at(
+        &roots,
+        source,
+        "pub fn early (b : Bool) : Bool = helper b",
+        "Mid.early",
+    );
+}
+
+/// MEASURED: a later import of `other` leaves the earlier G's root helper
+/// reachable at its checked ID. CLAIMED: only a matching bound spelling
+/// shadows, not any import in the scope. THE GAP: R1 and R3 cover both
+/// matching bare and renamed imports, so this acceptance is not vacuous.
+#[test]
+fn later_unrelated_import_leaves_root_helper_visible_to_grandchild() {
+    let root = tempfile::tempdir().expect("isolated catalog");
+    let roots = provider_with_shadow_candidates(root.path());
+    let mut env = ElabEnv::new().expect("base");
+    strict(
+        &mut env,
+        &roots,
+        "fn helper (b : Bool) : Bool = b\n\
+         module Mid {\n\
+           module G { pub fn g (b : Bool) : Bool = helper b }\n\
+           import Provider (other)\n\
+         }\n",
+    )
+    .expect("unrelated import cannot shadow helper");
+    body_mentions(&env, "Mid.G.g", env.globals["helper"]);
+}
+
+/// MEASURED: Mid first expands A, then imports A.x, then y selects A.x's
+/// checked ID. CLAIMED: position-independent shadowing leaves module
+/// availability and textual import application intact. THE GAP: refusing
+/// imports after children would reject this accepted sibling source.
+#[test]
+fn sibling_provider_then_selective_import_keeps_textual_application() {
+    let mut env = ElabEnv::new().expect("base");
+    strict(
+        &mut env,
+        &[],
+        "module Mid {\n\
+           module A { pub fn x (b : Bool) : Bool = b }\n\
+           import A (x)\n\
+           pub fn y (b : Bool) : Bool = x b\n\
+         }\n",
+    )
+    .expect("sibling provider is available before its later import");
+    body_mentions(&env, "Mid.y", env.globals["Mid.A.x"]);
 }
