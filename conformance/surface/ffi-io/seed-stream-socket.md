@@ -211,18 +211,21 @@ before object emission.
 
 - promise class: durable invariant.
 - spec: §1.13 atomic close-on-exec acquisition.
-- given: use a host-boundary schedule with a minimal exec child whose spawn
-  actions do not close inherited descriptors. Start the tested accept path's
-  child immediately after the accepted descriptor exists. Pair it with a
-  control that pauses after non-atomic `accept` and before
-  `fcntl(FD_CLOEXEC)`, then execs the same child.
-- expect: the specified accepted-stream path never exposes the descriptor to
-  the child. The non-atomic control exposes it, proving the schedule reaches
-  the inheritance window.
-- why: checking `FD_CLOEXEC` after acquisition cannot distinguish atomic
-  close-on-exec from a later flag update. A child that closes inherited
-  descriptors would mask the control, so this harness observes the descriptor
-  across exec using `FD_CLOEXEC` alone.
+- given: use a host-boundary schedule with a minimal exec observer on a
+  second thread whose spawn actions do not close inherited descriptors.
+  Trigger the tested path's observer at the accepted descriptor's underlying
+  `accept`/`accept4` return boundary, before any later userspace
+  `fcntl(FD_CLOEXEC)` can run. Inspect the exec child's `/proc/<pid>/fd` links
+  for the accepted socket inode. Pair this with a control
+  that uses non-atomic `accept` and blocks at the same return boundary before
+  `fcntl(FD_CLOEXEC)`, then execs the same observer.
+- expect: the specified accept path exposes no accepted socket inode to the
+  exec child. The non-atomic control exposes it, proving this schedule reaches
+  the vulnerable interval.
+- why: the observer runs at descriptor creation, before any post-creation
+  flag-setting on the control path. Starting the child only after the Ken
+  operation returns could miss the interval; an observer that closes
+  inherited descriptors would also mask it.
 
 ### surface/ffi-io/socket-declared-native-refusal
 
