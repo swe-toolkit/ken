@@ -20,7 +20,7 @@
 //! unit-local collision admission) → rewrite (qualify free `RCon`/pattern-ctor
 //! references via the active import scope) → `elaborate_rdecl_v1` (unchanged).
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -31,6 +31,8 @@ use std::sync::Arc;
 thread_local! {
     static CENSUS_ENTRIES: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
     static CENSUS_HITS: RefCell<Vec<CensusHit>> = const { RefCell::new(Vec::new()) };
+    // Shadow-only probes must not manufacture S-* production arrivals.
+    static CENSUS_SHADOW_PROBE: Cell<bool> = const { Cell::new(false) };
 }
 
 struct CensusHit {
@@ -55,38 +57,27 @@ impl CensusEntry {
             return;
         }
         let hits = CENSUS_HITS.with(|hits| std::mem::take(&mut *hits.borrow_mut()));
-        let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
-        // Count every arrived name, including ones an earlier speculative
-        // resolver attempt discarded. The terminal diagnostic alone would
-        // undercount if this entry reached more than one candidate.
+        // The terminal hit is evidence, not a new test failure. The ordinary
+        // Strict Err reaches the caller, so passing and failing tests can be
+        // classified from nextest outcomes rather than census-induced panics.
         for (index, hit) in hits.iter().enumerate() {
-            let status = if result.is_err() && index + 1 == hits.len() {
-                "terminal"
+            let terminal = result.is_err() && index + 1 == hits.len();
+            let matched = if terminal {
+                match census_error_name_span(result.as_ref().err().expect("terminal Err")) {
+                    Some((name, span)) if name == hit.name && span == &hit.span => "exact",
+                    Some((name, _)) if name == hit.name => "name",
+                    _ => "none",
+                }
             } else {
-                "discarded"
+                "not-terminal"
             };
-            eprintln!(
-                "LEGACY_CENSUS_ARRIVAL row={row} site={} entry={} name={} root={} span={}..{} status={status}",
-                hit.site, hit.entry, hit.name, hit.root, hit.span.start, hit.span.end
-            );
-        }
-        if let (Err(error), Some(hit)) = (result, hits.last()) {
-            let matched = match census_error_name_span(error) {
-                Some((name, span)) if name == hit.name && span == &hit.span => "exact",
-                Some((name, _)) if name == hit.name => "name",
-                _ => "none",
-            };
-            panic!(
-                "LEGACY_CENSUS row={row} site={} entry={} name={} raw={} root={} span={}..{} matched={matched}",
-                hit.site, hit.entry, hit.name, hit.raw, hit.root, hit.span.start, hit.span.end
-            );
-        }
-        for hit in hits {
-            eprintln!(
-                "LEGACY_CENSUS_DISCARDED row={row} site={} entry={} name={} raw={} root={} span={}..{} caller={}",
-                hit.site, hit.entry, hit.name, hit.raw, hit.root,
-                hit.span.start, hit.span.end, hit.caller
-            );
+            let status = if terminal { "terminal" } else { "discarded" };
+            crate::census_i4::emit("S", serde_json::json!({
+                "site": hit.site, "entry": hit.entry, "name": hit.name,
+                "root": hit.root, "span": [hit.span.start, hit.span.end],
+                "raw": hit.raw, "caller": hit.caller,
+                "status": status, "matched": matched,
+            }));
         }
     }
 }
@@ -149,11 +140,15 @@ fn census_caller() -> String {
 }
 
 fn census_record(scope: &Scope, site: &'static str, name: &str, span: &Span) {
-    if !scope.census_was_legacy {
+    if !scope.census_was_legacy || CENSUS_SHADOW_PROBE.with(Cell::get) {
         return;
     }
-    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied())
-        .unwrap_or_else(|| panic!("LEGACY_CENSUS_INSTRUMENT unguarded site={site} name={name}"));
+    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied()).unwrap_or("<unguarded>");
+    if entry == "<unguarded>" {
+        crate::census_i4::emit("INSTRUMENT-UNGUARDED", serde_json::json!({
+            "site": site, "name": name,
+        }));
+    }
     CENSUS_HITS.with(|hits| {
         hits.borrow_mut().push(CensusHit {
             site,
@@ -1917,6 +1912,55 @@ fn resolve_checked_ref(
         return Err(ElabError::UnboundName { name: name.to_string(), span: span.clone() });
     }
     Ok((canonical, selected))
+}
+
+/// Classify the strict-root shadow route without modifying the flat-global
+/// result of elaborate_expr. The boolean probe is kept out of the S-* ledger:
+/// those arrivals must come from real production resolution, not this shadow.
+pub(crate) fn census_classify_standalone(
+    state: &ModuleState,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    owner: &str,
+    hits: &[(String, Span)],
+) {
+    for (name, span) in hits {
+        let flat = globals.get(name).copied();
+        let result = CENSUS_SHADOW_PROBE.with(|probe| {
+            struct RestoreProbe<'a>(&'a Cell<bool>, bool);
+            impl Drop for RestoreProbe<'_> {
+                fn drop(&mut self) {
+                    self.0.set(self.1);
+                }
+            }
+            let previous = probe.replace(true);
+            let _restore = RestoreProbe(probe, previous);
+            resolve_checked_ref(&state.root_scope, &state.exports, name, span)
+        });
+        let (status, canonical, checked, error) = match result {
+            Err(error) => ("REFUSED", None, None, Some(format!("{error:?}"))),
+            Ok((canonical, Some(checked))) => {
+                let status = match flat {
+                    Some(previous) if previous == checked => "SAME",
+                    Some(_) => "DIVERGED",
+                    None => "ROOT-ONLY",
+                };
+                (status, Some(canonical), Some(checked), None)
+            }
+            Ok((canonical, None)) => {
+                let admitted = is_prelude_floor_name(&canonical)
+                    || state.root_scope.kernel_names.contains(&canonical)
+                    || is_unshadowable_kernel_name(&canonical);
+                let status = if admitted { "UNSELECTED-BUILTIN" } else { "UNSELECTED-OTHER" };
+                (status, Some(canonical), None, None)
+            }
+        };
+        crate::census_i4::emit("STANDALONE", serde_json::json!({
+            "owner": owner, "name": name, "span": [span.start, span.end],
+            "status": status, "canonical": canonical,
+            "checked": checked.map(|id| id.0), "flat": flat.map(|id| id.0),
+            "error": error,
+        }));
+    }
 }
 
 fn resolve_class_ref(

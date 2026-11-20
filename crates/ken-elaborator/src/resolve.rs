@@ -9,7 +9,7 @@
 use ken_kernel::GlobalId;
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     rc::Rc,
 };
 
@@ -547,7 +547,7 @@ struct Scope {
     contains_infix_spine: Rc<Cell<bool>>,
     builtin_binders: Option<Rc<HashSet<String>>>,
     /// Scratch census: clones/branches share the actual standalone fallthroughs.
-    standalone_hits: Option<Rc<RefCell<Vec<String>>>>,
+    standalone_hits: Option<Rc<RefCell<Vec<(String, Span)>>>>,
 }
 
 impl Scope {
@@ -572,9 +572,9 @@ impl Scope {
         self.contains_infix_spine.set(true);
     }
 
-    fn census_standalone_fallthrough(&self, name: &str) {
+    fn census_standalone_fallthrough(&self, name: &str, span: &Span) {
         if let Some(hits) = &self.standalone_hits {
-            hits.borrow_mut().push(name.to_string());
+            hits.borrow_mut().push((name.to_string(), span.clone()));
         }
     }
 
@@ -1869,15 +1869,16 @@ pub(crate) fn resolve_expr_standalone(expr: &Expr) -> Result<RExpr, ElabError> {
 /// resolver unit tests call the ordinary one-argument entry above unchanged.
 pub(crate) fn census_resolve_expr_standalone(
     expr: &Expr,
+    state: &crate::modules::ModuleState,
     globals: &HashMap<String, GlobalId>,
     owner_label: &str,
 ) -> Result<RExpr, ElabError> {
-    resolve_expr_standalone_inner(expr, Some((globals, owner_label)))
+    resolve_expr_standalone_inner(expr, Some((state, globals, owner_label)))
 }
 
 fn resolve_expr_standalone_inner(
     expr: &Expr,
-    census: Option<(&HashMap<String, GlobalId>, &str)>,
+    census: Option<(&crate::modules::ModuleState, &HashMap<String, GlobalId>, &str)>,
 ) -> Result<RExpr, ElabError> {
     let mut scope = Scope::new();
     let hits = Rc::new(RefCell::new(Vec::new()));
@@ -1885,27 +1886,12 @@ fn resolve_expr_standalone_inner(
         scope.standalone_hits = Some(Rc::clone(&hits));
     }
     let result = resolve_expr(&mut scope, expr);
-    if let Some((globals, owner_label)) = census {
-        // Count actual RCon fallthroughs, not .elaborate_expr call sites. A
-        // local binder never reaches this list. A matched flat global is the
-        // route I4 must close or re-root under Strict.
-        let mut names = BTreeMap::<String, usize>::new();
-        for name in hits.borrow().iter() {
-            if !name.contains('.')
-                && !name.contains("::")
-                && !crate::modules::is_prelude_floor_name(name)
-                && globals.contains_key(name)
-            {
-                *names.entry(name.clone()).or_default() += 1;
-            }
-        }
-        if !names.is_empty() {
-            let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
-            let arrivals: usize = names.values().sum();
-            panic!(
-                "LEGACY_CENSUS_STANDALONE row={row} entry=elaborate_expr owner={owner_label} arrivals={arrivals} names={names:?} matched=global"
-            );
-        }
+    if let Some((state, globals, owner_label)) = census {
+        // Every value or type RCon fallthrough is measured, including the
+        // builtins that the earlier floor-name filter incorrectly dropped.
+        crate::modules::census_classify_standalone(
+            state, globals, owner_label, &hits.borrow(),
+        );
     }
     result
 }
@@ -1988,7 +1974,7 @@ fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExp
     match expr {
         Expr::EVar(..) => resolve_expr_ctx_evar(scope, expr, ctx),
         Expr::ECon(name, span) => {
-            scope.census_standalone_fallthrough(name);
+            scope.census_standalone_fallthrough(name, span);
             Ok(RExpr::RCon(name.clone(), span.clone()))
         }
         Expr::EUniv(l, span) => Ok(RExpr::RUniv(*l, span.clone())),
@@ -2047,7 +2033,7 @@ fn resolve_expr_ctx_evar(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result
         } else {
             // Local scope miss — fall through to global lookup (same as TVar).
             // The elaborator's RCon handler resolves the name against globals.
-            scope.census_standalone_fallthrough(name);
+            scope.census_standalone_fallthrough(name, span);
             Ok(RExpr::RCon(name.clone(), span.clone()))
         }
     }
@@ -2909,7 +2895,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
         Type::TUniv(l, span) => Ok(RType::RUniv(*l, span.clone())),
 
         Type::TCon(name, span) => {
-            scope.census_standalone_fallthrough(name);
+            scope.census_standalone_fallthrough(name, span);
             Ok(RType::RCon(name.clone(), span.clone()))
         }
 
@@ -2919,7 +2905,7 @@ fn resolve_type(scope: &mut Scope, ty: &Type) -> Result<RType, ElabError> {
             } else if let Some(i) = scope.index_of(name) {
                 Ok(RType::RVarTy(i, name.clone(), span.clone()))
             } else {
-                scope.census_standalone_fallthrough(name);
+                scope.census_standalone_fallthrough(name, span);
                 Ok(RType::RCon(name.clone(), span.clone()))
             }
         }

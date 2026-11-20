@@ -17,6 +17,7 @@
 #![deny(private_interfaces)]
 
 mod ast;
+pub mod census_i4;
 pub mod bytes;
 pub mod capabilities;
 pub mod checked_core;
@@ -1225,7 +1226,7 @@ impl ElabEnv {
         let owner_label = owner_label.into();
         let result = (|| {
         let expr = parser::parse_expr(src)?;
-        let rexpr = resolve::census_resolve_expr_standalone(&expr, &self.globals, &owner_label)?;
+        let rexpr = resolve::census_resolve_expr_standalone(&expr, &self.module_state, &self.globals, &owner_label)?;
         self.with_owner(owner_label.clone(), |env| {
             env.with_env_mark_rollback(|env| {
                 elab::elaborate_rexpr(
