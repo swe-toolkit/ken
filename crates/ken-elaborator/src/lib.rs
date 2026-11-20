@@ -601,6 +601,9 @@ impl ElabEnv {
                 elab.type_charged_args.entry(name.clone()).or_insert(None);
             }
         }
+        // Scratch census: flip the default source scope to Strict only after
+        // compiler pre-source registration, which is not part of the sample.
+        elab.module_state.install_census_root_scope();
         Ok(elab)
     }
 
@@ -641,6 +644,7 @@ impl ElabEnv {
             .map_err(|e| ElabError::Internal(format!("declare_postulate failed: {}", e)))?;
         self.globals.insert(name.to_string(), id);
         self.module_state.bind_raw_root(name, id);
+        self.module_state.census_record_raw_name(name);
         if is_globals_type_former(&self.env, id) {
             // Raw postulates bypass register_effect_row too. Preserve a
             // charge-all spelling if a later phantom family shadows it.
@@ -653,22 +657,30 @@ impl ElabEnv {
     ///
     /// On success the declaration is registered in `self.env`.
     pub fn elaborate_decl(&mut self, src: &str) -> Result<GlobalId, ElabError> {
-        self.elaborate_decl_v1(src).map(|result| result.def_id)
+        let mut census = modules::census_entry("elaborate_decl");
+        let result = self.elaborate_decl_v1(src).map(|result| result.def_id);
+        census.finish(&result);
+        result
     }
 
     /// Elaborate a V1/L1 declaration, returning obligations alongside the id.
     pub fn elaborate_decl_v1(&mut self, src: &str) -> Result<ElabResult, ElabError> {
-        let decls = parser::parse_decls(src)?;
-        if decls.len() != 1 {
-            return Err(ElabError::ParseError {
-                msg: format!("expected exactly one declaration, found {}", decls.len()),
-                span: Span::zero(),
-            });
-        }
-        let results = modules::expand_and_elaborate(self, &decls)?;
-        results.into_iter().last().ok_or_else(|| {
-            ElabError::Internal("declaration produced no definition (bare import?)".into())
-        })
+        let mut census = modules::census_entry("elaborate_decl_v1");
+        let result = (|| {
+            let decls = parser::parse_decls(src)?;
+            if decls.len() != 1 {
+                return Err(ElabError::ParseError {
+                    msg: format!("expected exactly one declaration, found {}", decls.len()),
+                    span: Span::zero(),
+                });
+            }
+            let results = modules::expand_and_elaborate(self, &decls)?;
+            results.into_iter().last().ok_or_else(|| {
+                ElabError::Internal("declaration produced no definition (bare import?)".into())
+            })
+        })();
+        census.finish(&result);
+        result
     }
 
     /// Elaborate one declaration, returning every result it expands to
@@ -677,14 +689,19 @@ impl ElabEnv {
         &mut self,
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        let decls = parser::parse_decls(src)?;
-        if decls.len() != 1 {
-            return Err(ElabError::ParseError {
-                msg: format!("expected exactly one declaration, found {}", decls.len()),
-                span: Span::zero(),
-            });
-        }
-        modules::expand_and_elaborate(self, &decls)
+        let mut census = modules::census_entry("elaborate_decl_results_v1");
+        let result = (|| {
+            let decls = parser::parse_decls(src)?;
+            if decls.len() != 1 {
+                return Err(ElabError::ParseError {
+                    msg: format!("expected exactly one declaration, found {}", decls.len()),
+                    span: Span::zero(),
+                });
+            }
+            modules::expand_and_elaborate(self, &decls)
+        })();
+        census.finish(&result);
+        result
     }
 
     /// Elaborate one interactive-session declaration. A session is not a
@@ -697,8 +714,10 @@ impl ElabEnv {
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
         let package = std::mem::take(&mut self.module_state.package_definitions);
+        let mut census = modules::census_entry("elaborate_session_decl_results_v1");
         let result = self.elaborate_decl_results_v1(src);
         self.module_state.package_definitions = package;
+        census.finish(&result);
         result
     }
 
@@ -712,15 +731,21 @@ impl ElabEnv {
     /// never a kernel-visible module concept. Returns the `GlobalId` of
     /// every successfully elaborated declaration.
     pub fn elaborate_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
-        self.elaborate_file_v1(src)
-            .map(|results| results.into_iter().map(|result| result.def_id).collect())
+        let mut census = modules::census_entry("elaborate_file");
+        let result = self.elaborate_file_v1(src)
+            .map(|results| results.into_iter().map(|result| result.def_id).collect());
+        census.finish(&result);
+        result
     }
 
     /// Elaborate a file while retaining verification obligations, including
     /// those emitted by block-space operation contracts.
     pub fn elaborate_file_v1(&mut self, src: &str) -> Result<Vec<ElabResult>, ElabError> {
-        let decls = parser::parse_decls(src)?;
-        modules::expand_and_elaborate(self, &decls)
+        let mut census = modules::census_entry("elaborate_file_v1");
+        let result = parser::parse_decls(src)
+            .and_then(|decls| modules::expand_and_elaborate(self, &decls));
+        census.finish(&result);
+        result
     }
 
     /// Prepare one Strict in-memory root, importing only its explicit catalog
@@ -776,7 +801,10 @@ impl ElabEnv {
         roots: &[PathBuf],
         entry: &str,
     ) -> Result<Vec<GlobalId>, ElabError> {
-        modules::elaborate_module_from_roots(self, roots, entry)
+        let mut census = modules::census_entry("elaborate_module_from_roots");
+        let result = modules::elaborate_module_from_roots(self, roots, entry);
+        census.finish(&result);
+        result
     }
 
     /// Elaborate a roots-loaded unit and return the V1 results of its whole
@@ -787,7 +815,10 @@ impl ElabEnv {
         roots: &[PathBuf],
         entry: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        modules::elaborate_module_from_roots_v1(self, roots, entry)
+        let mut census = modules::census_entry("elaborate_module_from_roots_v1");
+        let result = modules::elaborate_module_from_roots_v1(self, roots, entry);
+        census.finish(&result);
+        result
     }
 
     /// Elaborate a roots-loaded unit with strict bare-name resolution.
@@ -874,11 +905,12 @@ impl ElabEnv {
     /// observe declarations an earlier one introduced, and neither role
     /// forks/rolls back env state.
     pub fn elaborate_ken_md_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
-        let (declarations, _examples, _example_ids) = self.elaborate_ken_md_file_parts(src)?;
-        Ok(declarations
-            .into_iter()
-            .map(|result| result.def_id)
-            .collect())
+        let mut census = modules::census_entry("elaborate_ken_md_file");
+        let result = self.elaborate_ken_md_file_parts(src).map(|(declarations, _, _)| {
+            declarations.into_iter().map(|result| result.def_id).collect()
+        });
+        census.finish(&result);
+        result
     }
 
     /// Elaborate a `.ken.md` artifact and retain results from its declarations
@@ -887,10 +919,13 @@ impl ElabEnv {
         &mut self,
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        let (mut declarations, examples, _example_ids) =
-            self.elaborate_ken_md_file_parts(src)?;
-        declarations.extend(examples);
-        Ok(declarations)
+        let mut census = modules::census_entry("elaborate_ken_md_file_v1");
+        let result = self.elaborate_ken_md_file_parts(src).map(|(mut declarations, examples, _)| {
+            declarations.extend(examples);
+            declarations
+        });
+        census.finish(&result);
+        result
     }
 
     pub(crate) fn elaborate_ken_md_file_parts(
@@ -936,8 +971,10 @@ impl ElabEnv {
         src: &str,
         extracted: &literate::KenMdExtraction,
     ) -> Result<(), ElabError> {
-        self.execute_ken_md_checked_fences_v1(src, extracted)
-            .map(|_| ())
+        let mut census = modules::census_entry("execute_ken_md_checked_fences");
+        let result = self.execute_ken_md_checked_fences_v1(src, extracted).map(|_| ());
+        census.finish(&result);
+        result
     }
 
     /// Execute checked literate fences and return results from successful
@@ -952,7 +989,10 @@ impl ElabEnv {
         src: &str,
         extracted: &literate::KenMdExtraction,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        self.execute_ken_md_checked_fences_reporting(src, extracted, None)
+        let mut census = modules::census_entry("execute_ken_md_checked_fences_v1");
+        let result = self.execute_ken_md_checked_fences_reporting(src, extracted, None);
+        census.finish(&result);
+        result
     }
 
     pub(crate) fn execute_ken_md_checked_fences_reporting(
@@ -1178,9 +1218,11 @@ impl ElabEnv {
         owner_label: impl Into<String>,
         src: &str,
     ) -> Result<(Term, Term), ElabError> {
-        let expr = parser::parse_expr(src)?;
-        let rexpr = resolve::resolve_expr_standalone(&expr)?;
+        let mut census = modules::census_entry("elaborate_expr");
         let owner_label = owner_label.into();
+        let result = (|| {
+        let expr = parser::parse_expr(src)?;
+        let rexpr = resolve::resolve_expr_standalone(&expr, &self.globals, &owner_label)?;
         self.with_owner(owner_label.clone(), |env| {
             env.with_env_mark_rollback(|env| {
                 elab::elaborate_rexpr(
@@ -1199,6 +1241,9 @@ impl ElabEnv {
                 )
             })
         })
+        })();
+        census.finish(&result);
+        result
     }
 
     pub fn kernel_version(&self) -> &'static str {

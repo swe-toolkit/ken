@@ -8,8 +8,8 @@
 
 use ken_kernel::GlobalId;
 use std::{
-    cell::Cell,
-    collections::{HashMap, HashSet},
+    cell::{Cell, RefCell},
+    collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
 };
 
@@ -546,6 +546,8 @@ struct Scope {
     /// declaration remains an O(1) resolution-side fact.
     contains_infix_spine: Rc<Cell<bool>>,
     builtin_binders: Option<Rc<HashSet<String>>>,
+    /// Scratch census: clones/branches share the actual standalone fallthroughs.
+    standalone_hits: Option<Rc<RefCell<Vec<String>>>>,
 }
 
 impl Scope {
@@ -556,6 +558,7 @@ impl Scope {
             space_cells: std::collections::HashMap::new(),
             contains_infix_spine: Rc::new(Cell::new(false)),
             builtin_binders: None,
+            standalone_hits: None,
         }
     }
 
@@ -567,6 +570,12 @@ impl Scope {
 
     fn saw_infix_spine(&self) {
         self.contains_infix_spine.set(true);
+    }
+
+    fn census_standalone_fallthrough(&self, name: &str) {
+        if let Some(hits) = &self.standalone_hits {
+            hits.borrow_mut().push(name.to_string());
+        }
     }
 
     fn has_infix_spine(&self) -> bool {
@@ -1852,9 +1861,36 @@ pub(crate) fn resolve_decl_in_unit(
     }
 }
 
-pub(crate) fn resolve_expr_standalone(expr: &Expr) -> Result<RExpr, ElabError> {
+pub(crate) fn resolve_expr_standalone(
+    expr: &Expr,
+    globals: &HashMap<String, GlobalId>,
+    owner_label: &str,
+) -> Result<RExpr, ElabError> {
     let mut scope = Scope::new();
-    resolve_expr(&mut scope, expr)
+    let hits = Rc::new(RefCell::new(Vec::new()));
+    scope.standalone_hits = Some(Rc::clone(&hits));
+    let result = resolve_expr(&mut scope, expr);
+    // Count actual RCon fallthroughs, not .elaborate_expr call sites. A local
+    // binder never reaches this list. A matched flat global is the route that
+    // would be lost if I4 closed standalone resolution without a root scope.
+    let mut names = BTreeMap::<String, usize>::new();
+    for name in hits.borrow().iter() {
+        if !name.contains('.')
+            && !name.contains("::")
+            && !crate::modules::is_prelude_floor_name(name)
+            && globals.contains_key(name)
+        {
+            *names.entry(name.clone()).or_default() += 1;
+        }
+    }
+    if !names.is_empty() {
+        let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
+        let arrivals: usize = names.values().sum();
+        panic!(
+            "LEGACY_CENSUS_STANDALONE row={row} entry=elaborate_expr owner={owner_label} arrivals={arrivals} names={names:?} matched=global"
+        );
+    }
+    result
 }
 
 // ----- internal resolution -----
@@ -1934,7 +1970,10 @@ fn resolve_infix_spine(
 fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
     match expr {
         Expr::EVar(..) => resolve_expr_ctx_evar(scope, expr, ctx),
-        Expr::ECon(name, span) => Ok(RExpr::RCon(name.clone(), span.clone())),
+        Expr::ECon(name, span) => {
+            scope.census_standalone_fallthrough(name);
+            Ok(RExpr::RCon(name.clone(), span.clone()))
+        }
         Expr::EUniv(l, span) => Ok(RExpr::RUniv(*l, span.clone())),
         Expr::EApp(..) => resolve_expr_ctx_eapp(scope, expr, ctx),
         Expr::ELam(..) => resolve_expr_ctx_elam(scope, expr, ctx),
@@ -1991,6 +2030,7 @@ fn resolve_expr_ctx_evar(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result
         } else {
             // Local scope miss — fall through to global lookup (same as TVar).
             // The elaborator's RCon handler resolves the name against globals.
+            scope.census_standalone_fallthrough(name);
             Ok(RExpr::RCon(name.clone(), span.clone()))
         }
     }

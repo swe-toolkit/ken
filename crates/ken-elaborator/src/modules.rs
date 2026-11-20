@@ -20,9 +20,146 @@
 //! unit-local collision admission) → rewrite (qualify free `RCon`/pattern-ctor
 //! references via the active import scope) → `elaborate_rdecl_v1` (unchanged).
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+// Measurement-only scratch instrument. Classify a refusal at the outermost
+// entry; a speculative resolver error that its caller discards is not a
+// terminal Legacy residue. Each thread has its own row identity and hit list.
+thread_local! {
+    static CENSUS_ENTRIES: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+    static CENSUS_HITS: RefCell<Vec<CensusHit>> = const { RefCell::new(Vec::new()) };
+}
+
+struct CensusHit {
+    site: &'static str,
+    entry: &'static str,
+    name: String,
+    raw: bool,
+    root: String,
+    span: Span,
+    caller: String,
+}
+
+pub(crate) struct CensusEntry {
+    outermost: bool,
+    finished: bool,
+}
+
+impl CensusEntry {
+    pub(crate) fn finish<T>(&mut self, result: &Result<T, ElabError>) {
+        self.finished = true;
+        if !self.outermost {
+            return;
+        }
+        let hits = CENSUS_HITS.with(|hits| std::mem::take(&mut *hits.borrow_mut()));
+        let row = std::thread::current().name().unwrap_or("<unnamed>").to_string();
+        if let (Err(error), Some(hit)) = (result, hits.last()) {
+            let matched = match census_error_name_span(error) {
+                Some((name, span)) if name == hit.name && span == &hit.span => "exact",
+                Some((name, _)) if name == hit.name => "name",
+                _ => "none",
+            };
+            panic!(
+                "LEGACY_CENSUS row={row} site={} entry={} name={} raw={} root={} span={}..{} matched={matched}",
+                hit.site, hit.entry, hit.name, hit.raw, hit.root, hit.span.start, hit.span.end
+            );
+        }
+        for hit in hits {
+            eprintln!(
+                "LEGACY_CENSUS_DISCARDED row={row} site={} entry={} name={} raw={} root={} span={}..{} caller={}",
+                hit.site, hit.entry, hit.name, hit.raw, hit.root,
+                hit.span.start, hit.span.end, hit.caller
+            );
+        }
+    }
+}
+
+impl Drop for CensusEntry {
+    fn drop(&mut self) {
+        CENSUS_ENTRIES.with(|entries| {
+            entries.borrow_mut().pop();
+        });
+        if self.outermost && !self.finished && !std::thread::panicking() {
+            panic!("LEGACY_CENSUS_INSTRUMENT outermost entry exited without classifying its result");
+        }
+    }
+}
+
+pub(crate) fn census_entry(name: &'static str) -> CensusEntry {
+    let outermost = CENSUS_ENTRIES.with(|entries| {
+        let mut entries = entries.borrow_mut();
+        let outermost = entries.is_empty();
+        entries.push(name);
+        outermost
+    });
+    if outermost {
+        CENSUS_HITS.with(|hits| hits.borrow_mut().clear());
+    }
+    CensusEntry {
+        outermost,
+        finished: false,
+    }
+}
+
+fn census_direct_entry() -> Option<CensusEntry> {
+    CENSUS_ENTRIES.with(|entries| entries.borrow().is_empty())
+        .then(|| census_entry("expand_and_elaborate"))
+}
+
+fn census_error_name_span(error: &ElabError) -> Option<(&str, &Span)> {
+    match error {
+        ElabError::UnboundName { name, span }
+        | ElabError::AmbiguousReference { name, span, .. }
+        | ElabError::BuiltinNameBinding { name, span } => Some((name, span)),
+        _ => None,
+    }
+}
+
+fn census_caller() -> String {
+    let backtrace = std::backtrace::Backtrace::force_capture().to_string();
+    backtrace
+        .lines()
+        .find_map(|line| {
+            let symbol = line.split_once(": ")?.1.trim();
+            (symbol.contains("ken_elaborator::modules::")
+                && !symbol.contains("::census_caller")
+                && !symbol.contains("::census_record")
+                && !symbol.contains("::resolve_ref")
+                && !symbol.contains("::resolve_class_ref"))
+                .then(|| symbol.to_string())
+        })
+        .unwrap_or_else(|| "<unknown>".to_string())
+}
+
+fn census_record(scope: &Scope, site: &'static str, name: &str, span: &Span) {
+    if !scope.census_was_legacy {
+        return;
+    }
+    let entry = CENSUS_ENTRIES.with(|entries| entries.borrow().last().copied())
+        .unwrap_or_else(|| panic!("LEGACY_CENSUS_INSTRUMENT unguarded site={site} name={name}"));
+    CENSUS_HITS.with(|hits| {
+        hits.borrow_mut().push(CensusHit {
+            site,
+            entry,
+            name: name.to_string(),
+            raw: scope.census_raw_names.contains(name),
+            root: scope.census_root.clone().unwrap_or_else(|| "<in-memory>".to_string()),
+            span: span.clone(),
+            caller: census_caller(),
+        })
+    });
+}
+
+fn census_record_error(scope: &Scope, site: &'static str, error: &ElabError) {
+    if let Some((name, span)) = census_error_name_span(error) {
+        census_record(scope, site, name, span);
+    } else {
+        census_record(scope, site, "<other-refusal>", &Span::zero());
+    }
+}
 
 use crate::ast::{
     BoundaryHeader, CtorDecl, Decl, ExplicitDataCtor, ExportForm, Fixity, ImportItem, ImportKind,
@@ -144,6 +281,8 @@ pub struct ModuleState {
     /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
     /// cache records elaborated results rather than unresolved source.
     roots_resolution_mode: Option<ResolutionMode>,
+    /// Scratch-only: names admitted as raw postulates, not source declarations.
+    census_raw_names: HashSet<String>,
     /// Home module -> checked pre-source package identities bound in that
     /// module's scope, never in unrelated clients or the strict ambient set.
     package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>>,
@@ -208,6 +347,21 @@ impl ModuleState {
 
     pub(crate) fn finish_prelude_source_registration(&mut self) {
         self.legacy_in_memory_source_started = false;
+    }
+
+    /// Flip the public default only after compiler pre-source registration has
+    /// finished; pre-source implementation declarations keep their base mode.
+    pub(crate) fn install_census_root_scope(&mut self) {
+        let mut scope = Scope::with_mode(ResolutionMode::Strict, self.strict_builtin_names.clone());
+        scope.private_ids.clone_from(&self.private_ids);
+        scope.census_was_legacy = true;
+        scope.census_raw_names.clone_from(&self.census_raw_names);
+        self.root_scope = scope;
+    }
+
+    pub(crate) fn census_record_raw_name(&mut self, name: &str) {
+        self.census_raw_names.insert(name.to_string());
+        self.root_scope.census_raw_names.insert(name.to_string());
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -1067,6 +1221,10 @@ impl EnclosingLayer {
 #[derive(Default, Clone)]
 struct Scope {
     mode: ResolutionMode,
+    /// Scratch-only: a formerly Legacy entry now forced through Strict.
+    census_was_legacy: bool,
+    census_root: Option<String>,
+    census_raw_names: HashSet<String>,
     /// Compiler-installed vocabulary captured before package source can speak.
     /// This excludes later ambient postulates while preserving primitive names.
     kernel_names: HashSet<String>,
@@ -1497,6 +1655,7 @@ fn resolve_ref(
                 }
             }
             if scope.mode == ResolutionMode::Strict && scope.bindings.contains_key(subject) {
+                census_record(scope, "S-SELECTOR", name, span);
                 return Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1583,18 +1742,21 @@ fn resolve_ref(
         if let Some((canonical, _)) = scope.checked_enclosing(name, span)? {
             return Ok(canonical.to_string());
         }
-        if scope.facade_only.contains(name)
-            || (scope.mode == ResolutionMode::Strict
-                && !is_prelude_floor_name(name)
-                && !scope.kernel_names.contains(name)
-                && !is_unshadowable_kernel_name(name))
+        // The pre-source registrar alone still uses Legacy internally; all
+        // package entries were switched to Strict at the constructor boundary.
+        if !scope.facade_only.contains(name)
+            && (is_prelude_floor_name(name)
+                || scope.kernel_names.contains(name)
+                || is_unshadowable_kernel_name(name)
+                || (scope.mode == ResolutionMode::Legacy && !scope.census_was_legacy))
         {
-            return Err(ElabError::UnboundName {
-                name: name.to_string(),
-                span: span.clone(),
-            });
+            return Ok(name.to_string());
         }
-        Ok(name.to_string())
+        census_record(scope, "S-BARE", name, span);
+        Err(ElabError::UnboundName {
+            name: name.to_string(),
+            span: span.clone(),
+        })
     }
 }
 
@@ -1789,6 +1951,9 @@ fn resolve_attached_ref(
         && !subject.contains('.')
     {
         return Ok((format!("{canonical_subject}::{proof_name}"), None));
+    }
+    if !scope.bindings.contains_key(subject) && !subject.contains('.') {
+        census_record(scope, "S-AMBIENT-PROOF", &format!("{canonical_subject}::{proof_name}"), span);
     }
     Err(ElabError::UnboundName {
         name: format!("{canonical_subject}::{proof_name}"),
@@ -2820,6 +2985,7 @@ fn load_unit(
     module: &str,
     span: &Span,
     mode: ResolutionMode,
+    census_flag: bool,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     if let Some(start) = elab
         .module_state
@@ -2898,7 +3064,7 @@ fn load_unit(
             // declared later: the ordered pass will reject its premature use
             // at the import. An unrelated global export is not a file load.
             if declared_inline_import(&owner, Some(module), &dependency, &local_modules).is_none() {
-                let (_, results) = load_unit(elab, &dependency, &import_span, mode)?;
+                let (_, results) = load_unit(elab, &dependency, &import_span, mode, census_flag)?;
                 loaded_dependencies.push(dependency.clone());
                 dependency_results.extend(results);
             }
@@ -2916,6 +3082,9 @@ fn load_unit(
         elab.class_env.next_module();
 
         let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
+        scope.census_was_legacy = census_flag;
+        scope.census_root = Some(path.display().to_string());
+        scope.census_raw_names.clone_from(&elab.module_state.census_raw_names);
         scope.private_ids.clone_from(&elab.module_state.private_ids);
         // Only the approved file unit owns these pre-source IDs. An ordinary
         // export publishes them through its provider table; other units must
@@ -3085,9 +3254,14 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    // Direct entry-unit IDs, exactly as on main and as the strict entry returns.
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
-        .map(|(ids, _)| ids)
+    // Measurement: route the formerly Legacy roots entry through Strict.
+    let mut census = census_entry("elaborate_module_from_roots");
+    let result = elaborate_module_from_roots_with_mode_v1(
+        elab, roots, entry, ResolutionMode::Strict, true,
+    )
+    .map(|(ids, _)| ids);
+    census.finish(&result);
+    result
 }
 
 /// Elaborate a roots-loaded unit and return the V1 results of its whole
@@ -3098,8 +3272,13 @@ pub fn elaborate_module_from_roots_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
-        .map(|(_, results)| results)
+    let mut census = census_entry("elaborate_module_from_roots_v1");
+    let result = elaborate_module_from_roots_with_mode_v1(
+        elab, roots, entry, ResolutionMode::Strict, true,
+    )
+    .map(|(_, results)| results);
+    census.finish(&result);
+    result
 }
 
 /// Strict roots entry returning the checked V1 results of the whole closure.
@@ -3108,7 +3287,7 @@ pub fn elaborate_module_from_roots_strict_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, false)
         .map(|(_, results)| results)
 }
 
@@ -3118,7 +3297,7 @@ pub fn elaborate_module_from_roots_strict(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict, false)
         .map(|(ids, _)| ids)
 }
 
@@ -3178,9 +3357,10 @@ fn elaborate_module_from_roots_with_mode_v1(
     roots: &[PathBuf],
     entry: &str,
     mode: ResolutionMode,
+    census_flag: bool,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     set_catalog_roots_for_mode_v1(elab, roots, mode, false)?;
-    load_unit(elab, entry, &Span::zero(), mode)
+    load_unit(elab, entry, &Span::zero(), mode, census_flag)
 }
 
 /// Prepare one in-memory root and its explicit catalog imports for Strict.
@@ -3241,7 +3421,7 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
     set_catalog_roots_for_mode_v1(elab, roots, ResolutionMode::Strict, true)?;
     for (dependency, owner, span) in imports {
         if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
-            load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
+            load_unit(elab, &dependency, &span, ResolutionMode::Strict, false)?;
         }
     }
     // Each Strict isolated source is its own unit (33 §3.3): it starts from
@@ -5226,12 +5406,16 @@ fn resolve_raw_scoped_decl(
     } else {
         None
     };
-    resolve::resolve_decl_in_unit(
+    let resolved = resolve::resolve_decl_in_unit(
         decl,
         unit_definitions,
         attached_name.as_deref(),
         (scope.mode == ResolutionMode::Strict).then(|| std::rc::Rc::new(binder_names.clone())),
-    )
+    );
+    if let Err(error @ ElabError::BuiltinNameBinding { .. }) = &resolved {
+        census_record_error(scope, "S-BINDER", error);
+    }
+    resolved
 }
 
 fn reject_prelude_binding(
@@ -5512,6 +5696,7 @@ fn reject_decl_prelude_bindings(
     prefix: &str,
     prelude_binding_names: &HashSet<String>,
     mode: ResolutionMode,
+    scope: &Scope,
 ) -> Result<(), ElabError> {
     let reject = |bare: &str, span: &Span| {
         reject_prelude_binding(bare, &qualify(prefix, bare), span, prelude_binding_names)
@@ -5522,7 +5707,11 @@ fn reject_decl_prelude_bindings(
             reject(law, span)?;
             if mode == ResolutionMode::Strict {
                 for (field, _) in fields {
-                    reject(&format!("{law}_{field}"), span)?;
+                    let name = format!("{law}_{field}");
+                    if let Err(error) = reject(&name, span) {
+                        census_record(scope, "S-LAWFIELD", &name, span);
+                        return Err(error);
+                    }
                 }
             }
             Ok(())
@@ -5609,7 +5798,7 @@ fn prebind_scope_declarations(
     // or elaborating any declaration so refusal cannot allocate or replace a
     // canonical global.
     for decl in decls {
-        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode)?;
+        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode, scope)?;
     }
 
     // Collect locals before imports so collisions are source-order independent.
@@ -6155,6 +6344,9 @@ fn expand_scope(
                 elab.module_state
                     .require_module_path_available(&child_prefix, unit_owner, span)?;
                 let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
+                child_scope.census_was_legacy = scope.census_was_legacy;
+                child_scope.census_root.clone_from(&scope.census_root);
+                child_scope.census_raw_names.clone_from(&scope.census_raw_names);
                 child_scope.private_ids.clone_from(&scope.private_ids);
                 if scope.mode == ResolutionMode::Strict {
                     child_scope.enclosing =
@@ -6326,7 +6518,13 @@ fn expand_scope(
                     span,
                     (scope.mode == ResolutionMode::Strict)
                         .then(|| std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
-                )?;
+                )
+                .or_else(|error| {
+                    if let error @ ElabError::BuiltinNameBinding { .. } = &error {
+                        census_record_error(scope, "S-SPACE", error);
+                    }
+                    Err(error)
+                })?;
                 let mut declared = vec![DeclaredIdentity {
                     key: resolved.name.clone(),
                     provenance: IdentityProvenance::Source,
@@ -7068,6 +7266,8 @@ pub fn expand_and_elaborate(
     elab: &mut ElabEnv,
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    let mut direct_entry = census_direct_entry();
+    let result = (|| {
     let boundary = admission_boundary(decls)?;
     // A failed file can leave an earlier declaration admitted without ever
     // committing its in-memory unit counter. An empty file can commit a unit
@@ -7107,7 +7307,8 @@ pub fn expand_and_elaborate(
             ) {
                 continue;
             }
-            load_unit(elab, &dependency, &span, mode)?;
+            let census_flag = elab.module_state.root_scope.census_was_legacy;
+            load_unit(elab, &dependency, &span, mode, census_flag)?;
         }
     }
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
@@ -7188,6 +7389,11 @@ pub fn expand_and_elaborate(
         elab.module_state.next_in_memory_unit += 1;
     }
     Ok(results)
+    })();
+    if let Some(census) = &mut direct_entry {
+        census.finish(&result);
+    }
+    result
 }
 
 #[cfg(test)]
