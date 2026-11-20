@@ -26,6 +26,7 @@ fn bare_not_elaborate_expr_registers_a_standalone_arrival() {
         .expect("census panic is a string");
     assert!(
         report.contains("LEGACY_CENSUS_STANDALONE")
+            && report.contains("row=bare_not_elaborate_expr_registers_a_standalone_arrival")
             && report.contains("entry=elaborate_expr")
             && report.contains("owner=not-owner")
             && report.contains("arrivals=1")
