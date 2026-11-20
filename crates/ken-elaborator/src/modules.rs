@@ -27,7 +27,8 @@ use std::sync::Arc;
 
 // Measurement-only scratch instrument. Classify a refusal at the outermost
 // entry; a speculative resolver error that its caller discards is not a
-// terminal Legacy residue. Each thread has its own row identity and hit list.
+// terminal Legacy residue. Hit lists are thread-local; emitted records use
+// the owning nextest process's (binary, test) identity.
 thread_local! {
     static CENSUS_ENTRIES: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
     static CENSUS_HITS: RefCell<Vec<CensusHit>> = const { RefCell::new(Vec::new()) };
