@@ -31,11 +31,11 @@ fn expected_provider_id(path: &Path, isolated: bool) -> GlobalId {
             .expect("independent isolated root precedes Q");
     } else {
         separate
-            .elaborate_module_from_roots_strict(&roots(path), "M")
+            .elaborate_module_from_roots(&roots(path), "M")
             .expect("independent catalog root precedes Q");
     }
     let results = separate
-        .elaborate_module_from_roots_strict_v1(&roots(path), "Q")
+        .elaborate_module_from_roots_v1(&roots(path), "Q")
         .expect("Q roots-loads independently");
     results
         .iter()
@@ -84,7 +84,7 @@ fn example_catalog_entry_imports_provider_outside_tangled_closure() {
     std::fs::write(dir.path().join("M.ken.md"), &doc).unwrap();
     let provider = expected_provider_id(dir.path(), false);
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&roots(dir.path()), "M")
+    env.elaborate_module_from_roots(&roots(dir.path()), "M")
         .expect("entry loads without a Q import");
     assert_eq!(env.loaded_module_count(), 1, "Q is outside tangled closure");
     let examples = env
@@ -107,7 +107,7 @@ fn reject_catalog_entry_imports_provider_outside_tangled_closure() {
     let doc = document("reject", "Q");
     std::fs::write(dir.path().join("M.ken.md"), &doc).unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&roots(dir.path()), "M")
+    env.elaborate_module_from_roots(&roots(dir.path()), "M")
         .expect("entry loads before checked roles");
     assert_eq!(env.loaded_module_count(), 1);
     let err = env
@@ -163,7 +163,7 @@ fn absent_provider_reject_still_passes_on_both_routes() {
     let range = extract_ken_md(&doc).unwrap().reject_ranges[0].clone();
     let mut catalog = ElabEnv::new().unwrap();
     catalog
-        .elaborate_module_from_roots_strict(&roots(dir.path()), "M")
+        .elaborate_module_from_roots(&roots(dir.path()), "M")
         .unwrap();
     let errors = catalog
         .execute_loaded_entry_checked_fences_reporting_rejections("M")

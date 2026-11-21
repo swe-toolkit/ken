@@ -167,7 +167,7 @@ fn owned_ord_int_law_ids(env: &ElabEnv, lawful_owned: &[GlobalId]) -> BTreeSet<G
 fn canonical_ord_result_is_strict_standalone_and_exports_one_identity() {
     let mut env = ElabEnv::new().expect("base environment");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    env.elaborate_module_from_roots_strict(&[catalog_root()], ORD_RESULT_MODULE)
+    env.elaborate_module_from_roots(&[catalog_root()], ORD_RESULT_MODULE)
         .expect("canonical OrdResult must load standalone under strict resolution");
 
     let ty = env.globals["Core.Logic.OrdResult.OrdResult"];

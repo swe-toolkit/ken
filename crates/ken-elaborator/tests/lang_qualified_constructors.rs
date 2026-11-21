@@ -301,7 +301,7 @@ fn strict_roots_type_constructor_selection_keeps_public_and_private_faces() {
     )
     .expect("write strict consumer");
     let mut env = env();
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+    env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect("public checked constructor reaches both positions");
     let selected = env.globals["M.Red"];
     assert_constructor(body(&env, "Entry.selected"), selected);
@@ -322,7 +322,7 @@ fn strict_roots_type_constructor_selection_keeps_public_and_private_faces() {
     .expect("write denied strict consumer");
     let error = ElabEnv::new()
         .expect("checked prelude")
-        .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Private")
+        .elaborate_module_from_roots(&[root.path().to_path_buf()], "Private")
         .expect_err("a private constructor must not be recovered through T.C");
     assert!(
         matches!(error, ElabError::UnboundName { ref name, .. }

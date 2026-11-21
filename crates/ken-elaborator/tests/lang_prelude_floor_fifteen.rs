@@ -174,7 +174,7 @@ fn strict_five_proposition_members_resolve_canonically_and_and_does_not() {
     let mut env = ElabEnv::new().expect("compiler prelude");
     let ids = ["Bottom", "Equal", "Prop", "Proved", "Top"].map(|name| (name, env.globals[name]));
     let trust_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+    env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect("the five floor names must resolve in strict roots");
     assert_eq!(env.env.trusted_base(), trust_before);
     for (name, id) in ids {
@@ -214,7 +214,7 @@ fn strict_five_proposition_members_resolve_canonically_and_and_does_not() {
     .expect("write non-floor control");
     let error = ElabEnv::new()
         .expect("compiler prelude")
-        .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "NonFloor")
+        .elaborate_module_from_roots(&[root.path().to_path_buf()], "NonFloor")
         .expect_err("And cannot become a strict floor member");
     assert!(
         matches!(error, ElabError::UnboundName { ref name, .. } if name == "And"),
@@ -243,7 +243,7 @@ fn five_floor_name_redeclarations_fail_before_allocation() {
         let old_id = env.globals[name];
         let next = env.env.next_global_id();
         let error = env
-            .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+            .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
             .expect_err("a checked source declaration must not rebind a floor name");
         assert!(
             matches!(error,
@@ -279,7 +279,7 @@ fn strict_entry_rejects_forged_pre_source_floor_identity() {
     assert_ne!(actual, forged);
     assert_eq!(env.globals.insert("Top".to_string(), forged), Some(actual));
     let error = env
-        .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+        .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect_err("a strict unit cannot use substituted floor ID");
     match error {
         ElabError::Internal(message) => {

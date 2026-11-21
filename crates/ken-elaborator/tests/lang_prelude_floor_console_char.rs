@@ -134,7 +134,7 @@ fn load(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
     fs::write(root.path().join("Entry.ken"), source).expect("write client source");
     match mode {
         "strict-roots" => {
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")?;
+            env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")?;
         }
         "legacy-roots" => {
             env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
@@ -431,7 +431,7 @@ fn check_home_imports_select_all_five(mode: &str) {
     let stdout = env.globals["ConsoleStream.Stdout"];
     match mode {
         "strict-roots" => {
-            env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+            env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
                 .expect("strict home and client load");
         }
         "legacy-roots" => {
@@ -524,7 +524,7 @@ fn home_local_collision_with_granted_write_refuses_as_ambiguous() {
     let mut env = ElabEnv::new().expect("prelude");
     let original = env.globals["write"];
     let err = env
-        .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Capability.Console.Text")
+        .elaborate_module_from_roots(&[root.path().to_path_buf()], "Capability.Console.Text")
         .expect_err("home's local may not replace a granted checked identity");
     assert!(
         matches!(err, ElabError::AmbiguousReference { .. }),

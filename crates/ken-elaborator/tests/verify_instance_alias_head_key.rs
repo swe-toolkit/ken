@@ -147,7 +147,7 @@ fn cross_module_alias_instance_resolves_at_imported_named_head() {
                       const selected : String where E T = d.label",
     );
     let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_module_from_roots_strict(&[roots.0.clone()], "B")
+    env.elaborate_module_from_roots(&[roots.0.clone()], "B")
         .expect("B must resolve A's alias-headed dictionary via T");
     let dictionary = env.globals["A.E_instance_A.T2"];
     assert!(env
@@ -168,7 +168,7 @@ fn owner_alias_instance_of_imported_class_admits() {
                       instance E T2 { label = \"owner\" }",
     );
     let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_module_from_roots_strict(&[roots.0.clone()], "A")
+    env.elaborate_module_from_roots(&[roots.0.clone()], "A")
         .expect("A owns T, so an instance spelled through A's alias T2 is not an orphan");
 }
 
@@ -188,7 +188,7 @@ fn imported_alias_cannot_evade_orphan_rule() {
     );
     let mut env = ElabEnv::new().expect("prelude");
     let error = env
-        .elaborate_module_from_roots_strict(&[roots.0.clone()], "B")
+        .elaborate_module_from_roots(&[roots.0.clone()], "B")
         .expect_err("B owns neither class E nor unfolded head T");
     assert!(
         matches!(error, ElabError::OrphanInstance { ref class, .. } if class == "A.E"),

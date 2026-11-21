@@ -399,8 +399,8 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   boundary are contract values
 - spec: `30-taxonomy §4` (`BufferWindow` is an H home; `BufferSpan` is in B),
   `33 §3.3`, and `39 §2.0`
-- given: in fresh default roots entrypoints, the `_strict` alias, and rootless
-  single-file units, use no import for the ordinary local `BufferWindow`
+- given: in fresh roots-loaded and rootless single-file units, use no import
+  for the ordinary local `BufferWindow`
   declaration. Pair
   the protected `BufferSpan` declaration with a same-production renamed control:
 
@@ -418,15 +418,15 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   const local_span : LocalBufferSpan = LocalSpan
   ```
 
-  In fresh default-roots and `_strict`-alias units, pair the imported home
-  client below with an otherwise identical client omitting only the import:
+  In fresh roots-loaded units, pair the imported home client below with an
+  otherwise identical client omitting only the import:
 
   ```ken
   import Capability.System.Buffer (BufferWindow)
   fn window_id (x : BufferWindow) : BufferWindow = x
   ```
 - expect: the local `BufferWindow` declaration accepts with a fresh
-  inductive identity in all three routes. Each imported `window_id` client
+  inductive identity in both routes. Each imported `window_id` client
   accepts and resolves `BufferWindow` to its captured pre-source id;
   each omitted-import client refuses with `UnboundName(BufferWindow)`. The
   `BufferSpan` replacement rejects at introduction, while its same-production
@@ -701,8 +701,8 @@ unrelated `ElabEnv` does not satisfy them.
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
   the bare implementation-global spelling `Ambient`. Then invoke all three
-  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and the
-  `_strict` roots alias on the controlled arms below. The rootless no-import
+  `elaborate_module_from_roots` and `elaborate_module_from_roots_v1` on
+  the controlled arms below. The rootless no-import
   arm uses the same bare spelling through
   `elaborate_file_v1`.
 
@@ -840,7 +840,7 @@ sentinel beside the current contract.
   For each of the seven `ResourceKind` constructors, pair an accepted
   qualified value in expected type `ResourceKind` with a rejection of the bare
   leaf in the same position, using separate fresh source units.
-  `SpawnPlan` is an explicit home, not a floor name. Through all three roots
+  `SpawnPlan` is an explicit home, not a floor name. Through both roots
   entrypoints, import the module `Capability.Process.Child` and selectively
   import `SpawnPlan`, then use it in a typed identity function. Pair each with
   the same source after omitting only the selective item; retain the qualified
@@ -1038,9 +1038,9 @@ sentinel beside the current contract.
   and bare constructor names, `Char`, and Pair-family names are protected
   contract values; each collision/renaming pair is a durable relation
 - spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
-- given: use a fresh `_strict`-alias roots environment for every row. For the six
+- given: use a fresh roots-loaded environment for every row. For the six
   newly admitted FS/resource parents, also run the same collision/renaming
-  pairs independently in default roots and rootless single-file, as specified
+  pairs independently in rootless single-file, as specified
   by the route-explicit matrix below. The preceding table
   has twenty-two inductive parent rows: `Auth`, `Bool`, `BufferSpan`,
   `Coproduct`, `CreatePolicy`, `FileError`, `IOError`, `List`, `Nat`, `Option`,
@@ -1110,7 +1110,7 @@ sentinel beside the current contract.
   declaration also passed the root loader. The probe did not measure the full
   matrix above. **CLAIMED:** each listed collision rejects at introduction
   while its paired same-production renamed control accepts. The dedicated
-  ITree route cases below cover all three source-entry forms; the FS/resource
+  ITree route cases below cover both source-entry forms; the FS/resource
   case below extends the six new parent pairs to default roots and rootless
   loading. **THE GAP:**
   non-inductive floor names `Bottom`, `Equal`, `HostIO`, `Prop`, `Proved`, and
@@ -1126,8 +1126,8 @@ sentinel beside the current contract.
   parent-name boundary belong to the thirty pre-Console/Char floor members
 - spec: `30-taxonomy §4` (six newly admitted families), `33 §3.3`
   (scope and protected names), `34 §1.1` (qualified constructor identity)
-- given: in each fresh route (default roots, `_strict` roots alias, and
-  rootless single-file), elaborate this accepted prefix without a package
+- given: in each fresh route (roots and rootless single-file), elaborate this
+  accepted prefix without a package
   import:
 
   ```ken
@@ -1144,8 +1144,8 @@ sentinel beside the current contract.
   fn keep_count (x : TransferCount) : TransferCount = x
   ```
 
-  In each of the three routes (default roots, `_strict` alias, and rootless
-  standalone entry), elaborate the same accepted prefix in a fresh unit, then
+  In each of the two routes (roots and rootless standalone entry), elaborate
+  the same accepted prefix in a fresh unit, then
   append only this declaration:
 
   ```ken
@@ -1155,8 +1155,8 @@ sentinel beside the current contract.
   The accepted prefix must complete first; the negative is isolated to the
   one removed `IOError.` qualifier, not a missing type, import, or parser
   failure.
-- admitted-parent collisions: **in each route separately** (default roots,
-  `_strict` roots alias, and rootless single-file), test every row below in
+- admitted-parent collisions: **in each route separately** (roots and
+  rootless single-file), test every row below in
   two fresh source units. Start each with the accepted six-type prefix above.
   Append the rejected `data` in one unit and the renamed `data` in the other.
   Change
@@ -1182,7 +1182,7 @@ sentinel beside the current contract.
   `ResourceError.C` entries of the constructor table in
   `prelude-floor-reuses-exact-types-and-constructors`. For every one of these
   28 `T.C` entries independently, reuse its accepted expression or pattern arm
-  from `closed-floor-accepts-arbitrary-global-does-not` in all three routes,
+  from `closed-floor-accepts-arbitrary-global-does-not` in both routes,
   and record the exact checked ID. After the accepted six-type prefix, use two
   additional fresh strict-roots units:
 
@@ -1232,12 +1232,12 @@ sentinel beside the current contract.
 - expect: every accepted prefix resolves the six types to their recorded
   pre-source IDs, and its three qualified values to constructors with their
   respective checked parents. Bare `NotFound` rejects at surface name
-  resolution **after** the accepted prefix in all three routes. Each
+  resolution **after** the accepted prefix in both routes. Each
   admitted-parent collision rejects at introduction while its paired renamed
   local family accepts in each route. For all 28 scoped leaves, strict roots
   refuse the isolated bare floor use; the same-leaf local constructor accepts
   with a distinct checked parent and ID, and the qualified `T.C` still resolves
-  to its original checked ID **after** the local binding. All three routes
+  to its original checked ID **after** the local binding. Both routes
   accept the qualified clients; the cross-route unbound-leaf result is pinned
   by the `NotFound` pair. No route changes `trusted_base()` or allocates a
   replacement floor family.
@@ -1289,8 +1289,8 @@ sentinel beside the current contract.
 
 The Console/Char rows implement the `30-taxonomy §4` source-availability
 contract for `ConsoleStream` and `eqChar`. They cover
-`elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and the
-`_strict` alias, plus `elaborate_file_v1`, `elaborate_ken_md_file_v1`,
+`elaborate_module_from_roots` and `elaborate_module_from_roots_v1`, plus
+`elaborate_file_v1`, `elaborate_ken_md_file_v1`,
 `elaborate_decl`, literate example fences, and inline REPL submissions. Roots
 require explicit imports for package homes; import-omission pairs run through
 all roots entrypoints. Rootless entries
@@ -1333,7 +1333,7 @@ duplicates a checked definition.
 - promise class: **durable discriminator** — checked parents are reserved,
   scoped case leaves and the generic `Stream` spelling are not reserved
 - spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`
-- given: in separate fresh units in all three routes, compare the protected
+- given: in separate fresh units in both routes, compare the protected
   names `ConsoleStream` and `eqChar` with their accepted one-name controls:
   `const ConsoleStream : Nat = Zero` and `const eqChar : Nat = Zero` against
   `const LocalStream : Nat = Zero` and `const local_char_eq : Nat = Zero`.
@@ -1343,7 +1343,7 @@ duplicates a checked definition.
   `const local : LocalCase = C` and
   `const still_checked : ConsoleStream = ConsoleStream.C`.
   Independently declare `data Stream = MkStream` in each route.
-- expect: in all three routes, both admitted-name declarations reject at
+- expect: in both routes, both admitted-name declarations reject at
   introduction and their unrelated local controls accept. Each bare scoped
   constructor use refuses at surface resolution, each same-leaf local
   constructor accepts with a different parent and ID, and the qualified checked
@@ -1362,8 +1362,8 @@ duplicates a checked definition.
   checked identities and scoped paths
 - spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §2.2, §2.3, §4.5.7;
   `38 §1.12`
-- given: in each of three fresh routes (default roots, the `_strict` roots
-  alias, and the rootless single-file entry), use no imports and elaborate:
+- given: in each of two fresh routes (roots and the rootless single-file
+  entry), use no imports and elaborate:
 
   ```ken
   fn console_operation_cases (op : ConsoleOp) : Bool =
@@ -1434,7 +1434,7 @@ duplicates a checked definition.
   Console constructor `C`, in each route, declare a fresh local family with a
   same-named constructor and the same fields, then use both `LocalC.C` and
   `ConsoleOp.C`. These are twelve preserved-same-kind controls. In each of
-  the three routes, pair each qualified constructor value with the same
+  the two routes, pair each qualified constructor value with the same
   fully applied bare value, changing only the `ConsoleOp.` qualifier. Use
   `Read ConsoleStream.Stdin 1`, `Write ConsoleStream.Stdout b""`,
   `Flush ConsoleStream.Stdout`, and `IsTerminal ConsoleStream.Stdout` for the
@@ -1476,11 +1476,11 @@ duplicates a checked definition.
 - the gap: a constructor-name match alone does not prove parent identity or
   the dependent response. The result-typed functions and same-kind local
   controls expose those distinctions independently.
-- expect: every qualified client accepts in all three routes and resolves the
+- expect: every qualified client accepts in both routes and resolves the
   snapshotted IDs. Each local constructor keeps a distinct parent while the
   qualified `ConsoleOp.C` still resolves to the original parent and ID. Each
   same-name declaration for `ConsoleOp`, `console_resp`, `itree_bind`, and
-  `resp_coproduct` refuses at binding introduction in all three routes; its
+  `resp_coproduct` refuses at binding introduction in both routes; its
   renamed local control accepts. The `sequence_ret` and `sequence_vis`
   equalities accept `Refl`. In each route, bare-constructor and bare-`bind`
   clients refuse with `UnboundName`; their qualified and local-name controls
@@ -1503,8 +1503,8 @@ duplicates a checked definition.
   operations retain their exact identities and declared-tree signatures
 - spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.1`, §2.4, §4.2,
   §4.5.2–§4.5.3, §4.5.7
-- given: in each of three fresh routes (default roots, the `_strict` roots
-  alias, and the rootless single-file entry), use no imports and elaborate:
+- given: in each of two fresh routes (roots and the rootless single-file
+  entry), use no imports and elaborate:
 
   ```ken
   fn state_get_probe (s : Type) (f : Type) (rf : f → Type)
@@ -1537,7 +1537,7 @@ duplicates a checked definition.
   `a` explicitly to `run_state` before the initial state and tree.
 
   Snapshot each operation's pre-source `GlobalId`. In separate fresh units
-  for all three routes, compare these one-name collision pairs:
+  for both routes, compare these one-name collision pairs:
 
   | Floor name | Collision arm | Renamed control |
   |---|---|---|
@@ -1546,7 +1546,7 @@ duplicates a checked definition.
   | `run_state` | `const run_state : Nat = Zero` | `const local_run_state : Nat = Zero` |
 
   Also submit `fn get (n : Nat) : Nat = n` and
-  `fn put (n : Nat) : Nat = n` in separate units in all three routes. These
+  `fn put (n : Nat) : Nat = n` in separate units in both routes. These
   local declarations remain legal; no bare-use meaning for either spelling is
   asserted.
 - measured: each unimported operation reference's resolved `GlobalId`, its
@@ -1561,7 +1561,7 @@ duplicates a checked definition.
   The first two result types match the checked declared-tree signatures, and
   the `run_state` input is already composed as §4.5.3 specifies. The
   one-name local binding control isolates protected-name behavior.
-- expect: all three routes accept the typed operations and resolve each
+- expect: both routes accept the typed operations and resolve each
   captured ID. Each same-name floor binding refuses at introduction and its
   renamed local control accepts. The local `get` and `put` declarations accept
   in every route. No bare-use meaning for either spelling is asserted; no
@@ -1586,9 +1586,9 @@ duplicates a checked definition.
 - given: one roots-loaded `Capability.Console.Text` file exports
   `IO, write, print_line`, and another roots-loaded
   `Core.Classes.LawfulClasses` file exports `charToInt, leqChar`. The
-  Clients through `elaborate_module_from_roots`,
-  `elaborate_module_from_roots_v1`, and `elaborate_module_from_roots_strict`
-  each have these selective imports and this complete body:
+  Clients through `elaborate_module_from_roots` and
+  `elaborate_module_from_roots_v1` each have these selective imports and
+  this complete body:
 
   ```ken
   import Capability.Console.Text (IO, write, print_line)
@@ -2105,7 +2105,7 @@ duplicates a checked definition.
 The ITree cases below implement the source-resolution slice of
 `LANG-PRELUDE-FLOOR-ITREE` AC-1. Qualified constructors, protected type names,
 bare-constructor refusals, and same-name local controls use the same rule in
-default roots, the `_strict` alias, and rootless single-file entries. Bare
+roots-loaded and rootless single-file entries. Bare
 `Ret` and `Vis` are outside B: without a source binding or import they refuse,
 and local declarations may bind those spellings in every route.
 
@@ -2115,8 +2115,8 @@ and local declarations may bind those spellings in every route.
   scoped constructors retain their checked identities
 - spec: `30-taxonomy §4`; `31 §2`; `32 §1`; `33 §2`/§3.3;
   `34 §1.1`; `36 §2.1`/§2.4
-- given: in each fresh route — default roots, `_strict` alias, and rootless
-  single-file — elaborate:
+- given: in each fresh route — roots-loaded and rootless single-file —
+  elaborate:
 
   ```ken
   record Effect {
@@ -2164,8 +2164,8 @@ and local declarations may bind those spellings in every route.
 - promise class: **discriminating** — protected ITree bindings refuse while
   same-production fresh names remain available
 - spec: `33 §3.3` (B binding ban); `30-taxonomy §4` (ITree member)
-- given: in separate fresh default-roots, `_strict`-alias, and rootless
-  single-file runs, compare each refusal with its one-token control:
+- given: in separate fresh roots-loaded and rootless single-file runs,
+  compare each refusal with its one-token control:
 
   | binding position | refusal source | accepted control |
   |---|---|---|
@@ -2210,8 +2210,8 @@ and local declarations may bind those spellings in every route.
 
 - promise class: **durable invariant** — freed `Ret` remains bindable by source
 - spec: `33 §3.3` (scoped ITree family); `36 §2.1`
-- given: in fresh default-roots, `_strict`-alias, and rootless
-  single-file runs, elaborate `data LocalRet = Ret`.
+- given: in fresh roots-loaded and rootless single-file runs, elaborate
+  `data LocalRet = Ret`.
 - expect: each route accepts and records `Ret` as a constructor of the new
   `LocalRet` family, distinct from checked `ITree.Ret`.
 - why: this same-spelling source declaration is the positive control for the
@@ -2221,8 +2221,8 @@ and local declarations may bind those spellings in every route.
 
 - promise class: **durable invariant** — freed `Vis` remains bindable by source
 - spec: `33 §3.3` (scoped ITree family); `36 §2.1`
-- given: in fresh default-roots, `_strict`-alias, and rootless
-  single-file runs, elaborate `data LocalVis = Vis`.
+- given: in fresh roots-loaded and rootless single-file runs, elaborate
+  `data LocalVis = Vis`.
 - expect: each route accepts and records `Vis` as a constructor of the new
   `LocalVis` family, distinct from checked `ITree.Vis`.
 - why: this same-spelling source declaration is the positive control for the
@@ -2453,8 +2453,8 @@ already built.
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
 | floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 52-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
 | current floor inventory | the signature traversal and internal-provision set close to 52 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 44 internal-provision identities and adds no trust | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
-| Inc3a direct-tree vocabulary | default roots, `_strict` roots alias, and rootless entry resolve ConsoleOp's four cases, response reductions, itree_bind and resp_coproduct; bare bind is unbound on every route | the scoped families and operation names are the source contract; bare constructors and bind each have same-route positive controls | same-route qualified positives, local-family controls, and captured itree_bind identity; no ambient `bind` alias is claimed |
-| State direct operations | three routes use typed state_get, state_put, and run_state references; each protected operation has a collision control and local get/put declarations remain legal | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
+| Inc3a direct-tree vocabulary | roots-loaded and rootless entry resolve ConsoleOp's four cases, response reductions, itree_bind and resp_coproduct; bare bind is unbound on every route | the scoped families and operation names are the source contract; bare constructors and bind each have same-route positive controls | same-route qualified positives, local-family controls, and captured itree_bind identity; no ambient `bind` alias is claimed |
+| State direct operations | two routes use typed state_get, state_put, and run_state references; each protected operation has a collision control and local get/put declarations remain legal | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
 | Inc3a package homes | each of 24 ordinary H names has its own import/omission pair; eight FixedWidth conversions have separate range vectors | the target home set is 96: 81 base rows minus 17 retired FileOperation rows plus 32 additions | `seed-strict-package-homes.md` covers the exact new names and ranges; the counts are normative targets, not test-run measurements |
 | root/path | valid anchor accepts; each one-axis mutation rejects at its guard | root and source identities fail closed | one valid loader input plus independent matrix rows |
 | laziness | inert poison accepts; adding its sole edge rejects at the poison | discovery follows only entry-rooted edges | identical poisoned tree in both arms |
@@ -2993,7 +2993,7 @@ monotone-downward and revocation management actions remain runner/host-internal
   `itree-source-name-is-protected-in-all-routes`, the all-route bare
   `Ret`/`Vis` refusal rows, and their matching same-name local-binding controls.
   The qualified-family and protected-type cases cover
-  all three routes. These bounded cases do not claim the full B binding ban.
+  both routes. These bounded cases do not claim the full B binding ban.
 - **I4 source-entry resolution** (`30 §4`, `33 §3.3`, `39 §2.0`):
   `closed-floor-accepts-arbitrary-global-does-not` checks the same pre-registered
   global on all roots entrypoints and a rootless file. The `console-char`,
@@ -3097,8 +3097,8 @@ monotone-downward and revocation management actions remain runner/host-internal
   name. The protected-name matrix specifies same-production refusals
   and renamed controls for its sixteen parent rows and ten unscoped constructor
   families; `Char` and Pair have separate rows. The ITree cases test exact
-  constructor paths and the protected type-name guard across all three routes.
-  All three source routes test bare `Ret` and `Vis` refusals against same-name
+  constructor paths and the protected type-name guard across both routes.
+  Both source routes test bare `Ret` and `Vis` refusals against same-name
   local-binding controls.
   These bounded cases do not claim the full B binding ban. Ambient availability
   still does not make an unrelated module a head owner. The actual `Ord Nat`

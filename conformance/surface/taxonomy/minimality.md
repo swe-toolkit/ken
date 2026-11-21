@@ -184,11 +184,11 @@ possession.
   `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` as
   `ConsoleStream` values, paired with bare-leaf refusals in separate fresh
   units. Resolve `eqChar` at type `Char → Char → Bool`. Through
-  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
-  `elaborate_module_from_roots_strict`, import the qualified
-  `Capability.Process.Child` module and selectively import `SpawnPlan`. Resolve
-  it in type position; pair each accepted client with the same source after
-  omitting only the selective item, retaining the qualified module import so
+  `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`,
+  import the qualified `Capability.Process.Child` module and selectively
+  import `SpawnPlan`. Resolve it in type position; pair each accepted client
+  with the same source after omitting only the selective item, retaining the
+  qualified module import so
   the provider remains loaded. The `ResourceKind.SpawnPlan`/bare-`SpawnPlan`
   value-position pair across root and rootless routes is specified in
   `seed-modules.md` under `prelude-floor-reuses-exact-types-and-constructors`.

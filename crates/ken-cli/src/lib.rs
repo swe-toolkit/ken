@@ -238,7 +238,7 @@ where
     let effective_uid = ken_runtime::observe_effective_uid_v1()
         .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
     let mut env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
-    env.elaborate_module_from_roots_strict_v1(&[unit.root.clone()], &unit.entry)
+    env.elaborate_module_from_roots_v1(&[unit.root.clone()], &unit.entry)
         .map_err(|error| match error {
             ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
                 if name == &format!("{}.main", unit.entry) =>

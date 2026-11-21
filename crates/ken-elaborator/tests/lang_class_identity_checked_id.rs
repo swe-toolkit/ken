@@ -43,7 +43,7 @@ impl Mode {
             fs::write(root.join(format!("{client}.ken")), source).expect("write client fixture");
             match self {
                 Self::Strict => {
-                    env.elaborate_module_from_roots_strict(&[root.to_path_buf()], client)?
+                    env.elaborate_module_from_roots(&[root.to_path_buf()], client)?
                 }
                 Self::Default => env.elaborate_module_from_roots(&[root.to_path_buf()], client)?,
                 Self::Direct => unreachable!(),
@@ -330,7 +330,7 @@ fn class_session(warm: bool) -> (tempfile::TempDir, ElabEnv) {
     let mut env = ElabEnv::new().expect("base environment");
     if warm {
         fs::write(root.path().join("A.ken"), FILE_CLASS).expect("write A provider");
-        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+        env.elaborate_module_from_roots(&[root.path().to_path_buf()], "A")
             .expect("check old A provider");
     }
     (root, env)

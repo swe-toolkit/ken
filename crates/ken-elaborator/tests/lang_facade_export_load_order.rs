@@ -65,7 +65,7 @@ fn observe(
     inline_name: Option<&str>,
 ) -> Verdict {
     let mut env = ElabEnv::new().expect("fresh base environment per entry");
-    let result = env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], entry);
+    let result = env.elaborate_module_from_roots(&[root.path().to_path_buf()], entry);
     match result {
         Err(ElabError::UnboundName { name, span }) if name == "N" => {
             let at = a_source.find(facade).expect("facade in A source");

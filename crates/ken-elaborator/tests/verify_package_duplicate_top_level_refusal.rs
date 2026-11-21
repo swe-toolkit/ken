@@ -159,7 +159,7 @@ fn roots_entry_checked_fence_refuses_its_own_name() {
         "```ken\nconst base : Bool = True\n```\n```ken example\nconst base : Bool = False\n```\n";
     fs::write(root.0.join("Entry.ken.md"), source).unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .unwrap();
     let error = env
         .execute_loaded_entry_checked_fences_v1("Entry")
@@ -196,7 +196,7 @@ fn roots_entry_checked_fence_accepts_fresh_name() {
     fs::write(root.0.join("Entry.ken.md"),
         "```ken\nconst base : Bool = True\n```\n```ken example\nconst zz_fresh : Bool = False\n```\n").unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .unwrap();
     let examples = env
         .execute_loaded_entry_checked_fences_v1("Entry")
@@ -218,7 +218,7 @@ fn roots_entry_checked_fence_refuses_own_constructor() {
     )
     .unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .unwrap();
     let error = env
         .execute_loaded_entry_checked_fences_v1("Entry")

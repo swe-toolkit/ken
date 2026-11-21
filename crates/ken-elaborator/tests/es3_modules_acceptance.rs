@@ -104,7 +104,7 @@ fn module_elaborates_to_identical_flat_sigma() {
 
     let mut strict = mk_env();
     strict
-        .elaborate_module_from_roots_strict(&[address.root.clone()], &address.entry)
+        .elaborate_module_from_roots(&[address.root.clone()], &address.entry)
         .expect("opt-in strict roots program elaborates");
     assert_eq!(
         strict.env.decls().count(),
@@ -130,7 +130,7 @@ fn module_elaborates_to_identical_flat_sigma() {
     // Legacy and strict roots loading both erase the module/export layer; the
     // flat program emits the identical three kernel declarations.
     strict
-        .elaborate_module_from_roots_strict(&[address.root], "Core.Logic.Or")
+        .elaborate_module_from_roots(&[address.root], "Core.Logic.Or")
         .expect("strict roots load proof-relevant Or");
     b.elaborate_file(
         "data Or (a : Omega) (b : Omega) : Type where { \
@@ -424,7 +424,7 @@ fn strict_roots_parameterized_abstract_export_keeps_two_faces() {
 
     let mut env = mk_env();
     let trusted_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[fixture.clone()], "Entry")
+    env.elaborate_module_from_roots(&[fixture.clone()], "Entry")
         .expect("strict roots provider and client elaborate through the two faces");
     let boxed_id = env.globals["M.Boxed"];
     let (_, boxed_kind) = env.env.const_type(boxed_id).expect("Boxed has a kind");

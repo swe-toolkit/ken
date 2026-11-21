@@ -791,27 +791,6 @@ impl ElabEnv {
         modules::elaborate_module_from_roots_v1(self, roots, entry)
     }
 
-    /// Elaborate a roots-loaded unit under the single source-resolution rule.
-    ///
-    /// This alias and the ordinary roots entry select the same catalog root
-    /// and refuse bare names absent from the checked scope.
-    pub fn elaborate_module_from_roots_strict(
-        &mut self,
-        roots: &[PathBuf],
-        entry: &str,
-    ) -> Result<Vec<GlobalId>, ElabError> {
-        modules::elaborate_module_from_roots_strict(self, roots, entry)
-    }
-
-    /// Strict roots with V1 results for the entire loaded dependency closure.
-    pub fn elaborate_module_from_roots_strict_v1(
-        &mut self,
-        roots: &[PathBuf],
-        entry: &str,
-    ) -> Result<Vec<ElabResult>, ElabError> {
-        modules::elaborate_module_from_roots_strict_v1(self, roots, entry)
-    }
-
     /// Execute checked-fence obligations for an already-loaded dotted entry.
     ///
     /// The roots loader records but never executes literate document roles.

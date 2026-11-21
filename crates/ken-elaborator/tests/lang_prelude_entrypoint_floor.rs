@@ -12,7 +12,7 @@ fn strict(source: &str) -> Result<ElabEnv, ElabError> {
     let root = tempfile::tempdir().expect("entrypoint fixture directory");
     fs::write(root.path().join("Entry.ken"), source).expect("entrypoint fixture");
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")?;
+    env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")?;
     Ok(env)
 }
 
@@ -20,7 +20,7 @@ fn strict_error(source: &str) -> ElabError {
     let root = tempfile::tempdir().expect("entrypoint fixture directory");
     fs::write(root.path().join("Entry.ken"), source).expect("entrypoint fixture");
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+    env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect_err("source must be rejected")
 }
 
