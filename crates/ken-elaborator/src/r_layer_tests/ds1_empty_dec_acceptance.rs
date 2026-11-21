@@ -210,9 +210,9 @@ fn ac1_mechanism_probe_no_method_wrong_domain_rejected() {
     );
 }
 
-// Transition sentinel for L2-4: this deliberately inspects the still-
-// registered prelude family, not Core.Logic.EmptyDec's catalog identities.
-// AC2 — `Empty`/`absurdEmpty` elaborate through the real prelude+surface
+// This inspects the still-registered prelude family in globals while the
+// checked source explicitly imports Core.Logic.EmptyDec's catalog identity.
+// AC2 — `Empty`/`absurdEmpty` elaborate through the real checked surface
 // path (not the bare-kernel harness above).
 #[test]
 fn ac2_empty_and_absurd_empty_elaborate() {
@@ -224,6 +224,8 @@ fn ac2_empty_and_absurd_empty_elaborate() {
     assert!(env.globals.contains_key("No"), "No must be a prelude global");
     assert!(env.globals.contains_key("decide"), "decide must be a prelude global");
 
+    env.elaborate_file("import Core.Logic.EmptyDec (Empty)")
+        .expect("checked EmptyDec provider import");
     env.elaborate_decl("fn absurdEmpty (C : Type) (e : Empty) : C = match e { }")
         .expect("absurdEmpty must elaborate (large elim via ordinary surface match)");
 }

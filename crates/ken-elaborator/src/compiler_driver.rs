@@ -704,8 +704,8 @@ pub fn compile_ken_source(
 /// lowering; no Cranelift or linker artifact participates. The selected target
 /// is resolved from the live admitted environment, and operation subterms are
 /// decoded with the same identity-checked HostIO vocabulary used by production.
-/// Explicit source roots use Strict resolution as on the native route;
-/// rootless sources retain transitional resolution until LANG-DELETE I4.
+/// Rooted and rootless sources use the same source-resolution rule.
+/// Without selected roots, an import refuses at its module path.
 pub fn compile_checked_target_denotation(
     package_name: &str,
     source: CompilerSource,
@@ -1339,8 +1339,8 @@ fn elaborate_package_source(
     Ok(parts)
 }
 
-/// Explicit source roots use Strict resolution as on the native route;
-/// rootless sources retain transitional resolution until LANG-DELETE I4.
+/// Rooted and rootless sources use the same source-resolution rule.
+/// Without selected roots, an import refuses at its module path.
 pub fn compile_ken_package_sources(
     manifest: &CompilerManifest,
     sources: Vec<CompilerSource>,
@@ -2446,8 +2446,8 @@ fn require_native_package_name(package_name: &str) -> Result<(), NativeProgramBu
 }
 
 /// Checked elaboration output consumed by native preparation. Production
-/// constructs it from source text; the single fixture caller supplies the
-/// unchanged Legacy-elaborated program with compiler-internal identities.
+/// constructs it from source text; a fixture caller supplies kernel-checked
+/// declarations with compiler-internal identities.
 /// It carries no plan, marker, seed, or independently authored admission.
 #[doc(hidden)]
 pub struct ElaboratedNativeProgramV1 {
@@ -6402,7 +6402,7 @@ mod tests {
 
     /// Promise class: durable invariant. MEASURED: one closed source with a
     /// symbolic recursive call inside a Vis operation's discarded payload
-    /// exports at stated 16 MiB on both rooted Strict and rootless Legacy.
+    /// exports at stated 16 MiB on rooted and rootless source routes.
     /// CLAIMED: reading a checked operation head never forces that payload.
     /// THE GAP: this pins a direct L5 head on both routes and the rooted InL
     /// pipe head; existing B1/PX8 rows cover other arms and obligations.
@@ -6440,12 +6440,12 @@ mod tests {
                     .join("../../catalog/packages");
                 for (route, source) in [
                     (
-                        "rooted Strict",
+                        "rooted default",
                         CompilerSource::new("recursive-payload.ken", SOURCE)
                             .with_roots(vec![root.clone()]),
                     ),
                     (
-                        "rootless Legacy",
+                        "rootless default",
                         CompilerSource::new("recursive-payload.ken", SOURCE),
                     ),
                 ] {
@@ -9772,8 +9772,8 @@ mod native_program_example_exclusion {
     /// cannot resolve a checked example declared only in the first; native
     /// preparation returns UnboundName rather than a package. CLAIMED: no
     /// dangling example dependency is laundered into native output. THE GAP:
-    /// the E0073 package-closure guard remains covered by the separate Legacy
-    /// package path in verify_package_example_binding_scope.rs.
+    /// the E0073 package-closure guard remains covered by the separate package
+    /// path in verify_package_example_binding_scope.rs.
     #[test]
     fn native_main_referencing_example_refuses_before_emit() {
         on_native_stack(|| {

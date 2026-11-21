@@ -108,6 +108,7 @@ fn provider_first_zero_trust_owned_transparent_and_cancel_identity() {
 }
 
 const PREFIX: &str = r#"
+import Core.Classes.LawfulClasses (IsTrue)
 import Data.Numeric.Rational (Rational, MkRational, rational_add, rational_mul, rational_equiv, rational_leq)
 import Algorithm.Numeric.RationalInterval (Interval, MkInterval, interval_mul, interval_width, interval_width_mul)
 const r1 : Rational = MkRational (Suc Zero) Zero
@@ -125,8 +126,8 @@ const X_DROP_SECOND: &str = "theorem inverted_second_width : rational_equiv (int
 
 fn closed_prefix() -> ElabEnv {
     let mut env = loaded_interval();
-    // IsTrue is already present after root-loading LawfulClasses. Importing it
-    // again here creates an ambiguous reference rather than exercising a law.
+    // Loading LawfulClasses does not bind IsTrue in a client; PREFIX imports
+    // its checked identity for the separate in-memory source.
     env.elaborate_file(PREFIX)
         .expect("closed selective imports and one/two/three spellings");
     env

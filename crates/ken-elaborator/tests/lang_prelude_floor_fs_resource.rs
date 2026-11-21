@@ -17,11 +17,11 @@ const ADMITTED: [&str; 6] = [
 ];
 const SCOPED: [&str; 3] = ["CreatePolicy", "IOError", "ResourceError"];
 const PRIVATE: [&str; 2] = ["BufferSpan", "TransferCount"];
-const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
+const MODES: [&str; 3] = ["strict-roots", "default-roots", "file"];
 
 fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
     match mode {
-        "strict-roots" | "legacy-roots" => {
+        "strict-roots" | "default-roots" => {
             let root = tempfile::tempdir().expect("FS floor fixture directory");
             fs::write(root.path().join("Entry.ken"), source).expect("FS floor fixture");
             if mode == "strict-roots" {
@@ -30,7 +30,7 @@ fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), Ela
                 env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
             }
         }
-        "legacy-file" => {
+        "file" => {
             env.elaborate_file_v1(source)?;
         }
         other => panic!("unknown mode: {other}"),
@@ -187,8 +187,8 @@ fn admitted_fs_families_retain_checked_parents_and_private_visibility() {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: real strict and both legacy
-/// routes resolve each of six type IDs, use checked constructors for three
+/// Promise class: durable invariant. MEASURED: roots and file entries
+/// resolve each of six type IDs, use checked constructors for three
 /// public scoped cases, and preserve the exact trusted-base identity set.
 /// CLAIMED: all admitted families are source-usable with unchanged trust.
 /// THE GAP: these selected constructors do not alone pin every sibling's
@@ -205,7 +205,7 @@ fn fs_resource_source_resolves_checked_types_and_qualified_cases() {
                   fn count_id (x : TransferCount) : TransferCount = x";
     for mode in MODES {
         let env = elaborate(source, mode).unwrap_or_else(|e| panic!("{mode}: {e:?}"));
-        let prefix = if mode == "legacy-file" { "" } else { "Entry." };
+        let prefix = if mode == "file" { "" } else { "Entry." };
         for (name, parent) in [
             ("io", "IOError"),
             ("policy", "CreatePolicy"),
@@ -269,17 +269,10 @@ fn scoped_fs_constructors_refuse_bare_source_in_every_mode() {
                 Ok(_) => panic!("{mode} bare {family}.{name}: unexpectedly accepted"),
                 Err(e) => e,
             };
-            if mode == "strict-roots" {
-                assert!(
-                    matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
-                    "{mode} bare {family}.{name}: {failure:?}"
-                );
-            } else {
-                assert!(
-                    matches!(failure, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
-                    "{mode} bare {family}.{name}: {failure:?}"
-                );
-            }
+            assert!(
+                matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
+                "{mode} bare {family}.{name}: {failure:?}"
+            );
         }
     }
 }
@@ -313,8 +306,7 @@ fn admitted_fs_type_declarations_refuse_without_allocation() {
 
 /// Promise class: durable invariant. MEASURED: strict roots permit a
 /// same-name data declaration for the unkeyed BufferWindow while refusing
-/// an admitted sibling, BufferSpan, on the identical path. Legacy resolution
-/// of BufferWindow still points to its pre-source ID. CLAIMED: buffer family
+/// an admitted sibling, BufferSpan, on the identical path. CLAIMED: buffer family
 /// labels cannot reserve a sibling without its exact-ID witness. THE GAP:
 /// this checks the two discriminating names, not every unkeyed package row.
 #[test]
@@ -338,11 +330,6 @@ fn buffer_window_package_row_stays_unreserved_while_buffer_span_is_reserved() {
         matches!(failure, ElabError::AmbiguousReference { ref name, .. } if name == "BufferSpan"),
         "same-name admitted sibling must refuse: {failure:?}"
     );
-    for mode in ["legacy-roots", "legacy-file"] {
-        let env = elaborate("fn window_id (x : BufferWindow) : BufferWindow = x", mode)
-            .unwrap_or_else(|e| panic!("{mode}: legacy window resolution: {e:?}"));
-        assert_eq!(env.globals["BufferWindow"], base.globals["BufferWindow"]);
-    }
     for mode in MODES {
         elaborate(
             "data Local = NotFound | Other | Unsupported | Closed | CreateNew",

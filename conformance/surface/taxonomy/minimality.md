@@ -183,12 +183,17 @@ possession.
   bare-leaf refusal and an accepted same-spelling local-family control. Resolve
   `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` as
   `ConsoleStream` values, paired with bare-leaf refusals in separate fresh
-  units. Resolve `eqChar` at type `Char → Char → Bool`. On the separate
-  Legacy standalone §1.11 source
-  route, resolve `SpawnPlan` in type position and `ResourceKind.SpawnPlan` as a
-  kind value; in another source unit on that route, try bare `SpawnPlan` as a
-  `ResourceKind` value. Record the distinct identities. Do not select
-  declarations by helper name, source file, or a hand-picked primitive list.
+  units. Resolve `eqChar` at type `Char → Char → Bool`. Through
+  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
+  `elaborate_module_from_roots_strict`, import the qualified
+  `Capability.Process.Child` module and selectively import `SpawnPlan`. Resolve
+  it in type position; pair each accepted client with the same source after
+  omitting only the selective item, retaining the qualified module import so
+  the provider remains loaded. The `ResourceKind.SpawnPlan`/bare-`SpawnPlan`
+  value-position pair across root and rootless routes is specified in
+  `seed-modules.md` under `prelude-floor-reuses-exact-types-and-constructors`.
+  Record the distinct identities. Do not select declarations by helper name,
+  source file, or a hand-picked primitive list.
 - expect: the checked dependency set is exactly `{Auth, Bool, Char, List,
   Option, ResourceKind, Result, Utf8Error}`. Adding the independently witnessed
   internal-provision set `{Bottom, BufferSpan, ChildExit, ConsoleOp,
@@ -235,10 +240,13 @@ possession.
   `ConsoleStream.Stderr`; each bare leaf is refused against its qualified
   control, and only the `ConsoleStream` type name enters the roster.
   Unqualified `SpawnPlan` remains the separate pure plan type, outside the
-  52-name floor roster and not a bare constructor. On the Legacy standalone
-  §1.11 route it is accepted in type position, while its use as a
-  `ResourceKind` value is refused; the qualified `ResourceKind.SpawnPlan`
-  value is the accepted control. `eqChar` is the exact `Char → Char → Bool`
+  52-name floor roster and not a bare constructor. Its type use accepts on all
+  roots entrypoints only through the explicit selective `SpawnPlan` import;
+  omitting it while retaining the qualified module import refuses with
+  `UnboundName(SpawnPlan)`. The value-position pair in
+  `prelude-floor-reuses-exact-types-and-constructors` independently confirms
+  the root and rootless qualified floor control. `eqChar` is the
+  exact `Char → Char → Bool`
   operation identity, not a type or constructor family. Existing constructor
   dispositions remain unchanged, including bare `MkUnit` and scoped
   `Coproduct`, `Instant`, and `ITree`; no same-spelling constructor with another

@@ -43,7 +43,10 @@ fn assert_eval_eq(actual: &EvalVal, expected: i128, msg: &str) {
 fn import_width_conversions(env: &mut ElabEnv, src: &str) {
     let selected = WIDTHS
         .iter()
-        .map(|width| format!("intTo{}", width.name))
+        .flat_map(|width| {
+            ["intTo", "checkedAdd", "checkedSub", "saturatingAdd", "saturatingSub"]
+                .map(|prefix| format!("{prefix}{}", width.name))
+        })
         .filter(|name| src.contains(name))
         .collect::<Vec<_>>();
     if !selected.is_empty() {

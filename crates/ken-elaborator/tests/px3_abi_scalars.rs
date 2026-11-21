@@ -116,6 +116,12 @@ fn ac3_manifest_max_is_ok_and_max_plus_one_is_err_for_every_scalar() {
         let max = max_for(width(width_fact), signed);
 
         let mut env = ElabEnv::new().expect("PX3 prelude");
+        env.set_catalog_roots_v1(&[
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+        ])
+        .expect("checked catalog root");
+        env.elaborate_file("import Data.Numeric.FixedWidth (RangeError, intToUSize, intToISize, intToCInt)")
+            .expect("checked RangeError home");
         let ok = env
             .elaborate_decl_v1(&format!(
                 "const px3_ok : Result RangeError {name} = intTo{name} {max}"

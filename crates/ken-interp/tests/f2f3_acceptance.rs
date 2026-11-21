@@ -166,16 +166,12 @@ fn f3_legacy_names_are_refused_or_use_canonical_int_operations() {
         );
     }
 
-    // Population control at the resolver's real global-identity input: an
-    // opaque function under a legacy spelling is not the canonical operation.
+    // Population control: a user-declared root binding with this spelling
+    // resolves, but has a different checked identity from the canonical op.
     let mut wrong = ElabEnv::new().expect("prelude init");
-    let int = Term::const_(wrong.globals["Int"], vec![]);
-    let wrong_type = Term::pi(int.clone(), Term::pi(int.clone(), int));
-    let wrong_id = wrong
-        .declare_postulate_raw("WrongLegacyAdd", wrong_type)
-        .expect("wrong legacy fixture admits");
-    wrong.globals.insert("add".into(), wrong_id);
-    assert!(wrong.env.trusted_base().contains(&wrong_id));
+    wrong
+        .elaborate_file("fn add (x : Int) (y : Int) : Int = x")
+        .expect("user add");
     let wrong_canonical_id = wrong.globals["add_int"];
     assert!(!legacy_name_is_refused_or_canonical(
         &mut wrong,

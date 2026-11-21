@@ -24,10 +24,10 @@ fn strict_error(source: &str) -> ElabError {
         .expect_err("source must be rejected")
 }
 
-fn legacy(source: &str, roots: bool) -> Result<ElabEnv, ElabError> {
+fn default_entry(source: &str, roots: bool) -> Result<ElabEnv, ElabError> {
     let mut env = ElabEnv::new().expect("checked prelude");
     if roots {
-        let root = tempfile::tempdir().expect("legacy fixture directory");
+        let root = tempfile::tempdir().expect("default fixture directory");
         fs::write(root.path().join("Entry.ken"), source).expect("legacy fixture");
         env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
     } else {
@@ -127,7 +127,7 @@ fn entrypoint_types_and_constructors_resolve_to_checked_ids() {
 /// IDs of scoped families resolve in qualified form, while bare uses reject
 /// and legal local same-spelling data constructors can still be introduced.
 /// CLAIMED: reservation is per type rather than an accidental bare alias.
-/// THE GAP: this does not assert the old legacy API's spelling policy.
+/// THE GAP: each default entry below independently checks that policy.
 #[test]
 fn scoped_entrypoint_constructors_have_only_qualified_strict_paths() {
     let base = ElabEnv::new().expect("checked prelude");
@@ -167,14 +167,14 @@ fn scoped_entrypoint_constructors_have_only_qualified_strict_paths() {
         .expect("scoped ABI constructor leaves the bare source names available");
 }
 
-/// Promise class: durable invariant. MEASURED: both legacy entry paths admit
-/// the qualified checked constructor IDs and reject the bare spellings. The
-/// source, not the flat globals map, is the subject of both observations.
-/// CLAIMED: legacy/shipping routes cannot bypass the per-type scope choice.
+/// Promise class: durable invariant. MEASURED: both default entry paths admit
+/// the qualified checked constructor IDs and reject bare spellings. The
+/// source, not flat globals, is the subject of both observations.
+/// CLAIMED: neither entry bypasses the per-type scope choice.
 /// THE GAP: two API entry routes are covered; the CI consumer sweep covers
 /// their existing checked Ken fixtures.
 #[test]
-fn legacy_entrypoints_preserve_qualified_only_constructor_scope() {
+fn default_entrypoints_preserve_qualified_only_constructor_scope() {
     for roots in [false, true] {
         for (name, source) in [
             ("ExitCode.Success", "const witness : ExitCode = ExitCode.Success"),
@@ -184,8 +184,8 @@ fn legacy_entrypoints_preserve_qualified_only_constructor_scope() {
                 "fn witness (x : ProgramCaps APartial) : ProgramCaps APartial = match x { ProgramCaps.MkProgramCaps c ↦ ProgramCaps.MkProgramCaps APartial c }",
             ),
         ] {
-            let env = legacy(source, roots)
-                .unwrap_or_else(|error| panic!("legacy roots={roots} {name}: {error:?}"));
+            let env = default_entry(source, roots)
+                .unwrap_or_else(|error| panic!("default roots={roots} {name}: {error:?}"));
             let expected = env.globals[name];
             let witness = if roots { "Entry.witness" } else { "witness" };
             let (_, body) = env.env.transparent_body(env.globals[witness]).unwrap();
@@ -199,10 +199,10 @@ fn legacy_entrypoints_preserve_qualified_only_constructor_scope() {
                 "fn witness (x : ProgramCaps APartial) : ProgramCaps APartial = match x { MkProgramCaps c ↦ x }",
             ),
         ] {
-            let error = legacy(source, roots).err().expect("bare name refused");
+            let error = default_entry(source, roots).err().expect("bare name refused");
             assert!(
-                matches!(error, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
-                "legacy roots={roots}, {name}: {error:?}"
+                matches!(error, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
+                "default roots={roots}, {name}: {error:?}"
             );
         }
     }

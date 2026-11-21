@@ -85,17 +85,20 @@ Architect's AC-0 ruling. No official conformance runner result is claimed.
 ## surface/effects/space-operation-alias-refuses-at-declaration
 
 - spec: `30-surface/36-effects.md §4.1`, §1.1
-- given: a space operation that performs ambient Console output:
+- given: a roots-loaded source that imports
+  `print_line` from `Capability.Console.Text` and uses it in a space operation
+  that performs ambient Console output:
 
   ```ken
+  import Capability.Console.Text (print_line)
   space Console {
     mut cell : Int = 0
     proc call () : Unit visits [Console] = print_line "x"
   }
   ```
 
-  The same-form control names the space `Other` and gives its operation
-  `visits [Other]`.
+  The same-form control uses the same explicit `print_line` import, names the
+  space `Other`, and gives its operation `visits [Other]`.
 - expect: the `Console` program refuses at the space declaration with
   `SpaceNameIsEffectLabel` (`E0088`), rather than failing later while
   elaborating the operation. The `Other` control retains the existing

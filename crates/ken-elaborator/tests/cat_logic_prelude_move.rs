@@ -2,7 +2,6 @@
 //! not silently fall through to the still-registered prelude family.
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::KernelError;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -83,11 +82,9 @@ impl Drop for Fixture {
     }
 }
 
-/// Promise class: transition sentinel. Retire or rebaseline at the L2-4 flip,
-/// when omission yields UnboundName instead of a fall-through TypeMismatch.
-/// MEASURED: one roots-loaded consumer
-/// using catalog Empty/Dec/Yes/No/decide checks, but omitting each inductive
-/// import individually reaches a kernel TypeMismatch. CLAIMED: the imported
+/// Promise class: durable invariant. MEASURED: one roots-loaded consumer
+/// using catalog Empty/Dec/Yes/No/decide checks; omitting each inductive
+/// import refuses UnboundName at that name. CLAIMED: the imported
 /// family, constructors and refutation target share one checked identity,
 /// rather than falling back to the prelude copies. THE GAP: this fixture pins
 /// import resolution for these uses; the OrderedSearch consumer is checked
@@ -109,23 +106,15 @@ fn decision_family_imports_select_one_catalog_identity() {
             .check()
             .expect_err("omitting one family member must not fall through to the prelude");
         assert!(
-            matches!(
-                error,
-                ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    ..
-                }
-            ),
-            "omitting {omitted} must fail on a kernel type mismatch, got {error:?}"
+            matches!(error, ElabError::UnboundName { ref name, .. } if name == omitted),
+            "omitting {omitted} must refuse at that name, got {error:?}"
         );
     }
 }
 
-/// Promise class: transition sentinel. Retire or rebaseline at the L2-4 flip,
-/// when omission yields UnboundName instead of a fall-through TypeMismatch.
-/// MEASURED: the real OrderedSearch module
-/// checks when all four catalog names are imported; changing only its import
-/// list by deleting one name reaches a kernel TypeMismatch in each arm.
+/// Promise class: durable invariant. MEASURED: the real OrderedSearch module
+/// checks when all four catalog names are imported; omitting each name
+/// refuses UnboundName at that name.
 /// CLAIMED: its search uses one catalog decision family rather than silently
 /// falling through to prelude identities. THE GAP: this pins four import
 /// resolution edges, not search's operational or sortedness properties.
@@ -146,14 +135,8 @@ fn ordered_search_import_removals_are_attributable() {
             .check_module("Algorithm.Searching.OrderedSearch")
             .expect_err("only removing the selected import must reject OrderedSearch");
         assert!(
-            matches!(
-                error,
-                ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    ..
-                }
-            ),
-            "OrderedSearch omitting {omitted} must fail with kernel TypeMismatch, got {error:?}"
+            matches!(error, ElabError::UnboundName { ref name, .. } if name == omitted),
+            "OrderedSearch omitting {omitted} must refuse at that name, got {error:?}"
         );
     }
 }

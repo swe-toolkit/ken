@@ -8,7 +8,7 @@ fresh-prefix failed-premise refusal. It is an authored expectation, not a run
 of the shipped seed harness. No Ken check, official conformance run, CI,
 publication, landing, or trust measurement is claimed.
 
-Use a fresh Legacy-roots provider context matching the existing §2
+Use a fresh roots-loaded provider context matching the existing §2
 canonical-equality seed, with `NatPolynomial` and its
 `Core.Classes.LawfulClasses` dependency loaded. The client imports only the
 selected `NatPolynomial` exports below; it does not add a selective `IsTrue`

@@ -39,8 +39,14 @@ other stdout data. `watcher-ready` is emitted only after the exit witness is
 armed, and the target cannot exit normally until the Ken client closes stdin.
 
 Each client declares `Process` and `FS AFull`, imports the required names from
-`Capability.Process.Child`, and uses `spawn_plan`, `with_stdin`, and
-`with_stdout` to build a plan for the fixture's absolute path with nonempty argv
+`Capability.Process.Child`, and explicitly imports every other package-home
+name it uses from its owning Buffer, Resource, or IO module. In particular,
+`BufferHandle`, `BufferWindow`, `withBuffer`, `spanBytes`, and `read_pipe` are
+not obtained from an ambient implementation-global table. Effect names in
+`visits` rows and `program capabilities` clauses remain outside ordinary
+import resolution. The client uses
+`spawn_plan`, `with_stdin`, and `with_stdout` to build a plan for the fixture's
+absolute path with nonempty argv
 `[b"px10-child-exit-witness"]`. It selects `ChildPipe` for stdin and stdout,
 then uses `withChild`. The body takes those ends and reads
 the fixture markers through `read_pipe` with a `withBuffer`-owned

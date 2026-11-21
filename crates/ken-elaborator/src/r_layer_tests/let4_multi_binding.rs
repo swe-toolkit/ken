@@ -103,7 +103,7 @@ fn ac1_ac2_rejections_are_specific() {
             .unwrap_err();
         assert!(matches!(
             error,
-            ElabError::UnresolvedCon { ref name, .. } if name == missing
+            ElabError::UnboundName { ref name, .. } if name == missing
         ));
     }
 }
@@ -177,8 +177,18 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
         "let first = print_line \"first\"; second = print_line \"second\" in second";
     let effect_nested =
         "let first = print_line \"first\" in let second = print_line \"second\" in second";
-    let mut effect_grouped_env = ElabEnv::new().unwrap();
-    let mut effect_nested_env = ElabEnv::new().unwrap();
+    let selected_console = || {
+        let mut env = ElabEnv::new().expect("prelude");
+        env.set_catalog_roots_v1(&[
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
+        ])
+        .expect("checked catalog root");
+        env.elaborate_file("import Capability.Console.Text (print_line)")
+            .expect("checked Console.Text home");
+        env
+    };
+    let mut effect_grouped_env = selected_console();
+    let mut effect_nested_env = selected_console();
     let (effect_grouped_core, effect_grouped_ty) = effect_grouped_env
         .elaborate_expr("ac4_effectful_lowering_source_order", effect_grouped)
         .unwrap();
@@ -193,7 +203,7 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
     let bind = effect_grouped_env.prelude_env.bind_id;
     let (first, outer_k) = bind_parts(&effect_grouped_core, bind)
         .expect("first effect must be the outer bind's action");
-    let mut anchor_env = ElabEnv::new().unwrap();
+    let mut anchor_env = selected_console();
     let (anchor_core, _) = anchor_env
         .elaborate_expr(
             "ac4_effectful_lowering_source_order",

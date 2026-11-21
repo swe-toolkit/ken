@@ -11,12 +11,12 @@ use ken_kernel::{GlobalId, Term};
 #[derive(Clone, Copy, Debug)]
 enum Mode {
     Strict,
-    Legacy,
+    Default,
     Direct,
 }
 
 impl Mode {
-    const ALL: [Self; 3] = [Self::Strict, Self::Legacy, Self::Direct];
+    const ALL: [Self; 3] = [Self::Strict, Self::Default, Self::Direct];
 
     fn is_direct(self) -> bool {
         matches!(self, Self::Direct)
@@ -45,7 +45,7 @@ impl Mode {
                 Self::Strict => {
                     env.elaborate_module_from_roots_strict(&[root.to_path_buf()], client)?
                 }
-                Self::Legacy => env.elaborate_module_from_roots(&[root.to_path_buf()], client)?,
+                Self::Default => env.elaborate_module_from_roots(&[root.to_path_buf()], client)?,
                 Self::Direct => unreachable!(),
             }
         };
@@ -105,18 +105,11 @@ fn checked_body_mentions(env: &ElabEnv, id: GlobalId, dictionary: GlobalId) {
 }
 
 fn assert_unselected(error: ElabError, mode: Mode, spelling: &str) {
-    match mode {
-        Mode::Strict => assert!(
-            matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
-            "{mode:?} unselected {spelling} must refuse at scope: {error:?}"
-        ),
-        Mode::Legacy | Mode::Direct => assert!(
-            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == spelling),
-            "{mode:?} unselected {spelling} must refuse like data: {error:?}"
-        ),
-    }
+    assert!(
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
+        "{mode:?} unselected {spelling} must refuse at scope: {error:?}"
+    );
 }
-
 /// MEASURED: each loader/API selects the imported class's checked ID in a
 /// dictionary type, RCon type and where body, despite both loaded providers.
 /// CLAIMED: same-spelled class declarations do not share a mutable identity.
@@ -303,7 +296,7 @@ fn qualified_import_and_two_aliases_select_distinct_dictionaries() {
 /// reference is refused even if another class holds its canonical key.
 #[test]
 fn local_class_is_prebound_for_collision_and_type_use() {
-    for mode in [Mode::Strict, Mode::Legacy] {
+    for mode in [Mode::Strict, Mode::Default] {
         let (root, mut env) = fixture(mode, A, B);
         let error = mode
             .check(

@@ -496,7 +496,7 @@ fn deque_loader_visible_inventory_is_empty() {
 
 /// MEASURED: independently withholding each of the two Derived selections
 /// and the three Transport selections from the extracted module reaches the
-/// exact missing name's `UnresolvedCon` boundary, while ordinary roots
+/// exact missing name's `UnboundName` boundary, while ordinary roots
 /// loading above succeeds. CLAIMED: all four selections are individually
 /// necessary, not ambient through a transitive provider. THE GAP: none; each
 /// negative changes only one selective import, with the complete unchanged
@@ -567,7 +567,7 @@ fn all_deque_provider_imports_are_individually_load_bearing() {
         env.elaborate_module_from_roots(&[catalog_root()], DERIVED)
             .expect("Derived provider closure must be available");
         match env.elaborate_file(&source) {
-            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, missing_local),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, missing_local),
             Err(other) => {
                 panic!("withholding {missing} failed for the wrong reason: {other:?}")
             }
@@ -611,7 +611,7 @@ fn all_deque_provider_imports_are_individually_load_bearing() {
             "{qualified} must be available, but unimported in the negative"
         );
         match env.elaborate_file(&source) {
-            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, missing_local),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, missing_local),
             Err(other) => panic!("withholding Transport.{missing} failed differently: {other:?}"),
             Ok(_) => panic!("Deque unexpectedly elaborated without imported Transport.{missing}"),
         }

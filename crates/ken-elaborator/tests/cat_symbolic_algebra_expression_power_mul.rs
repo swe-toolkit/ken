@@ -16,9 +16,9 @@ fn root() -> PathBuf {
         .join("catalog/packages")
 }
 
-// The five providers already bind IsTrue in this elaboration environment.
-// Importing it again in this in-process client would be ambiguous.
+// A provider load alone does not bind IsTrue in this separate client.
 const GENERIC_CLIENT: &str = r#"
+import Core.Classes.LawfulClasses (IsTrue)
 import Data.Numeric.Nat.Arithmetic (mul)
 
 import Algorithm.SymbolicAlgebra.NatPolynomial

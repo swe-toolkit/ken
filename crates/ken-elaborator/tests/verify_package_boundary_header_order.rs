@@ -10,6 +10,7 @@ use ken_elaborator::compiler_driver::{
 
 const PKG: &str = "verify_boundary_header_order";
 const FULL: &str = "program capabilities FS AFull\n\
+    import Capability.Process.Exit (host_pure)\n\
     fn main (_input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode = host_pure AFull ExitCode ExitCode.Success";
 const NONE: &str = "program capabilities FS ANone\nconst zz_other : Nat = Zero";
 const SAME: &str = "program capabilities FS AFull\nconst zz_other : Nat = Zero";
@@ -27,9 +28,14 @@ fn other(name: &str, text: &str) -> CompilerSource {
 }
 
 fn package(sources: Vec<CompilerSource>) -> Result<CompilerDriverOutput, CompilerDriverError> {
+    let roots =
+        vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
     compile_ken_package_sources(
         &CompilerManifest::new(PKG, Vec::new()),
-        sources,
+        sources
+            .into_iter()
+            .map(|source| source.with_roots(roots.clone()))
+            .collect(),
         TargetSelector::StableSymbol {
             package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PKG.to_string()]),
             symbol: StableSymbol::declaration(PKG, &[], "main"),
@@ -45,18 +51,7 @@ fn native(
         vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
     let sources = sources
         .into_iter()
-        .map(|mut source| {
-            // The generic package route retains its original Legacy fixture.
-            // Only native preparation requires this checked identity's import.
-            if source.name == "full.ken" {
-                source.text = source.text.replacen(
-                    "program capabilities FS AFull\n",
-                    "program capabilities FS AFull\nimport Capability.Process.Exit (host_pure)\n",
-                    1,
-                );
-            }
-            source.with_roots(roots.clone())
-        })
+        .map(|source| source.with_roots(roots.clone()))
         .collect();
     prepare_native_program_sources(PKG, sources)
 }

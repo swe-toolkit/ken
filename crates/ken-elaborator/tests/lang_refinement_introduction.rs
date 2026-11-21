@@ -77,6 +77,12 @@ fn char_scalar_boundary_is_an_obligation_not_a_rejection() {
 #[test]
 fn matched_scalar_introduction_carries_and_uses_its_branch_equation() {
     let mut env = ElabEnv::new().expect("prelude");
+    env.set_catalog_roots_v1(&[
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+    ])
+    .expect("checked catalog root");
+    env.elaborate_file("import Core.Classes.LawfulClasses (inRangeBool)")
+        .expect("checked scalar range home");
     let branch = env.elaborate_decl_v1(
         "fn checked_scalar (n : Int) : Option Char = match (inRangeBool n) { True |-> Some Char n ; False |-> None Char }"
     ).expect("checked branch");
@@ -567,6 +573,8 @@ fn assert_unsinkable_obligation_with_provider(
     let mut standalone = ElabEnv::new().expect("prelude");
     if use_checked_not {
         checked_not::load(&mut standalone);
+        standalone.elaborate_file("import Core.Logic.Not")
+            .expect("standalone selects the checked negation module");
     }
     let before = trusted(&standalone);
     let error = standalone

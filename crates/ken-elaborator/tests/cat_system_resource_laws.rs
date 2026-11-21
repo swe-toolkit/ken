@@ -89,15 +89,62 @@ fn assert_release_continuation_hidden(env: &ElabEnv) {
     assert!(!env.globals.values().any(|visible| *visible == id));
 }
 
-fn assert_legacy_not_client(env: &mut ElabEnv, name: &str, client: &str) {
-    let expected = law_type(env, name);
-    let client_name = format!("client_{name}");
-    env.elaborate_decl(client)
-        .unwrap_or_else(|error| panic!("I4-owned Not client for `{name}` must check: {error:?}"));
+// A Not premise is itself a Pi, so the identity witness is found by the
+// client's parameter count, not by shape.
+fn identity_statement(term: Term, parameters: usize) -> Term {
+    match term {
+        Term::Pi(domain, body) if parameters > 0 => {
+            Term::Pi(domain, Box::new(identity_statement(*body, parameters - 1)))
+        }
+        Term::Pi(domain, _) => *domain,
+        other => panic!("Strict identity theorem must end in a witness: {other:?}"),
+    }
+}
+
+// The pre-source Not has no source route, so the client abstracts it and the
+// helper, and both checked identities are substituted back by the kernel.
+fn check_strict_not_client(
+    env: &mut ElabEnv,
+    name: &str,
+    source: &str,
+    parameters: usize,
+    private_helper: GlobalId,
+    pre_source_not: GlobalId,
+) {
+    let law = law_type(env, name);
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+    let client_ids = env
+        .elaborate_isolated_file_strict_v1(
+            &[root],
+            &format!(
+                "import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr, \
+            ResourceBracketResult, ResourceBracketReleaseError, \
+            ResourceBracketBodyAndReleaseError)\n{source}"
+            ),
+        )
+        .unwrap_or_else(|error| panic!("Strict Not client for `{name}`: {error:?}"));
+    let client_id = client_ids.last().expect("Strict Not theorem").def_id;
+    let Some(Decl::Transparent { ty, .. }) = env.env.lookup(client_id) else {
+        panic!("Strict Not client must be a checked theorem")
+    };
+    let Term::Pi(_, rest) = ty else {
+        panic!("Strict Not client must abstract the hidden helper")
+    };
+    let Term::Pi(_, rest) = ken_kernel::subst::subst0(rest, &Term::const_(private_helper, vec![]))
+    else {
+        panic!("Strict Not client must abstract the pre-source Not")
+    };
+    let statement = identity_statement(
+        ken_kernel::subst::subst0(&rest, &Term::const_(pre_source_not, vec![])),
+        parameters,
+    );
+    assert!(
+        convert_type(&env.env, &Context::new(), &statement, &law),
+        "the independently authored Not premise must convert to `{name}`"
+    );
     assert_eq!(
-        law_type(env, &client_name),
-        expected,
-        "I4-owned Not client must retain its exact independent proposition"
+        statement, law,
+        "the Strict Not client must retain its exact independent proposition"
     );
 }
 
@@ -179,71 +226,28 @@ fn check_strict_conjunction_client(
 }
 
 /// Promise class: normative compatibility vector for the Resource bracket.
-/// MEASURED: two clean-settlement propositions have independently checked
-/// Strict identity-theorem clients; the two Not-premise clients retain their
-/// exact Legacy proposition checks for I4. Each of the eleven effect-law types
-/// is kernel-convertible to an independently hand-built, well-formed kernel
-/// proposition, while its named non-erasable perturbation does not convert.
+/// MEASURED: the two clean-settlement and the two Not-premise propositions
+/// have independently checked Strict identity-theorem clients, each equal to
+/// its law once the abstracted checked identities are substituted. Each of the
+/// eleven effect-law types is kernel-convertible to an independently
+/// hand-built, well-formed kernel proposition, while its named non-erasable
+/// perturbation does not convert.
 /// CLAIMED: the four settlement outcomes and three bracket sequences remain
 /// exact without exposing implementation helpers or adding trusted claims.
 /// THE GAP: a private helper identity is recovered from its owner's checked
-/// theorem left head. The release continuation is authored here as a lambda
-/// over the checked settlement helper; its law RHS is inspected only by the
-/// old hiddenness assertion, never copied into an expected term. Separate
-/// production mutations exercise the laws' reach to real prelude definitions.
+/// theorem left head. The pre-source Not has no source route, so its identity
+/// is read from the prelude registry, not from a law. The release continuation
+/// is authored here as a lambda over the checked settlement helper; its law
+/// RHS is inspected only by the old hiddenness assertion, never copied into an
+/// expected term. Separate production mutations exercise the laws' reach to
+/// real prelude definitions.
 /// No expected effect term is copied from a law or elaborated from source text.
 #[test]
 fn resource_laws_have_exact_independent_checked_clients() {
-    // The two Not-premise clients are explicitly I4-owned; their old source
-    // spelling stays here in a separate Legacy environment until I4 removes
-    // the Legacy resolution mechanism. No other client uses it.
-    let mut legacy = ElabEnv::empty().expect("I4-owned Not-premise clients");
-    let legacy_trusted = legacy.env.trusted_base();
-    let settle = checked_private_helper(
-        &legacy,
-        "resource_settle_result_for",
-        "resource_settle_body_ok_clean",
-        true,
-    );
-    assert!(!legacy.globals.contains_key("resource_settle_result_for"));
-    legacy
-        .globals
-        .insert("resource_settle_result_for".to_owned(), settle);
-    assert_legacy_not_client(
-        &mut legacy,
-        "resource_settle_body_ok_release_error",
-        r#"theorem client_resource_settle_body_ok_release_error
-          (o : Type) (e : Type) (r : Type) (value : r) (release_error : ResourceError)
-          : Not (Equal ResourceError release_error ResourceError.Closed)
-            → Equal (Result o (ResourceBracketResult e r))
-              (resource_settle_result_for o e r (ResourceBodyOk e r value)
-                (Err ResourceError Unit release_error))
-              (Ok o (ResourceBracketResult e r)
-                (ResourceBracketReleaseError e r release_error)) =
-          resource_settle_body_ok_release_error o e r value release_error"#,
-    );
-    assert_legacy_not_client(
-        &mut legacy,
-        "resource_settle_body_error_release_error",
-        r#"theorem client_resource_settle_body_error_release_error
-          (o : Type) (e : Type) (r : Type) (body_error : e)
-          (release_error : ResourceError)
-          : Not (Equal ResourceError release_error ResourceError.Closed)
-            → Equal (Result o (ResourceBracketResult e r))
-              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
-                (Err ResourceError Unit release_error))
-              (Ok o (ResourceBracketResult e r)
-                (ResourceBracketBodyAndReleaseError e r body_error release_error)) =
-          resource_settle_body_error_release_error o e r body_error release_error"#,
-    );
-    assert_eq!(
-        legacy.env.trusted_base(),
-        legacy_trusted,
-        "I4 carry must not add trust"
-    );
-
     let mut env = ElabEnv::empty().expect("Strict Resource laws prelude");
     let trusted_before_clients = env.env.trusted_base();
+    // Read before any catalog load can write a bare spelling.
+    let pre_source_not = env.globals["Not"];
     for private in ["resource_refl", "private_resource_release_result"] {
         assert!(
             !env.globals.contains_key(private),
@@ -385,6 +389,55 @@ fn resource_laws_have_exact_independent_checked_clients() {
         ),
         settle,
         conjunction,
+    );
+
+    let not_header = |theorem: &str, parameters: &str| {
+        format!(
+            "theorem {theorem}\n\
+          (resource_settle_result_for : (o : Type) → (e : Type) → (r : Type)\n\
+            → ResourceBodyResult e r → Result ResourceError Unit\n\
+            → Result o (ResourceBracketResult e r))\n\
+          (Not : Omega → Omega)\n\
+          {parameters}"
+        )
+    };
+    check_strict_not_client(
+        &mut env,
+        "resource_settle_body_ok_release_error",
+        &identity(
+            &not_header(
+                "client_resource_settle_body_ok_release_error",
+                "(o : Type) (e : Type) (r : Type) (value : r) (release_error : ResourceError)",
+            ),
+            r#"Not (Equal ResourceError release_error ResourceError.Closed)
+            → Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit release_error))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketReleaseError e r release_error))"#,
+        ),
+        5,
+        settle,
+        pre_source_not,
+    );
+    check_strict_not_client(
+        &mut env,
+        "resource_settle_body_error_release_error",
+        &identity(
+            &not_header(
+                "client_resource_settle_body_error_release_error",
+                "(o : Type) (e : Type) (r : Type) (body_error : e) (release_error : ResourceError)",
+            ),
+            r#"Not (Equal ResourceError release_error ResourceError.Closed)
+            → Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit release_error))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyAndReleaseError e r body_error release_error))"#,
+        ),
+        5,
+        settle,
+        pre_source_not,
     );
 
     let names = [

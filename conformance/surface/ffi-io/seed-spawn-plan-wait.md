@@ -20,9 +20,12 @@ These are acceptance cases, not execution evidence. The seed has not been
 Ken-checked or run by the official conformance runner. No CI, publication,
 landing, or trust measurement is claimed. The cases describe surface clients
 using only the public forms in §1.11 and related existing buffer contract;
-they do not freeze host syscall mechanics. The seed includes Strict
-import-home cases for the three existing pipe names; the §1.11.2 rows
-continue to cover their behavior. These clients use the exact signatures,
+they do not freeze host syscall mechanics. Each source client imports the
+package-home names it uses from `Capability.Process.Child` and the corresponding
+Buffer, Resource, and IO homes; no behavioral case relies on an ambient
+implementation-global fallback. The seed includes explicit import-home pairs
+for the three pipe operation names; the §1.11.2 rows continue to cover their
+behavior. These clients use the exact signatures,
 including the Auth/type parameters, `withChild`'s `Cap a`, plan, and
 child-resource body, and each operation's specified typed resource
 arguments. No second Process capability argument or raw descriptor form is
@@ -314,7 +317,7 @@ spawn clients declare `Process` and `FS AFull`. Spawn and wait use
   corresponding accepting imports of those names.
 - claimed: each homed pipe operation requires its explicit package
   import in Strict isolated source.
-- gap: this does not pin Legacy-root resolution or CLI routing.
+- gap: this does not pin roots-loaded name resolution or CLI routing.
 - why: every refusal changes only its own import; the paired accepted
   source establishes the name and its use are otherwise valid.
 

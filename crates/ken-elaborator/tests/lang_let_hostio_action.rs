@@ -388,7 +388,7 @@ fn annotated_action_type_is_result_type_mismatch() {
 /// occupying bind's action argument rather than an ordinary Let value.
 #[test]
 fn public_standalone_performed_let_binds_the_first_checked_action() {
-    let mut env = ElabEnv::new().expect("checked prelude");
+    let mut env = selected_env(&[("Capability.Console.Text", "write")]);
     let (core, ty) = env
         .elaborate_expr(
             "standalone_effectful_let",

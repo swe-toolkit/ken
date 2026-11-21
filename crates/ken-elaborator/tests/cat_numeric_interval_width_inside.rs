@@ -83,7 +83,7 @@ fn provider_first_trust_and_seven_owned_transparent_laws() {
 }
 
 const OPEN_CLIENT: &str = r#"
-import Core.Classes.LawfulClasses (leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, leq_nat)
 import Data.Numeric.Nat.Arithmetic (mul)
 import Data.Numeric.Nat.Order (sub, mul_sub_distrib_r, mul_sub_distrib_l)
 import Data.Numeric.Rational (Rational, rational_sub, rational_leq, rational_sub_mono)
@@ -148,6 +148,7 @@ fn seven_public_open_law_shapes_and_two_private_refusals() {
 }
 
 const PREFIX: &str = r#"
+import Core.Classes.LawfulClasses (IsTrue)
 import Data.Numeric.Rational (Rational, MkRational, rational_sub, rational_leq, rational_equiv)
 import Algorithm.Numeric.RationalInterval
   (Interval, MkInterval, interval_inside, interval_width, interval_intersect,

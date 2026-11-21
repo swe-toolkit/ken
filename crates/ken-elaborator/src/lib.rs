@@ -451,6 +451,7 @@ impl ElabEnv {
             module_state: modules::ModuleState::default(),
             refinement_facts: elab::RefinementFacts::default(),
         };
+        elab.module_state.pre_source_open = true;
         // The Bytes registrar finishes before prelude source can use String
         // literal values (e.g. the ABI-range error names).
         elab.numeric_env
@@ -523,8 +524,8 @@ impl ElabEnv {
             }
         }
         elab.prelude_env.pre_source_names = pre_source;
-        // The generic ITree binder remains available as bare `bind` on the
-        // Legacy route. Its specific floor spelling is an additional binding
+        // The generic ITree binder remains available to the compiler during
+        // pre-source registration. Its specific floor spelling is an additional binding
         // to the *captured* checked ID, not a new definition or a rename of
         // the pre-source stable symbol. A later user `fn bind` cannot redirect
         // this alias. Install it after the artifact-name snapshot above.
@@ -790,10 +791,10 @@ impl ElabEnv {
         modules::elaborate_module_from_roots_v1(self, roots, entry)
     }
 
-    /// Elaborate a roots-loaded unit with strict bare-name resolution.
+    /// Elaborate a roots-loaded unit under the single source-resolution rule.
     ///
-    /// The catalog CLI selects this mode; the Legacy roots entry remains
-    /// available to isolated and transitional callers.
+    /// This alias and the ordinary roots entry select the same catalog root
+    /// and refuse bare names absent from the checked scope.
     pub fn elaborate_module_from_roots_strict(
         &mut self,
         roots: &[PathBuf],
@@ -1180,6 +1181,7 @@ impl ElabEnv {
     ) -> Result<(Term, Term), ElabError> {
         let expr = parser::parse_expr(src)?;
         let rexpr = resolve::resolve_expr_standalone(&expr)?;
+        let rexpr = modules::qualify_standalone_rexpr(&self.module_state, rexpr)?;
         let owner_label = owner_label.into();
         self.with_owner(owner_label.clone(), |env| {
             env.with_env_mark_rollback(|env| {

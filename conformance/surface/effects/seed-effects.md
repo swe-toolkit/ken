@@ -286,6 +286,8 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 - given: `write_file` declared `using fs : FsCap`; a
   `proc dump () : Unit visits [FS] = write_file "/x" data` with **no** `Cap FS`
   in scope (no capability parameter, no enclosing handler provides it).
+  Source imports `FS` and `write_file` from
+  `Capability.Filesystem.Authority`.
 - expect: **static error** — `MissingCapability(FsCap)` (kind `(oracle)`,
   `§7.3.2`): the `perform` is gated on the `Cap E` value's presence, unprovided.
 - why: the **capability-denial path** (`§7.3.2`).
@@ -294,6 +296,8 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 - spec: `36 §2.5`, `§5.1` (a handler provides the capability)
 - given: the same op, but `dump` takes `using fs : FsCap` (or an enclosing
   handler for `FS` provides it, `§5.1`).
+  Source imports `FS` and `write_file` from
+  `Capability.Filesystem.Authority`.
 - expect: **accepts** — `Cap FS` is in scope (a Π parameter, `§2.5`); gating
   satisfied.
 - why: the **flip** for `cap-op-without-token-rejected` (the `§7.5.3`
@@ -306,6 +310,8 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 - given: `proc exfil () visits [FS, Net] = { write_file "/x" d ; send sock d }`
   — `write_file using fs:FsCap`, `send using net:NetCap`. Three variants: (a)
   both caps in scope; (b) only `fs`; (c) only `net`.
+  Source imports `FS` and `write_file` from
+  `Capability.Filesystem.Authority`.
 - expect: (a) **accepts**; (b) **rejects** `MissingCapability(NetCap)`; (c)
   **rejects** `MissingCapability(FsCap)`.
 - why: ≥2 distinct capabilities, **each independently gated** — one case per
@@ -519,25 +525,41 @@ against. The case **defines "done"**; it is correctly red until Runtime/Language
 build it.
 
 ### surface/effects/direct-state-next-post-increment (oracle, build-forcing)
-- spec: `36 §4.5.3` (`runState` = `§4.2` fold at `F = 𝟘`; worked `next`),
-  `§4.5.2` (`get`/`put` = `§2.1` `Get`/`Put` under `perform`), `§2.4` (`𝟘`
-  collapse)
-- given: the direct-surface post-increment `next` — returns the current value,
-  bumps the state:
+- spec: `36 §4.5.3` (`run_state` = `§4.2` fold at `F = 𝟘`; worked `next`),
+  `§4.5.2` (`state_get`/`state_put` build declared trees), and `§2.4`
+  (`𝟘` collapse)
+- given: in a roots-loaded source, import the empty residual effect type and
+  build the post-increment tree with the checked direct-State operations:
 
-  ```
-  next () = bind (get ()) (λ n. bind (put (n + 1)) (λ _. Ret n))
+  ```ken
+  import Core.Logic.EmptyDec (Empty)
+
+  const next : ITree (Coproduct (StateOp Nat) Empty)
+      (resp_coproduct (StateOp Nat) Empty
+        (resp_state Nat) (λ (_ : Empty). Unit)) Nat =
+    itree_bind (Coproduct (StateOp Nat) Empty)
+      (resp_coproduct (StateOp Nat) Empty
+        (resp_state Nat) (λ (_ : Empty). Unit)) Nat Nat
+      (state_get Nat Empty (λ (_ : Empty). Unit) MkUnit)
+      (λ n. itree_bind (Coproduct (StateOp Nat) Empty)
+        (resp_coproduct (StateOp Nat) Empty
+          (resp_state Nat) (λ (_ : Empty). Unit)) Unit Nat
+        (state_put Nat Empty (λ (_ : Empty). Unit) (n + 1))
+        (λ _. ITree.Ret (Coproduct (StateOp Nat) Empty)
+          (resp_coproduct (StateOp Nat) Empty
+            (resp_state Nat) (λ (_ : Empty). Unit)) Nat n)
   ```
 
-  driven through the **real interpreter** under `runState 0` and `runState 41`
-  (not a hand-fed harness — per the build-forcing note above).
-- expect: `runState 0 next` reduces to the pair **`(0, 1)`** and `runState 41
-  next` to **`(41, 42)`** — `(result, final-state)`: the result is the **old**
-  value (`get` observes the pre-increment state), the second component is the
-  **final** state after `put (n+1)`. Re-derive (`§4.2` clauses): `runState 0
-  (Vis Get k) = runState 0 (k 0)` (answer with current `0`) → `k 0 = Vis (Put 1)
-  (λ_. Ret 0)` → `runState 0 (Vis (Put 1) k') = runState 1 (k' tt) = runState 1
-  (Ret 0) = Ret (0, 1)`; at `F = 𝟘` collapses (`§2.4`) to `(0, 1)`.
+  Run `run_state Nat Empty (λ (_ : Empty). Unit) Nat initial next` through
+  the **real interpreter** for `initial = Zero` and `initial = 41` (a fixed
+  natural value; not a hand-fed harness, per the build-forcing note above).
+- expect: `run_state Nat Empty (λ (_ : Empty). Unit) Nat Zero next` reduces
+  to **`(0, 1)`**, and the same call with initial value `41` reduces to
+  **`(41, 42)`**. The pair is `(result, final-state)`: `state_get` reads the
+  pre-increment value and `state_put` adopts its successor. With residual
+  signature `Empty`, the state handler's returned tree collapses to this pair
+  by §2.4. These observations use the §4.2 `Get`/`Put` fold, not a bare
+  source-level `bind`, `get`, `put`, or `Ret`.
 - why: **verdict-independent structural value** — the pair **flips** on the two
   bugs the direct surface must exclude, and (by `result 0 ≠ state 1`, chosen so)
   pins the pair **order** the equal-valued EFF4 `(2,2)` cannot: **(a)** a
@@ -553,7 +575,8 @@ build it.
   **components and order** and its Σ-pair denotation; the **surface constructor
   spelling** is deferred `OQ-syntax` (`§4.5.2`), so do **not** freeze a
   constructor name (over-freezing a deferred spelling would falsely fail a valid
-  build once the stdlib pair name finalizes).
+  build once the stdlib pair name finalizes). The source tree reaches `Ret` as
+  `ITree.Ret` with explicit carrier, response, and result arguments.
 
 ### surface/effects/direct-state-console-commute (oracle, build-forcing)
 - spec: `36 §4.5.4` (composition via `⊕`; handler nesting = discharge order;

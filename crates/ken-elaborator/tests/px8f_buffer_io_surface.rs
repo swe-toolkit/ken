@@ -342,17 +342,24 @@ fn write_all_checked_step_preserves_the_exact_first_error() {
     let proposition = proposition.replace("HostIO a (Result ResourceError Unit)", tree);
     let witness = format!("{header}\n  (h : {proposition}) : {proposition} = h");
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
-    let checked = env.elaborate_isolated_file_strict_v1(
-        &[root.clone()],
-        &format!("import Capability.System.Buffer (BufferHandle)\n{witness}"),
-    ).expect("Strict identity theorem over private representation checks");
+    let checked = env
+        .elaborate_isolated_file_strict_v1(
+            &[root.clone()],
+            &format!("import Capability.System.Buffer (BufferHandle)\n{witness}"),
+        )
+        .expect("Strict identity theorem over private representation checks");
     let checked_id = checked.last().expect("identity theorem declaration").def_id;
-    let Some(Decl::Transparent { ty: checked_type, .. }) = env.env.lookup(checked_id) else {
+    let Some(Decl::Transparent {
+        ty: checked_type, ..
+    }) = env.env.lookup(checked_id)
+    else {
         panic!("independent client theorem must have a checked body")
     };
     let mut statement = checked_type.clone();
     for identity in &hidden {
-        let Term::Pi(_, tail) = statement else { panic!("hidden binder missing") };
+        let Term::Pi(_, tail) = statement else {
+            panic!("hidden binder missing")
+        };
         statement = ken_kernel::subst::subst0(&tail, identity);
     }
     fn without_witness(ty: Term) -> Term {
@@ -383,13 +390,20 @@ fn write_all_checked_step_preserves_the_exact_first_error() {
         "(Err ResourceError Unit ResourceError.NoProgress))",
         "(Err ResourceError Unit ResourceError.Closed))",
     );
-    assert_ne!(wrong_proposition, proposition, "wrong-error conclusion differs");
-    let wrong = format!("{}\n  (h : {proposition}) : {wrong_proposition} = h",
-        header.replace("first_error_is_no_progress", "first_error_is_closed"));
-    let rejection = env.elaborate_isolated_file_strict_v1(
-        &[root],
-        &format!("import Capability.System.Buffer (BufferHandle)\n{wrong}"),
-    ).expect_err("a distinct error cannot be derived from the first-error witness");
+    assert_ne!(
+        wrong_proposition, proposition,
+        "wrong-error conclusion differs"
+    );
+    let wrong = format!(
+        "{}\n  (h : {proposition}) : {wrong_proposition} = h",
+        header.replace("first_error_is_no_progress", "first_error_is_closed")
+    );
+    let rejection = env
+        .elaborate_isolated_file_strict_v1(
+            &[root],
+            &format!("import Capability.System.Buffer (BufferHandle)\n{wrong}"),
+        )
+        .expect_err("a distinct error cannot be derived from the first-error witness");
     assert!(
         matches!(
             rejection,
@@ -475,10 +489,7 @@ proc mapping_surface_read
 #[test]
 fn checked_source_cannot_forge_or_project_mapping_handles() {
     for (private, source) in [
-        (
-            "PrivateMappingHandle",
-            "let escaped = PrivateMappingHandle",
-        ),
+        ("PrivateMappingHandle", "let escaped = PrivateMappingHandle"),
         (
             "mapping_handle_resource",
             "fn escaped (mapping : MappingHandle) : Resource ResourceKind.Mapping = \
@@ -491,9 +502,12 @@ fn checked_source_cannot_forge_or_project_mapping_handles() {
         ),
     ] {
         let mut env = ElabEnv::empty().expect("ABI-S6 prelude");
+        catalog_roots::load(&mut env, "Capability.System.Mapping");
+        env.elaborate_file("import Capability.System.Mapping (MappingHandle)")
+            .expect("select public mapping handle before testing private names");
         match env.elaborate_file(source) {
-            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, private),
-            other => panic!("`{private}` must reject as an unresolved private name, got {other:?}"),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, private),
+            other => panic!("`{private}` must reject as an unbound private name, got {other:?}"),
         }
     }
 }
@@ -626,8 +640,8 @@ fn checked_source_cannot_forge_or_project_buffer_handles() {
         env.elaborate_file("import Capability.System.Buffer (BufferHandle)")
             .expect("select the checked public handle former");
         match env.elaborate_file(source) {
-            Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, private),
-            other => panic!("`{private}` must reject as an unresolved private name, got {other:?}"),
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, private),
+            other => panic!("`{private}` must reject as an unbound private name, got {other:?}"),
         }
     }
 }

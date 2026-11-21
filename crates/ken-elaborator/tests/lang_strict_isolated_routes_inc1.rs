@@ -3,6 +3,11 @@
 
 use std::path::{Path, PathBuf};
 
+use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
+use ken_elaborator::compiler_driver::{
+    compile_ken_package_sources, CompilerDriverError, CompilerManifest, CompilerSource,
+    CompilerTargetKind, TargetSelector,
+};
 use ken_elaborator::modules::{catalog_module_from_path, discover_source_path, SourcePathKind};
 use ken_elaborator::{ElabEnv, ElabError};
 
@@ -177,53 +182,12 @@ fn imported_main_does_not_become_the_roots_entrypoint() {
     assert!(env.globals.contains_key("Lib.main"));
 }
 
-/// Promise class: durable invariant. A partially committed Legacy file is
-/// still an active Legacy run: the first checked declaration survives a later
-/// refusal even though no complete in-memory unit was recorded. Strict must
-/// not replace its scope and quietly admit a second source.
+/// Promise class: durable invariant (spec 33 §3.3). Each isolated source on
+/// one environment starts from a fresh scope: a later source sees neither an
+/// earlier source's imports nor its top-level declarations. A root change,
+/// multiple roots and rootless-to-rooted selection still refuse.
 #[test]
-fn partial_legacy_admission_cannot_switch_to_strict() {
-    let (_dir, root) = root_with_lib();
-    let mut env = ElabEnv::new().unwrap();
-    assert!(env
-        .elaborate_file_v1("const leaked : Nat = Zero\nconst broken : Bool = Zero\n")
-        .is_err());
-    assert!(
-        env.globals.contains_key("leaked"),
-        "earlier Legacy declaration was admitted"
-    );
-    match load(&mut env, &[root], "const fresh : Nat = Zero\n") {
-        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
-        other => panic!("partial Legacy admission must keep its mode lock, got {other:?}"),
-    }
-    let mut parse_only = ElabEnv::new().unwrap();
-    assert!(parse_only
-        .elaborate_file_v1("const invalid : Nat =")
-        .is_err());
-    load(&mut parse_only, &[], "const fresh : Nat = Zero\n").unwrap();
-}
-
-/// Promise class: durable invariant. Even an empty but successful Legacy
-/// source commits an in-memory unit. It cannot be followed by a Strict entry
-/// that changes the mode of the same environment.
-#[test]
-fn completed_empty_legacy_unit_cannot_switch_to_strict() {
-    let mut env = ElabEnv::new().unwrap();
-    assert!(env.elaborate_file_v1("").unwrap().is_empty());
-    match load(&mut env, &[], "const after_empty_legacy : Nat = Zero\n") {
-        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
-        other => panic!("completed empty Legacy unit must keep its mode lock, got {other:?}"),
-    }
-}
-
-/// Promise class: durable invariant (spec 33 §3.3). Each Strict isolated
-/// source on one environment starts from a fresh scope: a later source sees
-/// neither an earlier source's imports nor its top-level declarations. The
-/// environment-level locks persist: a root change, multiple roots and a
-/// prior Legacy unit refuse before a second source can reinterpret checked
-/// identities.
-#[test]
-fn strict_env_keeps_root_and_mode_locks_but_each_source_starts_fresh() {
+fn strict_env_keeps_root_locks_but_each_source_starts_fresh() {
     let (_dir, root) = root_with_lib();
     let mut env = ElabEnv::new().unwrap();
     load(
@@ -272,21 +236,56 @@ fn strict_env_keeps_root_and_mode_locks_but_each_source_starts_fresh() {
         }
         other => panic!("expected rootless-to-rooted lock refusal, got {other:?}"),
     }
-    let mut legacy = ElabEnv::new().unwrap();
-    legacy
-        .elaborate_file_v1("const legacy : Nat = Zero\n")
-        .unwrap();
-    match load(&mut legacy, &[root.clone()], "const strict : Nat = Zero\n") {
-        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
-        other => panic!("expected Legacy-to-Strict refusal, got {other:?}"),
+}
+
+/// Promise class: durable invariant. MEASURED: three rootless entries reject
+/// a library import at the module path, roots APIs reject zero roots, and a
+/// bare pre-source Perm is unavailable. CLAIMED: every source route uses the
+/// same strict boundary. THE GAP: the d1 chokes cover additional shapes.
+#[test]
+fn rootless_library_import_refuses_at_the_import() {
+    let source = "import Core.Logic.Not (Not)\nconst witness : Bool = True";
+    let mut isolated = ElabEnv::new().expect("pre-source environment");
+    unbound(load(&mut isolated, &[], source), "Core.Logic.Not");
+    let mut file = ElabEnv::new().expect("pre-source environment");
+    unbound(file.elaborate_file_v1(source).map(|_| ()), "Core.Logic.Not");
+
+    let package = "rootless";
+    let symbol = StableSymbol::declaration(package, &[], "witness");
+    let driver = compile_ken_package_sources(
+        &CompilerManifest::new(package, Vec::new()),
+        vec![CompilerSource::new("rootless.ken", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![package.to_string()]),
+            symbol,
+            kind: CompilerTargetKind::Library,
+        },
+    );
+    match driver {
+        Err(CompilerDriverError::Elaboration(ElabError::UnboundName { name, .. })) => {
+            assert_eq!(name, "Core.Logic.Not");
+        }
+        other => panic!("rootless driver import must refuse at module path: {other:?}"),
     }
-    let mut legacy_roots = ElabEnv::new().unwrap();
-    legacy_roots
-        .elaborate_module_from_roots_v1(&[root.clone()], "Lib")
-        .unwrap();
-    match load(&mut legacy_roots, &[root], "const strict : Nat = Zero\n") {
-        Err(ElabError::Internal(msg)) => assert!(msg.contains("resolution mode cannot change")),
-        other => panic!("expected roots mode-lock refusal, got {other:?}"),
+
+    let mut roots_entry = ElabEnv::new().expect("pre-source environment");
+    match roots_entry.elaborate_module_from_roots(&[], "Entry") {
+        Err(ElabError::ParseError { msg, .. }) => {
+            assert!(msg.contains("N2 requires exactly one populated catalog root, found 0"));
+        }
+        other => panic!("zero roots must refuse in the roots entry: {other:?}"),
+    }
+    let mut set_roots = ElabEnv::new().expect("pre-source environment");
+    match set_roots.set_catalog_roots_v1(&[]) {
+        Err(ElabError::ParseError { msg, .. }) => {
+            assert!(msg.contains("N2 requires exactly one populated catalog root, found 0"));
+        }
+        other => panic!("zero roots must refuse in set_catalog_roots_v1: {other:?}"),
+    }
+    let mut perm = ElabEnv::new().expect("pre-source environment");
+    match perm.elaborate_file_v1("fn f (xs : List Nat) : Prop = Perm Nat xs xs") {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "Perm"),
+        other => panic!("bare pre-source Perm must refuse: {other:?}"),
     }
 }
 

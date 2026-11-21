@@ -18,10 +18,8 @@ fn env_with_checked_not() -> ElabEnv {
         .join("../..")
         .join("catalog/packages");
     env.set_catalog_roots_v1(&[root]).expect("catalog roots");
-    // The pre-source spelling is still present through I1. Select the
-    // checked provider under a separate binding so Legacy does not report
-    // two candidates for the same bare spelling.
-    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)")
+    // The qualified standalone name needs a checked provider selection.
+    env.elaborate_file("import Core.Logic.Not (Not as CheckedNot)\nimport Core.Logic.Not")
         .expect("checked propositional negation imports");
     env
 }

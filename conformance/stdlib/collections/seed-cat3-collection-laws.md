@@ -45,10 +45,10 @@ The **Architect's three fork rulings** (`evt_4c3q1e611va69`), as transcribed in
 including the five formerly deferred surfaces and their negative controls.
 Historical row ids retain `red-until-built`; Pair-independent dispositions
 below are GREEN with the executing evidence that justifies the change. The lens
-rows that name `Pair` are RED-UNTIL the compiler-origin Pair floor realization;
-they use its always-present four-name transparent-Σ family with no package
-import. Current native acceptance is measured Legacy behavior, not Strict floor
-closure.
+rows that name `Pair` use the compiler-origin four-name transparent-Σ family
+with no package import. Their native acceptance observation is separate from
+source-level Pair identity; see
+`conformance/surface/modules/seed-pair-strict-boundary.md`.
 
 ## Grounding (content-verified against the landed targets)
 

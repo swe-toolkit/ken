@@ -1,8 +1,7 @@
-//! LANG-MOD-STRICT-RESOLUTION D1 strict-mode enforcement fixtures.
+//! LANG-MOD-STRICT-RESOLUTION D1 single-mode enforcement fixtures.
 //!
-//! The existing roots entry remains legacy until WP-4. These fixtures opt in
-//! through `elaborate_module_from_roots_strict` and exercise the two resolver
-//! chokes established by the D0 representation inventory.
+//! Default roots entries exercise the two resolver chokes established by
+//! the D0 representation inventory.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -134,17 +133,12 @@ fn strict_globals_choke_covers_every_d0_globals_representation() {
     ];
     let mut covered = BTreeSet::new();
     for (entry, name, route) in cases {
-        let mut strict = ambient_globals();
-        let error = strict
-            .elaborate_module_from_roots_strict(&[root.0.clone()], entry)
-            .expect_err("strict roots must reject ambient globals");
+        let mut default_entry = ambient_globals();
+        let error = default_entry
+            .elaborate_module_from_roots(&[root.0.clone()], entry)
+            .expect_err("default roots must reject ambient globals");
         assert_unbound(error, name);
         covered.insert(route);
-
-        let mut legacy = ambient_globals();
-        legacy
-            .elaborate_module_from_roots(&[root.0.clone()], entry)
-            .unwrap_or_else(|error| panic!("legacy {entry} route remains live: {error}"));
     }
     assert_eq!(covered, GLOBAL_ROUTES.into_iter().collect());
 }
@@ -204,37 +198,17 @@ fn strict_class_choke_covers_every_d0_direct_class_representation() {
     ];
     let mut covered = BTreeSet::new();
     for (entry, name, route) in cases {
-        let mut strict = ambient_classes();
+        let mut default_entry = ambient_classes();
         if entry == "ViewConstraint" {
-            strict
-                .elaborate_module_from_roots_strict(&[root.0.clone()], "ViewProvider")
-                .expect("strict provider setup");
+            default_entry
+                .elaborate_module_from_roots(&[root.0.clone()], "ViewProvider")
+                .expect("default provider setup");
         }
-        let error = strict
-            .elaborate_module_from_roots_strict(&[root.0.clone()], entry)
-            .expect_err("strict roots must reject ambient class/data names");
+        let error = default_entry
+            .elaborate_module_from_roots(&[root.0.clone()], entry)
+            .expect_err("default roots must reject ambient class/data names");
         assert_unbound(error, name);
         covered.insert(route);
-
-        let mut legacy = ambient_classes();
-        if entry == "ViewConstraint" {
-            legacy
-                .elaborate_module_from_roots(&[root.0.clone()], "ViewProvider")
-                .expect("legacy provider setup");
-        }
-        if entry == "ViewConstraint" {
-            let error = legacy
-                .elaborate_module_from_roots(&[root.0.clone()], entry)
-                .expect_err("legacy roots must also refuse an unselected module class");
-            assert!(
-                matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "AmbientView"),
-                "legacy view constraint must refuse at the missing selection: {error:?}"
-            );
-        } else {
-            legacy
-                .elaborate_module_from_roots(&[root.0.clone()], entry)
-                .unwrap_or_else(|error| panic!("legacy {entry} class route remains live: {error}"));
-        }
     }
     assert_eq!(covered, CLASS_ROUTES.into_iter().collect());
 }
@@ -363,17 +337,28 @@ fn strict_underapplied_j_without_binding_is_unbound() {
     assert_unbound(error, "J");
 }
 
+/// Promise class: durable invariant. MEASURED: a flat spelling with no
+/// scope binding refuses from file, declaration and standalone entries.
+/// CLAIMED: no source entry reads a flat global by spelling. THE GAP: the
+/// default roots chokes above cover file-backed units and class routes.
 #[test]
-fn one_roots_run_cannot_mix_legacy_and_strict_cache_entries() {
-    let root = FixtureRoot::new("mode-cache");
-    root.write("Entry.ken", "fn bool_id (x : Bool) : Bool = x");
-    let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
-        .expect("legacy roots entry works");
-    assert!(matches!(
-        env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry"),
-        Err(ElabError::Internal(_))
-    ));
-
-    assert!(root.path().exists());
+fn in_memory_entries_refuse_ambient_globals() {
+    let mut file = ambient_globals();
+    assert_unbound(
+        file.elaborate_file_v1("const leaked : Bool = AmbientTrue")
+            .expect_err("file entry must reject an ambient global"),
+        "AmbientTrue",
+    );
+    let mut decl = ambient_globals();
+    assert_unbound(
+        decl.elaborate_decl("const leaked : Bool = AmbientTrue")
+            .expect_err("declaration entry must reject an ambient global"),
+        "AmbientTrue",
+    );
+    let mut expr = ambient_globals();
+    assert_unbound(
+        expr.elaborate_expr("ambient-probe", "AmbientTrue")
+            .expect_err("standalone entry must reject an ambient global"),
+        "AmbientTrue",
+    );
 }

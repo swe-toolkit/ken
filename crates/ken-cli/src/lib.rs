@@ -189,8 +189,8 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
 }
 
 /// Drive a previously elaborated program through the ordinary checked-main
-/// admission and host-effect observation path. The held relay fixture uses
-/// Legacy elaboration for compiler-internal identities (spec 30 §4, I row).
+/// admission and host-effect observation path. The relay fixture supplies
+/// kernel-checked terms for private compiler identities (spec 30 §4, I row).
 #[doc(hidden)]
 pub fn run_elaborated_program_effect_observation<H: ken_interp::HostHandler>(
     elab_env: ken_elaborator::ElabEnv,

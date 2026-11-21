@@ -97,10 +97,9 @@ pub struct ModuleState {
     module_path_owners: HashMap<String, ModuleUnitOwner>,
     /// The next distinct in-memory unit identity, committed only on success.
     next_in_memory_unit: u64,
-    /// Entering a Legacy in-memory source locks this environment's resolution
-    /// mode even when a later declaration fails after earlier admissions.
-    /// Prelude registration uses the same entry and resets this at its end.
-    legacy_in_memory_source_started: bool,
+    /// Only compiler pre-source registration may admit all compiler spellings.
+    /// This closes before any package source can elaborate.
+    pub(crate) pre_source_open: bool,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
     /// V1 results owned by each loaded file unit, retained for cached roots
@@ -141,9 +140,9 @@ pub struct ModuleState {
     /// Compiler vocabulary captured before package source can add aliases.
     /// Includes native trusted names and constructors of the closed floor.
     strict_builtin_names: HashSet<String>,
-    /// One roots-loader run cannot mix legacy and strict units: the loaded-unit
-    /// cache records elaborated results rather than unresolved source.
-    roots_resolution_mode: Option<ResolutionMode>,
+    /// Whether the catalog-root selection has been made, including empty
+    /// roots selected by the isolated-source route.
+    catalog_roots_selected: bool,
     /// Home module -> checked pre-source package identities bound in that
     /// module's scope, never in unrelated clients or the strict ambient set.
     package_home_ids: HashMap<String, Vec<(String, ken_kernel::GlobalId)>>,
@@ -206,8 +205,18 @@ impl ModuleState {
         }
     }
 
+    /// The root scope every source entry starts from (spec 33 §3.3): the
+    /// compiler vocabulary captured at the pre-source boundary, and none of
+    /// the prelude registration's own locals.
+    fn fresh_root_scope(&self) -> Scope {
+        let mut scope = Scope::with_kernel_names(self.strict_builtin_names.clone());
+        scope.private_ids.clone_from(&self.private_ids);
+        scope
+    }
+
     pub(crate) fn finish_prelude_source_registration(&mut self) {
-        self.legacy_in_memory_source_started = false;
+        self.pre_source_open = false;
+        self.root_scope = self.fresh_root_scope();
     }
 
     pub(crate) fn source_name_for_report(&self, id: ken_kernel::GlobalId) -> Option<&str> {
@@ -990,13 +999,6 @@ fn require_fixed_proved_identity(
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum ResolutionMode {
-    #[default]
-    Legacy,
-    Strict,
-}
-
 /// Per-scope bare-name resolution: selective-import bindings plus this scope's
 /// own local declarations. A top-level
 /// local/import collision is fail-closed regardless of source order (`33
@@ -1066,7 +1068,6 @@ impl EnclosingLayer {
 
 #[derive(Default, Clone)]
 struct Scope {
-    mode: ResolutionMode,
     /// Compiler-installed vocabulary captured before package source can speak.
     /// This excludes later ambient postulates while preserving primitive names.
     kernel_names: HashSet<String>,
@@ -1163,9 +1164,8 @@ impl Scope {
         self.private_ids.retain(|id| !removed.contains(id));
     }
 
-    fn with_mode(mode: ResolutionMode, kernel_names: HashSet<String>) -> Self {
+    fn with_kernel_names(kernel_names: HashSet<String>) -> Self {
         Self {
-            mode,
             kernel_names,
             ..Self::default()
         }
@@ -1307,8 +1307,8 @@ impl Scope {
             };
             if local_id == Some(selected_id) {
                 // A pre-source local and its exporting home can be the same
-                // checked declaration. Keep that ID in the root binding even
-                // under Legacy: the flat globals spelling may be rebound.
+                // checked declaration. Keep that ID in the root binding;
+                // the flat globals spelling may be rebound.
                 self.binding_ids.insert(bare.to_string(), selected_id);
                 return Ok(());
             }
@@ -1412,11 +1412,6 @@ fn record_checked_attached_proof(
     canonical: &str,
     proof_id: ken_kernel::GlobalId,
 ) -> Result<(), ElabError> {
-    // Only a Strict scope is snapshotted for its inline children
-    // (`expand_scope`), so a Legacy scope's record would never be read.
-    if scope.mode != ResolutionMode::Strict {
-        return Ok(());
-    }
     if let Decl::AttachedProofDecl {
         subject,
         proof_name,
@@ -1476,10 +1471,8 @@ fn qualify(prefix: &str, name: &str) -> String {
 
 /// Resolve a (possibly dotted) surface name reference to its canonical
 /// qualified form, using the active `scope` for bare names and `exports`
-/// for qualified (`M.foo`) references. Legacy mode returns an untracked name
-/// unchanged, preserving the pre-existing flat `cx.globals` fallback. Strict
-/// mode instead fails closed unless the name is scope-bound, compiler
-/// vocabulary, or a member of the closed prelude floor.
+/// for qualified (`M.foo`) references. Bare names refuse unless scope-bound,
+/// compiler vocabulary, or a member of the closed prelude floor.
 fn is_unshadowable_kernel_name(name: &str) -> bool {
     matches!(
         name,
@@ -1502,7 +1495,7 @@ fn resolve_ref(
                     return Ok(format!("{canonical}::{proof}"));
                 }
             }
-            if scope.mode == ResolutionMode::Strict && scope.bindings.contains_key(subject) {
+            if scope.bindings.contains_key(subject) {
                 return Err(ElabError::UnboundName {
                     name: name.to_string(),
                     span: span.clone(),
@@ -1590,8 +1583,7 @@ fn resolve_ref(
             return Ok(canonical.to_string());
         }
         if scope.facade_only.contains(name)
-            || (scope.mode == ResolutionMode::Strict
-                && !is_prelude_floor_name(name)
+            || (!is_prelude_floor_name(name)
                 && !scope.kernel_names.contains(name)
                 && !is_unshadowable_kernel_name(name))
         {
@@ -1787,15 +1779,6 @@ fn resolve_attached_ref(
         if let Some(selected) = select_enclosing_attached(scope, subject_id, proof_name, span)? {
             return Ok((selected.0, Some(selected.1)));
         }
-    }
-    // D0's legacy ambient path remains available only when the subject is
-    // genuinely untracked. An imported subject has a selected provider, so
-    // a missing checked proof must never borrow ambient global history.
-    if scope.mode == ResolutionMode::Legacy
-        && !scope.bindings.contains_key(subject)
-        && !subject.contains('.')
-    {
-        return Ok((format!("{canonical_subject}::{proof_name}"), None));
     }
     Err(ElabError::UnboundName {
         name: format!("{canonical_subject}::{proof_name}"),
@@ -2826,7 +2809,6 @@ fn load_unit(
     elab: &mut ElabEnv,
     module: &str,
     span: &Span,
-    mode: ResolutionMode,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     if let Some(start) = elab
         .module_state
@@ -2905,7 +2887,7 @@ fn load_unit(
             // declared later: the ordered pass will reject its premature use
             // at the import. An unrelated global export is not a file load.
             if declared_inline_import(&owner, Some(module), &dependency, &local_modules).is_none() {
-                let (_, results) = load_unit(elab, &dependency, &import_span, mode)?;
+                let (_, results) = load_unit(elab, &dependency, &import_span)?;
                 loaded_dependencies.push(dependency.clone());
                 dependency_results.extend(results);
             }
@@ -2922,8 +2904,7 @@ fn load_unit(
         // not leak into this unit's declarations.
         elab.class_env.next_module();
 
-        let mut scope = Scope::with_mode(mode, elab.module_state.strict_builtin_names.clone());
-        scope.private_ids.clone_from(&elab.module_state.private_ids);
+        let mut scope = elab.module_state.fresh_root_scope();
         // Only the approved file unit owns these pre-source IDs. An ordinary
         // export publishes them through its provider table; other units must
         // import that provider, never resolve the live process-global spelling.
@@ -3092,9 +3073,7 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    // Direct entry-unit IDs, exactly as on main and as the strict entry returns.
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
-        .map(|(ids, _)| ids)
+    elaborate_module_from_roots_v1_inner(elab, roots, entry).map(|(ids, _)| ids)
 }
 
 /// Elaborate a roots-loaded unit and return the V1 results of its whole
@@ -3105,45 +3084,38 @@ pub fn elaborate_module_from_roots_v1(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
-        .map(|(_, results)| results)
+    elaborate_module_from_roots_v1_inner(elab, roots, entry).map(|(_, results)| results)
 }
 
-/// Strict roots entry returning the checked V1 results of the whole closure.
+/// Alias returning the checked V1 results of the whole closure.
 pub fn elaborate_module_from_roots_strict_v1(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
-        .map(|(_, results)| results)
+    elaborate_module_from_roots_v1(elab, roots, entry)
 }
 
-/// Strict roots entry returning only the direct entry-unit identities.
+/// Alias returning only the direct entry-unit identities.
 pub fn elaborate_module_from_roots_strict(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
-        .map(|(ids, _)| ids)
+    elaborate_module_from_roots(elab, roots, entry)
 }
 
-/// Configure the one N2 catalog root for an ordinary in-memory source or a
-/// file-backed roots entry. The roots cache and its resolution mode are one
-/// run-wide selection; a repeated equal setting is harmless, a changed
-/// setting cannot reinterpret already checked imports.
-fn set_catalog_roots_for_mode_v1(
+/// Select the one N2 catalog root for this run. Only the isolated-source
+/// route may select none; a roots entry and set_catalog_roots_v1 need
+/// exactly one. A changed selection cannot reinterpret checked imports.
+fn select_catalog_roots_v1(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
-    mode: ResolutionMode,
-    allow_rootless_strict: bool,
+    allow_empty: bool,
 ) -> Result<(), ElabError> {
-    if mode == ResolutionMode::Strict {
-        require_fixed_proved_identity(&elab.env, &elab.globals)?;
-        require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
-    }
-    if roots.len() != 1 && !(allow_rootless_strict && roots.is_empty()) {
+    require_fixed_proved_identity(&elab.env, &elab.globals)?;
+    require_pre_source_floor_identities(&elab.module_state, &elab.globals)?;
+    if roots.len() != 1 && !(allow_empty && roots.is_empty()) {
         return Err(ElabError::ParseError {
             msg: format!(
                 "N2 requires exactly one populated catalog root, found {}",
@@ -3152,20 +3124,14 @@ fn set_catalog_roots_for_mode_v1(
             span: Span::zero(),
         });
     }
-    if elab.module_state.catalog_roots.is_empty()
-        && elab.module_state.roots_resolution_mode.is_none()
-    {
+    if !elab.module_state.catalog_roots_selected {
         elab.module_state.catalog_roots = roots.to_vec();
-        elab.module_state.roots_resolution_mode = Some(mode);
+        elab.module_state.catalog_roots_selected = true;
     } else if elab.module_state.catalog_roots != roots {
         return Err(ElabError::ParseError {
             msg: "catalog roots cannot change during one elaboration run".to_string(),
             span: Span::zero(),
         });
-    } else if elab.module_state.roots_resolution_mode != Some(mode) {
-        return Err(ElabError::Internal(
-            "roots resolution mode cannot change during one elaboration run".to_string(),
-        ));
     }
     Ok(())
 }
@@ -3173,21 +3139,18 @@ fn set_catalog_roots_for_mode_v1(
 /// Set catalog roots for ordinary `elaborate_file_v1` and
 /// `elaborate_decl_v1` calls without selecting the isolated-source route.
 /// An empty selection is rejected; an env with no selected roots keeps its
-/// existing import refusal. The current mode is preserved, including Legacy until
-/// the I4 deletion.
+/// existing import refusal.
 pub fn set_catalog_roots_v1(elab: &mut ElabEnv, roots: &[PathBuf]) -> Result<(), ElabError> {
-    let mode = elab.module_state.root_scope.mode;
-    set_catalog_roots_for_mode_v1(elab, roots, mode, false)
+    select_catalog_roots_v1(elab, roots, false)
 }
 
-fn elaborate_module_from_roots_with_mode_v1(
+fn elaborate_module_from_roots_v1_inner(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
     entry: &str,
-    mode: ResolutionMode,
 ) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
-    set_catalog_roots_for_mode_v1(elab, roots, mode, false)?;
-    load_unit(elab, entry, &Span::zero(), mode)
+    select_catalog_roots_v1(elab, roots, false)?;
+    load_unit(elab, entry, &Span::zero())
 }
 
 /// Prepare one in-memory root and its explicit catalog imports for Strict.
@@ -3210,14 +3173,7 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
             span: Span::zero(),
         });
     }
-    if elab.module_state.roots_resolution_mode == Some(ResolutionMode::Legacy)
-        || elab.module_state.legacy_in_memory_source_started
-    {
-        return Err(ElabError::Internal(
-            "resolution mode cannot change during one elaboration run".to_string(),
-        ));
-    }
-    if elab.module_state.roots_resolution_mode.is_some()
+    if elab.module_state.catalog_roots_selected
         && elab.module_state.catalog_roots != roots
     {
         return Err(ElabError::ParseError {
@@ -3245,26 +3201,21 @@ pub(crate) fn prepare_isolated_strict_scope_v1(
             });
         }
     }
-    set_catalog_roots_for_mode_v1(elab, roots, ResolutionMode::Strict, true)?;
+    select_catalog_roots_v1(elab, roots, true)?;
     for (dependency, owner, span) in imports {
         if declared_inline_import(&owner, None, &dependency, &local_modules).is_none() {
-            load_unit(elab, &dependency, &span, ResolutionMode::Strict)?;
+            load_unit(elab, &dependency, &span)?;
         }
     }
-    // Each Strict isolated source is its own unit (33 §3.3): it starts from
-    // a fresh scope and never inherits another source's imports or locals.
-    let mut scope = Scope::with_mode(
-        ResolutionMode::Strict,
-        elab.module_state.strict_builtin_names.clone(),
-    );
-    scope.private_ids.clone_from(&elab.module_state.private_ids);
-    elab.module_state.root_scope = scope;
+    // Each isolated source is its own unit (33 §3.3): it starts from a fresh
+    // scope and never inherits another source's imports or locals.
+    elab.module_state.root_scope = elab.module_state.fresh_root_scope();
     Ok(())
 }
 
 /// Strict entry for an isolated source. Unlike the file-unit entry, the
 /// source itself is an in-memory root; only explicit imports load catalog
-/// units. The legacy standalone entries remain unchanged.
+/// units. All entries use the same source-resolution rule.
 pub fn elaborate_isolated_strict_v1(
     elab: &mut ElabEnv,
     src: &str,
@@ -3613,6 +3564,18 @@ fn rexpr_kernel_head(expr: &RExpr) -> Option<&'static str> {
         (crate::resolve::SUGAR_ELIM_TRUNC, n) if n >= 3 => Some(crate::resolve::SUGAR_ELIM_TRUNC),
         _ => None,
     }
+}
+
+pub(crate) fn qualify_standalone_rexpr(
+    state: &ModuleState,
+    rexpr: RExpr,
+) -> Result<RExpr, ElabError> {
+    // A standalone expression resolves as a root declaration body does:
+    // with the floor families and constructor members installed by expand_scope.
+    let mut scope = state.root_scope.clone();
+    scope.floor_type_ids.clone_from(&state.prelude_floor_ids);
+    scope.constructor_members.extend(state.constructor_members.clone());
+    rewrite_rexpr(&scope, &state.exports, rexpr)
 }
 
 fn rewrite_rexpr(
@@ -5237,7 +5200,7 @@ fn resolve_raw_scoped_decl(
         decl,
         unit_definitions,
         attached_name.as_deref(),
-        (scope.mode == ResolutionMode::Strict).then(|| std::rc::Rc::new(binder_names.clone())),
+        Some(std::rc::Rc::new(binder_names.clone())),
     )
 }
 
@@ -5518,7 +5481,6 @@ fn reject_decl_prelude_bindings(
     decl: &Decl,
     prefix: &str,
     prelude_binding_names: &HashSet<String>,
-    mode: ResolutionMode,
 ) -> Result<(), ElabError> {
     let reject = |bare: &str, span: &Span| {
         reject_prelude_binding(bare, &qualify(prefix, bare), span, prelude_binding_names)
@@ -5527,10 +5489,8 @@ fn reject_decl_prelude_bindings(
         DeclNamespaceEffect::TopLevelName { name, span } => reject(name, span),
         DeclNamespaceEffect::LawDerivedNames { law, fields, span } => {
             reject(law, span)?;
-            if mode == ResolutionMode::Strict {
-                for (field, _) in fields {
-                    reject(&format!("{law}_{field}"), span)?;
-                }
+            for (field, _) in fields {
+                reject(&format!("{law}_{field}"), span)?;
             }
             Ok(())
         }
@@ -5616,7 +5576,7 @@ fn prebind_scope_declarations(
     // or elaborating any declaration so refusal cannot allocate or replace a
     // canonical global.
     for decl in decls {
-        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names, scope.mode)?;
+        reject_decl_prelude_bindings(decl, prefix, prelude_binding_names)?;
     }
 
     // Collect locals before imports so collisions are source-order independent.
@@ -6173,15 +6133,13 @@ fn expand_scope(
                 let child_prefix = qualify(prefix, name);
                 elab.module_state
                     .require_module_path_available(&child_prefix, unit_owner, span)?;
-                let mut child_scope = Scope::with_mode(scope.mode, scope.kernel_names.clone());
+                let mut child_scope = Scope::with_kernel_names(scope.kernel_names.clone());
                 child_scope.private_ids.clone_from(&scope.private_ids);
-                if scope.mode == ResolutionMode::Strict {
-                    child_scope.enclosing =
-                        Some(scope.snapshot_enclosing(&elab.module_state.exports)?);
-                    child_scope
-                        .prop_intro_members
-                        .clone_from(&scope.prop_intro_members);
-                }
+                child_scope.enclosing =
+                    Some(scope.snapshot_enclosing(&elab.module_state.exports)?);
+                child_scope
+                    .prop_intro_members
+                    .clone_from(&scope.prop_intro_members);
                 let (child_ids, child_exports) = expand_scope(
                     elab,
                     inner,
@@ -6343,8 +6301,7 @@ fn expand_scope(
                     cells,
                     operations,
                     span,
-                    (scope.mode == ResolutionMode::Strict)
-                        .then(|| std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
+                    Some(std::rc::Rc::new(elab.module_state.prelude_binding_names.clone())),
                 )?;
                 let mut declared = vec![DeclaredIdentity {
                     key: resolved.name.clone(),
@@ -7089,11 +7046,11 @@ pub fn expand_and_elaborate(
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     let boundary = admission_boundary(decls)?;
-    // A failed file can leave an earlier declaration admitted without ever
-    // committing its in-memory unit counter. An empty file can commit a unit
-    // without declaring anything. Lock the mode at entry for both cases.
-    if elab.module_state.root_scope.mode == ResolutionMode::Legacy {
-        elab.module_state.legacy_in_memory_source_started = true;
+    // Compiler pre-source registration is the I row of spec 30 §4: its
+    // sources name compiler-declared identities, all of which exist before
+    // any package source can add a spelling. Admit exactly those.
+    if elab.module_state.pre_source_open {
+        elab.module_state.root_scope.kernel_names = elab.globals.keys().cloned().collect();
     }
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
@@ -7103,18 +7060,13 @@ pub fn expand_and_elaborate(
     };
     precheck_module_paths(&elab.module_state, decls, "", &owner)?;
     // Ordinary roots use the same file-unit dependency loader as the catalog
-    // entry and isolated-source routes, under the mode the roots were selected
-    // with. A declared inline sibling stays on the ordered pass (including its
+    // entry and isolated-source routes. A declared inline sibling stays on
+    // the ordered pass (including its
     // premature-import refusal). A path already owned by an earlier in-memory
     // unit of this env resolves through the ordered pass, as with no roots;
     // it is never reloaded from a file. With no roots the existing
     // absent-provider refusal is unchanged.
     if !elab.module_state.catalog_roots.is_empty() && elab.module_state.active_imports.is_empty() {
-        let Some(mode) = elab.module_state.roots_resolution_mode else {
-            return Err(ElabError::Internal(
-                "catalog roots are selected without a resolution mode".to_string(),
-            ));
-        };
         let mut imports = Vec::new();
         imported_module_paths(decls, "", &mut imports);
         for (dependency, import_owner, span) in imports {
@@ -7127,7 +7079,7 @@ pub fn expand_and_elaborate(
             ) {
                 continue;
             }
-            load_unit(elab, &dependency, &span, mode)?;
+            load_unit(elab, &dependency, &span)?;
         }
     }
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
@@ -7214,7 +7166,7 @@ pub fn expand_and_elaborate(
 mod inline_enclosing_identity_tests {
     use std::collections::{HashMap, HashSet};
 
-    use super::{resolve_checked_ref, select_in_scope_export, ResolutionMode, Scope};
+    use super::{resolve_checked_ref, select_in_scope_export, Scope};
     use crate::ast::ImportItem;
     use crate::error::Span;
     use crate::ElabEnv;
@@ -7234,7 +7186,7 @@ mod inline_enclosing_identity_tests {
         let ord = env.globals["Ord"];
         let decoy = env.globals["Decoy"];
         assert_ne!(ord, decoy);
-        let mut child = Scope::with_mode(ResolutionMode::Strict, HashSet::new());
+        let mut child = Scope::with_kernel_names(HashSet::new());
         child.enclosing = Some(
             env.module_state
                 .root_scope
@@ -7306,8 +7258,8 @@ mod namespace_effect_tests {
     /// checked dictionary ID at the root and through same-file child replay.
     /// CLAIMED: S3 prebind and S5 ordered admission agree on that checked
     /// identity, without global-resolving a binder.
-    /// THE GAP: a missing-class UnboundName at the class span cannot be green
-    /// under Legacy (it gives UnresolvedCon); that negative is held to I4.
+    /// THE GAP: the direct-declaration missing-class refusal is checked by
+    /// `generic_instance_missing_class_refuses_in_declaration_entry`.
     #[test]
     fn generic_instance_head_binder_has_checked_identity_after_child_replay() {
         let mut root = ElabEnv::new().expect("prelude");
@@ -7338,6 +7290,28 @@ mod namespace_effect_tests {
             .instances_by_id
             .values()
             .any(|info| info.instance_id == child_id));
+    }
+
+    /// Promise class: durable invariant (33 §5.3, 39 §6).
+    /// MEASURED: the direct declaration entry refuses an absent generic
+    /// instance class as UnboundName naming the class, where Legacy gave
+    /// UnresolvedCon. The refusal currently spans the whole declaration.
+    /// CLAIMED: a missing class has no ambient fallback on this entry.
+    /// THE GAP: InstanceDecl carries no class-token span, so the pinned 0..37
+    /// is current behaviour, not a localization promise. Pointing at the class
+    /// head is a follow-on AST change (a name span, as LetBinding.name_span
+    /// does), which updates this pin deliberately.
+    #[test]
+    fn generic_instance_missing_class_refuses_in_declaration_entry() {
+        const SOURCE: &str = "instance MissingFlag a { tag = True }";
+        let mut env = ElabEnv::new().expect("checked prelude");
+        match env.elaborate_decl_v1(SOURCE) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "MissingFlag");
+                assert_eq!((span.start, span.end), (0, SOURCE.len()));
+            }
+            other => panic!("missing class must refuse as UnboundName: {other:?}"),
+        }
     }
 
     /// Promise class: durable owner-scope isolation invariant (33 §3.3/§4).
@@ -7488,7 +7462,7 @@ mod namespace_effect_tests {
     ///
     /// MEASURED: bare Proved declarations at roots, under public inline
     /// modules, and as data constructors collide with the installed binding
-    /// before the kernel allocates an id, in both legacy and strict units.
+    /// before the kernel allocates an id, through file and roots entries.
     /// CLAIMED: source declarations cannot replace the fixed tt introduction.
     /// THE GAP: public-map mutation bypasses source prebinding and is checked
     /// independently by the strict-entry control below.
@@ -7497,13 +7471,13 @@ mod namespace_effect_tests {
         let mut baseline = ElabEnv::new().expect("base environment");
         let expected_next = baseline.env.fresh_id();
         for (label, source, strict) in [
-            ("bare-legacy", "const Proved : Nat = Zero", false),
+            ("bare-file", "const Proved : Nat = Zero", false),
             (
-                "nested-public-legacy",
+                "nested-public-file",
                 "module M { pub const Proved : Nat = Zero }",
                 false,
             ),
-            ("constructor-legacy", "data Token = Proved", false),
+            ("constructor-file", "data Token = Proved", false),
             ("bare-strict", "const Proved : Nat = Zero", true),
             (
                 "nested-public-strict",
@@ -7534,24 +7508,11 @@ mod namespace_effect_tests {
             assert_eq!(env.env.fresh_id(), expected_next, "{label}: allocated id");
         }
 
-        let mut lexical = ElabEnv::new().expect("base environment");
-        assert_eq!(
-            lexical.module_state.root_scope.mode,
-            super::ResolutionMode::Legacy
-        );
-        lexical
-            .elaborate_file("fn keep (Proved : Nat) : Nat = Zero")
-            .expect("Legacy local binder remains accepted");
-        assert_eq!(
-            lexical.module_state.root_scope.mode,
-            super::ResolutionMode::Legacy
-        );
-        assert_eq!(lexical.globals["Proved"], lexical.env.tt_id());
     }
 
     /// Promise class: durable invariant (spec 33, Strict built-in binders).
-    /// The same lexical Proved source checks under Legacy above, but is refused
-    /// by Strict at its parameter Binder span. A non-B rename remains lawful.
+    /// A lexical Proved binder refuses at its parameter span, while a
+    /// non-floor rename remains lawful.
     #[test]
     fn strict_local_proved_refuses_and_localproved_renames_lawfully() {
         let source = "fn keep (Proved : Nat) : Nat = Zero";
@@ -10961,13 +10922,14 @@ mod reused_env_identity_scrub_tests;
 mod strict_catalog_home_tests {
     use super::*;
 
+
     /// Promise class: durable invariant. MEASURED: each malformed candidate
     /// reaches its own identity, family, owner, or subject gate. CLAIMED: a
     /// malformed home cannot confer an unrelated checked identity. THE GAP:
     /// the pre-source environment has no non-transparent non-family witness;
     /// that error arm has no live bootstrap example on this base.
     /// Promise class: normative compatibility vector. MEASURED: the new
-    /// specific floor spelling and Legacy bare spelling share the immutable
+    /// specific floor spelling and pre-source bare spelling share the immutable
     /// bind ID, while the pre-source stable-name snapshot still says `bind`
     /// and the trusted-base set equals its captured pre-source set. CLAIMED:
     /// the alias changes source availability, not kernel identity or trust.
@@ -10977,7 +10939,7 @@ mod strict_catalog_home_tests {
     fn itree_bind_alias_keeps_the_pre_source_symbol_and_trust() {
         let env = ElabEnv::new().expect("checked pre-source environment");
         let id = env.prelude_env.bind_id;
-        assert_eq!(env.globals["bind"], id, "Legacy original spelling");
+        assert_eq!(env.globals["bind"], id, "pre-source original spelling");
         assert_eq!(env.globals["itree_bind"], id, "specific floor alias");
         assert_eq!(env.prelude_env.pre_source_names.get(&id).and_then(|name| name.as_deref()), Some("bind"));
         let trust: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
@@ -11069,18 +11031,16 @@ mod strict_catalog_home_tests {
             .contains("incomplete checked constructor set"));
     }
 
-    /// Promise class: durable invariant. MEASURED: the Legacy resolver keeps
-    /// every bare home spelling, and its global target remains the pre-source
-    /// checked ID. CLAIMED: adding the Strict homes does not change bare
-    /// Legacy meanings. THE GAP: a separate client elaborates a family and a
-    /// transparent definition to pin their checked terms, not every arity.
+    /// Promise class: durable invariant. MEASURED: every bare home spelling
+    /// keeps its pre-source checked ID in globals, and the fresh root scope
+    /// refuses it unless the captured compiler vocabulary admits it.
+    /// CLAIMED: a home grants its identity only through an import. THE GAP:
+    /// real_homes_publish_their_pre_source_identities is the import positive.
     #[test]
-    fn legacy_bare_home_names_retain_the_pre_source_ids() {
+    fn bare_home_names_keep_pre_source_ids_and_refuse_without_import() {
         let env = ElabEnv::new().expect("pre-source environment");
-        let scope = Scope::with_mode(
-            ResolutionMode::Legacy,
-            env.module_state.strict_builtin_names.clone(),
-        );
+        let scope = env.module_state.fresh_root_scope();
+        let mut refused = 0;
         for &(home, name) in &PRELUDE_PACKAGE_HOMES {
             let id = env
                 .module_state
@@ -11090,13 +11050,25 @@ mod strict_catalog_home_tests {
                 .map(|(_, id)| *id)
                 .expect("captured home ID");
             assert_eq!(env.globals.get(name), Some(&id), "{home}.{name}");
-            if !name.contains("::") {
-                let resolved = resolve_ref(&scope, &HashMap::new(), name, &Span::zero())
-                    .expect("Legacy bare name");
-                assert_eq!(resolved, name, "{home}.{name}");
-                assert_eq!(env.globals.get(&resolved), Some(&id));
+            if name.contains("::") {
+                continue;
+            }
+            match resolve_ref(&scope, &HashMap::new(), name, &Span::zero()) {
+                Err(ElabError::UnboundName { name: rejected, .. }) => {
+                    assert_eq!(rejected, name, "{home}.{name}");
+                    refused += 1;
+                }
+                Ok(resolved) => assert!(
+                    resolved == name
+                        && (is_prelude_floor_name(name)
+                            || scope.kernel_names.contains(name)
+                            || is_unshadowable_kernel_name(name)),
+                    "{home}.{name} resolved without import: {resolved}"
+                ),
+                Err(other) => panic!("{home}.{name}: {other:?}"),
             }
         }
+        assert!(refused > 0, "the refusal arm must be exercised");
     }
 
     /// Promise class: durable invariant. MEASURED: capture's exact checked

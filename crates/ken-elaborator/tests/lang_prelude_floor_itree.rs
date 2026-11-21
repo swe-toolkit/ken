@@ -7,7 +7,7 @@ use std::fs;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
-const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
+const MODES: [&str; 3] = ["strict-roots", "default-roots", "file"];
 const RET_SOURCE: &str = "fn responses (op : Nat) : Type = Unit\n\
      const witness : ITree Nat responses Nat = \
      ITree.Ret Nat responses Nat Zero";
@@ -18,7 +18,7 @@ const VIS_SOURCE: &str = "fn responses (op : Nat) : Type = Unit\n\
 
 fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
     match mode {
-        "strict-roots" | "legacy-roots" => {
+        "strict-roots" | "default-roots" => {
             let root = tempfile::tempdir().expect("ITree floor fixture directory");
             fs::write(root.path().join("Entry.ken"), source).expect("ITree floor fixture");
             if mode == "strict-roots" {
@@ -27,7 +27,7 @@ fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), Ela
                 env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
             }
         }
-        "legacy-file" => {
+        "file" => {
             env.elaborate_file_v1(source)?;
         }
         other => panic!("unknown mode: {other}"),
@@ -82,7 +82,7 @@ fn itree_floor_resolves_checked_type_and_qualified_constructors() {
         for (source, constructor) in [(RET_SOURCE, "ITree.Ret"), (VIS_SOURCE, "ITree.Vis")] {
             let env = elaborate(source, mode)
                 .unwrap_or_else(|failure| panic!("{mode} {constructor}: {failure:?}"));
-            let witness = if mode == "legacy-file" {
+            let witness = if mode == "file" {
                 "witness"
             } else {
                 "Entry.witness"
@@ -121,17 +121,10 @@ fn assert_bare_refuses(mode: &str, name: &str, qualified_source: &str) {
         Ok(_) => panic!("{mode} bare {name}: unexpectedly accepted"),
         Err(failure) => failure,
     };
-    if mode == "strict-roots" {
-        assert!(
-            matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
-            "{mode} bare {name}: {failure:?}"
-        );
-    } else {
-        assert!(
-            matches!(failure, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
-            "{mode} bare {name}: {failure:?}"
-        );
-    }
+    assert!(
+        matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
+        "{mode} bare {name}: {failure:?}"
+    );
 }
 
 #[test]
@@ -145,23 +138,23 @@ fn bare_vis_refuses_in_strict_roots() {
 }
 
 #[test]
-fn bare_ret_refuses_in_legacy_roots() {
-    assert_bare_refuses("legacy-roots", "Ret", RET_SOURCE);
+fn bare_ret_refuses_in_default_roots() {
+    assert_bare_refuses("default-roots", "Ret", RET_SOURCE);
 }
 
 #[test]
-fn bare_vis_refuses_in_legacy_roots() {
-    assert_bare_refuses("legacy-roots", "Vis", VIS_SOURCE);
+fn bare_vis_refuses_in_default_roots() {
+    assert_bare_refuses("default-roots", "Vis", VIS_SOURCE);
 }
 
 #[test]
-fn bare_ret_refuses_in_legacy_file() {
-    assert_bare_refuses("legacy-file", "Ret", RET_SOURCE);
+fn bare_ret_refuses_in_file_entry() {
+    assert_bare_refuses("file", "Ret", RET_SOURCE);
 }
 
 #[test]
-fn bare_vis_refuses_in_legacy_file() {
-    assert_bare_refuses("legacy-file", "Vis", VIS_SOURCE);
+fn bare_vis_refuses_in_file_entry() {
+    assert_bare_refuses("file", "Vis", VIS_SOURCE);
 }
 
 /// Promise class: durable invariant. MEASURED: no bare global alias survives,

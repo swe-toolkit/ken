@@ -2,7 +2,7 @@
 //! Contract: LANG-STRICT-ISOLATED-ROUTES AC-2b-a–c; 33 §3.3 and 38 §1.9, §1.11.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::literate::extract_ken_md;
@@ -196,34 +196,9 @@ fn later_child_homes_require_import_without_leaking_the_plan_constructor() {
     }
 }
 
-fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).expect("enumerate isolated sources") {
-        let path = entry.expect("source entry").path();
-        if path.is_dir() {
-            collect_sources(&path, out);
-        } else if path.to_string_lossy().ends_with(".ken")
-            || path.to_string_lossy().ends_with(".ken.md")
-        {
-            out.push(path);
-        }
-    }
-}
-
-fn has_remainder_token(source: &str) -> bool {
-    let Ok(tokens) = Lexer::lex(source) else {
-        return false;
-    };
-    tokens.into_iter().any(|(token, _)| match token {
-        Token::Ident(name) | Token::ConId(name) => {
-            MAPPING.contains(&name.as_str()) || CHILD.contains(&name.as_str())
-        }
-        _ => false,
-    })
-}
-
 fn with_home_imports(source: &str, code: &str, literate: bool) -> String {
     let used = Lexer::lex(code)
-        .expect("Legacy-clean source must lex")
+        .expect("frozen isolated source must lex")
         .into_iter()
         .filter_map(|(token, _)| match token {
             Token::Ident(name) | Token::ConId(name) => Some(name),
@@ -255,38 +230,34 @@ fn with_home_imports(source: &str, code: &str, literate: bool) -> String {
 }
 
 /// Promise class: transition sentinel for the 3a vocabulary / 3b route split.
-/// Eight isolated files using D0's remainder vocabulary still check under
-/// Legacy and now check under Strict with ephemeral checked-home imports.
-/// rnspk_v_argv_stdout_null.ken (RNSPK): Legacy-clean, Strict-clean with
-/// checked-home imports.
-/// Increment 3a rewrote the preceding seven's compiler-internal FSOp/bind use;
-/// RNSPK migrated the eighth. Neither switched real entry routes or persisted
-/// imports in unrooted sources.
+/// Eight isolated files measured through the parent's Legacy classification
+/// check through the single scoped route with ephemeral checked-home imports.
+/// The frozen paths are checked for existence before their checker outcomes.
 /// Lexical selection ignores comments, literals, and literate prose; the
 /// assertions concern checker outcomes, not source-text occurrence counts.
 #[test]
-fn eight_legacy_clean_remainder_sources_have_measured_strict_frontier() {
+fn eight_isolated_remainder_sources_have_measured_strict_frontier() {
+    const FROZEN: [&str; 8] = [
+        "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed.ken",
+        "crates/ken-cli/tests/fixtures/abi_s6_mapping_file_backed_cow.ken",
+        "crates/ken-cli/tests/fixtures/px10_argv_env_pipe.ken",
+        "crates/ken-cli/tests/fixtures/px10_child_wait_smoke.ken",
+        "crates/ken-cli/tests/fixtures/px10_live_child.ken",
+        "crates/ken-cli/tests/fixtures/rnspk_v_argv_stdout_null.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_transport_file_backed.ken",
+        "crates/ken-elaborator/tests/fixtures/rt_bracket_transport_mapping.ken",
+    ];
     let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .expect("repository root");
-    let mut files = Vec::new();
-    for tree in ["examples", "conformance", "crates"] {
-        collect_sources(&repo.join(tree), &mut files);
-    }
-    files.retain(|path| {
-        !path.components().any(|part| part.as_os_str() == "catalog")
-            && (!path.components().any(|part| part.as_os_str() == "crates")
-                || path.components().any(|part| part.as_os_str() == "tests"))
-    });
-    files.sort();
-    let mut remainder_sources = 0;
-    let mut legacy_clean = 0;
     let mut strict_clean = 0;
     let mut strict_unbound = 0;
-    for path in files {
+    for relative in FROZEN {
+        let path = repo.join(relative);
+        assert!(path.is_file(), "frozen source missing: {}", path.display());
         let source = std::fs::read_to_string(&path).expect("read isolated source");
-        let literate = path.to_string_lossy().ends_with(".ken.md");
+        let literate = relative.ends_with(".ken.md");
         let code = if literate {
             extract_ken_md(&source)
                 .expect("extract literate source")
@@ -294,24 +265,6 @@ fn eight_legacy_clean_remainder_sources_have_measured_strict_frontier() {
         } else {
             source.clone()
         };
-        if !has_remainder_token(&code) {
-            continue;
-        }
-        remainder_sources += 1;
-        let legacy_source = source
-            .split_inclusive('\n')
-            .filter(|line| !line.starts_with("import "))
-            .collect::<String>();
-        let mut legacy = ElabEnv::new().expect("checked prelude");
-        let checked = if literate {
-            legacy.elaborate_ken_md_file_v1(&legacy_source)
-        } else {
-            legacy.elaborate_file_v1(&legacy_source)
-        };
-        if checked.is_err() {
-            continue;
-        }
-        legacy_clean += 1;
         let imported = with_home_imports(&source, &code, literate);
         let mut strict = ElabEnv::new().expect("checked prelude");
         let result = if literate {
@@ -341,9 +294,7 @@ fn eight_legacy_clean_remainder_sources_have_measured_strict_frontier() {
         }
     }
     eprintln!(
-        "isolated remainder sources={remainder_sources} legacy_clean={legacy_clean} \
-         strict_clean={strict_clean} strict_unbound={strict_unbound}"
+        "frozen isolated sources=8 strict_clean={strict_clean} strict_unbound={strict_unbound}"
     );
-    assert_eq!(legacy_clean, 8);
     assert_eq!((strict_clean, strict_unbound), (8, 0));
 }

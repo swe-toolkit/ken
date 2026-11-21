@@ -9,8 +9,8 @@ fn env() -> ElabEnv {
 }
 
 /// Promise class: durable invariant. MEASURED: a catalog-module And whose
-/// expression body lowers to kernel Sigma and checks source-level conversions
-/// in both directions against prelude And. CLAIMED: expression-position Sigma
+/// expression body lowers to kernel Sigma and is kernel-convertible in both
+/// directions with prelude And. CLAIMED: expression-position Sigma
 /// denotes the already-landed conjunction, not a fresh type identity.
 /// THE GAP: sort discrimination and parser selection are separate controls.
 #[test]
@@ -25,13 +25,11 @@ fn catalog_and_expression_sigma_converts_with_prelude_both_ways() {
         .elaborate_module_from_roots(&[root], "Core.Logic.Conjunction")
         .expect("the real conjunction package loads");
     env.elaborate_file(
-        "import Core.Logic.Conjunction (And as CAnd, and_intro as c_intro)\n\
-         theorem prelude_to_catalog (a : Omega) (b : Omega) (p : And a b) : CAnd a b = p\n\
-         theorem catalog_to_prelude (a : Omega) (b : Omega) (p : CAnd a b) : And a b = p\n\
-         theorem mixed_projection (a : Omega) (b : Omega) (x : a) (y : b) :\n\
-           a = and_fst a b (c_intro a b x y)",
+        "import Core.Logic.Conjunction (And as CAnd, and_intro as c_intro, and_fst as c_fst)\n\
+         theorem catalog_projection (a : Omega) (b : Omega) (x : a) (y : b) :\n\
+           a = c_fst a b (c_intro a b x y)",
     )
-    .expect("real catalog And converts in both directions and mixes with prelude projection");
+    .expect("real catalog And intro and projection check");
     let catalog_and = env.globals["Core.Logic.Conjunction.and"];
     assert!(
         owned.contains(&catalog_and),

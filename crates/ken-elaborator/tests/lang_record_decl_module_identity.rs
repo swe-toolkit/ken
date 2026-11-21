@@ -9,7 +9,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 #[derive(Clone, Copy, Debug)]
 enum Mode {
     StrictRoots,
-    LegacyRoots,
+    DefaultRoots,
     DirectAfterRoots,
     DirectInline,
 }
@@ -17,7 +17,7 @@ enum Mode {
 impl Mode {
     const ALL: [Self; 4] = [
         Self::StrictRoots,
-        Self::LegacyRoots,
+        Self::DefaultRoots,
         Self::DirectAfterRoots,
         Self::DirectInline,
     ];
@@ -31,7 +31,7 @@ impl Mode {
         let roots = [root.path().to_path_buf()];
         let mut env = ElabEnv::new().expect("base environment");
         let ids = match self {
-            Self::StrictRoots | Self::LegacyRoots => {
+            Self::StrictRoots | Self::DefaultRoots => {
                 fs::write(root.path().join("Client.ken"), client).expect("write client source");
                 if matches!(self, Self::StrictRoots) {
                     env.elaborate_module_from_roots_strict(&roots, "Client")?
@@ -76,16 +76,10 @@ fn refused(mode: Mode, providers: &[(&str, &str)], client: &str) -> ElabError {
 }
 
 fn assert_unselected(error: ElabError, mode: Mode, spelling: &str) {
-    match mode {
-        Mode::StrictRoots => assert!(
-            matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
-            "{mode:?} must refuse {spelling} at scope: {error:?}"
-        ),
-        Mode::LegacyRoots | Mode::DirectAfterRoots | Mode::DirectInline => assert!(
-            matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == spelling),
-            "{mode:?} must refuse {spelling} like unselected data: {error:?}"
-        ),
-    }
+    assert!(
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == spelling),
+        "{mode:?} must refuse {spelling} at scope: {error:?}"
+    );
 }
 
 /// MEASURED: a selected public record elaborates a typed projection, literal,

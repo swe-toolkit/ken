@@ -273,11 +273,10 @@ effect labels or definitions authored in `Exit.ken.md`. The
 compiler-internal `FSOp`, `AmbientOp` and `host_exit` names are not
 made source APIs by these exports. Independently, §30 §4 admits the
 checked generic ITree sequencer under the specific floor spelling
-`itree_bind`, while Legacy keeps bare `bind` at that same identity;
-these HostIO exports imply no generic `ret` source promise. This
-admission changes neither the `main` type above nor any CLI resolution
-route: an isolated route still uses Legacy until its separate strict
-flip.
+`itree_bind`; bare `bind` is not reserved or admitted as a compiler
+alias. A user may declare it under the ordinary non-B rules. These
+HostIO exports imply no generic `ret` source promise and change neither
+the `main` type above nor the resolution rule for any source entry.
 
 Neither header takes a name token. The file path is the single identity of the
 program or package boundary; a spelling such as `program App` or `package Lib`
@@ -304,17 +303,22 @@ is a **surface error** (`24`) — it never reaches the kernel:
   lookup order, capitalization, nor an identical target ID breaks the tie.
   Qualified and aliased module imports otherwise preserve the imported
   declaration's identity. Selectively imported or renamed names do too.
-- **Strict roots resolution.** `elaborate_module_from_roots_strict`
-  resolves each unit's names through lexical locals, explicit imports,
-  kernel/built-in vocabulary, or the closed prelude of `30-taxonomy §4`.
-  This is the complete scope: no lookup in an implementation-global table
-  makes another spelling visible. A loaded dependency is not implicitly
-  imported and units do not inherit each other's imports. The five package
-  identities `IO`, `write`, `print_line`, `charToInt`, and `leqChar` need
-  explicit public imports from `Capability.Console.Text` and
-  `Core.Classes.LawfulClasses` as appropriate. Each such import resolves
-  to the exact pre-source `GlobalId`; without it, an unimported bare use
-  raises `UnboundName` in Strict roots.
+- **One source-resolution rule.** Every source entry—roots-loaded unit,
+  in-memory file, declaration, REPL, isolated file, and standalone
+  expression—resolves a bare name through its scope bindings, its lexical
+  enclosing chain, and the closed compiler vocabulary captured at the
+  pre-source boundary (`30-taxonomy §4`). Otherwise it raises
+  `UnboundName`: a spelling's presence in the implementation-global table
+  alone does not make it visible. A loaded dependency is not implicitly
+  imported and units do not inherit each other's imports. The roots-loaded
+  entries and their `_strict` aliases apply this same rule. Each of `IO`,
+  `write`, `print_line`, `charToInt`, and `leqChar` needs an explicit public
+  import from `Capability.Console.Text` or `Core.Classes.LawfulClasses`;
+  that import preserves its exact pre-source `GlobalId`. An unimported bare
+  use raises `UnboundName`. On a rootless file, isolated or driver entry,
+  an external import raises `UnboundName` at the **module path in that
+  import**, not at a later use of an exported name. The roots-loaded
+  entry itself requires one populated catalog root (`39 §2`).
   In an inline child module, a child-scope local or import shadows an
   inherited enclosing local with the same non-B spelling within that child
   without altering the enclosing scope, while same-spelled local/import
@@ -328,10 +332,16 @@ is a **surface error** (`24`) — it never reaches the kernel:
   position among that scope's declarations and inline child modules: a
   matching unqualified use in that scope or an inline descendant, before
   or after the import, cannot select the farther enclosing local.
-- **Checked package homes for the Strict catalog route.** The four catalog
-  units below that otherwise fail at resolution under Strict roots have the
-  following explicit-import homes for their already-checked pre-source
-  declarations. Each listed binding retains its exact pre-source
+  A checked `ken example` or `ken reject` fence in a literate module
+  elaborates in that module's completed scope. A fence's own imports use
+  the selected catalog roots just like the module's imports, including a
+  provider outside the tangled module's dependency closure: that provider
+  is then loaded and checked as part of the module's checked closure. A
+  `ken reject` fence witnesses a language refusal, not an accident of
+  which modules were already loaded when the fence ran.
+- **Checked package homes for the catalog route.** The four catalog units
+  below have the following explicit-import homes for their already-checked
+  pre-source declarations. Each listed binding retains its exact pre-source
   `GlobalId`; a home does not copy a definition, mint another identity,
   or place a name in the closed prelude floor or protected set B.
   The owning unit publishes only its intended names with ordinary
@@ -341,7 +351,7 @@ is a **surface error** (`24`) — it never reaches the kernel:
 
   - `Capability.Filesystem.Authority` homes `FS`, `read_bytes`, and
     `write_file`. Its checked FS clients use these identities through
-    this unit, not through a second FS family or an ambient Strict name.
+    this unit, not through a second FS family or an ambient name.
   - `Capability.System.Buffer` homes the `BufferWindow` family with its
     exact `MkBufferWindow` constructor, the checked projections
     `buffer_span_budget` and `buffer_span_length`, and
@@ -383,40 +393,21 @@ is a **surface error** (`24`) — it never reaches the kernel:
   An attached proof is homed only in the same unit as its subject,
   and every identity has at most one home.
   Explicit imports of these names through their home preserve the
-  exact checked identities in both roots modes. Legacy resolution
-  continues to admit their existing bare uses; this home migration
-  neither removes those Legacy meanings nor makes them floor names.
-  This Part 1 rule concerns catalog roots only. Standalone file,
-  literate, declaration, REPL, and non-catalog CLI routes retain the
-  transitional Legacy contract below; their Strict flip and any
-  isolated-file import loader are separate successor work.
-- **Transitional Legacy resolution.** Until the L2-4 strict-entry flip,
-  `elaborate_module_from_roots` and `_v1` use Legacy roots. Explicit
-  provider imports there also resolve each of the five to its exact ID.
-  Bare unimported uses in Legacy roots are not required to be refused,
-  but neither their availability nor their identity is promised: a
-  loaded declaration may take over a spelling in the flat global table.
-  Catalog clients import their providers as a migration obligation, not
-  because Legacy roots enforce the Strict no-import rule. Standalone
-  `elaborate_file_v1`, `elaborate_ken_md_file_v1`, `elaborate_decl`, and
-  CLI entries outside `catalog/packages/` retain bare access to the five
-  exact pre-source IDs. Examples and inline sources using these entries
-  follow the same route. Other bare implementation globals may resolve
-  in Legacy mode but are neither guaranteed nor refused by this contract.
-  Legacy mode neither adds a floor/B name nor creates a second ID.
+  exact checked identities on catalog and in-memory routes alike.
+  Registering a checked identity before source loading does not make
+  its bare spelling visible or add it to the compiler floor.
   `ConsoleStream` and its scoped `ConsoleStream.Stdin`,
-  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths apply in every
-  mode; the bare constructor spellings are not restored. This slice
-  changes no CLI route or standalone roots loader. L2-4 owns that route
-  and the strict-default flip.
+  `ConsoleStream.Stdout`, and `ConsoleStream.Stderr` paths remain
+  available under the closed floor, not as bare constructor spellings.
+  A rootless file cannot import a catalog home without a selected root.
 - **CLI observation of checked resolution.** The opt-in
-  `--resolution-report=<path>` file (§70 §1.4) makes the five-ID promise
-  on standalone and non-catalog `ken check`, `ken run` and
-  `ken native-build` observable at each route's own successful
-  elaboration. A closed root referencing `IO`, `write`, `print_line`,
-  `charToInt` and `leqChar` yields `pre-source` entries with their
-  canonical names in the checked declarations' reference sets. This
-  observes the exact checked identities, not merely successful
+  `--resolution-report=<path>` file (§70 §1.4) makes the imported
+  five-ID promise on `ken check`, `ken run` and `ken native-build`
+  observable after successful elaboration. A closed root importing
+  `IO`, `write`, `print_line`, `charToInt` and `leqChar` from their homes
+  yields `pre-source` entries with their canonical names in checked
+  declarations' reference sets. The report observes exact checked
+  identities, not merely successful
   type-checking or matching program output; it does not replace the
   normative guarantee above.
 
@@ -424,10 +415,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
   discriminating control: the three routes accept a well-typed shadow
   root, but its `write_probe` references `source-declared` `write`, not
   the pre-source `write`; the other four identities remain pre-source.
-  In a Strict root the accepted client imports all five from their
-  homes, while the shadow must **omit** the `write` import to avoid an
-  ambiguous declaration. The shadow's own body must not mention
-  `write`: a top-level binding captures earlier uses too, making a
+  The accepted client imports all five from their homes, while the
+  shadow must **omit** the `write` import to avoid an ambiguous
+  declaration. The shadow's own body must not mention `write`: a
+  top-level binding captures earlier uses too, making a
   wrapper that calls `write` recursive. The report distinguishes
   identities fixed in checked terms, not which source spellings
   produced them: inserted references are included and literal
@@ -457,9 +448,9 @@ is a **surface error** (`24`) — it never reaches the kernel:
   constructor families. The space desugarer reads the checked
   `StateOp` family, `resp_state`, `itree_bind`, `resp_coproduct` and
   three State operations at exact pre-source IDs (`36 §4.2`, §4.5).
-  Bare `get`, `put` and `bind` remain unreserved; Legacy keeps the
-  bare `bind` alias for the same checked sequencing identity. For an
-  inductive floor type, its per-type **scoped constructors** property
+  Bare `get`, `put` and `bind` remain unreserved; only `itree_bind`
+  names the checked sequencing identity through the compiler floor.
+  For an inductive floor type, its per-type **scoped constructors** property
   determines whether its whole exact constructor family also occupies
   bare B names. When enabled, only `T`
   enters B and public constructors resolve as `T.C`; no bare `C` is reserved

@@ -176,6 +176,8 @@ fn whnf_list_elements(
 #[test]
 fn ac2_filter_computes_and_rejects_at_least_one_element() {
     let mut env = with_derived_combinators();
+    env.elaborate_file("import Data.Collections.Derived")
+        .expect("standalone selects the checked filter module");
     let nil_id = env.globals["Nil"];
     let cons_id = env.globals["Cons"];
     let zero_id = env.globals["Zero"];

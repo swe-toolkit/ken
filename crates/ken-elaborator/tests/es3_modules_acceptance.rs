@@ -377,7 +377,7 @@ fn parameterized_abstract_export_preserves_kind_and_owner_proof() {
         "fn forbidden_match (xs : M.NonEmpty Nat) : Nat = \
            match xs { NonEmptyCons x rest |-> x }",
     ) {
-        Err(ElabError::UnresolvedCon { name, .. }) => assert_eq!(name, "NonEmptyCons"),
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "NonEmptyCons"),
         other => panic!("client match with the hidden constructor must reject: {other:?}"),
     }
     assert_eq!(

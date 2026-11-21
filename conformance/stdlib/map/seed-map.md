@@ -26,11 +26,10 @@ non-canonical-carrier `Bottom` exploit),
 proof-relevant-`Ω` / verified-sort coupling that the deferred permutation law
 inherits).
 
-The `toList : … → List (Pair k v)` surface is a positive named-Pair vector. Its
-Strict floor form is RED-UNTIL the compiler-origin Pair floor realization and
-then uses that always-present transparent-Σ family without a package import. The
-existing Map-law evidence remains valid for computation, but current Legacy
-availability is not evidence that Strict floor capture has landed.
+The `toList : … → List (Pair k v)` surface is a positive named-Pair vector
+that uses the transparent-Σ Pair floor family without a package import. The
+Map-law cases pin computation, not Pair's source identity; the latter is pinned
+separately in `surface/modules/seed-pair-strict-boundary.md`.
 
 **Status — the full seven `Map` correctness laws are BUILT + realized on
 `main`** — the two Branch-A non-inductive proofs + all **five inductive laws**

@@ -83,7 +83,7 @@ fn dictionaries_scope_over_contracts_refinement_and_body_but_not_siblings() {
         "const sibling_cannot_see_chosen : Bool = chosen.tag",
     );
     assert!(
-        matches!(leaked, Err(ElabError::UnresolvedCon { ref name, .. }) if name == "chosen"),
+        matches!(leaked, Err(ElabError::UnboundName { ref name, .. }) if name == "chosen"),
         "dictionary names must not leak to sibling declarations: {leaked:?}"
     );
 }
