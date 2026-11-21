@@ -205,6 +205,31 @@ evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
    shape at module granularity: a home's own source loaded in memory does
    not own the home's pre-source ids; only the roots loader's file unit
    does (`evt_4txr5d63gtdp8`).
+10. A bare name whose only catalog namesake is a distinct checked identity
+    (the Type-sorted Core.Logic.And; the convertible but distinct
+    Conjunction `and`; catalog Not against pre-source Not) was placed as an
+    import, because the M rule accepted a single spelling-equal provider.
+    Keyed on the export's spelling. It is a member of entry 9's predicate
+    (answered YES). Its closure is the I-KERNEL form, plus R7's follow-on
+    retirement count.
+11. An M-ROOTED row was placed from its first blocker, while its source
+    also spelled private representation names (FSOp, fs_resp, AmbientOp,
+    ambient_resp) and reached private ids through hand-inserted globals
+    aliases. Keyed on the census's first refusing name. It is a member of
+    entry 9's predicate. Its closure is G1's R form for the trees, plus
+    G2's I form for the one private node.
+12. An L-TRIM row was placed by the shape of its named Legacy block, while
+    a later default-entry load in the same test also depended on ambient
+    resolution. AC-2 M3 and M5 predicted a red at a named assertion, while
+    the mutated code had an earlier consumer (the N2 panic, the pre-source
+    registrar). Keyed on the one site the census or the Architect's reading
+    named. Predicate at entry 12, answered YES (Architect
+    `evt_5a45xm6cdfnjk`): the dependence on the removed route was placed at
+    the single site that a one-observation-per-row plane recorded, while
+    the disposition depends on the row's whole dependence. The closure is a
+    measured residual pass, keyed on each row's stated subject; the Steward
+    authorized it as the I4 recut (`evt_wrat3hqvkrm9`), retaining every
+    green row.
 
 ## Stop conditions
 
