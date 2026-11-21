@@ -29,10 +29,12 @@ fn root() -> PathBuf {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: the real package roots-loads four owned checked declarations;
 /// `And` selectively imports and resolves to `and`, not a second GlobalId.
-/// Both source conversion directions and a mixed prelude projection check;
-/// swapped conjuncts refuse, and the exact trusted-identity set is unchanged.
+/// The pre-source and catalog conjunctions are kernel-convertible in both
+/// directions, the pre-source spelling refuses UnboundName from source,
+/// catalog intro and projections check, swapped conjuncts refuse, and the
+/// exact trusted-identity set is unchanged.
 /// CLAIMED: conjunction reuses the Omega Sigma, with no new assumption.
-/// THE GAP: this checks the generic types, not every independent consumer;
+/// THE GAP: the kernel conversion checks the generic types, not every consumer;
 /// their root-loading and strict-floor census are tested separately.
 #[test]
 fn conjunction_is_checked_owned_convertible_and_zero_trust() {
@@ -55,13 +57,10 @@ fn conjunction_is_checked_owned_convertible_and_zero_trust() {
     }
     env.elaborate_file(
         "import Core.Logic.Conjunction (And as CAnd, and_intro as c_intro, and_fst as c_fst, and_snd as c_snd)\n\
-         theorem to_catalog (a : Omega) (b : Omega) (p : And a b) : CAnd a b = p\n\
-         theorem to_prelude (a : Omega) (b : Omega) (p : CAnd a b) : And a b = p\n\
-         theorem mixed_first (a : Omega) (b : Omega) (x : a) (y : b) : a = and_fst a b (c_intro a b x y)\n\
          theorem selected_first (a : Omega) (b : Omega) (x : a) (y : b) : a = c_fst a b (c_intro a b x y)\n\
          theorem selected_second (a : Omega) (b : Omega) (x : a) (y : b) : b = c_snd a b (c_intro a b x y)",
     )
-    .expect("both generic conversion directions and all helpers check");
+    .expect("catalog conjunction intro and both projections check");
     let a = Term::var(1);
     let b = Term::var(0);
     let prelude = Term::app(
@@ -76,13 +75,20 @@ fn conjunction_is_checked_owned_convertible_and_zero_trust() {
     assert!(convert_type(&env.env, &context, &prelude, &catalog));
     match env.elaborate_file(
         "import Core.Logic.Conjunction (And as CAnd)\n\
-         theorem wrong_order (a : Omega) (b : Omega) (p : CAnd a b) : And b a = p",
+         theorem wrong_order (a : Omega) (b : Omega) (p : CAnd a b) : CAnd b a = p",
     ) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             ..
         }) => {}
         other => panic!("swapped conjuncts must refuse in the kernel: {other:?}"),
+    }
+    match env.elaborate_file(
+        "import Core.Logic.Conjunction (And as CAnd)\n\
+         theorem pre_source_and (a : Omega) (b : Omega) (p : CAnd a b) : And a b = p",
+    ) {
+        Err(ElabError::UnboundName { ref name, .. }) if name == "And" => {}
+        other => panic!("the pre-source conjunction has no source route: {other:?}"),
     }
 }
 
