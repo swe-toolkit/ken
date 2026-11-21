@@ -4,14 +4,19 @@
 use ken_elaborator::program_admission::{admit_checked_main, ProgramAdmissionError};
 use ken_elaborator::ElabEnv;
 
+#[path = "support/catalog_roots.rs"]
+mod catalog_roots;
+
 fn checked_unix_program(authority: &str) -> ElabEnv {
     let source = format!(
         "program capabilities FS {authority}, Net Unix\n\
+         import Capability.Process.Exit (host_pure)\n\
          proc main (_input : ProcessInput) (_caps : ProgramCaps {authority})\n\
            : HostIO {authority} ExitCode visits [Net] =\n\
            host_pure {authority} ExitCode ExitCode.Success\n"
     );
     let mut env = ElabEnv::new().expect("prelude");
+    catalog_roots::load(&mut env, "Capability.Process.Exit");
     env.elaborate_file(&source)
         .expect("all three authority variants elaborate a checked main");
     env
