@@ -1212,16 +1212,15 @@ Pair(run_state s₀ m, π) : Σ(t:ITree F (a × s)).AllRet P t
 - Worked `accumulator-factory` (VAL2 #10) — a post-increment `next` that returns
   the current value and bumps the state. The following is a **schematic
   denotational equation**, not a Ken source example or an acceptance
-  claim in either resolution mode:
+  claim for a source entry:
   `next () = bind (state_get ()) (λ n. bind (state_put (n + 1)) (λ _. Ret n))`.
   Here `bind` means §2.2's tree grafting, and `Ret` is the tree return
-  with its type and response-family arguments elided. Strict source
-  names the checked sequencer `itree_bind` and the scoped constructor
+  with its type and response-family arguments elided. Source names
+  the checked sequencer `itree_bind` and the scoped constructor
   `ITree.Ret`, applying the latter with its operation carrier,
   response family, result type and value (`§2.1`, `30-taxonomy §4`).
-  Legacy also resolves bare `bind` to that same checked sequencer ID;
-  the displayed bare `Ret` and omitted arguments are not a source
-  promise in Legacy either.
+  The displayed bare `bind` and `Ret` and omitted arguments are not
+  source promises.
 
   ```
   run_state 0  next  =  (0, 1)     -- result = old value 0 ; final state 1 ; pair = (result, state)
@@ -1321,11 +1320,10 @@ inject_r : (g h : Type) -> (rg : g -> Type) -> (rh : h -> Type) -> (a : Type) ->
 - **Surface names and home are fixed.** `Core.Effect.Coproduct` explicitly
   exports the existing checked `inject_l` and `inject_r` identities with the
   complete signatures above, not copied definitions or new primitives. They
-  are not ambient floor names; an isolated Strict source imports them.
+  are not ambient floor names; source imports them explicitly.
   A program composes two base effects by injecting each single-effect
   sub-computation, then sequencing with floor `itree_bind` (`ITree
-  (Coproduct g h) …` is homogeneous). Legacy also resolves bare `bind` at
-  the same checked sequencing ID. This is the **direct/monadic door**;
+  (Coproduct g h) …` is homogeneous). This is the **direct/monadic door**;
   the eventual sugar is the row-directed elaboration inserting `incl`
   automatically from a `visits [E, F]` row (§2.4), of which this is the
   floor — as C1 threading (§4.5.6) is the floor under `[State s]`.

@@ -95,10 +95,10 @@ The loader proceeds as follows:
    Cache each successfully completed unit by canonical module path and elaborate
    it at most once in the run; later edges reuse that result.
 4. For each roots-loaded unit, construct a scope from its local declarations,
-   explicit imports, kernel and built-in vocabulary, and the closed prelude
-   floor. In Strict roots this is the complete source-name scope; Legacy roots
-   retain the pre-flip resolution mode of `33 §3.3`. The exact prelude-floor
-   name set in either mode is `{Auth, Bool,
+   explicit imports, the captured compiler vocabulary, and the closed prelude
+   floor. This is the complete source-name scope; the same rule applies to
+   every other source entry (`33 §3.3`). The exact prelude-floor name
+   set is `{Auth, Bool,
    Bottom, BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream,
    Coproduct, CreatePolicy, Decimal, DirEntry, Equal, ExitCode, FileError,
    FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
@@ -108,15 +108,15 @@ The loader proceeds as follows:
    Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
    resp_coproduct, resp_state, run_state, state_get, state_put}`
    (`30-taxonomy §4`; `33 §3.3`). These fifty-two checked identities
-   are ambiently nameable in Strict roots, not fifty-two types: `Top`
+   are ambiently nameable in source, not fifty-two types: `Top`
    and `Bottom` are proposition constants, `Proved` is a proof binding,
    `HostIO` is a type-level function, and `console_resp`, `eqChar`,
    `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
    and `state_put` are checked operations. The State operations,
    `StateOp`, `ConsoleOp` and its checked response are protected; bare
-   `get`, `put` and `bind` are not reserved by them. Strict resolves
+   `get`, `put` and `bind` are not reserved by them. Source resolves
    `itree_bind` at the captured sequencing ID, not a mutable bare
-   `bind` binding. Legacy retains bare `bind` at that same ID.
+   `bind` binding. Bare `bind` may be introduced as a user name.
    Admit a floor constructor only at its exact checked parent and
    subject to its per-type scoped-constructors property and visibility. `Auth`'s
    `ANone`/`APartial`/`AFull`, `Bool`'s `True`/`False`, `List`'s `Nil`/`Cons`,
@@ -171,14 +171,13 @@ The loader proceeds as follows:
    identities whose checked types reference the exact floor `Pair`.
    Imports are non-transitive in both directions, as required by `33 §3.3`:
    a unit neither borrows its caller's imports nor exports its own imports
-   merely because it was loaded. In Strict roots, unimported bare uses of
-   `IO`, `write`, `print_line`, `charToInt`, and `leqChar` raise
+   merely because it was loaded. In every source entry, unimported bare
+   uses of `IO`, `write`, `print_line`, `charToInt`, and `leqChar` raise
    `UnboundName`; explicit provider imports resolve to their exact pre-source
-   IDs. Legacy roots guarantee those same exact IDs through explicit imports
-   but do not promise a bare unimported meaning or refusal. Only Strict
-   roots forbid fallback to arbitrary implementation globals. Pair's four
-   names enter through the witnessed closed floor inventories, never merely
-   because the compiler global map happens to contain them.
+   IDs. No source entry falls back to arbitrary implementation globals.
+   A rootless external import refuses at its module path (`33 §3.3`).
+   Pair's four names enter through the witnessed closed floor inventories,
+   never merely because the compiler global map happens to contain them.
 5. Resolve every imported or re-exported name through the provider's public
    interface to the provider declaration's existing canonical identity. Enforce
    privacy, ambiguity, and re-export clashes before emitting the caller. An
@@ -221,13 +220,12 @@ floor family"`).
 A front end checking a source entry uses this loader whenever that entry is
 addressed through a catalog root. Reading the entry as an isolated file is not
 a substitute: it cannot establish the entry-rooted dependency graph or the
-per-unit visibility and scope contract above. Until L2-4, the standalone
-entries enumerated in `33 §3.3` guarantee bare resolution of the five exact
-pre-source package identities without using this loader. Other bare Legacy
-globals may resolve but are neither guaranteed nor refused; the Legacy-roots
-route likewise promises exact package identities only through imports.
-`ConsoleStream` and its scoped constructor paths apply in every mode. This
-transitional contract adds no floor member, CLI roots route, or strict flip.
+per-unit visibility and scope contract above. Standalone and isolated entries
+use the same name-resolution rule as roots-loaded entries: the five package
+identities are available only through explicit provider imports, while the
+closed floor and its scoped `ConsoleStream` constructors remain available
+without an import. A rootless file cannot import a catalog provider; a
+roots-loaded entry requires one populated root (`33 §3.3`).
 
 ### 2.1 Proof-returning dependent `match` motives
 

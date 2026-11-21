@@ -657,9 +657,11 @@ The prover must be able to unfold `is_sorted` and the count-based
 `Perm` imported from `Data.Collections.Derived`. Both are checked
 `Ω`-valued definitions, out of `trusted_base()`. Replacing either
 with an opaque postulate would make a claimed verified `sort` circular
-rather than prove its conjoined obligation (`30 §6`). A legacy
-pre-source `Perm` registration survives until I4, but does not define
-the pinned imported predicate. The defining shapes are:
+rather than prove its conjoined obligation (`30 §6`). The distinct
+pre-source `Perm` registration has no source route under the single
+resolution rule (`33 §3.3`); it is not the imported predicate and is
+scheduled for retirement in the follow-on framed at I4 landing. The
+defining shapes are:
 
 - **`is_sorted : Π(a : Type). (a → a → Bool) → List a → Ω`** — an `Ω`-valued
   structural recursion over the **explicit comparator**: `is_sorted a leq Nil = ⊤`,
@@ -692,10 +694,12 @@ the pinned imported predicate. The defining shapes are:
   **not** the `Perm` pin. A bare proof-relevant inductive
   `Perm_rel : Ω` would violate `16 §1.1`.
 
-No `Perm` is prelude in this contract: it is imported from
-`Data.Collections.Derived`, along with `is_sorted` and `eq_from_ord`.
-The legacy pre-source registration is an I4 retirement obligation,
-not a second permitted definition of the verified-sort predicate.
+Neither `Perm` nor `is_sorted` is in the source prelude floor: both
+are imported from `Data.Collections.Derived`, alongside
+`eq_from_ord`. Their distinct pre-source registrations still exist in
+the compiler but have no source route after I4. Both registrations,
+and `Perm_rel`, retire in a separately framed follow-on at I4 landing;
+none is a second permitted definition of the verified-sort predicate.
 
 **L-classes staging boundary (flag, do not resolve).** The collection **types**
 and **structural equality** ship in L3 with **built-in** `DecEq`/`Ord` instances

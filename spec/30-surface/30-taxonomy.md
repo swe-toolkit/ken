@@ -328,17 +328,17 @@ the checked `bind` and `resp_coproduct` identities by exact ID; direct
 State and composed-effect trees need both, and a direct Console tree
 needs the generic sequencing identity. The floor spelling of that
 sequencing identity is **`itree_bind`**, not the colliding generic
-`bind`: both modes add `itree_bind` at the *same* captured checked ID;
-Legacy retains bare `bind`, while Strict does not reserve or ambiently
-resolve bare `bind`. A user `fn bind` remains legal in Strict. The
-response operation keeps the specific spelling `resp_coproduct`.
+`bind`: it resolves at the captured checked ID. Bare `bind` is not
+reserved or ambiently bound to the compiler sequencer; a user
+`fn bind` is legal under the ordinary non-B rules. The response
+operation keeps the specific spelling `resp_coproduct`.
 These four admissions allocate no new checked identity and add no
 `trusted_base()` entry. HostIO-only uses can still migrate to the
 checked `host_bind` and related wrappers without admitting their
 `FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
 
 Thus the closed **floor-identity roster** has fifty-two names: the exact
-checked identities Strict source may name without an import, not a type
+checked identities source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
 ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal,
 ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO,
@@ -380,9 +380,9 @@ For an inductive floor member, constructor names are governed **per type** by
 the scoped-constructors property (`33 §3.3`, `34 §1`). An unscoped floor type
 reserves its whole kernel-recorded constructor family as bare names in B; a
 scoped floor type reserves **only the type name**, and its constructors are
-reachable solely as `T.C`, not reserved as bare spellings. Neither mode admits
-a partial constructor family, and each constructor's parent remains the exact
-floor identity. Abstract or constructor-private visibility still applies
+reachable solely as `T.C`, not reserved as bare spellings. No source entry
+admits a partial constructor family, and each constructor's parent remains
+the exact floor identity. Abstract or constructor-private visibility still applies
 (`33 §4.2`); qualification cannot expose a hidden constructor. The existing
 `ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
 `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
@@ -508,8 +508,8 @@ another candidate, that candidate has no new ambient availability.
 source alias, `read_bytes` and `write_file` are source-promised but
 unkeyed: they remain outside B as package material, not internal-only
 identities. In particular, `BufferWindow` is unreserved;
-a same-name source declaration is allowed in strict mode, while legacy
-resolution stays unchanged. `FS` as an effect/capability label does not
+a same-name source declaration is allowed under the ordinary non-B
+rules. `FS` as an effect/capability label does not
 make the distinct type alias keyed. A keyed identity without an independent
 source-name requirement stays compiler-internal; an unkeyed, promised
 definition belongs in an explicit package; an unkeyed, unpromised
@@ -545,9 +545,8 @@ wrapper `read` in `Capability.Console.Text`, `wall_now` in
 `Capability.Process.Exit`. The exact `ReadResult`
 family is **not** homed with `read`: it is scoped floor, including both
 qualified constructors. An explicit import makes each package name
-available in Strict isolated source, whereas an unimported use refuses
-`UnboundName`; floor names need no import. These changes do not switch
-CLI routes or alter the separate Legacy-root guarantees below.
+available through its checked home; an unimported use refuses
+`UnboundName` in every source entry. Floor names need no import.
 
 **Increment 3a strict-entry disposition roster.** The AC-0 census on
 `f3c016f89` identified fifty source-written blocked names in 98 files and
@@ -763,22 +762,16 @@ or aliases remain package identities: `IO`, `write`, and
 `Core.Classes.LawfulClasses`. These existing homes export the captured
 checked IDs, not copied definitions or synthetic substitute globals.
 Catalog clients migrate to explicit provider imports on both roots routes.
-Strict roots (`elaborate_module_from_roots_strict`) refuse an unimported
-bare use of any of the five with `UnboundName`; importing the provider
-resolves each to its exact pre-source ID. Legacy roots
-(`elaborate_module_from_roots` and `_v1`) also resolve explicit imports
-to those exact IDs, but an unimported bare use is neither promised nor
-refused and carries no exact-ID guarantee. Until the L2-4 strict-entry
-flip, standalone Legacy entries (`elaborate_file_v1`,
-`elaborate_ken_md_file_v1`, `elaborate_decl`, and CLI paths outside
-`catalog/packages/`) guarantee bare access to the five exact pre-source
-package IDs. Examples and inline sources using those entries follow the
-same route. Other bare Legacy globals may resolve, but their availability
-is neither guaranteed nor refused by the surface contract. This does not
-make those names floor members or expand Strict resolution. The
-`ConsoleStream` rename and qualified constructor paths apply in every
-mode. This slice changes neither CLI routing nor standalone roots loading
-and does not include the strict-default flip.
+Every source entry (including `elaborate_module_from_roots` and its
+`_strict` aliases, in-memory files, declarations, REPL and standalone
+expressions) refuses an unimported bare use of any of the five with
+`UnboundName`; an explicit provider import resolves to its exact
+pre-source ID. The checked identity's presence in implementation globals
+does not grant an ambient source name or a second identity. A file or
+isolated entry without selected catalog roots cannot import a provider;
+a rootless external import refuses at its module path (`33 §3.3`).
+`ConsoleStream` and its qualified constructor paths apply through the
+same source rule.
 
 The implementer's token-aware census classified 1,045 candidate rows
 across 164 paths. It predicts 127 ambient-pair deletions, not 127

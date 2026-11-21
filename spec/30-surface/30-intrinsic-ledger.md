@@ -106,7 +106,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `ProcessInput` (floor) | No | Its `MkProcessInput` constructor is bare and reserved with its type. |
 | `Unit` (current floor) | No | `MkUnit` names its exact checked parent and remains bare and reserved. |
 | `FileError` (floor) | No | `MkFileError` remains bare and reserved with its parent. |
-| `BufferWindow` (package) | No if later admitted | `MkBufferWindow` names its carrier, but neither is reserved now; strict-mode same-name source declarations remain legal. |
+| `BufferWindow` (package) | No if later admitted | `MkBufferWindow` names its carrier, but neither is reserved now; same-name source declarations remain legal under the non-B rules. |
 | `ProgramCaps` (floor) | Yes | Its runner-minted `MkProgramCaps` does not reserve a bare spelling; constructor visibility remains unchanged. |
 | `BufferSpan`, `TransferCount` (floor) | Yes | Exact minted constructor IDs retain private visibility; neither bare spelling nor a public qualified constructor is admitted. |
 | `Coproduct` (current floor) | Yes | `InL`/`InR` are generic; only `Coproduct.InL`/`Coproduct.InR` resolve to the exact constructors. |
@@ -187,7 +187,7 @@ alone reserves a name.
 | `Coproduct` (floor, scoped) | `PreludeEnv.coproduct_id` identifies the checked effect-signature sum; native composition keys the exact injection parents and source needs the family (`36 §2.3`, §4.5.7). |
 | `InL` (qualified floor constructor) | `CanonicalRuntimeRoles::in_l` selects the exact `Coproduct` constructor; only `Coproduct.InL` resolves, not bare `InL`. |
 | `InR` (qualified floor constructor) | `CanonicalRuntimeRoles::in_r` selects the exact `Coproduct` constructor; only `Coproduct.InR` resolves, not bare `InR`. |
-| `itree_bind` (floor operation) | The space desugarer selects `effect_sequencing_ids`' checked `bind_id`; direct State, Console and composed trees require this generic sequencing identity. Both modes add the specific `itree_bind` spelling to that ID after the pre-source snapshot. Legacy also keeps bare `bind`; Strict neither reserves nor ambiently resolves bare `bind`. The ID comes from the capture, not `globals["bind"]`. |
+| `itree_bind` (floor operation) | The space desugarer selects `effect_sequencing_ids`' checked `bind_id`; direct State, Console and composed trees require this generic sequencing identity. The specific `itree_bind` spelling resolves to that captured ID. Bare `bind` is neither reserved nor ambiently bound by the compiler and remains legal as a user declaration. The ID comes from the capture, not `globals["bind"]`. |
 | `resp_coproduct` (floor operation) | The elaborator constructs this exact checked response-family ID; direct composed-effect trees name it. It is not the `HostIO` alias or a constructor. |
 | `inject_l` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_fs`. |
 | `inject_r` (package) | No native exact-ID reader; §36 §4.5.7 promises the generic checked coproduct injection. `Core.Effect.Coproduct` exports its captured pre-source ID for explicit import. Complete HostIO instances may instead use `host_console`. |
@@ -232,7 +232,7 @@ alone reserves a name.
 | `CreateOrKeep` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateOrKeep`, not bare; retain its native artifact leaf. |
 | `BufferSpan` (floor, scoped) | `38 §1.7.1–2` requires this exact bounded span across operations; native code mints `PrivateBufferSpan`, fixing its checked parent. |
 | `PrivateBufferSpan` (private floor constructor) | Exact checked `BufferSpan` constructor minted by the host; its parent is admitted without changing constructor privacy or reserving a bare name. |
-| `BufferWindow` (package, not floor) | Source-promised public request descriptor (`38 §1.7.1`); no native ID reader. Strict-mode same-name source declaration is accepted; legacy resolution is unchanged. |
+| `BufferWindow` (package, not floor) | Source-promised public request descriptor (`38 §1.7.1`); no native ID reader. A same-name source declaration remains legal under the non-B rules. |
 | `MkBufferWindow` (package constructor) | Checked request descriptor constructor; neither it nor its unkeyed parent enters B. |
 | `TransferCount` (floor, scoped) | `38 §1.7.2` exposes this exact progress carrier and its count view; native code mints `PrivateTransferCount`, fixing the checked parent. |
 | `PrivateTransferCount` (private floor constructor) | Exact checked `TransferCount` constructor minted by the host; constructor privacy and absence of a bare reservation remain. |
@@ -319,7 +319,7 @@ names, three formerly held wrappers, eight safe fixed-width narrowings,
 and two generic coproduct injections). The scoped families were never
 package homes; `resp_state`, `console_resp`, `itree_bind` and
 `resp_coproduct` are floor operations rather than package material. The package rows
-above are not additional floor members or bare Strict names. The three
+above are not additional floor members or bare source names. The three
 Console constructors retain their exact IDs and scoped paths but are
 not separate
 `PRELUDE_FLOOR_NAMES` entries. Unscoped constructor
@@ -340,17 +340,13 @@ For checked definitions the test remains per-name: `leqChar` does not
 inherit `eqChar`'s registry key. The five source-promised but unkeyed
 names `IO`, `write`, `print_line`, `charToInt`, and `leqChar` remain
 package identities with their exact pre-source IDs, not new copies.
-Strict roots refuse an unimported bare use of each of the five with
-`UnboundName`; explicit provider imports resolve to their exact IDs.
-Legacy roots resolve explicit imports to those IDs too, but a bare
-unimported use has no promised identity or refusal. Standalone Legacy
-entries named in `33 §3.3` guarantee bare access to the five exact
-pre-source IDs until the L2-4 strict-entry flip, as a separate census
-class. Other Legacy bare globals may resolve but are neither guaranteed
-nor refused; the catalog import edits are migration, not a restriction
-on Legacy resolution. The `ConsoleStream` rename and scoped constructor
-paths apply in every mode; no CLI roots route, standalone roots loading,
-or strict-default flip is introduced. `IOError`'s thirteen causes are
+On every source entry, an unimported bare use of each of the five
+refuses with `UnboundName`; explicit provider imports resolve to their
+exact IDs. The implementation-global table confers no separate source
+route or identity. The earlier Increment 3a split between Strict roots
+and standalone Legacy entries is historical; it does not describe the
+current resolution rule (`33 §3.3`). `ConsoleStream` and its scoped
+constructor paths follow that one rule. `IOError`'s thirteen causes are
 one **scoped** family, not thirteen bare B names. Architect's D0 names each cause's
 native producer separately, without inferring all readers from one cause.
 The twelve `ResourceError` constructors likewise retain their exact IDs
