@@ -1174,9 +1174,10 @@ fn system_error_file_operation_is_floor_not_home_granted() {
 
 /// Promise class: durable invariant.
 ///
-/// MEASURED: a non-home Legacy client directly writes lowercase `write`,
-/// while the body of its only imported provider also reaches the checked
-/// `write` ID. The identity remains a CanonicalHome prerequisite. CLAIMED:
+/// MEASURED: a client directly writes lowercase `write` without importing it,
+/// while the checked body of its imported provider reaches the `write` ID. The
+/// client refuses with UnboundName at its own `write` spelling, and the
+/// provider neither exports that ID nor makes it strict-available. CLAIMED:
 /// an imported checked dependency cannot excuse a name the client writes
 /// without importing that name. THE GAP: the ConId sibling is exercised by
 /// System.Error; this fixture isolates the Ident branch of the lexical guard.
@@ -1195,21 +1196,29 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
         .join("catalog")
         .join("packages");
     fs::create_dir_all(root.join("Test")).expect("create fixture package root");
+    // The provider imports every name it writes, so the single mode loads it
+    // and the only unimported name in the consumer is its direct `write`.
+    fs::create_dir_all(root.join("Capability/Console")).expect("create home directory");
+    fs::copy(
+        catalog_root().join("Capability/Console/Text.ken.md"),
+        root.join("Capability/Console/Text.ken.md"),
+    )
+    .expect("mirror the write home");
     fs::write(
         root.join("Test/Provider.ken"),
-        "pub proc provider_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
+        "import Capability.Console.Text (IO, write)\npub proc provider_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
     )
     .expect("write checked provider body");
-    fs::write(
-        root.join("Test/Consumer.ken"),
-        "import Test.Provider (provider_write)\nproc via_provider (payload : Bytes) : IO (Result IOError Unit) visits [Console] = provider_write payload\nproc direct_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n",
-    )
-    .expect("write direct lowercase consumer");
+    let consumer = "import Test.Provider (provider_write)\nimport Capability.Console.Text (IO)\nproc via_provider (payload : Bytes) : IO (Result IOError Unit) visits [Console] = provider_write payload\nproc direct_write (payload : Bytes) : IO (Result IOError Unit) visits [Console] = write ConsoleStream.Stdout payload\n";
+    fs::write(root.join("Test/Consumer.ken"), consumer).expect("write direct lowercase consumer");
 
     let units = discover_units(&root);
     assert_eq!(
         units["Test.Consumer"].direct_imports,
-        BTreeSet::from(["Test.Provider".to_string()])
+        BTreeSet::from([
+            "Test.Provider".to_string(),
+            "Capability.Console.Text".to_string()
+        ])
     );
     assert_eq!(
         observe_strict(&root, "Test.Consumer"),
@@ -1217,10 +1226,22 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
             stage: PipelineStage::Resolution,
         }
     );
+    let direct = consumer
+        .rfind("write ConsoleStream")
+        .expect("direct write spelling");
+    let mut refused = ElabEnv::new().expect("base environment");
+    match refused.elaborate_module_from_roots(&[root.clone()], "Test.Consumer") {
+        Err(ElabError::UnboundName { name, span }) => {
+            assert_eq!(name, "write");
+            assert_eq!((span.start, span.end), (direct, direct + "write".len()));
+        }
+        other => panic!("the direct write must refuse at its own spelling: {other:?}"),
+    }
+
     let mut env = ElabEnv::new().expect("base environment");
     let write_id = env.globals["write"];
-    env.elaborate_module_from_roots(&[root.clone()], "Test.Consumer")
-        .expect("legacy consumer loads");
+    env.elaborate_module_from_roots(&[root.clone()], "Test.Provider")
+        .expect("checked provider loads");
     let provider_id = env.globals["Test.Provider.provider_write"];
     assert!(
         explained_identity_closure(&env, BTreeSet::from([provider_id])).contains(&write_id),
@@ -1234,10 +1255,6 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
         .module_state
         .package_export_ids("Test.Provider")
         .contains(&write_id));
-    assert!(env
-        .module_state
-        .package_home_ids("Test.Consumer")
-        .is_empty());
     assert!(!strict_available_ids(&env).contains(&write_id));
 
     let fixture_top = root
