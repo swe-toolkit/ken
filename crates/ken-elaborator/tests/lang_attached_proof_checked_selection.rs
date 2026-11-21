@@ -135,12 +135,13 @@ fn imported_same_subject_selects_root_proof_but_other_identity_refuses() {
 }
 
 /// MEASURED: shadowing f with a child local lacking p refuses both reference
-/// forms; their exact diagnostics are recorded rather than equated. CLAIMED:
-/// an enclosing proof never migrates to a different subject ID merely because
-/// the child's subject has the same spelling. THE GAP: the positive preceding
-/// child tests prove an unchanged identity still selects the proof.
+/// forms as UnboundName at Child.f::p. CLAIMED: an enclosing proof never
+/// migrates to a different subject ID merely because the child's subject has
+/// the same spelling. THE GAP: the positive preceding child tests prove an
+/// unchanged identity still selects the proof.
 #[test]
 fn child_local_subject_without_proof_does_not_borrow_enclosing_proof() {
+    let mut wrong = Vec::new();
     for reference in ["f::p x", "(proof p for f) x"] {
         let source = format!(
             "fn f (x : Int) : Int = x\n\
@@ -152,17 +153,15 @@ fn child_local_subject_without_proof_does_not_borrow_enclosing_proof() {
         );
         let mut env = ElabEnv::new().expect("base");
         let error = strict(&mut env, &[], &source).expect_err("different subject has no proof");
-        match reference {
-            "f::p x" => match error {
-                ElabError::UnresolvedCon { name, .. } => assert_eq!(name, "Child.f::p"),
-                other => panic!("child f::p diagnostic: {other:?}"),
-            },
-            _ => match error {
-                ElabError::UnresolvedCon { name, .. } => assert_eq!(name, "Child.f::p"),
-                other => panic!("child proof-ref diagnostic: {other:?}"),
-            },
+        match error {
+            ElabError::UnboundName { name, .. } if name == "Child.f::p" => {}
+            other => wrong.push((reference, format!("{other:?}"))),
         }
     }
+    assert!(
+        wrong.is_empty(),
+        "child-local diagnostic per form: {wrong:?}"
+    );
 }
 
 /// MEASURED: a middle scope's import of f blocks its descendant from the
@@ -305,4 +304,72 @@ fn strict_parameterized_abstract_export_preserves_kind_and_owner_proof() {
         trusted_before,
         "the catalog import and owner declarations add no trust"
     );
+}
+
+/// MEASURED: neither the parent nor a sibling can select Child's private
+/// attached proof in either surface form; Child's own use checks against the
+/// proof's checked identity. CLAIMED: only scopes that can see the proof may
+/// select it. THE GAP: exported provider and enclosing selectors have their
+/// own unchanged controls in this binary.
+#[test]
+fn parent_reference_to_inline_child_private_proof_refuses_in_both_forms() {
+    let mut wrong_parent = Vec::new();
+    for reference in ["f::p x", "(proof p for f) x"] {
+        let prefix = "fn f (x : Int) : Int = x\n\
+                      module Child {\n\
+                        proof p for f (x : Int) : Equal Int (f x) x = Refl\n\
+                      }\n";
+        let mut parent = ElabEnv::new().expect("base");
+        let source = format!("{prefix}theorem after (x : Int) : Equal Int (f x) x = {reference}\n");
+        match strict(&mut parent, &[], &source) {
+            Err(ElabError::UnboundName { name, .. }) if name == "f::p" => {}
+            other => wrong_parent.push((reference, format!("{other:?}"))),
+        }
+
+        let mut sibling = ElabEnv::new().expect("base");
+        let source = format!(
+            "{prefix}module Sibling {{\n\
+               theorem after (x : Int) : Equal Int (f x) x = {reference}\n\
+             }}\n"
+        );
+        match strict(&mut sibling, &[], &source) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "f::p", "{reference}"),
+            other => panic!("sibling {reference} private proof diagnostic: {other:?}"),
+        }
+    }
+
+    let mut child = ElabEnv::new().expect("base");
+    strict(
+        &mut child,
+        &[],
+        "fn f (x : Int) : Int = x\n\
+         module Child {\n\
+           proof p for f (x : Int) : Equal Int (f x) x = Refl\n\
+           pub theorem own (x : Int) : Equal Int (f x) x = f::p x\n\
+         }\n",
+    )
+    .expect("Child must select its own attached proof");
+    body_mentions(&child, "Child.own", child.globals["f::p"]);
+    assert!(
+        wrong_parent.is_empty(),
+        "parent-private diagnostic per form: {wrong_parent:?}"
+    );
+}
+
+/// MEASURED: both earlier same-scope references select a proof declared later
+/// by checked ID. CLAIMED: declaration order does not change a local proof's
+/// selection. THE GAP: the child-private case is separately measured above.
+#[test]
+fn same_scope_proof_declared_after_use_keeps_its_verdict() {
+    for reference in ["f::p x", "(proof p for f) x"] {
+        let source = format!(
+            "fn f (x : Int) : Int = x\n\
+             theorem early (x : Int) : Equal Int (f x) x = {reference}\n\
+             proof p for f (x : Int) : Equal Int (f x) x = Refl\n"
+        );
+        let mut env = ElabEnv::new().expect("base");
+        strict(&mut env, &[], &source)
+            .unwrap_or_else(|error| panic!("same-scope later {reference}: {error:?}"));
+        body_mentions(&env, "early", env.globals["f::p"]);
+    }
 }
