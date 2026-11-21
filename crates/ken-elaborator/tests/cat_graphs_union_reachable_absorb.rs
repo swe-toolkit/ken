@@ -213,7 +213,7 @@ fn union_absorb_and_idem_open_public_owned_and_trust_neutral() {
             env.env.lookup(owner),
             Some(Decl::Transparent { .. })
         ));
-        let client = format!("import Data.Finite.Finite (Finite)\nimport {GRAPH} (Graph, graph_union, graph_reachable, {name})\n{source}");
+        let client = format!("import Data.Finite.Finite (Finite)\nimport {GRAPH} (Graph, edge, graph_union, graph_reachable, {name})\n{source}");
         let elaborated = env
             .elaborate_file(&client)
             .unwrap_or_else(|error| panic!("open {name} client rejected: {error:?}"));
