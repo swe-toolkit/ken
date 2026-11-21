@@ -14,7 +14,11 @@
 > SPEC-GRAPHS-REACHABILITY-ANTISYMMETRIC §12;
 > SPEC-GRAPHS-ORDER-EDGE-ANTITONE §13;
 > SPEC-GRAPHS-SUCCESSOR-LIST-ADAPTOR §14;
-> SPEC-GRAPHS-UNION §15).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-UNION §15;
+> SPEC-GRAPHS-UNION-REACHABLE-COMM §16;
+> SPEC-GRAPHS-UNION-REACHABLE-ASSOC §17;
+> SPEC-GRAPHS-REACHABLE-REVERSE-SWAP §18;
+> SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1698,3 +1702,90 @@ must refuse at its own `Proved`: the original chain reaches V2 from V0
 with-reversal equality is its control. This closed refusal is not a
 proof of the generic law; the checked proof, separately owned CV seed
 and package test, and assembled-tip gates remain distinct.
+
+## 19. A union with an included graph adds no reachability
+
+> **Section 19 status: DRAFT v0
+> (SPEC-GRAPHS-UNION-REACHABLE-ABSORB).** Architect's AC-0 on
+> `15e57bf39` checked both generic laws and accepted clients in a
+> detached scratch worktree (rc 0), with no new `Axiom` and equal
+> trusted `GlobalId` identity sets (114 → 114). An altered private
+> helper refused with `KernelRejected TypeMismatch` before restoration.
+> Those observations do not check this Spec child or establish the
+> catalog export, CV seed, assembled AC-T, official conformance, CI,
+> publication, landing or landed trust.
+
+`Algorithm.Graphs.Dependency` must export two public Transparent checked
+laws after `graph_union_reachable_assoc`. Their exact binder orders and
+types are:
+
+```ken
+pub theorem graph_union_reachable_absorb
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q h u v)
+        True
+        → Equal
+        Bool
+        (edge q g u v)
+        True)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g h) s target)
+        (graph_reachable q fq g s target)
+
+pub theorem graph_union_reachable_idem
+      (q : Type) (fq : Finite q) (g : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g g) s target)
+        (graph_reachable q fq g s target)
+```
+
+`included` has exactly §7's graph-monotonicity edge-inclusion
+shape, read from `h` to `g`: it is the sole premise beyond the
+explicit `Finite q` argument. The union result is on the **left** and
+`g`'s result on the right, for every finite graph and Boolean target.
+This is an equality of Boolean reachability decisions, not equality
+of graph values, pointwise edge equality, or a split of union
+reachability into reachability over its separate operands. The
+premise-free idempotence law instantiates absorption at `h := g` with
+identity inclusion `λu. λv. λpresent. present`. There is no separately
+exported right-operand absorption form: §16's
+`graph_union_reachable_comm` already transports it for clients. The
+§15–§18 rosters are historical; §19 adds two public theorems and no
+function, giving **17 public functions and 35 public theorems**
+through §19. No operation or law type from §§1–18 changes.
+
+The checked proof combines §15's `graph_union_reachable_left` with
+§7's `graph_reachable_graph_monotone` from `graph_union q g h` back to
+`g`. The private `graph_union_edge_absorb` splits a checked union edge
+with `graph_union_edge_cases`: a `g` edge stays unchanged, while an
+`h` edge passes through `included`. The existing private
+`bool_eq_from_iff` joins the forward and reverse truth implications
+into the public `Equal Bool` result. The helper stays private; the
+public union case and inclusion laws already give clients its effect.
+No public edge-level law, new assumption, kernel or surface rule is
+specified.
+
+The separately owned seed uses a three-vertex graph `g_base` with
+edges V0 → V1 and V2 → V0, so V0 does **not** reach V2. The
+included `h_sub` has only V0 → V1; its union with `g_base` has the
+same reachability as `g_base`, and the idempotence case uses `g_base`
+twice. A contrasting `h_adds` has V1 → V2, which completes a new
+V0 → V1 → V2 walk in the union. The refused client changes only
+`h_sub` to `h_adds`, keeping the same inclusion proof term: it must
+refuse at its own law-application declaration because the h-to-g
+edge-inclusion premise fails, not because the conclusion can be
+assumed unconditionally. The accepted general-client checks and
+closed value controls are separate from this premise refusal. This
+finite witness does not decompose union reachability, and neither
+its own acceptance nor its refusal establishes the generic theorem.
+The assembled package test owes the exact trusted-base identity-set
+AC-T gate before a Decision.
