@@ -1,7 +1,7 @@
 ---
 id: LANG-ATTACHED-PROOF-OWN-SCOPE-SELECTION
 title: "In Strict, a scope that owns a local subject accepts any attached-proof name on it, whether or not that scope declares the proof, and leaves the reference to the flat global spelling, so a parent reaches an inline child's private `proof p for f` as `f::p` while a sibling module refuses it. Select own-scope attached proofs only from the scope's declared proofs, so a child's private proof is invisible to its parent as spec 33 §8.2 requires"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
