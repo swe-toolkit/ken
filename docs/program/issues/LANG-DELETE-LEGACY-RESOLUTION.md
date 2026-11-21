@@ -236,6 +236,12 @@ evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
     be stated against abstract binders. Keyed on the declarations I had
     read as failing, not on the property that makes a template fail
     (Architect `evt_yhsy7045ft1d`). The predicate question is due at 15.
+14. The relay seam was measured by re-admitting one declaration (main,
+    named through globals), while the native producer's
+    stable_symbols_for_env needs a name for every declaration in env
+    (pre_source_names, then globals, then the private decl_owner). Keyed
+    on the one declaration the seam probe readmitted (Architect
+    `evt_27kfyeczdy3sg`).
 
 ## Stop conditions
 
