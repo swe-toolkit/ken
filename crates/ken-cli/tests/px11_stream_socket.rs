@@ -137,7 +137,23 @@ fn px11_declared_net_native_build_refuses_before_emission() {
         stderr.contains("host_effect_lowering_unavailable"),
         "{stderr}"
     );
-    assert!(stderr.contains("NetListen"), "{stderr}");
+    let named: Vec<_> = ken_host::HostOpV1::ALL
+        .into_iter()
+        .filter(|operation| stderr.contains(&format!("{operation:?}")))
+        .collect();
+    assert_eq!(
+        named,
+        [
+            ken_host::HostOpV1::NetListen,
+            ken_host::HostOpV1::NetAccept,
+            ken_host::HostOpV1::NetConnect,
+            ken_host::HostOpV1::NetReceive,
+            ken_host::HostOpV1::NetSend,
+            ken_host::HostOpV1::NetShutdown,
+            ken_host::HostOpV1::NetLocalAddress,
+        ],
+        "the refusal names exactly the seven unavailable Net operations: {stderr}"
+    );
     assert!(stderr.contains("RepresentedUnavailable"), "{stderr}");
     assert_eq!(std::fs::read_dir(&output_dir).unwrap().count(), 0);
 }

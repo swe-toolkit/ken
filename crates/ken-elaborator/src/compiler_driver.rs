@@ -2645,9 +2645,18 @@ fn prepare_native_program_from_elaborated(
     // before planning or object emission, even when its first operation is
     // hidden behind a checked helper rather than visible at the entrypoint.
     if plan.net_declared {
+        let unavailable = ken_host::HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                crate::export::host_operation_family_v1(*operation)
+                    == crate::export::HostOpFamilyV1::Net
+            })
+            .map(|operation| format!("{operation:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
         return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
             "host_effect_lowering_unavailable",
-            "NetListen is RepresentedUnavailable for native execution (declared Net)",
+            format!("{unavailable} are RepresentedUnavailable for native execution (declared Net)"),
         )));
     }
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
