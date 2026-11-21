@@ -60,61 +60,84 @@ pub fn socket_ipv6
           match tb {
             VCons _ c tc ↦
               match tc {
-                VCons _ d td ↦
-                  match td {
-                    VCons _ e te ↦
-                      match te {
-                        VCons _ f tf ↦
-                          match tf {
-                            VCons _ g tg ↦
-                              match tg {
-                                VCons _ h th ↦
-                                  match th {
-                                    VCons _ i ti ↦
-                                      match ti {
-                                        VCons _ j tj ↦
-                                          match tj {
-                                            VCons _ k tk ↦
-                                              match tk {
-                                                VCons _ l tl ↦
-                                                  match tl {
-                                                    VCons _ m tm ↦
-                                                      match tm {
-                                                        VCons _ n tn ↦
-                                                          match tn {
-                                                            VCons _ o to ↦
-                                                              match to {
-                                                                VCons _ p _ ↦
-                                                                  private_socket_ipv6_octets
-                                                                    a
-                                                                    b
-                                                                    c
-                                                                    d
-                                                                    e
-                                                                    f
-                                                                    g
-                                                                    h
-                                                                    i
-                                                                    j
-                                                                    k
-                                                                    l
-                                                                    m
-                                                                    n
-                                                                    o
-                                                                    p
-                                                                    port
-                                                              }
-                                                          }
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                      }
-                  }
+                VCons _ d td ↦ socket_ipv6_after_four a b c d td port
+              }
+          }
+      }
+  }
+
+fn socket_ipv6_after_four
+      (a : UInt8)
+      (b : UInt8)
+      (c : UInt8)
+      (d : UInt8)
+      (rest : Vec
+        UInt8
+        (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))))))
+      (port : UInt16)
+    : SocketAddress =
+  match rest {
+    VCons _ e te ↦
+      match te {
+        VCons _ f tf ↦
+          match tf {
+            VCons _ g tg ↦
+              match tg {
+                VCons _ h th ↦ socket_ipv6_after_eight a b c d e f g h th port
+              }
+          }
+      }
+  }
+
+fn socket_ipv6_after_eight
+      (a : UInt8)
+      (b : UInt8)
+      (c : UInt8)
+      (d : UInt8)
+      (e : UInt8)
+      (f : UInt8)
+      (g : UInt8)
+      (h : UInt8)
+      (rest : Vec UInt8 (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))
+      (port : UInt16)
+    : SocketAddress =
+  match rest {
+    VCons _ i ti ↦
+      match ti {
+        VCons _ j tj ↦
+          match tj {
+            VCons _ k tk ↦
+              match tk {
+                VCons _ l tl ↦ socket_ipv6_after_twelve a b c d e f g h i j k l tl port
+              }
+          }
+      }
+  }
+
+fn socket_ipv6_after_twelve
+      (a : UInt8)
+      (b : UInt8)
+      (c : UInt8)
+      (d : UInt8)
+      (e : UInt8)
+      (f : UInt8)
+      (g : UInt8)
+      (h : UInt8)
+      (i : UInt8)
+      (j : UInt8)
+      (k : UInt8)
+      (l : UInt8)
+      (rest : Vec UInt8 (Suc (Suc (Suc (Suc Zero)))))
+      (port : UInt16)
+    : SocketAddress =
+  match rest {
+    VCons _ m tm ↦
+      match tm {
+        VCons _ n tn ↦
+          match tn {
+            VCons _ o to ↦
+              match to {
+                VCons _ p _ ↦ private_socket_ipv6_octets a b c d e f g h i j k l m n o p port
               }
           }
       }
