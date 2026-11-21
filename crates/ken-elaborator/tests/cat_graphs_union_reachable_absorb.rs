@@ -159,13 +159,14 @@ const LAW_IDEM: &str = r#"theorem law_idem
       (graph_reachable Vertex3 vertex3_finite (graph_union Vertex3 g_base g_base) V0 is_v2)
       (graph_reachable Vertex3 vertex3_finite g_base V0 is_v2) =
   graph_union_reachable_idem Vertex3 vertex3_finite g_base V0 is_v2"#;
-const LAW_ABSORB: &str = r#"theorem law_absorb
+const LAW_ABSORB_HEAD: &str = r#"theorem law_absorb
   : Equal Bool
       (graph_reachable Vertex3 vertex3_finite (graph_union Vertex3 g_base h_sub) V0 is_v2)
       (graph_reachable Vertex3 vertex3_finite g_base V0 is_v2) =
   graph_union_reachable_absorb
     Vertex3 vertex3_finite g_base h_sub V0 is_v2
-    (λu. λv.
+    "#;
+const INCLUSION: &str = r#"(λu. λv.
       match u {
         V0 ↦ match v {
           V0 ↦ λe. absurd e; V1 ↦ λe. Proved; V2 ↦ λe. absurd e
@@ -177,6 +178,18 @@ const LAW_ABSORB: &str = r#"theorem law_absorb
           V0 ↦ λe. Proved; V1 ↦ λe. absurd e; V2 ↦ λe. absurd e
         }
       })"#;
+
+fn law_absorb(h: &str) -> String {
+    format!("{}{INCLUSION}", LAW_ABSORB_HEAD.replace("h_sub", h))
+}
+
+fn inclusion_claim(h: &str) -> String {
+    format!(
+        "theorem included_edges : (u : Vertex3) → (v : Vertex3) \
+         → Equal Bool (edge Vertex3 {h} u v) True \
+         → Equal Bool (edge Vertex3 g_base u v) True = {INCLUSION}"
+    )
+}
 
 /// SOURCE: graphs §19, graph_union_reachable_absorb and _idem.
 /// PROMISE CLASS: durable invariant.
@@ -238,11 +251,13 @@ fn union_absorb_and_idem_open_public_owned_and_trust_neutral() {
 /// MEASURED: two independent reachability values and all open/closed law
 /// applications check; the same-value closed Proved control checks, but the
 /// otherwise identical law application with h_adds refuses in its own theorem.
+/// The same inclusion term is checked independently at its own type: it
+/// accepts for h_sub and refuses for h_adds without any conclusion in scope.
 /// CLAIMED: subgraph inclusion lets the union retain g's reachability, while
 /// adding a genuinely new edge cannot reuse that inclusion proof.
 /// THE GAP: one finite graph does not prove the generic law (the Transparent
-/// proof above does); refusal identifies the typed premise, not the whole
-/// space of false graph equalities.
+/// proof above does); the independent inclusion refusal identifies the
+/// premise, but the whole-law refusal span is only scoped to its declaration.
 #[test]
 fn union_absorb_closed_values_idem_and_added_edge_refusal() {
     let mut accepted = loaded_graph();
@@ -256,12 +271,17 @@ fn union_absorb_closed_values_idem_and_added_edge_refusal() {
         ("generic idem", GEN_IDEM),
         ("closed independent equality", SUB_SAME),
         ("closed idem", LAW_IDEM),
-        ("closed absorb", LAW_ABSORB),
     ] {
         accepted
             .elaborate_file(row)
             .unwrap_or_else(|error| panic!("{label}: {error:?}"));
     }
+    accepted
+        .elaborate_file(&law_absorb("h_sub"))
+        .expect("closed absorption with true inclusion");
+    accepted
+        .elaborate_file(&inclusion_claim("h_sub"))
+        .expect("the same inclusion term inhabits its own premise");
 
     let mut refused = loaded_graph();
     refused
@@ -273,10 +293,10 @@ fn union_absorb_closed_values_idem_and_added_edge_refusal() {
         .expect("union with added edge is True");
     // The accepted law was checked above on the same fixture; the refused
     // environment contains no other law claim before the appended false one.
-    let wrong = LAW_ABSORB.replace("h_sub", "h_adds");
+    let wrong = law_absorb("h_adds");
     // Both mentions of h changed: the conclusion and the fourth law argument.
     // The inclusion proof and every other argument stay byte-identical.
-    assert_eq!(LAW_ABSORB.matches("h_sub").count(), 2);
+    assert_eq!(LAW_ABSORB_HEAD.matches("h_sub").count(), 2);
     let proof = wrong
         .find("graph_union_reachable_absorb")
         .expect("law call");
@@ -288,6 +308,27 @@ fn union_absorb_closed_values_idem_and_added_edge_refusal() {
             && span.end >= proof + "graph_union_reachable_absorb".len()
             && span.end <= wrong.len() => {}
         other => panic!("added edge must refuse at the appended law claim: {other:?}"),
+    }
+
+    // Isolate the actual premise: this row has no reachability equality
+    // conclusion, so a mismatch here cannot be blamed on the law's result.
+    let mut premise = loaded_graph();
+    premise
+        .elaborate_file(PREFIX)
+        .expect("fresh inclusion prefix");
+    premise
+        .elaborate_file(BASE_MISSES)
+        .expect("base observation remains checked");
+    premise
+        .elaborate_file(ADDS_REACHES)
+        .expect("added-edge observation remains checked");
+    let false_inclusion = inclusion_claim("h_adds");
+    match premise.elaborate_file(&false_inclusion) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            span,
+        }) if span.start == 0 && span.end <= false_inclusion.len() => {}
+        other => panic!("h_adds inclusion must fail at its own premise: {other:?}"),
     }
 }
 
