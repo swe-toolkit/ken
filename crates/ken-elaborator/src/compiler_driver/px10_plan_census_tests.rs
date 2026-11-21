@@ -398,14 +398,15 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 633 resumes through fold 12 and is returned by Vis 668.
+/// settlement 699 resumes through fold 12 and is returned by Vis 734.
 /// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
 /// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
 /// settlement Construct 647→623 preserved producer and order before I2.
 /// The new ChildSignal prelude shifts those smoke identities by nine, without
 /// changing producer roles. The ReturnFold producer remains computational
 /// match 12; the ReturnedVisSettlement producer is the same region-0
-/// body-entry Construct, not the fold.
+/// body-entry Construct, not the fold. PX11's checked Net prelude shifts
+/// the smoke exit and returned owner origins by 66; fold 12 is unchanged.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -432,7 +433,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 633, 12), (ReturnedVisSettlement, 633, 668)],
+            &[(ReturnFold, 699, 12), (ReturnedVisSettlement, 699, 734)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -444,7 +445,10 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
 /// None. Both retain exact static region-exit owners. CLAIMED: the planner
 /// cannot confuse an ordinary successor Vis under Excluded{Relay} with a
 /// completed K Ret publication. THE GAP: native execution is established by
-/// the F parity rows, not this static-plan observation.
+/// the F parity rows, not this static-plan observation. PX11's checked
+/// Net prelude shifts argv's two exit origins and three owners by 132, but
+/// the first ReturnFold owner by 66; live's exits and three owners shift
+/// by 66 while its fold-12 owner stays fixed.
 #[test]
 fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
@@ -453,10 +457,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1180, 581),
-                (ReturnFold, 1425, 1185),
-                (ReturnedVisSettlement, 1180, 1803),
-                (ReturnedVisSettlement, 1425, 1520),
+                (ReturnFold, 1312, 647),
+                (ReturnFold, 1557, 1317),
+                (ReturnedVisSettlement, 1312, 1935),
+                (ReturnedVisSettlement, 1557, 1652),
             ][..],
             None,
         ),
@@ -464,10 +468,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 611, 12),
-                (ReturnFold, 856, 616),
-                (ReturnedVisSettlement, 611, 1310),
-                (ReturnedVisSettlement, 856, 1029),
+                (ReturnFold, 677, 12),
+                (ReturnFold, 922, 682),
+                (ReturnedVisSettlement, 677, 1376),
+                (ReturnedVisSettlement, 922, 1095),
             ][..],
             None,
         ),
@@ -587,11 +591,11 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 }
 
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1243 and 1012 and live's relays 674 and 443 are relay members of
+/// relays 1375 and 1144 and live's relays 740 and 509 are relay members of
 /// their owners' returned-Vis protocols, numbered once per emitting copy
 /// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1243 and 674 resume at the rows
-/// whose Vis are 1468 and 918; copies of 1012 and 443 resume by their planned
+/// kept in the settled member set. Copies of 1375 and 740 resume at the rows
+/// whose Vis are 1600 and 984; copies of 1144 and 509 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
 /// census does not prove that every emitting owner minted a copy or that
@@ -604,19 +608,21 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 /// I2's checked ChildSignal prelude shifts argv origins by 18 and live origins
 /// by nine; F2's extra take_stdin operand shifts the argv origins by two and
 /// live origins by one more. The returned-Vis protocols and settled relays were
-/// re-observed on the F2 tree before repinning their identities.
+/// re-observed on the F2 tree before repinning their identities. PX11's
+/// checked Net prelude shifts argv's relay, owner and resume origins by 132
+/// and live's by 66; the two relay pairs and trap/resume roles are unchanged.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
         (
             "px10_census_relay_argv_env_pipe",
             ARGV_ENV_PIPE,
-            [(1243, 1707, Some(1468)), (1012, 1803, None)],
+            [(1375, 1839, Some(1600)), (1144, 1935, None)],
         ),
         (
             "px10_census_relay_live_child",
             LIVE_CHILD,
-            [(674, 1214, Some(918)), (443, 1310, None)],
+            [(740, 1280, Some(984)), (509, 1376, None)],
         ),
     ] {
         in_census_thread(name, move || {

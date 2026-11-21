@@ -1619,13 +1619,26 @@ mod resource_lifetime_hash_tests {
                 ken_host::ResourceKindV1::Buffer,
             ]
         );
+        let binding = |operation, role| ResourceLifetimeBindingPoint { operation, role };
         assert_eq!(
             full.plans[0].require_same_at,
-            FS_HANDLE_REQUIRE_SAME_AT.to_vec()
+            [
+                binding(ken_host::HostOpV1::FsHandleMetadata, ken_host::ResourceBindingRole::Target),
+                binding(ken_host::HostOpV1::FsReadAt, ken_host::ResourceBindingRole::File),
+                binding(ken_host::HostOpV1::FsWriteAt, ken_host::ResourceBindingRole::File),
+                binding(ken_host::HostOpV1::ResourceRelease, ken_host::ResourceBindingRole::Target),
+            ]
         );
+        // The positioned alphabet performs no Net operation, so the buffer's
+        // Net binding points are unreachable and are not projected.
         assert_eq!(
             full.plans[1].require_same_at,
-            BUFFER_REQUIRE_SAME_AT.to_vec()
+            [
+                binding(ken_host::HostOpV1::FsReadAt, ken_host::ResourceBindingRole::Buffer),
+                binding(ken_host::HostOpV1::FsWriteAt, ken_host::ResourceBindingRole::Buffer),
+                binding(ken_host::HostOpV1::BufferFreeze, ken_host::ResourceBindingRole::Target),
+                binding(ken_host::HostOpV1::ResourceRelease, ken_host::ResourceBindingRole::Target),
+            ]
         );
     }
 

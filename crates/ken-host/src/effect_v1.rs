@@ -5427,6 +5427,8 @@ mod tests {
             HostOpV1::FsChangeMode,
             HostOpV1::FsOpen,
             HostOpV1::ProcessPlanOpen,
+            HostOpV1::NetListen,
+            HostOpV1::NetConnect,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -5439,7 +5441,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 22] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 27] = [
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -5462,6 +5464,11 @@ mod tests {
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
             HostOpV1::ProcessSignal,
+            HostOpV1::NetAccept,
+            HostOpV1::NetReceive,
+            HostOpV1::NetSend,
+            HostOpV1::NetShutdown,
+            HostOpV1::NetLocalAddress,
         ];
         for operation in HostOpV1::ALL {
             let capability_admitted = expected.contains(&operation);
@@ -5522,6 +5529,11 @@ mod tests {
             HostOpV1::ProcessTakePipe,
             HostOpV1::ProcessWait,
             HostOpV1::ProcessSignal,
+            HostOpV1::NetAccept,
+            HostOpV1::NetReceive,
+            HostOpV1::NetSend,
+            HostOpV1::NetShutdown,
+            HostOpV1::NetLocalAddress,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -5882,10 +5894,23 @@ mod tests {
             HostOpV1::ProcessWait,
             HostOpV1::ProcessSignal,
         ];
+        // PX11's socket operations acquire or borrow SocketListener and
+        // SocketStream resources, so none is a pre-resource operation.
+        let px11_net = [
+            HostOpV1::NetListen,
+            HostOpV1::NetAccept,
+            HostOpV1::NetConnect,
+            HostOpV1::NetReceive,
+            HostOpV1::NetSend,
+            HostOpV1::NetShutdown,
+            HostOpV1::NetLocalAddress,
+        ];
         let pre_resource = HostOpV1::ALL
             .into_iter()
             .filter(|operation| {
-                !RESOURCE_BEARING.contains(operation) && !px10_process.contains(operation)
+                !RESOURCE_BEARING.contains(operation)
+                    && !px10_process.contains(operation)
+                    && !px11_net.contains(operation)
             })
             .collect::<Vec<_>>();
         assert_eq!(backend.0, requested, "every listed request uses the shared dispatch");
