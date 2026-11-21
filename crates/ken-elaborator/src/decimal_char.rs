@@ -311,6 +311,12 @@ mod tests {
     #[test]
     fn ac2_int_to_char_true_arm_discharge_depends_on_its_guard() {
         let mut env = ElabEnv::new().expect("prelude");
+        env.set_catalog_roots_v1(&[
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+        ])
+        .expect("checked catalog root");
+        env.elaborate_file("import Core.Classes.LawfulClasses (inRangeBool)")
+            .expect("checked scalar range home");
         let guarded_source = INT_TO_CHAR_DECL.replacen("fn intToChar", "fn guarded_int_to_char", 1);
         let guarded = env
             .elaborate_decl_v1(&guarded_source)

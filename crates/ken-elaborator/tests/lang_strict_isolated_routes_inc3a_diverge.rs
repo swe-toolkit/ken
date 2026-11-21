@@ -22,19 +22,13 @@ fn missing_observation(
     }
 }
 
-/// Promise class: transition sentinel for the 3b migration, retired when
-/// Legacy-to-Strict source comparisons are no longer needed. MEASURED: each static
-/// invalid-source fixture reaches Legacy E0027 on its own missing name and
-/// Strict E0012 on that same name after only its required imports. For Rosetta
-/// examples, remove the new Strict-only H imports from the Legacy comparison
-/// but retain them in Strict. Report raw spans and compare the normalized
-/// Strict span to the Legacy span: imports change absolute byte positions but
-/// not the error's source location. CLAIMED: vocabulary changes
-/// do not mask or shift these intentional refusals. THE GAP: generated Rust
-/// sources and the six FSOp template cases are separate populations, not
-/// claimed by this file-source subset.
+/// Promise class: durable invariant. MEASURED: each invalid-source fixture
+/// refuses UnboundName at its measured missing name through the isolated
+/// route, with its required checked imports. CLAIMED: vocabulary changes do
+/// not mask these intentional refusals. THE GAP: generated Rust sources and
+/// the six FSOp template cases are separate populations.
 #[test]
-fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
+fn baseline_unresolved_sources_refuse_at_the_measured_missing_name() {
     const CASES: [(&str, &str); 13] = [
         ("conformance/challenge/C1-deceq-noncanonical/sound-deceq-char.ken", "DecEq"),
         ("conformance/challenge/C6-lawful-ord-vs-stub/sound-ord-proved.ken", "Ord"),
@@ -64,34 +58,7 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         } else {
             original.clone()
         };
-        let legacy_source = if path.starts_with("examples/rosetta/") {
-            original
-                .split_inclusive('\n')
-                .filter(|line| {
-                    let import = line.trim_start();
-                    !import.starts_with("import Capability.Console.Text ")
-                        && !import.starts_with("import Capability.Process.Exit ")
-                })
-                .collect::<String>()
-        } else {
-            original.clone()
-        };
-        let shift = strict_source.len() - legacy_source.len();
         let literate = path.ends_with(".ken.md");
-        let mut legacy = ElabEnv::new().expect("checked prelude");
-        let legacy = if literate {
-            legacy.elaborate_ken_md_file_v1(&legacy_source).map(|_| ())
-        } else {
-            legacy.elaborate_file_v1(&legacy_source).map(|_| ())
-        };
-        let old = match missing_observation(legacy) {
-            Ok(observation) => observation,
-            Err(detail) => {
-                println!("ISOL3A_SAME_NAME {path} legacy={detail}");
-                mismatches.push(format!("{path}: {detail}"));
-                continue;
-            }
-        };
         let mut selected = ElabEnv::new().expect("checked prelude");
         let strict = if literate {
             selected
@@ -105,26 +72,14 @@ fn baseline_unresolved_sources_keep_the_same_missing_name_in_strict() {
         let new = match missing_observation(strict) {
             Ok(observation) => observation,
             Err(detail) => {
-                println!("ISOL3A_SAME_NAME {path} legacy={old:?} strict={detail}");
+                println!("ISOL3A_SAME_NAME {path} strict={detail}");
                 mismatches.push(format!("{path}: {detail}"));
                 continue;
             }
         };
-        let normalized = (new.1.start.checked_sub(shift), new.1.end.checked_sub(shift));
-        println!(
-            "ISOL3A_SAME_NAME {path} legacy={}@{}..{} code={} strict={}@{}..{} code={} normalized={normalized:?} import_bytes={shift}",
-            old.0, old.1.start, old.1.end, old.2,
-            new.0, new.1.start, new.1.end, new.2,
-        );
-        if old.0 != expected
-            || new.0 != old.0
-            || normalized != (Some(old.1.start), Some(old.1.end))
-            || old.2 != "E0027"
-            || new.2 != "E0012"
-        {
-            mismatches.push(format!(
-                "{path}: expected {expected}, observed {old:?} -> {new:?}"
-            ));
+        println!("ISOL3A_SAME_NAME {path} strict={}@{}..{} code={}", new.0, new.1.start, new.1.end, new.2);
+        if new.0 != expected || new.2 != "E0012" {
+            mismatches.push(format!("{path}: expected {expected}, observed {new:?}"));
         }
     }
     assert!(
@@ -197,10 +152,9 @@ fn local_latent_invalid_sources_keep_their_type_mismatch_kind() {
 
 /// Promise class: transition sentinel until a valid quotient surface and
 /// conformance verdict replace these unconsumed prepared sketches. MEASURED:
-/// the exact C7 pair has the known Legacy type error at unsupported `/` and
-/// the Strict missing `elim_` name (the source writes `elim_/`). CLAIMED: the two reporting orders differ
-/// over the same two invalid constructs, without becoming a conformance pass.
-/// THE GAP: this fixed two-row inventory is not a classifier for new sketches.
+/// the C7 pair refuses at missing `elim_` (the source writes `elim_/`).
+/// CLAIMED: neither invalid sketch is a conformance pass. THE GAP: this
+/// fixed two-row inventory is not a classifier for new sketches.
 #[test]
 fn known_diverge_c7_pair_keeps_both_specific_refusal_codes() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -213,19 +167,6 @@ fn known_diverge_c7_pair_keeps_both_specific_refusal_codes() {
         "conformance/challenge/C7-quotient-respect/unsound-nonrespecting.ken",
     ] {
         let source = std::fs::read_to_string(root.join(path)).expect("C7 sketch");
-        let mut legacy = ElabEnv::new().expect("prelude");
-        let old = legacy
-            .elaborate_file_v1(&source)
-            .expect_err("unsupported quotient");
-        match old {
-            ElabError::TypeMismatch { reason, .. } => {
-                assert!(
-                    reason.contains("'/' not supported on this type"),
-                    "{path}: {reason}"
-                )
-            }
-            error => panic!("{path}: expected Legacy TypeMismatch, got {error:?}"),
-        }
         let mut selected = ElabEnv::new().expect("prelude");
         match selected.elaborate_isolated_file_strict_v1(&[catalog.clone()], &source) {
             Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "elim_", "{path}"),

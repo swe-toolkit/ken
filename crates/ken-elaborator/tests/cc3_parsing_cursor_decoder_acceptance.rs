@@ -370,7 +370,7 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
         )
         .expect_err("available but unimported reverse must not resolve");
     assert!(
-        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
+        matches!(error, ElabError::UnboundName { ref name, .. } if name == "reverse"),
         "the non-import control must fail at the omitted binding, got {error:?}"
     );
 }

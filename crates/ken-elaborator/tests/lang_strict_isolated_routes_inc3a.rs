@@ -100,10 +100,9 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
     }
 }
 
-/// Promise class: durable invariant. MEASURED: both resolution modes bind the
-/// new specific `itree_bind` spelling to the exact captured bind ID; Strict
-/// reserves that spelling and `resp_coproduct` but refuses bare `bind` unless
-/// a user defines it, while Legacy still accepts the original bare spelling.
+/// Promise class: durable invariant. MEASURED: the single resolution route
+/// binds `itree_bind` to the exact captured bind ID, reserves that spelling
+/// and `resp_coproduct`, and refuses bare `bind` unless a user defines it.
 /// CLAIMED: direct ITree sequencing is source-nameable without reserving an
 /// unrelated package's `bind`. THE GAP: this checks checked-source binding and
 /// identical trusted-base sets, not interpreter or native execution.
@@ -112,7 +111,7 @@ fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
     let baseline = ElabEnv::new().expect("checked prelude");
     let bind = baseline.prelude_env.bind_id;
     assert_eq!(baseline.globals["itree_bind"], bind);
-    assert_eq!(baseline.globals["bind"], bind, "Legacy binding survives");
+    assert_eq!(baseline.globals["bind"], bind, "pre-source spelling survives");
     assert_eq!(
         baseline.globals["resp_coproduct"],
         baseline.prelude_env.resp_coproduct_id
@@ -133,14 +132,6 @@ fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
     let selected = strict(source).expect("specific ITree bind and response in Strict");
     assert_eq!(selected.globals["itree_bind"], bind);
     assert_eq!(selected.env.trusted_base(), baseline.env.trusted_base());
-    let mut legacy = ElabEnv::new().expect("checked prelude");
-    legacy
-        .elaborate_file_v1(source)
-        .expect("the specific ITree bind is also available in Legacy");
-    let mut bare_legacy = ElabEnv::new().expect("checked prelude");
-    bare_legacy
-        .elaborate_file_v1(&source.replace("itree_bind", "bind"))
-        .expect("Legacy bare bind retains the checked ID");
     match strict(&source.replace("itree_bind", "bind")) {
         Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, "bind"),
         Err(error) => panic!("wrong bare bind refusal: {error:?}"),

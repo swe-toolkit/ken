@@ -103,7 +103,7 @@ fn ac1_ac2_rejections_are_specific() {
             .unwrap_err();
         assert!(matches!(
             error,
-            ElabError::UnresolvedCon { ref name, .. } if name == missing
+            ElabError::UnboundName { ref name, .. } if name == missing
         ));
     }
 }

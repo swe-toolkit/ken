@@ -17,6 +17,11 @@ fn opaque_predicate(env: &mut ElabEnv) {
 #[test]
 fn instance_fields_and_expression_entry_share_the_literal_refinement_boundary() {
     let mut env = ElabEnv::new().expect("prelude");
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../catalog/packages");
+    env.set_catalog_roots_v1(&[root.clone()]).expect("checked catalog root");
+    env.elaborate_file("import Core.Classes.LawfulClasses (isScalar)")
+        .expect("checked scalar predicate home");
     env.elaborate_decl("class Pick (a : Type) { pick : a }")
         .expect("class");
     let instance = env.elaborate_decl_v1("instance Pick Char { pick = 55296 }")
@@ -31,6 +36,9 @@ fn instance_fields_and_expression_entry_share_the_literal_refinement_boundary() 
     assert_eq!(open_refinements(&env, &ordinary), 1);
 
     let mut standalone = ElabEnv::new().expect("prelude");
+    standalone.set_catalog_roots_v1(&[root]).expect("checked catalog root");
+    standalone.elaborate_file("import Core.Classes.LawfulClasses (isScalar)")
+        .expect("checked scalar predicate home");
     let literal_error = standalone.elaborate_expr("literal", "(55296 : {c : Int | isScalar c})")
         .expect_err("literal open scalar cannot be reported");
     assert!(matches!(literal_error, ElabError::ObligationWithoutChannel { .. }), "{literal_error:?}");

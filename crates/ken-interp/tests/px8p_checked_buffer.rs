@@ -11,6 +11,8 @@ fn repo_root() -> PathBuf {
 
 fn env() -> ken_elaborator::ElabEnv {
     let mut env = ken_elaborator::ElabEnv::empty().expect("PX8-P prelude");
+    env.set_catalog_roots_v1(&[repo_root().join("catalog/packages")])
+        .expect("checked catalog root");
     let trusted_before_clients = env.env.trusted_base();
     // The escape discriminator reaches the same private checked release node
     // used by `withBuffer`'s finalizer without publishing a raw release name.
@@ -27,7 +29,11 @@ fn env() -> ken_elaborator::ElabEnv {
     env.globals
         .insert("Px8pBufferHandleResource".to_string(), handle);
     env.elaborate_file(
-        r#"
+        r#"import Capability.System.Buffer (BufferHandle)
+import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr,
+  ResourceBracketResult, ResourceBracketOk, ResourceBracketBodyError,
+  ResourceBracketReleaseError, ResourceBracketBodyAndReleaseError, withBuffer)
+import Capability.Filesystem.Authority (FS)
 fn px8p_ok_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
   ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
