@@ -609,6 +609,46 @@ pub theorem graph_union_reachable_assoc
       target
       (graph_union_edge_regroup_left q g h k))
 
+pub theorem graph_union_reachable_absorb
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q h u v)
+        True
+        → Equal
+        Bool
+        (edge q g u v)
+        True)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g h) s target)
+        (graph_reachable q fq g s target) =
+  bool_eq_from_iff
+    (graph_reachable q fq (graph_union q g h) s target)
+    (graph_reachable q fq g s target)
+    (graph_reachable_graph_monotone
+      q
+      fq
+      (graph_union q g h)
+      g
+      s
+      target
+      (graph_union_edge_absorb q g h included))
+    (graph_union_reachable_left q fq g h s target)
+
+pub theorem graph_union_reachable_idem
+      (q : Type) (fq : Finite q) (g : Graph q) (s : q) (target : q → Bool)
+    : Equal Bool
+        (graph_reachable q fq (graph_union q g g) s target)
+        (graph_reachable q fq g s target) =
+  graph_union_reachable_absorb q fq g g s target (λu. λv. λpresent. present)
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -1000,6 +1040,11 @@ graph monotonicity in both directions, using the private
 private `graph_union_edge_regroup_right` and `graph_union_edge_regroup_left`
 each split the outer and then the inner union with `graph_union_edge_cases`,
 rebuilding the edge with the left and right inclusion laws.
+`graph_union_reachable_absorb` joins left inclusion with graph monotonicity
+from the union back to `g`: the private `graph_union_edge_absorb` splits a
+union edge with `graph_union_edge_cases`, keeps a `g` edge as it is, and sends
+an `h` edge through the edge-inclusion premise. `graph_union_reachable_idem`
+is that law at `h := g`, with the identity inclusion.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -1462,6 +1507,29 @@ theorem graph_union_edge_regroup_left
               (graph_union_edge_right q g h u v from_h);
           Inr from_k ↦ graph_union_edge_right q (graph_union q g h) k u v from_k
         }
+    }
+
+theorem graph_union_edge_absorb
+      (q : Type)
+      (g : Graph q)
+      (h : Graph q)
+      (included : (u : q)
+        → (v : q)
+        → Equal
+        Bool
+        (edge q h u v)
+        True
+        → Equal
+        Bool
+        (edge q g u v)
+        True)
+      (u : q)
+      (v : q)
+    : Equal Bool (edge q (graph_union q g h) u v) True → Equal Bool (edge q g u v) True =
+  λpresent.
+    match graph_union_edge_cases q g h u v present {
+      Inl from_g ↦ from_g;
+      Inr from_h ↦ included u v from_h
     }
 
 theorem bool_eq_from_iff
@@ -3013,7 +3081,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–18](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–19](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3042,7 +3110,10 @@ uses a one-way chain order to exclude backward reachability and refuses an
 order on a two-cycle. The
 [§13 seed](../../../../conformance/stdlib/graphs/seed-topo-order-edge-antitone.md)
 removes a shortcut edge while keeping the ordered list and refuses inclusion
-of an added backward edge. The public API exports six data families (`Graph`,
+of an added backward edge. The §19
+[seed](../../../../conformance/stdlib/graphs/seed-graph-union-reachable-absorb.md)
+checks absorption with a proper subgraph, idempotence, and refusal when the
+second graph adds an edge. The public API exports six data families (`Graph`,
 `Walk`, `Cycle`, `ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `MkTopoOrder`, `HasOrder`, `HasCycle`). Its seventeen functions are `edge`,
@@ -3050,7 +3121,7 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors`. Thirty-three kernel-checked theorems expose their laws,
+`graph_from_successors`. Thirty-five kernel-checked theorems expose their laws,
 including successor-list soundness and completeness. Every other helper is
 private to this package.
 
@@ -3096,7 +3167,9 @@ where `g_only` does, and confirms both proof helpers remain private.
 The union-grouping package test checks the open law and both closed groupings,
 refuses the claim that the three-way union reaches only where
 `graph_union g_only h_only` does, and confirms both regroup lemmas remain
-private. The reverse-swap package test checks the open law and both closed
+private. The union-absorption package test applies both public laws to open
+and closed graphs, compares exact trusted identities, and isolates the added-edge
+inclusion refusal. The reverse-swap package test checks the open law and both closed
 endpoint pairs on a directed chain, refuses swapping without graph reversal,
 and confirms the one-direction helper remains private. These package tests do
 not stand in for official conformance-runner execution or CI, and do not
