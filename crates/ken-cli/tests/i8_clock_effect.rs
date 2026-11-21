@@ -217,6 +217,7 @@ fn undeclared_clock_row_is_a_named_effect_escape() {
 #[test]
 fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
     let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
+    let pre_load = catalog_roots::pre_load_ids(&env);
     let before = env.env.trusted_base();
     catalog_roots::load_owner(&mut env, "Capability.Time.WallClock");
     assert_eq!(before, env.env.trusted_base());
@@ -230,7 +231,7 @@ fn clock_package_is_structural_zero_trust_and_declares_no_ordering_law() {
         "instant_nanoseconds",
         "replace_instant_nanoseconds",
     ] {
-        let id = catalog_roots::selected_owner_id(&env, "Capability.Time.WallClock", name);
+        let id = catalog_roots::selected_owner_id(&env, &pre_load, "Capability.Time.WallClock", name);
         assert!(
             !env.env.trusted_base().contains(&id),
             "{name} must be ordinary kernel-checked Ken"

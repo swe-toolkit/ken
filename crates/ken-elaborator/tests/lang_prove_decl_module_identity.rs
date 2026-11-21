@@ -8,7 +8,7 @@ use ken_elaborator::{ElabEnv, ElabError, ElabResult, v2_extract};
 #[derive(Clone, Copy, Debug)]
 enum Mode {
     StrictRoots,
-    LegacyRoots,
+    DefaultRoots,
     DirectAfterRoots,
     DirectInline,
 }
@@ -16,7 +16,7 @@ enum Mode {
 impl Mode {
     const ALL: [Self; 4] = [
         Self::StrictRoots,
-        Self::LegacyRoots,
+        Self::DefaultRoots,
         Self::DirectAfterRoots,
         Self::DirectInline,
     ];
@@ -39,7 +39,7 @@ impl Mode {
                 fs::write(root.path().join("Client.ken"), client).expect("write client file");
                 env.elaborate_module_from_roots_strict(&roots, "Client")?;
             }
-            Self::LegacyRoots => {
+            Self::DefaultRoots => {
                 fs::write(root.path().join("Client.ken"), client).expect("write client file");
                 results = env.elaborate_module_from_roots_v1(&roots, "Client")?;
             }
@@ -99,7 +99,7 @@ fn same_spelling_has_distinct_module_owners_in_all_modes() {
 const PRIVATE_PROVIDER: &str = "prove leak_p : Top\npub data Tag = MkTag\nexport MkTag";
 
 /// Promise class: durable invariant (33 §3–4). MEASURED: an unimported prove
-/// use refuses with each mode's surface error while importing an unrelated
+/// use refuses with UnboundName while importing an unrelated
 /// public data constructor from the same unit succeeds. CLAIMED: a private
 /// prove is not reachable through ambient globals. THE GAP: one private
 /// spelling is exercised in each of the four distinct resolution routes.
@@ -114,12 +114,7 @@ fn unimported_prove_refuses_in_each_mode() {
             .err()
             .unwrap_or_else(|| panic!("{mode:?} leaked unimported prove"));
         assert!(
-            match mode {
-                Mode::StrictRoots =>
-                    matches!(error, ElabError::UnboundName { ref name, .. } if name == "leak_p"),
-                Mode::LegacyRoots | Mode::DirectAfterRoots | Mode::DirectInline =>
-                    matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "leak_p"),
-            },
+            matches!(error, ElabError::UnboundName { ref name, .. } if name == "leak_p"),
             "{mode:?}: unexpected refusal {error:?}",
         );
         let (env, _) = mode

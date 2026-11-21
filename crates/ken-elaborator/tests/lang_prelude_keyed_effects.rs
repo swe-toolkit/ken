@@ -7,11 +7,11 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const EFFECT_TYPES: [&str; 3] = ["Unit", "Coproduct", "Instant"];
-const MODES: [&str; 3] = ["strict-roots", "legacy-file", "legacy-roots"];
+const MODES: [&str; 3] = ["strict-roots", "file", "default-roots"];
 
 fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), ElabError> {
     match mode {
-        "strict-roots" | "legacy-roots" => {
+        "strict-roots" | "default-roots" => {
             let root = tempfile::tempdir().expect("effect floor fixture directory");
             fs::write(root.path().join("Entry.ken"), source).expect("effect floor fixture");
             if mode == "strict-roots" {
@@ -20,7 +20,7 @@ fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), Ela
                 env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
             }
         }
-        "legacy-file" => {
+        "file" => {
             env.elaborate_file_v1(source)?;
         }
         other => panic!("unknown mode: {other}"),
@@ -55,7 +55,7 @@ fn contains_id(term: &Term, target: GlobalId) -> bool {
 }
 
 /// Promise class: normative compatibility vector. MEASURED: strict roots and
-/// both shipping legacy routes resolve all three pre-source floor types and
+/// both other entries resolve all three pre-source floor types and
 /// four constructor paths to their registered IDs and checked parent types.
 /// CLAIMED: the reserved floor exposes only these exact identities with no
 /// new trust. THE GAP: this covers consumer resolution, not every native
@@ -123,7 +123,7 @@ fn effect_floor_names_resolve_to_captured_ids_in_strict_and_legacy_modes() {
         for (type_name, source, constructor) in cases {
             let env = elaborate(source, mode)
                 .unwrap_or_else(|failure| panic!("{mode} {constructor}: {failure:?}"));
-            let witness = if mode == "legacy-file" {
+            let witness = if mode == "file" {
                 "witness"
             } else {
                 "Entry.witness"
@@ -174,7 +174,7 @@ fn scoped_effect_constructors_have_no_bare_aliases() {
 
 /// Promise class: durable invariant. MEASURED: this route independently
 /// refuses each bare scoped constructor in expression position with its
-/// mode-specific error. CLAIMED: no source route accepts a bare prelude alias.
+/// exact UnboundName. CLAIMED: no source route accepts a bare prelude alias.
 /// THE GAP: the qualified positives are pinned independently in the exact-ID
 /// row above; constructor patterns are tested by other consumers.
 fn assert_bare_scoped_constructors_refuse(mode: &str) {
@@ -193,17 +193,10 @@ fn assert_bare_scoped_constructors_refuse(mode: &str) {
             Ok(_) => panic!("{mode} bare {name}: unexpectedly accepted"),
             Err(failure) => failure,
         };
-        if mode == "strict-roots" {
-            assert!(
-                matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
-                "{mode} bare {name}: {failure:?}"
-            );
-        } else {
-            assert!(
-                matches!(failure, ElabError::UnresolvedCon { name: ref rejected, .. } if rejected == name),
-                "{mode} bare {name}: {failure:?}"
-            );
-        }
+        assert!(
+            matches!(failure, ElabError::UnboundName { name: ref rejected, .. } if rejected == name),
+            "{mode} bare {name}: {failure:?}"
+        );
     }
 }
 
@@ -213,13 +206,13 @@ fn bare_scoped_effect_constructors_refuse_in_strict_roots() {
 }
 
 #[test]
-fn bare_scoped_effect_constructors_refuse_in_legacy_roots() {
-    assert_bare_scoped_constructors_refuse("legacy-roots");
+fn bare_scoped_effect_constructors_refuse_in_default_roots() {
+    assert_bare_scoped_constructors_refuse("default-roots");
 }
 
 #[test]
-fn bare_scoped_effect_constructors_refuse_in_legacy_file() {
-    assert_bare_scoped_constructors_refuse("legacy-file");
+fn bare_scoped_effect_constructors_refuse_in_file_entry() {
+    assert_bare_scoped_constructors_refuse("file");
 }
 
 /// Promise class: durable invariant. MEASURED: same-spelling source type or

@@ -17,12 +17,23 @@ pub fn load_owner(env: &mut ElabEnv, module: &str) {
         .unwrap_or_else(|error| panic!("{module} checked fences must execute: {error:?}"));
 }
 
-pub fn selected_owner_id(env: &ElabEnv, module: &str, name: &str) -> GlobalId {
+/// Pre-source identities, captured before any package source loads. A
+/// later package declaration cannot overwrite an entry in this copy.
+pub fn pre_load_ids(env: &ElabEnv) -> std::collections::HashMap<String, GlobalId> {
+    env.globals.clone()
+}
+
+pub fn selected_owner_id(
+    env: &ElabEnv,
+    pre_load: &std::collections::HashMap<String, GlobalId>,
+    module: &str,
+    name: &str,
+) -> GlobalId {
     let qualified = format!("{module}.{name}");
     env.module_state
         .root_results_for_report(module)
         .and_then(|results| results.iter().find(|result| result.name == qualified))
         .map(|result| result.def_id)
-        .or_else(|| env.globals.get(name).copied())
+        .or_else(|| pre_load.get(name).copied())
         .unwrap_or_else(|| panic!("missing checked {module} owner or pre-source name {name}"))
 }

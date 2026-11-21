@@ -8,6 +8,17 @@ use std::path::PathBuf;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{conv::convert_type, env::Context, Decl, KernelError, Level, Term};
 
+fn contains(term: &Term, id: ken_kernel::GlobalId) -> bool {
+    match term {
+        Term::Const { id: found, .. }
+        | Term::IndFormer { id: found, .. }
+        | Term::Constructor { id: found, .. }
+            if *found == id => true,
+        Term::Elim { fam, .. } if *fam == id => true,
+        _ => term.children().into_iter().any(|child| contains(child, id)),
+    }
+}
+
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -80,9 +91,8 @@ fn conjunction_is_checked_owned_convertible_and_zero_trust() {
 /// MEASURED: the real Derived package owns one checked public sortedness
 /// definition, distinct from prelude's identity. An alias-importing consumer
 /// accepts empty, singleton and ordered two-element cases; an unordered
-/// adjacent pair rejects its attempted proof. Open proofs cannot cross either
-/// direction between the distinct prelude and catalog identities, and a bare
-/// loose import refuses ambiguity rather than choosing one identity. Provider
+/// adjacent pair rejects its attempted proof. A bare import selects the
+/// catalog identity rather than the pre-source one. Provider
 /// and Derived trusted GlobalId sets agree exactly.
 /// CLAIMED: the moved predicate is a checked Omega definition, not a
 /// second prelude alias or a new trusted assumption.
@@ -150,31 +160,12 @@ fn sortedness_is_derived_checked_and_rejects_an_unordered_pair() {
         }) => {}
         other => panic!("false adjacent comparison must refuse: {other:?}"),
     }
-    match env.elaborate_file(
+    env.elaborate_file(
         "import Data.Collections.Derived (is_sorted)\n\
-         theorem bare_sorted (xs : List Nat) : is_sorted Nat ordered xs = Proved",
-    ) {
-        Err(ElabError::AmbiguousReference { .. }) => {}
-        other => panic!("loose bare sortedness import must refuse ambiguity: {other:?}"),
-    }
-    for (direction, source) in [
-        (
-            "prelude to catalog",
-            "theorem from_prelude (xs : List Nat) (le : Nat -> Nat -> Bool) \
-             (p : is_sorted Nat le xs) : catalog_is_sorted Nat le xs = p",
-        ),
-        (
-            "catalog to prelude",
-            "theorem to_prelude (xs : List Nat) (le : Nat -> Nat -> Bool) \
-             (p : catalog_is_sorted Nat le xs) : is_sorted Nat le xs = p",
-        ),
-    ] {
-        match env.elaborate_file(source) {
-            Err(ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { .. },
-                ..
-            }) => {}
-            other => panic!("open {direction} conversion must refuse: {other:?}"),
-        }
-    }
+         theorem bare_sorted : is_sorted Nat ordered empty = Proved",
+    )
+    .expect("a bare import binds the catalog identity uniquely");
+    let (_, ty) = env.env.const_type(env.globals["bare_sorted"]).expect("bare_sorted type");
+    assert!(contains(&ty, sorted), "bare import must select the catalog ID");
+    assert!(!contains(&ty, prelude_sorted), "bare import must not select pre-source ID");
 }

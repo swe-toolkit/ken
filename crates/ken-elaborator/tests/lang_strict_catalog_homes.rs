@@ -1,8 +1,8 @@
 //! Checked package-home client behavior (spec 33 §3.3).
 //! Promise class: durable invariant. MEASURED: a source client imports and
 //! uses an inductive parent, constructor and transparent checked definition;
-//! strict bare use refuses and Legacy bare use preserves its old meaning.
-//! CLAIMED: the home changes only Strict admission, not identity or Legacy.
+//! bare use refuses and an import selects the checked pre-source identity.
+//! CLAIMED: the home changes admission, not the checked identity.
 //! THE GAP: the separate table and real-catalog pins test full family closure.
 
 use ken_elaborator::{ElabEnv, ElabError};
@@ -24,7 +24,7 @@ fn contains(term: &Term, id: GlobalId) -> bool {
 }
 
 #[test]
-fn family_and_transparent_home_require_import_only_in_strict_roots() {
+fn family_and_transparent_home_require_import() {
     let root = tempfile::tempdir().expect("fixture root");
     let home = root.path().join("Capability/System/Buffer.ken");
     fs::create_dir_all(home.parent().expect("parent")).expect("directory");
@@ -42,29 +42,6 @@ fn family_and_transparent_home_require_import_only_in_strict_roots() {
         &[root.path().to_path_buf()], "Entry"),
         Err(ElabError::UnboundName { name, .. }) if name == "BufferWindow"));
 
-    let mut legacy = ElabEnv::new().expect("pre-source environment");
-    let parent = legacy.globals["BufferWindow"];
-    let constructor = legacy.globals["MkBufferWindow"];
-    let projection = legacy.globals["transfer_count_nat"];
-    legacy
-        .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
-        .expect("legacy bare meanings unchanged");
-    let (_, legacy_type) = legacy
-        .env
-        .const_type(legacy.globals["Entry.window"])
-        .expect("window signature");
-    assert!(contains(&legacy_type, parent));
-    let (_, legacy_body) = legacy
-        .env
-        .transparent_body(legacy.globals["Entry.window"])
-        .expect("window body");
-    assert!(contains(&legacy_body, constructor));
-    let (_, legacy_count) = legacy
-        .env
-        .transparent_body(legacy.globals["Entry.count"])
-        .expect("count body");
-    assert!(contains(&legacy_count, projection));
-
     fs::write(
         root.path().join("Entry.ken"),
         format!(
@@ -73,6 +50,9 @@ fn family_and_transparent_home_require_import_only_in_strict_roots() {
     )
     .expect("imported entry");
     let mut imported = ElabEnv::new().expect("pre-source environment");
+    let parent = imported.globals["BufferWindow"];
+    let constructor = imported.globals["MkBufferWindow"];
+    let projection = imported.globals["transfer_count_nat"];
     imported
         .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
         .expect("strict imported checked identities");

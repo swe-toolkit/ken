@@ -1,5 +1,5 @@
-//! Strict local B-name introduction is refused at the source binder, while
-//! the same source retains Legacy resolution. These are behavioral pins, not
+//! Local B-name introduction is refused at the source binder. These are
+//! behavioral pins, not
 //! assertions about the repository's text or about a frozen B inventory.
 
 use ken_elaborator::error::{ElabError, Span};
@@ -7,10 +7,10 @@ use ken_elaborator::ElabEnv;
 use std::fs;
 
 // Promise class: durable invariant (spec 33, no binding of a built-in name).
-// MEASURED: each Strict source returns the named binder error at the own or
-// introducing AST span and that same source checks under Legacy.
-// CLAIMED: every represented binder form reaches the Strict introduction gate
-// without changing Legacy. THE GAP: new binder forms need their own row; AC-3
+// MEASURED: each source returns the named binder error at the own or
+// introducing AST span.
+// CLAIMED: every represented binder form reaches the introduction gate.
+// THE GAP: new binder forms need their own row; AC-3
 // removes the gate to show these existing rows were checking its behavior.
 macro_rules! binder_row {
     ($test_name:ident, $source:expr, $binder:expr, $start:expr, $end:expr) => {
@@ -20,10 +20,6 @@ macro_rules! binder_row {
         #[test]
         fn $test_name() {
             let source = $source;
-            let mut legacy = ElabEnv::new().expect("checked prelude");
-            legacy
-                .elaborate_file_v1(source)
-                .unwrap_or_else(|error| panic!("Legacy source changed: {error:?}"));
             let error = match $route(source) {
                 Err(error) => error,
                 Ok(_) => panic!("Strict must refuse the built-in binder"),
@@ -280,12 +276,12 @@ fn law_own_builtin_name_refuses_before_non_builtin_derived_name_strict() {
 }
 
 #[test]
-fn law_own_builtin_name_retains_legacy_e0058() {
+fn law_own_builtin_name_refuses_in_file_entry() {
     let source = "law Pair (x) { fst : Top }";
     let error = ElabEnv::new()
         .unwrap()
         .elaborate_file_v1(source)
-        .expect_err("Legacy own-name B introduction must keep its E0058 refusal");
+        .expect_err("file own-name B introduction must keep its E0058 refusal");
     assert_law_own_builtin_name(&error, source, "Pair");
 }
 
@@ -313,18 +309,4 @@ fn law_derived_builtin_name_refuses_at_module_prebind() {
 #[test]
 fn law_derived_outside_builtin_names_remains_accepted() {
     strict_roots("law local_pair (x) { fst : Top }").expect("non-B derived law identity is lawful");
-}
-
-#[test]
-fn legacy_law_derived_collision_keeps_its_prior_error() {
-    let error = ElabEnv::new()
-        .unwrap()
-        .elaborate_file_v1("law pair (x) { fst : Top }")
-        .expect_err("Legacy collision still refuses through its identity check");
-    assert!(
-        matches!(error,
-        ElabError::DeclarationIdentityCollision { identity, .. }
-        if identity == "pair_fst"),
-        "Strict E0058 must not change Legacy collision diagnostics"
-    );
 }

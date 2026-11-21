@@ -13,7 +13,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 #[derive(Clone, Copy, Debug)]
 enum Mode {
     StrictRoots,
-    LegacyRoots,
+    DefaultRoots,
     DirectAfterRoots,
     DirectInline,
 }
@@ -21,7 +21,7 @@ enum Mode {
 impl Mode {
     const ALL: [Self; 4] = [
         Self::StrictRoots,
-        Self::LegacyRoots,
+        Self::DefaultRoots,
         Self::DirectAfterRoots,
         Self::DirectInline,
     ];
@@ -35,7 +35,7 @@ impl Mode {
         let roots = [root.path().to_path_buf()];
         let mut env = ElabEnv::new().expect("base environment");
         match self {
-            Self::StrictRoots | Self::LegacyRoots => {
+            Self::StrictRoots | Self::DefaultRoots => {
                 fs::write(root.path().join("Client.ken"), client).expect("write client file");
                 if matches!(self, Self::StrictRoots) {
                     env.elaborate_module_from_roots_strict(&roots, "Client")?;
@@ -103,12 +103,7 @@ fn unimported_private_kinds_refuse_at_the_surface_in_all_modes() {
                 .err()
                 .unwrap_or_else(|| panic!("{label} {mode:?} wrongly admitted"));
             assert!(
-                match mode {
-                    Mode::StrictRoots =>
-                        matches!(error, ElabError::UnboundName { ref name, .. } if name == key),
-                    Mode::LegacyRoots | Mode::DirectAfterRoots | Mode::DirectInline =>
-                        matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == key),
-                },
+                matches!(error, ElabError::UnboundName { ref name, .. } if name == key),
                 "{label} {mode:?}: expected surface refusal, got {error:?}",
             );
         }
