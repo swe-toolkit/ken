@@ -15,7 +15,11 @@
 > SPEC-LINEAR-ALGEBRA-MATRIX-PRODUCT-ZERO §13;
 > SPEC-LINEAR-ALGEBRA-DOT-SELF-ZERO §14;
 > SPEC-LINEAR-ALGEBRA-DOT-RIGHT-LINEARITY §15;
-> SPEC-LINEAR-ALGEBRA-MATRIX-SCALE §16).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-MATRIX-SCALE §16;
+> SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-SCALE §17;
+> SPEC-LINEAR-ALGEBRA-TRACE §18;
+> SPEC-LINEAR-ALGEBRA-TRACE-PRODUCT-COMM §19;
+> SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1725,3 +1729,83 @@ that `c d` equals `d c` is refused at its own proof term with
 elaborator `TypeMismatch` (E0038), “Refl expects an `Eq`-shaped
 goal”. This discriminator rules out matrix commutativity; it does
 not replace the generic checked proof or run the separate CV seed.
+
+## 20. Cancellation of vector and matrix sums
+
+> Section 20 status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-ADD-CANCEL).
+> Architect's AC-0 on `f3ecab2b9` checked both generic laws in a
+> scratch catalog development: `ken check` returned rc 0 without a
+> new `Axiom`, postulate or foreign declaration. An imported client
+> checked the two closed applications and observed a false vector
+> premise refusing at its own `Refl`. The D0 did **not** measure exact
+> `trusted_base()` identity-set equality. The Foundation package test
+> owes that gate on the assembled candidate before a Decision opens;
+> a changed set stops to the Architect. Scratch checks do not attest
+> this Spec child, a catalog or CV seed child, official conformance,
+> CI, publication, landing or measured landed trust.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export two public checked
+Transparent right-cancellation theorems. The exact public types retain
+the dimension binders before the colon and place the indexed inputs and
+the **sole** sum-equality premise in the dependent Pi telescope after
+it:
+
+```ken
+pub theorem vector_add_cancel_right
+      (n : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → (zs : Vec Nat n)
+      → Equal (Vec Nat n) (vector_add n xs zs) (vector_add n ys zs)
+      → Equal (Vec Nat n) xs ys
+
+pub theorem matrix_add_cancel_right
+      (m : Nat) (n : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → (c : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_add m n a c) (matrix_add m n b c)
+      → Equal (Vec (Vec Nat n) m) a b
+```
+
+`vector_add_cancel_right` follows `vector_add_zero_right` and
+`matrix_add_cancel_right` follows `matrix_add_zero_right` in their
+respective public law sequences. In each type the **same** right
+summand, `zs` or `c`, appears on both sides of the premise; the
+conclusion removes it and equates the original operands structurally.
+There is no distinctness, positivity or nonzero-dimension requirement:
+`n`, `m` and all entries may be zero. Neither conclusion follows
+without its sum-equality premise.
+
+The vector proof inducts on dimension `n`, keeping the dependent
+vectors and premise inside that induction's motive rather than
+matching on computed or indexed vector expressions. At `Zero`,
+zero-length vector equality closes the case. At `Suc k`, private
+head/tail and vector-sum views project the premise into equality
+of head sums and of tail sums. The existing public Nat law
+`add_cancel_r` cancels the common head summand; the recursive
+`vector_add_cancel_right` cancels the common tail vector. Private
+vector cons/eta equalities reassemble structural equality of the
+original vectors. The matrix proof inducts on row count `m`:
+its head-row equality invokes the **public vector law** at width
+`n`, and its tail-row equality invokes the matrix law recursively;
+private cons/eta views reassemble the matrix. There is no second
+element-level cancellation proof for rows. The private projections
+and views are not new public operators or premises. Only the
+`add_cancel_r` import is added to the package; no §1–19 operation
+or law type, kernel or surface rule changes. Left cancellation
+follows from these right laws and existing add commutativity, so
+§20 adds no separate left-cancellation law.
+
+At dimension two, the equal-sum instance with `xs = ys = [1,2]`
+and `zs = [0,0]` admits the vector law, and an equal pair of
+`2 × 2` matrices admits the matrix law. On a fresh accepted
+prefix, changing only `ys` to `[2,1]` while keeping `xs = [1,2]`
+and `zs = [0,0]` makes the attempted premise equality false;
+its `Refl` must refuse at that premise, before a conclusion
+`[1,2] = [2,1]` is reached. These are closed client discriminators
+owned by the separate CV seed, not a substitute for the checked
+generic proofs. The two additions take the §19 roster of twelve
+operations and fifty-six laws to twelve operations, fifty-eight
+laws and seventy public names; §19's sixty-eight-name count remains
+historical.
