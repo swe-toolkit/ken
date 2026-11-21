@@ -213,7 +213,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 /// Promise class: durable invariant over these committed source fixtures.
 /// MEASURED: the actual writer compares the emitted answer with its returned
 /// operand, including SSA-word identity for carried values. Each foreign
-/// issued member is reached and its answer stays raw.
+/// issued member is reached and its answer stays raw. The foreign issued
+/// members are keyed by their owner and a single shared writer result, not
+/// by that result's SSA number, which moves when earlier lowering adds
+/// instructions.
 /// CLAIMED: no alternative member mints a [Child, Label] answer.
 /// THE GAP: a specialized-to-specialized substitution cannot be distinguished
 /// by the operand-kind comparison; the foreign-member mutation must wrap a
@@ -224,7 +227,6 @@ fn px10_argv_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_argv",
         ARGV_ENV_PIPE,
         "Predeclared(PredeclaredFunctionId(17))",
-        1789,
         &[1, 2, 3],
     );
 }
@@ -235,7 +237,6 @@ fn px10_live_alternative_writer_keeps_foreign_members_raw() {
         "px10_answer_live",
         LIVE_CHILD,
         "Predeclared(PredeclaredFunctionId(15))",
-        1296,
         &[2, 3, 4],
     );
 }
@@ -244,7 +245,6 @@ fn assert_alternative_writer_raw(
     name: &'static str,
     source: &'static str,
     foreign_owner: &'static str,
-    foreign_result: u32,
     targets: &'static [u32],
 ) {
     use ken_runtime::ProducerAlternativeAnswerObservation as Answer;
@@ -279,11 +279,18 @@ fn assert_alternative_writer_raw(
             writers.iter().all(|row| row.4),
             "{name}: a writer wrapped its answer: {writers:?}"
         );
-        let mut foreign: Vec<_> = writers
+        let foreign_rows: Vec<_> = writers
             .iter()
-            .filter(|row| row.0 == foreign_owner && row.1 == foreign_result && row.3)
-            .map(|row| row.2)
+            .filter(|row| row.0 == foreign_owner && row.3)
             .collect();
+        let foreign_results: std::collections::BTreeSet<u32> =
+            foreign_rows.iter().map(|row| row.1).collect();
+        assert_eq!(
+            foreign_results.len(),
+            1,
+            "{name}: the foreign issued members must reach one writer: {writers:?}"
+        );
+        let mut foreign: Vec<_> = foreign_rows.iter().map(|row| row.2).collect();
         foreign.sort_unstable();
         assert_eq!(
             foreign, targets,

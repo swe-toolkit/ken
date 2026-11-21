@@ -268,7 +268,7 @@ impl ModuleState {
 /// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 52] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 53] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -307,6 +307,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 52] = [
     "ResourceKind",
     "ResourceOpenMode",
     "Result",
+    "SocketAddress",
     "StateOp",
     "Top",
     "TransferCount",
@@ -326,7 +327,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 52] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 166] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 183] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -493,6 +494,23 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 166] = [
     ("Capability.Process.Child", "SignalUser2"),
     ("Capability.Process.Child", "SignalTerminate"),
     ("Capability.Process.Child", "signal_child"),
+    ("Capability.Net.Stream", "SocketShutdown"),
+    ("Capability.Net.Stream", "ShutdownRead"),
+    ("Capability.Net.Stream", "ShutdownWrite"),
+    ("Capability.Net.Stream", "ShutdownBoth"),
+    ("Capability.Net.Stream", "SocketTarget"),
+    ("Capability.Net.Stream", "ListeningSocket"),
+    ("Capability.Net.Stream", "ConnectedSocket"),
+    ("Capability.Net.Stream", "socket_unix_path"),
+    ("Capability.Net.Stream", "private_socket_ipv4_octets"),
+    ("Capability.Net.Stream", "private_socket_ipv6_octets"),
+    ("Capability.Net.Stream", "with_socket_listener"),
+    ("Capability.Net.Stream", "with_socket_accept"),
+    ("Capability.Net.Stream", "with_socket_connection"),
+    ("Capability.Net.Stream", "receive_socket"),
+    ("Capability.Net.Stream", "send_socket"),
+    ("Capability.Net.Stream", "shutdown_socket"),
+    ("Capability.Net.Stream", "socket_local_address"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.
