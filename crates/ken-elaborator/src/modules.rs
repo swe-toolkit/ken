@@ -1307,8 +1307,8 @@ impl Scope {
             };
             if local_id == Some(selected_id) {
                 // A pre-source local and its exporting home can be the same
-                // checked declaration. Keep that ID in the root binding even
-                // under Legacy: the flat globals spelling may be rebound.
+                // checked declaration. Keep that ID in the root binding;
+                // the flat globals spelling may be rebound.
                 self.binding_ids.insert(bare.to_string(), selected_id);
                 return Ok(());
             }

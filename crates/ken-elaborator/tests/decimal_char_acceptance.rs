@@ -63,6 +63,31 @@ fn eval_view_with_import(src: &str, imported: Option<&str>) -> EvalVal {
     }
 }
 
+// Decimal's internal producer and non-canonical pair have no source route.
+// Keep the exact checked operation by reading its pre-source ID before any
+// package load, then kernel-check the operation on two representation pairs.
+fn eval_decimal_binary(operation: &str, left: (i128, i128), right: (i128, i128)) -> EvalVal {
+    let env = ElabEnv::new().expect("pre-source Decimal registry");
+    let op_id = env.globals[operation];
+    let pair_id = env.prelude_env.mkdecimalpair_id;
+    let pair = |(coefficient, exponent): (i128, i128)| {
+        Term::app(
+            Term::app(
+                Term::constructor(pair_id, vec![]),
+                Term::IntLit(coefficient.into()),
+            ),
+            Term::IntLit(exponent.into()),
+        )
+    };
+    let term = Term::app(
+        Term::app(Term::const_(op_id, vec![]), pair(left)),
+        pair(right),
+    );
+    let ty = infer(&env.env, &Context::new(), &term).expect("Decimal operation checks");
+    eval_checked(&term, &ty, &env.env, &mut EvalStore::new())
+        .expect("checked Decimal operation evaluates")
+}
+
 /// Extract `(coeff, exp)` from a `Decimal` `Ctor` value — never constructs
 /// one, only inspects the real producer's output.
 fn as_decimal(v: &EvalVal) -> (i64, i64) {
@@ -91,9 +116,7 @@ fn decimal_mul_exact_flips_vs_saturating() {
     // coeff product 10^20 > i64::MAX (~9.22e18) — the old native
     // `mul_decimal` used `saturating_mul`, clamping to i64::MAX. The
     // derived `decimalMul` runs bignum `mul_int`, exact.
-    let result = eval_view(
-        "const t = decimalMul (MkDecimalPair 10000000000 0) (MkDecimalPair 10000000000 0)",
-    );
+    let result = eval_decimal_binary("decimalMul", (10_000_000_000, 0), (10_000_000_000, 0));
     match &result {
         EvalVal::Ctor { args, .. } => {
             match &args[0] {
@@ -128,9 +151,10 @@ fn decimal_eq_distinct_flips_vs_false_true() {
     // (the F4 hole: two distinct decimals comparing equal). The derived
     // `decimalEq` aligns exactly via `decimalPow10`/`mul_int`, so this must
     // reduce to `false`.
-    let result = eval_view(
-        "const t = decimalEq (MkDecimalPair 9223372036854775807 0) \
-                             (MkDecimalPair 9223372036854775807 1)",
+    let result = eval_decimal_binary(
+        "decimalEq",
+        (9_223_372_036_854_775_807, 0),
+        (9_223_372_036_854_775_807, 1),
     );
     assert_eq!(
         result,
@@ -143,9 +167,10 @@ fn decimal_eq_distinct_flips_vs_false_true() {
 /// confirm `decimalEq` isn't just accidentally always false.
 #[test]
 fn decimal_eq_same_value_both_alignments_true() {
-    let result = eval_view(
-        "const t = decimalEq (MkDecimalPair 9223372036854775807 1) \
-                             (MkDecimalPair 92233720368547758070 0)",
+    let result = eval_decimal_binary(
+        "decimalEq",
+        (9_223_372_036_854_775_807, 1),
+        (92_233_720_368_547_758_070, 0),
     );
     assert_eq!(
         result,
@@ -158,7 +183,7 @@ fn decimal_eq_same_value_both_alignments_true() {
 /// Sanity: `decimalAdd` at the same exponent needs no alignment.
 #[test]
 fn decimal_add_same_exponent() {
-    let result = eval_view("const t = decimalAdd (MkDecimalPair 1 0) (MkDecimalPair 2 0)");
+    let result = eval_decimal_binary("decimalAdd", (1, 0), (2, 0));
     assert_eq!(as_decimal(&result), (3, 0));
 }
 

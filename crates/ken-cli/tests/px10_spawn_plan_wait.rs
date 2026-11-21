@@ -982,53 +982,14 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
 /// `PerformedEffectOutsideDeclaredRow { effect: "FS" }` because it declares
 /// `visits [Process]` only. Its callers use LIVE_CHILD instead; the no-close
 /// stdin row exports its own source, so its PipeWrite plan is not borrowed
-/// from a different fixture.
+/// from a different fixture. The checked target uses the same rooted import
+/// route as native preparation.
 fn exported_process_resource_lifetime_obligation_for(
     source: &str,
 ) -> ken_elaborator::export::ResourceLifetimeObligation {
-    // The checked-target export API is not an isolated CLI route. It still
-    // elaborates standalone in Legacy without catalog roots; remove only the
-    // route's import directives, leaving the program body and effects intact.
-    let mut source_without_imports = String::new();
-    let mut skipping_import = false;
-    for line in source.split_inclusive('\n') {
-        if line.starts_with("import ") {
-            skipping_import = true;
-            continue;
-        }
-        if skipping_import && (line.starts_with(' ') || line.starts_with('\t')) {
-            continue;
-        }
-        skipping_import = false;
-        source_without_imports.push_str(line);
-    }
-    let source = source_without_imports;
-    // The earlier LIVE_CHILD fixture sampled 3292 KiB resident on 16 MiB;
-    // this dedicated export uses that stated provisioning for both sources.
-    std::thread::Builder::new()
-        .name("px10-lifetime-template-export".to_owned())
-        .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
-            let denotation = ken_elaborator::compiler_driver::compile_checked_target_denotation(
-                "px10_resource_lifetime_template",
-                ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", &source),
-                "main",
-            )
-            .expect("checked Process program denotation");
-            ken_elaborator::export::emit_checked_target_export(
-                &denotation,
-                &[],
-                &std::collections::BTreeSet::new(),
-                vec![],
-                vec![],
-            )
-            .expect("checked Process program export")
-            .resource_lifetime_obligation
-            .expect("a Process program exports a resource-lifetime obligation")
-        })
-        .expect("stated export stack")
-        .join()
-        .expect("export thread completes")
+    // LIVE_CHILD sampled 3292 KiB resident on 16 MiB; this dedicated export
+    // retains that stated provisioning for both sources.
+    exported_rooted_process_resource_lifetime_obligation_for(source, 16 * 1024 * 1024)
 }
 
 // D2 on c1b4b19bf completed all three unstripped Strict exports at 16 MiB.

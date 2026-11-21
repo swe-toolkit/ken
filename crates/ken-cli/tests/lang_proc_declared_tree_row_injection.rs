@@ -75,8 +75,9 @@ fn auth_index_b_two_caps_declared_host_tree_is_accepted() {
 fn auth_index_c_two_caps_declared_fs_tree_is_accepted() {
     accepts(
         "C declared FS",
-        "proc copy (src : Cap AFull) (dst : Cap APartial) : FS AFull Unit \
-         visits [FS] = ITree.Ret (FSOp AFull) (fs_resp AFull) Unit MkUnit",
+        "import Capability.Filesystem.Authority (FS)\n\
+         proc copy (src : Cap AFull) (dst : Cap APartial) (t : FS AFull Unit) \
+         : FS AFull Unit visits [FS] = t",
     );
 }
 
@@ -103,20 +104,20 @@ fn r1_clock_cannot_inject_into_console_tree() {
     );
 }
 
-const HOST_RET: &str = "ITree.Ret (Coproduct (FSOp APartial) AmbientOp) \
-    (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp) Unit MkUnit";
+const HOST_RET: &str = "host_pure APartial Unit MkUnit";
 
 #[test]
 fn r2_host_operation_labels_inject_only_into_their_family() {
     for (case, row) in [("R2 host family", "FS, FsOpen"), ("R2 FS", "FS")] {
         accepts(
             case,
-            &format!("proc h : HostIO APartial Unit visits [{row}] = {HOST_RET}"),
+            &format!("import Capability.Process.Exit (host_pure)\nproc h : HostIO APartial Unit visits [{row}] = {HOST_RET}"),
         );
     }
     refuses_label(
         "R2 FsOpen in IO",
-        "proc i : IO Unit visits [Console, FsOpen] = print_line \"x\"",
+        "import Capability.Console.Text (IO, print_line)\n\
+         proc i : IO Unit visits [Console, FsOpen] = print_line \"x\"",
         "FsOpen",
     );
 }
@@ -159,16 +160,18 @@ fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
 }
 
 fn host_tree_source(tree: HostTree, label: &str) -> String {
-    let (operation, response) = match tree {
-        HostTree::Console => ("ConsoleOp", "console_resp"),
-        HostTree::Clock => ("ClockOp", "clock_resp"),
-        HostTree::Entropy => ("EntropyOp", "entropy_resp"),
-        HostTree::Fs => ("(FSOp APartial)", "(fs_resp APartial)"),
+    let (import, signature) = match tree {
+        HostTree::Console => ("", "ITree ConsoleOp console_resp"),
+        HostTree::Clock => ("import Capability.Time.WallClock (ClockIO)\n", "ClockIO"),
+        // No public EntropyIO exists. HostIO is the narrowest public tree
+        // signature containing EntropyOp through its AmbientOp summand.
+        HostTree::Entropy => ("", "HostIO APartial"),
+        HostTree::Fs => (
+            "import Capability.Filesystem.Authority (FS)\n",
+            "FS APartial",
+        ),
     };
-    format!(
-        "proc p : ITree {operation} {response} Unit visits [{label}] = \
-         ITree.Ret {operation} {response} Unit MkUnit"
-    )
+    format!("{import}proc p (t : {signature} Unit) : {signature} Unit visits [{label}] = t")
 }
 
 #[test]

@@ -69,12 +69,12 @@ fn selected_package(
     StableSymbol,
 ) {
     let owner = StableSymbol::declaration(package_name, &[], name);
-    // This generic package route remains Legacy; only native preparation
-    // consumes the imported Strict source and its explicit catalog root.
-    let legacy_source = source.replacen("import Capability.Process.Exit (host_pure)\n", "", 1);
+    // The generic package and native preparation use the same checked import.
+    let roots =
+        vec![std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
     let compiled = compile_ken_package_sources(
         &CompilerManifest::new(package_name, Vec::new()),
-        vec![CompilerSource::new("src/main.ken", legacy_source)],
+        vec![CompilerSource::new("src/main.ken", source).with_roots(roots)],
         TargetSelector::StableSymbol {
             package_identity: StableSymbol::new(
                 SymbolNamespace::Module,
