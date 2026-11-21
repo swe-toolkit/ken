@@ -791,10 +791,10 @@ impl ElabEnv {
         modules::elaborate_module_from_roots_v1(self, roots, entry)
     }
 
-    /// Elaborate a roots-loaded unit with strict bare-name resolution.
+    /// Elaborate a roots-loaded unit under the single source-resolution rule.
     ///
-    /// The catalog CLI selects this mode; the Legacy roots entry remains
-    /// available to isolated and transitional callers.
+    /// This alias and the ordinary roots entry select the same catalog root
+    /// and refuse bare names absent from the checked scope.
     pub fn elaborate_module_from_roots_strict(
         &mut self,
         roots: &[PathBuf],
