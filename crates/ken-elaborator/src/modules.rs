@@ -4214,6 +4214,7 @@ fn rewrite_rdecl(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     rdecl: RDecl,
+    source_decl: &Decl,
 ) -> Result<RDecl, ElabError> {
     // Instance and derive declarations carry their class reference in the
     // declaration-name slot rather than an RCon. Route that direct class
@@ -4222,7 +4223,12 @@ fn rewrite_rdecl(
         &rdecl.kind,
         RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
     ) {
-        Some(resolve_checked_ref(scope, exports, &rdecl.name, &rdecl.span)?)
+        Some(resolve_checked_ref(
+            scope,
+            exports,
+            &rdecl.name,
+            class_reference_span(source_decl, &rdecl.span),
+        )?)
     } else {
         None
     };
@@ -5172,7 +5178,7 @@ fn resolve_scoped_decl(
     binder_names: &HashSet<String>,
 ) -> Result<RDecl, ElabError> {
     let rdecl = resolve_raw_scoped_decl(decl, scope, exports, unit_definitions, binder_names)?;
-    rewrite_rdecl(scope, exports, rdecl)
+    rewrite_rdecl(scope, exports, rdecl, decl)
 }
 
 fn resolve_raw_scoped_decl(
@@ -5335,15 +5341,27 @@ struct SynthesizedDictionaryName {
     head_canonical: String,
 }
 
+/// Only an instance carries a dedicated class-reference span. Derive keeps
+/// its existing declaration-span diagnostic until it has its own source span.
+fn class_reference_span<'a>(decl: &'a Decl, fallback: &'a Span) -> &'a Span {
+    match decl.unwrap_pub() {
+        Decl::InstanceDecl {
+            class_name_span, ..
+        } => class_name_span,
+        _ => fallback,
+    }
+}
+
 fn synthesized_dictionary_name(
     scope: &Scope,
     exports: &HashMap<String, HashMap<String, String>>,
     class_name: &str,
     head_name: &str,
     head_is_binder: bool,
+    class_span: &Span,
     span: &Span,
 ) -> Result<SynthesizedDictionaryName, ElabError> {
-    let resolved_class = resolve_class_ref(scope, exports, class_name, span)?;
+    let resolved_class = resolve_class_ref(scope, exports, class_name, class_span)?;
     // A generic instance head's type variable is bound by the declaration,
     // not by the module scope. Resolving it as a global spelling would discard
     // the planned identity during prebind and again at ordered admission.
@@ -5736,6 +5754,7 @@ fn prebind_synthesized_dictionaries(
                     class_name,
                     head_name,
                     instance_head_is_type_binder(inner),
+                    class_reference_span(inner, span),
                     span,
                 ) {
                     Ok(name) => name,
@@ -6417,7 +6436,8 @@ fn expand_scope(
                         unit_definitions,
                         &elab.module_state.prelude_binding_names,
                     )?;
-                    let rdecl = rewrite_rdecl(scope, &elab.module_state.exports, raw.clone())?;
+                    let rdecl =
+                        rewrite_rdecl(scope, &elab.module_state.exports, raw.clone(), inner)?;
                     node_names.insert(rdecl.name.clone(), index);
                     let ctor_names: Vec<&str> = match inner {
                         Decl::DataDecl { ctors, .. } => {
@@ -6518,6 +6538,7 @@ fn expand_scope(
                             scope,
                             &elab.module_state.exports,
                             raw_rdecls[k].clone(),
+                            node_decls[k].unwrap_pub(),
                         )?;
                         // The proof helper checks that its canonical name is
                         // free. If the prior occupant is this scope's public
@@ -6582,7 +6603,12 @@ fn expand_scope(
                         let members = scc
                             .iter()
                             .map(|&m| {
-                                rewrite_rdecl(scope, &elab.module_state.exports, raw_rdecls[m].clone())
+                                rewrite_rdecl(
+                                    scope,
+                                    &elab.module_state.exports,
+                                    raw_rdecls[m].clone(),
+                                    node_decls[m].unwrap_pub(),
+                                )
                             })
                             .collect::<Result<Vec<crate::resolve::RDecl>, ElabError>>()?;
                         let has_proof = members.iter().any(|rdecl| {
@@ -6818,6 +6844,40 @@ fn expand_scope(
                 }
                 {
                     // Class/instance/law/foreign/temporal/prove barriers.
+                    // An instance or derived dictionary owns its allocations
+                    // and obligation IDs under its own canonical dictionary
+                    // identity, never the class name all its instances share.
+                    // Resolve the instance class through that same path before
+                    // rewriting the raw declaration: an absent class must keep
+                    // the parsed class-reference span in its diagnostic.
+                    let dictionary = match decl_namespace_effect(inner) {
+                        DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                            class_name,
+                            head_name,
+                            span,
+                        } => match synthesized_dictionary_name(
+                            scope,
+                            &elab.module_state.exports,
+                            class_name,
+                            head_name,
+                            instance_head_is_type_binder(inner),
+                            class_reference_span(inner, span),
+                            span,
+                        ) {
+                            Err(ElabError::UnboundName {
+                                name,
+                                span: error_span,
+                            }) if matches!(inner, Decl::InstanceDecl { class_name, .. } if name == *class_name) =>
+                            {
+                                return Err(ElabError::UnboundName {
+                                    name,
+                                    span: error_span,
+                                });
+                            }
+                            other => other.ok(),
+                        },
+                        _ => None,
+                    };
                     let renamed = qualify_decl_name(inner, prefix);
                     let rdecl = resolve_scoped_decl(
                         &renamed,
@@ -6826,23 +6886,6 @@ fn expand_scope(
                         unit_definitions,
                         &elab.module_state.prelude_binding_names,
                     )?;
-                    // An instance or derived dictionary owns its allocations
-                    // and obligation IDs under its own canonical dictionary
-                    // identity, never the class name all its instances share.
-                    let dictionary = match decl_namespace_effect(inner) {
-                        DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
-                            class_name, head_name, span,
-                        } => synthesized_dictionary_name(
-                            scope,
-                            &elab.module_state.exports,
-                            class_name,
-                            head_name,
-                            instance_head_is_type_binder(inner),
-                            span,
-                        )
-                        .ok(),
-                        _ => None,
-                    };
                     let structural = match (&dictionary, &rdecl.kind) {
                         (None, RDeclKind::InstanceDecl { head_type, .. }) => {
                             crate::elab::structural_instance_symbol(&rdecl.name, head_type)
@@ -7293,14 +7336,10 @@ mod namespace_effect_tests {
     }
 
     /// Promise class: durable invariant (33 §5.3, 39 §6).
-    /// MEASURED: the direct declaration entry refuses an absent generic
-    /// instance class as UnboundName naming the class, where Legacy gave
-    /// UnresolvedCon. The refusal currently spans the whole declaration.
-    /// CLAIMED: a missing class has no ambient fallback on this entry.
-    /// THE GAP: InstanceDecl carries no class-token span, so the pinned 0..37
-    /// is current behaviour, not a localization promise. Pointing at the class
-    /// head is a follow-on AST change (a name span, as LetBinding.name_span
-    /// does), which updates this pin deliberately.
+    /// MEASURED: an absent generic instance class refuses as UnboundName
+    /// naming the class at the source class token, rather than at the whole
+    /// declaration. CLAIMED: direct-declaration resolution localizes the
+    /// refusal to the class reference without an ambient fallback.
     #[test]
     fn generic_instance_missing_class_refuses_in_declaration_entry() {
         const SOURCE: &str = "instance MissingFlag a { tag = True }";
@@ -7308,9 +7347,70 @@ mod namespace_effect_tests {
         match env.elaborate_decl_v1(SOURCE) {
             Err(ElabError::UnboundName { name, span }) => {
                 assert_eq!(name, "MissingFlag");
-                assert_eq!((span.start, span.end), (0, SOURCE.len()));
+                assert_eq!((span.start, span.end), (9, 20));
             }
             other => panic!("missing class must refuse as UnboundName: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (33 §3.1, §5.3).
+    /// MEASURED: an absent instance class in a module-file entry reports the
+    /// class token's file offset. CLAIMED: module replay preserves the parsed
+    /// class-reference span instead of replacing it with a declaration span.
+    /// THE GAP: the direct-declaration entry is checked separately above.
+    #[test]
+    fn generic_instance_missing_class_refuses_at_module_token() {
+        const SOURCE: &str = "module Inner { instance MissingFlag a { tag = True } }";
+        let token_start = SOURCE.find("MissingFlag").expect("class token in fixture");
+        let mut env = ElabEnv::new().expect("checked prelude");
+        match env.elaborate_file_v1(SOURCE) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "MissingFlag");
+                assert_eq!(
+                    (span.start, span.end),
+                    (token_start, token_start + "MissingFlag".len())
+                );
+            }
+            other => panic!("missing module class must refuse at its token: {other:?}"),
+        }
+    }
+
+    /// Promise class: durable invariant (33 §3.3, §5.3).
+    /// MEASURED: a dotted class reference's span includes both path tokens
+    /// and the separating source text. CLAIMED: the parser carries the actual
+    /// source extent rather than deriving it from the resolved path spelling.
+    /// THE GAP: the single-token module and direct entries are pinned above.
+    #[test]
+    fn generic_instance_missing_qualified_class_spans_source_path() {
+        const SOURCE: &str = "instance Missing . Flag a { tag = True }";
+        let mut env = ElabEnv::new().expect("checked prelude");
+        match env.elaborate_decl_v1(SOURCE) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "Missing.Flag");
+                assert_eq!((span.start, span.end), (9, 23));
+            }
+            other => panic!("missing qualified class must refuse at its path: {other:?}"),
+        }
+    }
+
+    /// Promise class: transition sentinel (Steward AC-3 amendment).
+    /// MEASURED: a missing `where` class still refuses as UnboundName at the
+    /// full declaration span measured on base 69458aa89 (0..51).
+    /// CLAIMED: moving the instance head-class span does not alter the
+    /// separate constraint rewrite. THE GAP: InstanceConstraint has no
+    /// class-name span; token localization there needs a separate change.
+    #[test]
+    fn generic_instance_missing_where_class_keeps_declaration_span() {
+        const SOURCE: &str = "instance Flag a where MissingClass a { tag = True }";
+        let mut env = ElabEnv::new().expect("checked prelude");
+        env.elaborate_decl_v1("class Flag A { tag : Bool }")
+            .expect("existing head class");
+        match env.elaborate_decl_v1(SOURCE) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "MissingClass");
+                assert_eq!((span.start, span.end), (0, SOURCE.len()));
+            }
+            other => panic!("missing where class must refuse as UnboundName: {other:?}"),
         }
     }
 

@@ -394,6 +394,8 @@ pub enum Decl {
     /// re-check, `check.rs:944`).
     InstanceDecl {
         class_name: String,
+        /// Span of the class reference, distinct from the whole declaration.
+        class_name_span: Span,
         /// Head type expression (may be a type constructor application).
         head_type: Type,
         /// Sub-constraints and their optional explicit dictionary binders.

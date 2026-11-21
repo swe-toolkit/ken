@@ -3311,7 +3311,9 @@ impl Parser {
     /// (`33 §5`, `39 §6`).
     fn parse_instance_decl(&mut self, start: usize) -> Result<Decl, ElabError> {
         self.advance(); // consume 'instance'
+        let class_name_start = self.peek_span().start;
         let class_name = self.parse_path()?;
+        let class_name_span = Span::new(class_name_start, self.tokens[self.pos - 1].1.end);
         let head_type = self.parse_atom_type_app()?;
         let constraints = self.parse_instance_constraints(false, true)?;
         self.expect(&Token::LBrace)?;
@@ -3329,6 +3331,7 @@ impl Parser {
         self.expect(&Token::RBrace)?;
         Ok(Decl::InstanceDecl {
             class_name,
+            class_name_span,
             head_type,
             constraints,
             fields,
