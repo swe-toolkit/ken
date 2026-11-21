@@ -134,6 +134,18 @@ also owns the currency repair of `spec/60-security/62-authority.md`'s
   naming the socket operation, with no artifact. One named test pins it.
 - **AC-5.** Full-workspace CI is green on the exact candidate.
 
+## §1b symptom inventory
+
+Chain: the CI withdrawal of `365483284` (Steward `evt_7aeyfmh1ry82y`;
+§1a 1 at Architect `evt_6sgn2694hyr41`).
+
+1. The Net members were added to closed inventories (ABI catalog rows,
+   BUFFER_REQUIRE_SAME_AT, the ken-host admission inventories, the
+   prelude), while those inventories' non-match consumers (probe facts, a
+   self-sourced oracle, hand-listed pins, literal SSA census pins,
+   catalog-walk depth) sat outside the targeted runs. Keyed on inventory
+   membership.
+
 ## Stop conditions
 
 - The design needs a raw `(level, optname)` option pair, or a resolver
