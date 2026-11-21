@@ -144,11 +144,13 @@ The loader proceeds as follows:
    `ConsoleOp.IsTerminal`; their bare cases do not enter B. Scoped
    constructors do not increase the fifty-three-name count. `IOError`'s
    complete thirteen-cause family, `CreatePolicy`'s three cases and
-   `ResourceError`'s complete
+   `ResourceError`'s complete current
    twelve-case family are scoped: their public constructor paths are
    `IOError.C`, `CreatePolicy.CreateNew` /
    `CreatePolicy.CreateOrTruncate` / `CreatePolicy.CreateOrKeep`, and
-   `ResourceError.C`, never their bare names. `BufferSpan` and
+   the twelve current `ResourceError.C` paths, never their bare names.
+   The successor `ResourceError.Revoked` (§38 §1.3.1) is not a current
+   checked constructor and does not enlarge this family. `BufferSpan` and
    `TransferCount` are scoped; `PrivateBufferSpan` and
    `PrivateTransferCount` are constructor-private and accessible by
    neither bare nor qualified source path. The five additional scoped

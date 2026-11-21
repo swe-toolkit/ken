@@ -237,30 +237,35 @@ Raw attenuation and revocation are trusted runner/host management actions over
 non-Ken-visible grant identities (`62 §4`), not source operations. Attenuation
 records child lineage; revocation closes the selected identity and its
 descendants. A program observes neither action directly. It observes revocation
-only when a later existing capability-consuming operation returns one of these
-exact type-local projections:
+only when a later existing capability-consuming operation returns a
+revocation result in its type-local error family:
 
 - a path/capability operation returns
-  `MkFileError <operation> <path> Revoked`, where `Revoked` is a new `IOError`
+  `MkFileError <operation> <path> Revoked`, where `Revoked` is an `IOError`
   cause beside and distinct from `CapabilityDenied`;
-- an ordinary resource-token operation, other than the Process host
-  operations of §1.11, returns the nullary constructor
-  `ResourceError.Revoked`.
+- an ordinary FS or Net resource-token operation currently returns
+  `ResourceHostIO IOError.Revoked` when its originating grant is revoked
+  before admission. The successor contract, after error unification,
+  projects this same denial as the nullary `ResourceError.Revoked`, distinct
+  from `Closed`, `MalformedResource`, `RightNotHeld`,
+  `ResourceKindMismatch`, and `ResourceHostIO _`. This successor is not a
+  constructor of the currently complete twelve-case `ResourceError` family.
 
-**Process host operations are the exception to the second projection.**
+**Process host operations remain distinct from the successor projection.**
 Later plan, child and pipe operations, including `signal_child`, return
 `ResourceHostIO IOError.Revoked` when the originating Process grant is
 revoked before admission (§1.11.2–§1.11.4). This retains the same
 `IOError.Revoked` cause through the Process classification of §1.11.3;
 it does not introduce a new semantic denial identity or permit the
 signal to reach the child. The two enclosing error families remain
-distinct; no shared sum is introduced. For the two general projections,
-the runtime/host mapping never substitutes `CapabilityDenied`,
-`ResourceHostIO CapabilityDenied`, `Closed`, malformed capability or
-resource, stale generation, `RightNotHeld`, `ResourceKindMismatch`,
-`ResourceHostIO _`, or another host I/O failure. The Process-host
-exception preserves `IOError.Revoked` inside `ResourceHostIO` rather
-than collapsing it to an unrelated host-I/O cause.
+distinct; no shared sum is introduced. Neither current nor successor
+mapping substitutes `CapabilityDenied`,
+`ResourceHostIO IOError.CapabilityDenied`, `Closed`, malformed
+capability or resource, stale generation, `RightNotHeld`,
+`ResourceKindMismatch`, or another host-I/O cause for revocation.
+For delivered resource-token and Process-host cases, `ResourceHostIO`
+**with the exact `IOError.Revoked` cause** is the intentional carrier,
+not a collapse of that cause.
 
 ### 1.4 Text is explicit `bytes_encode` / `bytes_decode` — no hidden charset
 
@@ -772,19 +777,21 @@ the reason the negative form matters: `error_transience Revoked = Permanent` —
 a revoked authority is gone, so retry cannot help, and `Revoked` is never
 `Transient`.
 
-**(2) `Revoked` is a single identity.** The revocation observable named today by
-three carriers — `IOError.Revoked` (`§1.3.1`), `ResourceError.Revoked`
-(`§1.3.1`), and the host-boundary revoked of the progress/error partition
-(`§1.7.2`) — is **one** semantic identity: an otherwise well-formed, live,
+**(2) `Revoked` is a single identity.** The path-level
+`IOError.Revoked` (§1.3.1) and the delivered resource-token and
+Process-host `ResourceHostIO IOError.Revoked` (§1.3.1, §1.11) carry
+**one** semantic denial: an otherwise well-formed, live,
 sufficiently-righted operation that lost at the `../60-security/62 §4.2`
-admission boundary. A conforming error surface exposes exactly **one** `Revoked`
-identity, classified `Permanent`. This is the unification `ABI-REVOKE` sequences
-before PX9 (`../../docs/program/10-linux-abi-completion.md §7`), and it
-**preserves** the `Revoked` identity rather than collapsing it — the opposite of
-mapping `Revoked` into `CapabilityDenied`, `Closed`, or an unrelated
-host-I/O cause, which `§1.7.2` already forbids. The Process-host
-`ResourceHostIO IOError.Revoked` projection (§1.11) carries this same
-identity through the existing `IOError` cause; it is not such a collapse.
+admission boundary. The host-boundary revoked of the progress/error
+partition (§1.7.2) retains that cause. The successor
+`ResourceError.Revoked` is a type-local projection of the same identity,
+not a third current checked constructor or a different denial. A conforming
+error surface exposes exactly **one** `Revoked` identity, classified
+`Permanent`. The `ABI-REVOKE` unification preserves it rather than
+collapsing it into `CapabilityDenied`, `Closed`, or an unrelated host-I/O
+cause, which §1.7.2 already forbids. The Process-host projection stays
+`ResourceHostIO IOError.Revoked` even when the ordinary resource-token
+projection changes; it is not such a collapse.
 
 These are behavioral contracts on the error surface, introducing no kernel
 feature: PX9's type and laws are re-checked Ken (the foundation deliverable),
@@ -1545,14 +1552,13 @@ need `Inet`, not `Loopback`. A `Unix` declaration also requires
 `ResourceHostIO IOError.Revoked`, before any socket syscall. The
 listener or stream retains the originating grant's provenance. On a
 revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
-`NetShutdown` and `NetLocalAddress` instead return the ordinary
-resource-token projection `ResourceError.Revoked` before any guarded
-host leaf. They are not Process host operations (§62 §4.1). Until the
-`ResourceError.Revoked` unification lands, the delivered resource-token
-carrier for these five operations is `ResourceHostIO IOError.Revoked`,
-as for FS resource tokens; the `ResourceError.Revoked` projection above
-is the successor contract, not a claim about current checked
-constructors. Bracket settlement still uses `ResourceRelease`. The
+`NetShutdown` and `NetLocalAddress` return the delivered FS/Net
+resource-token carrier `ResourceHostIO IOError.Revoked` before any
+guarded host leaf. They are not Process host operations (§62 §4.1).
+After unification, their successor projection is
+`ResourceError.Revoked`; it is not a current checked constructor or a
+thirteenth member of the present `ResourceError` family. Bracket
+settlement still uses `ResourceRelease`. The
 `a : Auth` argument and `HostIO a` are the existing authority-indexed
 carrier; Net-class
 membership is checked on the decoded address at admission, not

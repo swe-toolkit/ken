@@ -86,7 +86,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
 | `IOError` (floor) | Yes | All thirteen causes use `IOError.C`; `NotFound`, `Other`, `Unsupported` and `Revoked` are not bare reservations. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
-| `ResourceError` (floor) | Yes | All twelve error causes use `ResourceError.C`; no bare error name is reserved. |
+| `ResourceError` (floor) | Yes | All twelve current error causes use `ResourceError.C`; no bare error name is reserved. The successor `ResourceError.Revoked` (§38 §1.3.1) is not a current checked constructor. |
 | `ReadProgress` (floor) | Yes | `ReadProgress.ReadSome` and `ReadProgress.ReadEof` are the complete checked read-result family; neither leaf is bare-reserved. |
 | `WriteProgress` (floor) | Yes | `WriteProgress.Wrote` is the checked write-result case; `Wrote` is not bare-reserved. |
 | `ResourceOpenMode` (floor) | Yes | `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata` and `ResourceOpenMode.ResourceWriteCreate` select FS acquisition modes; their leaves are not bare-reserved. |
@@ -238,7 +238,7 @@ alone reserves a name.
 | `MkBufferWindow` (package constructor) | Checked request descriptor constructor; neither it nor its unkeyed parent enters B. |
 | `TransferCount` (floor, scoped) | `38 §1.7.2` exposes this exact progress carrier and its count view; native code mints `PrivateTransferCount`, fixing the checked parent. |
 | `PrivateTransferCount` (private floor constructor) | Exact checked `TransferCount` constructor minted by the host; constructor privacy and absence of a bare reservation remain. |
-| `ResourceError` (floor, scoped) | `38 §1.7–1.9` requires this public refusal family; native code produces all twelve exact checked constructor IDs, fixing their shared parent. Only `ResourceError.C` resolves. |
+| `ResourceError` (floor, scoped) | `38 §1.7–1.9` requires this public refusal family; native code produces all twelve current exact checked constructor IDs, fixing their shared parent. Only those current `ResourceError.C` paths resolve; successor `ResourceError.Revoked` is not registered or checked yet. |
 | `ResourceHostIO` (qualified floor constructor) | Native host-error wrapper ID; parent `ResourceError`; source `ResourceError.ResourceHostIO`, not bare. |
 | `Closed` (qualified floor constructor) | Native closed-token refusal ID; parent `ResourceError`; source `ResourceError.Closed`, not bare. |
 | `MalformedResource` (qualified floor constructor) | Native malformed-token refusal ID; parent `ResourceError`; source `ResourceError.MalformedResource`, not bare. |
