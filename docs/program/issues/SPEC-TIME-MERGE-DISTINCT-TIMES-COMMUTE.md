@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE
 title: "Spec 69 states trace_merge's ordering, membership, count, length and associativity, but no law says when argument order does not matter, so a client merging two event sources must fix an order even when no timestamp is shared. Rule from a checked D0 at zero trust that trace_merge p xs ys equals trace_merge p ys xs when no event of xs shares a timestamp with an event of ys, and state it with a seed that separates distinct timestamps from a shared one"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -22,7 +22,7 @@ and `ys`, if no event of `xs` has the same `event_time` as an event of
 `Equal (List (Event p))`. It holds at zero trust, and spec 69 states it by
 its public type.
 
-## Settled inputs (main `61b1f0f88`; re-check anchors at release)
+## Settled inputs (main `21d4c6ccd`; anchors re-checked at release)
 
 - **The operation.** `trace_merge` (`EventTrace.ken.md:119`) recurses on
   `xs` through the private `trace_merge_into` (`:474`). That function
@@ -92,7 +92,7 @@ SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV.
 - AC-T finds `trusted_base()` changed as an identity set.
 - A change to an existing §1 to §19 operation or law type.
 
-Checks: 3 fired. I listed every public `trace_merge` law on `61b1f0f88`;
+Checks: 3 fired. I listed every public `trace_merge` law on `21d4c6ccd`;
 none states argument-order independence. AC-0 sweeps the consumer roots
 by the sibling law, because Numerical's first QA pass found an exported
 law missing from the `modules.rs` roster. 4 fired. I read

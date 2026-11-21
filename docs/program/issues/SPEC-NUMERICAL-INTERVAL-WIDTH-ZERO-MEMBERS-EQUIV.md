@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV
 title: "Spec 68 §18 bounds the truncated difference of two enclosed values by the interval's width, but no law takes the limiting case, so a client holding a zero-width enclosure cannot conclude that it has pinned its value exactly without re-deriving order facts from truncated subtraction. Rule from a checked D0 at zero trust that, when interval_width i is rational_equiv to zero, any two values contained in i are rational_equiv, and state it with a seed that separates a zero-width interval from one of positive width"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
