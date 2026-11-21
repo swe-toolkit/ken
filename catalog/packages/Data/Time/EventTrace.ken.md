@@ -38,6 +38,8 @@ merge membership laws, merge associativity and adjacent-window split lead
 their private lemmas later in the source. The ordered, complete, and sound
 merge-all laws follow the associativity helper family. The count and length
 laws follow them, then the window-distribution law, then the append law.
+The distinct-time commutation law follows the append law and leads its two
+private recursion helpers and its private timestamp lemma.
 The separated-merge law follows the right empty-merge unit and leads its
 private head-comparison helper. The inverted-window law follows window
 append; its private decision lemma sits beside the split's bound lemmas.
@@ -2826,6 +2828,286 @@ pub theorem trace_merge_all_append
           (trace_merge_assoc p t (trace_merge_all p rest) (trace_merge_all p ys)))
   }
 
+pub theorem trace_merge_distinct_commute
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : ((x : Event p)
+        → list_elem
+        (Event p)
+        x
+        xs
+        → (y : Event p)
+        → list_elem
+        (Event p)
+        y
+        ys
+        → Equal
+        Bool
+        (bool_or
+          (lt_nat (event_time p x) (event_time p y))
+          (lt_nat (event_time p y) (event_time p x)))
+        True)
+      → Equal (List (Event p)) (trace_merge p xs ys) (trace_merge p ys xs) =
+  match xs {
+    Nil ↦
+      λdistinct.
+        sym (List (Event p)) (trace_merge p ys (Nil (Event p))) ys (trace_merge_nil_right p ys);
+    Cons x xt ↦
+      λdistinct.
+        trace_merge_distinct_commute_cons
+          p
+          x
+          xt
+          (λvs. λtail_distinct. trace_merge_distinct_commute p xt vs tail_distinct)
+          ys
+          distinct
+  }
+
+theorem trace_merge_distinct_commute_cons
+      (p : Type)
+      (x : Event p)
+      (xt : List (Event p))
+      (ih_xt : (vs : List (Event p))
+        → ((a : Event p)
+          → list_elem
+          (Event p)
+          a
+          xt
+          → (b : Event p)
+          → list_elem
+          (Event p)
+          b
+          vs
+          → Equal
+          Bool
+          (bool_or
+            (lt_nat (event_time p a) (event_time p b))
+            (lt_nat (event_time p b) (event_time p a)))
+          True)
+        → Equal
+        (List (Event p))
+        (trace_merge p xt vs)
+        (trace_merge p vs xt))
+      (ys : List (Event p))
+    : ((a : Event p)
+        → list_elem
+        (Event p)
+        a
+        (Cons (Event p) x xt)
+        → (b : Event p)
+        → list_elem
+        (Event p)
+        b
+        ys
+        → Equal
+        Bool
+        (bool_or
+          (lt_nat (event_time p a) (event_time p b))
+          (lt_nat (event_time p b) (event_time p a)))
+        True)
+      → Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x xt) ys)
+        (trace_merge p ys (Cons (Event p) x xt)) =
+  match ys {
+    Nil ↦ λdistinct. Refl;
+    Cons y yt ↦
+      λdistinct.
+        trace_merge_distinct_commute_step
+          p
+          x
+          xt
+          ih_xt
+          y
+          yt
+          (λtail_distinct. trace_merge_distinct_commute_cons p x xt ih_xt yt tail_distinct)
+          distinct
+          (event_before p x y)
+          Refl
+  }
+
+theorem trace_merge_distinct_commute_step
+      (p : Type)
+      (x : Event p)
+      (xt : List (Event p))
+      (ih_xt : (vs : List (Event p))
+        → ((a : Event p)
+          → list_elem
+          (Event p)
+          a
+          xt
+          → (b : Event p)
+          → list_elem
+          (Event p)
+          b
+          vs
+          → Equal
+          Bool
+          (bool_or
+            (lt_nat (event_time p a) (event_time p b))
+            (lt_nat (event_time p b) (event_time p a)))
+          True)
+        → Equal
+        (List (Event p))
+        (trace_merge p xt vs)
+        (trace_merge p vs xt))
+      (y : Event p)
+      (yt : List (Event p))
+      (ih_yt : ((a : Event p)
+        → list_elem
+        (Event p)
+        a
+        (Cons (Event p) x xt)
+        → (b : Event p)
+        → list_elem
+        (Event p)
+        b
+        yt
+        → Equal
+        Bool
+        (bool_or
+          (lt_nat (event_time p a) (event_time p b))
+          (lt_nat (event_time p b) (event_time p a)))
+        True)
+        → Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x xt) yt)
+        (trace_merge p yt (Cons (Event p) x xt)))
+      (distinct : (a : Event p)
+        → list_elem
+        (Event p)
+        a
+        (Cons (Event p) x xt)
+        → (b : Event p)
+        → list_elem
+        (Event p)
+        b
+        (Cons (Event p) y yt)
+        → Equal
+        Bool
+        (bool_or
+          (lt_nat (event_time p a) (event_time p b))
+          (lt_nat (event_time p b) (event_time p a)))
+        True)
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x xt) (Cons (Event p) y yt))
+        (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt)) =
+  match decision {
+    True ↦
+      λx_first.
+        trans
+          (List (Event p))
+          (trace_merge p (Cons (Event p) x xt) (Cons (Event p) y yt))
+          (Cons (Event p) x (trace_merge p xt (Cons (Event p) y yt)))
+          (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+          (trace_merge_cons_left p x xt (Cons (Event p) y yt) x_first)
+          (trans
+            (List (Event p))
+            (Cons (Event p) x (trace_merge p xt (Cons (Event p) y yt)))
+            (Cons (Event p) x (trace_merge p (Cons (Event p) y yt) xt))
+            (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_merge p xt (Cons (Event p) y yt))
+              (trace_merge p (Cons (Event p) y yt) xt)
+              (λtail. Cons (Event p) x tail)
+              (ih_xt
+                (Cons (Event p) y yt)
+                (λa. λmember. distinct a (list_elem_later (Event p) a x xt member))))
+            (sym
+              (List (Event p))
+              (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+              (Cons (Event p) x (trace_merge p (Cons (Event p) y yt) xt))
+              (trace_merge_cons_right
+                p
+                (Cons (Event p) y yt)
+                x
+                xt
+                (distinct_times_reverse_false
+                  (event_time p x)
+                  (event_time p y)
+                  (lt_nat (event_time p x) (event_time p y))
+                  Refl
+                  (distinct x (list_elem_head (Event p) x xt) y (list_elem_head (Event p) y yt))
+                  x_first))));
+    False ↦
+      λy_first.
+        trans
+          (List (Event p))
+          (trace_merge p (Cons (Event p) x xt) (Cons (Event p) y yt))
+          (Cons (Event p) y (trace_merge p (Cons (Event p) x xt) yt))
+          (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+          (trace_merge_cons_right p (Cons (Event p) x xt) y yt y_first)
+          (trans
+            (List (Event p))
+            (Cons (Event p) y (trace_merge p (Cons (Event p) x xt) yt))
+            (Cons (Event p) y (trace_merge p yt (Cons (Event p) x xt)))
+            (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_merge p (Cons (Event p) x xt) yt)
+              (trace_merge p yt (Cons (Event p) x xt))
+              (λtail. Cons (Event p) y tail)
+              (ih_yt (λa. λma. λb. λmb. distinct a ma b (list_elem_later (Event p) b y yt mb))))
+            (sym
+              (List (Event p))
+              (trace_merge p (Cons (Event p) y yt) (Cons (Event p) x xt))
+              (Cons (Event p) y (trace_merge p yt (Cons (Event p) x xt)))
+              (trace_merge_cons_left
+                p
+                y
+                yt
+                (Cons (Event p) x xt)
+                (event_before_flip p x y y_first))))
+  }
+
+theorem distinct_times_reverse_false
+      (a : Nat) (b : Nat) (decision : Bool)
+    : Equal Bool (lt_nat a b) decision
+      → Equal Bool (bool_or (lt_nat a b) (lt_nat b a)) True
+      → Equal Bool (leq_nat a b) True
+      → Equal Bool (leq_nat b a) False =
+  match decision {
+    True ↦ λa_lt. λdistinct. λa_leq. lt_nat_reverse_leq_false a b (leq_nat b a) Refl a_lt;
+    False ↦
+      λa_not_lt.
+        λdistinct.
+          λa_leq.
+            absurd
+              (trans
+                Bool
+                True
+                (leq_nat a b)
+                False
+                (sym Bool (leq_nat a b) True a_leq)
+                (lt_nat_reverse_leq_false
+                  b
+                  a
+                  (leq_nat a b)
+                  Refl
+                  (trans
+                    Bool
+                    (lt_nat b a)
+                    (bool_or (lt_nat a b) (lt_nat b a))
+                    True
+                    (sym
+                      Bool
+                      (bool_or (lt_nat a b) (lt_nat b a))
+                      (lt_nat b a)
+                      (cong
+                        Bool
+                        Bool
+                        (lt_nat a b)
+                        False
+                        (λchoice. bool_or choice (lt_nat b a))
+                        a_not_lt))
+                    distinct)))
+  }
+
 theorem event_before_skip
       (p : Type)
       (x : Event p)
@@ -3659,6 +3941,18 @@ it needs no ordering premise. Soundness excludes added events, but ordered
 and sound alone do not characterize this merge: a constant empty result
 satisfies both while violating completeness.
 
+`trace_merge_distinct_commute` requires each cross-trace pair of events to
+have different timestamps: one time must be strictly earlier than the other.
+The proof recurses over the left trace, then over the right trace when both
+have heads. If `event_before` selects the left head, the distinct-time
+premise makes the reverse head comparison false. The existing
+`trace_merge_cons_left` and `trace_merge_cons_right` lemmas expose the same
+left head on both sides, and the left-tail induction hypothesis equates the
+remaining merges. If the comparison is false, `event_before_flip` selects
+the right head in the swapped merge; the same head-insertion lemmas expose
+that head, and the right-tail recursive case equates the remaining merges.
+No ordering premise on either trace is needed.
+
 When every left event is at or before every right event, merge equals
 append, even if the individual traces are unordered. The checked
 `trace_merge_separated` proof inducts on the left trace, using
@@ -3734,7 +4028,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, and the twenty-nine laws form the
+   `trace_merge`, `trace_merge_all`, and the thirty laws form the
    package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
@@ -3760,6 +4054,12 @@ merging, not window multiplicity.
    `trace_window_merge` and `trace_merge_all_ordered`, with `map` as the
    sole new Derived import; these seven merge-all proofs add no helper.
    The append proof also reuses public `trace_merge_assoc` without ordering.
+   Distinct-time commutation recurses over both trace tails: the pairwise
+   premise rules out a reverse head tie in the True case; the False case
+   uses `event_before_flip`. Existing head-insertion lemmas align the chosen
+   heads, and the corresponding left- or right-tail recursion closes the
+   remaining equality without an ordered-input premise. Its two recursion
+   helpers and timestamp lemma remain private.
    The one-way window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
@@ -3782,7 +4082,7 @@ merging, not window multiplicity.
    `list_elem_head`/`list_elem_later`, without a new helper or ordering premise.
    The no-member law reuses those same lemmas and `window_keep` to delete
    each missed head, without an additional helper or import.
-4. **Trusted-base delta.** Zero: all twenty-nine exported laws have checked
+4. **Trusted-base delta.** Zero: all thirty exported laws have checked
    proof bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
