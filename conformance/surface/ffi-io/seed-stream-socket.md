@@ -97,6 +97,26 @@ before object emission.
   grant changes. The Unix authority pair holds `Net Unix` fixed while varying
   only the FS authority.
 
+### surface/ffi-io/socket-wildcard-addresses-require-inet
+
+- promise class: durable invariant.
+- spec: §1.13 address-class grants; AUTH-NET-SURFACE.
+- given: for each of `NetListen` and `NetConnect`, submit the exact IPv4
+  wildcard `0.0.0.0:4242` and IPv6 wildcard `[::]:4242` (the sixteen address
+  octets are zero; the port is 4242). For each fixed operation and address,
+  compare `Net Loopback` with `Net Inet` under the same FS authority and live
+  grant. Observe the address-class admission boundary with a backend spy;
+  backend reachability, not a successful OS connect to a wildcard, is the
+  positive observation. Keep `127.0.0.1:4242` and `[::1]:4242` under
+  `Net Loopback` as same-family positive controls.
+- expect: both wildcards return `IOError.CapabilityDenied` under `Loopback`
+  with zero backend calls and reach the backend under `Inet`; each loopback
+  control reaches it under `Loopback`. A generic host I/O error after backend
+  admission does not count as the denied-class result.
+- why: an implementation that treats either wildcard as a Loopback endpoint
+  passes the non-loopback-address case above but fails this fixed-address,
+  grant-only pair for that family.
+
 ### surface/ffi-io/socket-net-effect-row-is-required
 
 - promise class: durable invariant.
@@ -191,6 +211,68 @@ before object emission.
 - why: an error in a different operation or a second identity family does not
   meet the typed failure contract.
 
+### surface/ffi-io/socket-closed-peer-send-preserves-broken-pipe
+
+- promise class: durable invariant.
+- spec: §1.13 `NetSend` closed-peer result and `MSG_NOSIGNAL`.
+- given: hold a live, writable SocketStream and a valid positive `BufferSpan`.
+  A separate peer closes the other stream; synchronize that close and make
+  bounded positive sends until the first closed-peer send is attempted, since
+  a send racing a queued close may succeed. Run the sending boundary in a
+  subprocess with SIGPIPE at its default disposition immediately before the
+  tested send (not merely at launch, where Ken may change it). Keep the grant,
+  stream token, buffer and span valid, and observe the subsequent result and
+  a post-send process marker. Pair with the same send while the peer remains
+  open, and require the peer to receive the known bytes.
+- expect: the closed-peer attempt returns
+  `ResourceHostIO IOError.BrokenPipe`; the sender reaches the marker and
+  exits normally, not from SIGPIPE. The live-peer control transfers the bytes.
+  A successful send that raced the close is not the closed-peer oracle; an
+  unbounded retry or an unrelated resource refusal does not satisfy it.
+- why: an ordinary Ken process that ignores SIGPIPE could mask a dropped
+  `MSG_NOSIGNAL`. Restoring the default disposition at the send boundary
+  distinguishes a per-send suppression from process-wide signal policy.
+
+### surface/ffi-io/socket-send-zero-and-short-progress
+
+- promise class: durable invariant.
+- spec: §1.13 `NetSend` progress; §1.7.2 write partition.
+- given: at the host transfer boundary, use a live SocketStream and a
+  seven-byte checked `BufferSpan` with a positive effective request. In one
+  controlled send, have the backend return zero; in a separate otherwise
+  identical send, return three, then send the remaining four from the
+  advanced span. Observe both `WriteProgress` results, the exact requested
+  ranges and the bytes the peer receives. Include a full-seven positive
+  control with the same buffer and grant.
+- expect: a zero host result returns the error `ResourceError.NoProgress`,
+  never `WriteProgress.Wrote 0`. The short send returns `Wrote 3`, advances
+  only the first three bytes, and a subsequent `Wrote 4` completes the
+  remaining four; the peer receives the seven known bytes exactly once. The
+  full control returns `Wrote 7`. No result exceeds its admitted span.
+- why: a successful short send is not a complete send, and a zero result
+  cannot manufacture positive progress. Controlled backend counts make both
+  branches reachable without relying on TCP packetization.
+
+### surface/ffi-io/socket-shutdown-read-and-both-directions
+
+- promise class: durable invariant.
+- spec: §1.13 shutdown-direction family.
+- given: on separate live connected streams, call `NetShutdown` with checked
+  `ShutdownRead`, `ShutdownBoth` and the existing `ShutdownWrite` control.
+  Observe the host shutdown direction selected for each; keep the stream
+  kind, grant and prior byte exchange identical. For `ShutdownRead`, send a
+  known outbound chunk afterward and observe it at the peer. For
+  `ShutdownBoth`, try the same outbound send and a receive after the
+  shutdown, with the peer still open and ready.
+- expect: the three constructors select `SHUT_RD`, `SHUT_RDWR` and
+  `SHUT_WR`, respectively. Read-only shutdown leaves outbound transfer
+  possible; both-direction shutdown admits no further outbound bytes and
+  produces `ReadEof` on subsequent receive. The pre-shutdown control
+  transfers in both directions. An error from a closed resource token before
+  the host call does not count as choosing a direction.
+- why: exercising only `ShutdownWrite` leaves a swapped or collapsed read
+  and both code undetected; independent streams distinguish all three tags.
+
 ### surface/ffi-io/socket-fds-are-noninherited-and-close-on-exec
 
 - promise class: durable invariant.
@@ -232,7 +314,37 @@ before object emission.
 - promise class: transition sentinel, retired by the native-parity successor.
 - spec: §1.13 native boundary.
 - given: native-build the accepted exchange program with a resource profile
-  and an empty output directory.
-- expect: `host_effect_lowering_unavailable` names `NetListen` and
-  `RepresentedUnavailable` before object emission. The output remains empty.
-- why: interpreter admission is deliberately not native implementation.
+  and an empty output directory. Separately build a checked program declaring
+  `Net Loopback` whose socket operation sits only in a branch known not to
+  execute: the interpreter takes the non-socket branch and returns the known
+  result. Also build a Net-declared program with the same Net-free body as the
+  positive control below, so declaration alone is the only changed input.
+  Give each native attempt a fresh empty output directory.
+- expect: each Net-declared native build returns the typed
+  `host_effect_lowering_unavailable` reason before object emission. The
+  reason identifies `RepresentedUnavailable` for **each** of `NetListen`,
+  `NetAccept`, `NetConnect`, `NetReceive`, `NetSend`, `NetShutdown` and
+  `NetLocalAddress`; the exact set is seven, with no other operation named.
+  Every negative output directory remains empty. Interpreter acceptance of
+  the dormant-branch program is checked independently; a failure before
+  native admission does not count as this refusal.
+- why: a live socket call alone cannot prove that the declaration gate
+  refuses a program whose socket branch is dormant, or a program that
+  declares Net but contains no socket call at all. The named unavailable
+  set distinguishes this transition from an arbitrary build failure.
+
+### surface/ffi-io/socket-net-free-native-build-accepts
+
+- promise class: durable invariant.
+- spec: §1.13 native boundary and `45 §4` checked host entrypoint.
+- given: use the same checked Net-free body, FS authority and resource
+  profile as the declaration-only negative above, in a fresh output
+  directory. The only program difference is the absence of `Net Loopback`
+  in its capability header. Its main returns
+  a known ground exit result without a socket effect.
+- expect: native build succeeds, emits a runnable artifact and its invocation
+  returns the known exit result. It does not merely fail with a different
+  diagnostic. Interpreter execution of that same source gives the same
+  result.
+- why: rejecting every native build satisfies a negative-only refusal case;
+  this paired positive case would reject such an implementation.
