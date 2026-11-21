@@ -714,7 +714,9 @@ unrelated `ElabEnv` does not satisfy them.
      typed by `Cap a` and `Resource k`. Constructor coverage includes bare
      `MkUnit` and `MkFileError`; scoped `Coproduct.InL`/`InR`,
      `Instant.MkInstant`, `ITree.Ret`/`Vis`, all thirteen `IOError.C` cases,
-     all three `CreatePolicy.C` cases, and all twelve `ResourceError.C` cases.
+     all three `CreatePolicy.C` cases, and all twelve current
+     `ResourceError.C` cases; the post-unification `ResourceError.Revoked`
+     successor is not a current constructor.
      The `BufferSpan` and `TransferCount` types are reached while their exact
      constructor ids and parents are recorded as private and unavailable to
      source. Bare `InL`, `InR`, `MkInstant`, `Ret`, and `Vis` are not prelude
@@ -900,8 +902,11 @@ sentinel beside the current contract.
   their checked IDs, while bare `Ret` and `Vis` are not reserved and may be
   bound by source. `FileError` is unscoped and keeps bare `MkFileError`;
   `IOError`, `CreatePolicy`, and `ResourceError` use only their qualified
-  constructor paths. `BufferSpan` and `TransferCount` retain private
-  constructors, with no bare or qualified source constructor path. Each bare
+  constructor paths. The table lists the twelve current `ResourceError`
+  constructors; nullary `ResourceError.Revoked` is a post-unification
+  successor, not a current checked constructor. `BufferSpan` and `TransferCount`
+  retain private constructors, with no bare or qualified source constructor
+  path. Each bare
   `ResourceKind` leaf in value position rejects against its accepted qualified
   control. The `SpawnPlan` type accepts only through its explicit selective
   import; the retained qualified module import alone does not bind it. Each

@@ -86,13 +86,16 @@ before object emission.
   `Unix`. Use a backend spy for the address-class boundary. Separately, test
   `Net Unix` admission with `FS AFull`, `FS APartial` and `FS ANone`, keeping
   that class fixed. `Net AFull` is an invented class control.
-- expect: loopback addresses reach the backend under `Loopback`; both
-  non-loopback IP addresses are denied under `Loopback` before a backend call
-  and reach it under `Inet`. A Unix address is denied under `Loopback` and
-  reaches the backend under `Unix` with `FS AFull`. `FS APartial` and
-  `FS ANone` with `Net Unix` are refused at admission; `Net AFull` is rejected
-  as an invalid header. No diagnostic spelling is pinned where §1.13 does not
-  specify one.
+- expect: for each loopback address, both listen and connect reach the
+  backend under `Loopback` and `Inet`, with exactly one backend call per
+  request. Each non-loopback IP address returns exactly
+  `ResourceHostIO IOError.CapabilityDenied` under `Loopback`, with zero backend
+  calls, and reaches the backend under `Inet`. A Unix address returns exactly
+  `ResourceHostIO IOError.CapabilityDenied` under `Loopback`, with zero backend
+  calls, and reaches the backend under `Unix` with `FS AFull`. `FS APartial`
+  and `FS ANone` with `Net Unix` are refused at admission; `Net AFull` is
+  rejected as an invalid header. No diagnostic spelling is pinned where
+  §1.13 does not specify one.
 - why: each address-class pair holds the address and operation fixed while the
   grant changes. The Unix authority pair holds `Net Unix` fixed while varying
   only the FS authority.
@@ -109,10 +112,11 @@ before object emission.
   backend reachability, not a successful OS connect to a wildcard, is the
   positive observation. Keep `127.0.0.1:4242` and `[::1]:4242` under
   `Net Loopback` as same-family positive controls.
-- expect: both wildcards return `IOError.CapabilityDenied` under `Loopback`
-  with zero backend calls and reach the backend under `Inet`; each loopback
-  control reaches it under `Loopback`. A generic host I/O error after backend
-  admission does not count as the denied-class result.
+- expect: both wildcards return exactly
+  `ResourceHostIO IOError.CapabilityDenied` under `Loopback` with zero backend
+  calls and reach the backend under `Inet`; each loopback control reaches the
+  backend under `Loopback`. A generic host I/O error after backend admission
+  does not count as the denied-class result.
 - why: an implementation that treats either wildcard as a Loopback endpoint
   passes the non-loopback-address case above but fails this fixed-address,
   grant-only pair for that family.
@@ -149,32 +153,48 @@ before object emission.
 - why: acquisition consumes a host capability, not a previously acquired
   SocketListener or SocketStream token.
 
-### surface/ffi-io/socket-resource-revocation-is-resource-error
+### surface/ffi-io/socket-resource-revocation-uses-current-hostio-carrier
 
 - promise class: durable invariant.
-- spec: §1.13 held-resource revocation; `62 §4.1`.
-- fixture: GATED on source/spec shape mismatch. The delivered
-  `ResourceError` definition in `crates/ken-elaborator/src/prelude.rs` has no
-  `Revoked` constructor; `surface/ffi-io/revoked-single-identity` in
-  `conformance/surface/ffi-io/seed-error-classification.md` is gated on the
-  same mismatch. Keep this case gated until the resource revocation carrier is
-  unified with the normative `ResourceError.Revoked` projection.
+- spec: §1.13 delivered FS/Net resource-token carrier; `62 §4.1`.
 - given: create independent, otherwise valid fixtures for each held-resource
   operation: `NetAccept` on a listener, and `NetReceive`, `NetSend`,
   `NetShutdown` and `NetLocalAddress` on a stream. A test harness revokes the
   originating grant out of band before admission; no Ken-callable revoke term
   is used. Compare with a separately acquired resource of the same kind under
   the same live Net class and, for Unix, `FS AFull`. Keep buffer bounds,
-  rights and resource kind valid.
-  Record guarded host-leaf calls and bracket `ResourceRelease` calls.
+  rights and resource kind valid. Record guarded host-leaf calls and bracket
+  `ResourceRelease` calls.
 - expect: each revoked held-resource operation returns exactly
-  `ResourceError.Revoked` and makes no guarded host-leaf call; each live
-  control reaches its leaf. When a body operation returns the revocation
-  error, its surrounding bracket still settles the already acquired resource
+  `ResourceError.ResourceHostIO IOError.Revoked` and makes no guarded host-leaf
+  call; each live control reaches its leaf. When a body operation returns the
+  revocation error, its surrounding bracket still settles the acquired resource
   via `ResourceRelease`.
-- why: this covers the complete five-operation held-token set. These are
-  ordinary resource-token operations, not Process host operations; the
-  acquisition projection above is intentionally different.
+- why: this pins current delivery for the complete five-operation held-token
+  set. These are ordinary FS/Net resource-token operations, not Process host
+  operations; the carrier retains the same `IOError.Revoked` cause.
+
+### surface/ffi-io/socket-resource-revocation-uses-successor-projection
+
+- promise class: normative property — post-unification resource-token
+  projection.
+- spec: §1.13 held-resource revocation; `62 §4.1`.
+- fixture: GATED on ABI-REVOKE resource-token projection unification. The live
+  current carrier for all five operations is pinned by the case above.
+- given: create independent, otherwise valid fixtures for each held-resource
+  operation: `NetAccept` on a listener, and `NetReceive`, `NetSend`,
+  `NetShutdown` and `NetLocalAddress` on a stream. A test harness revokes the
+  originating grant out of band before admission; no Ken-callable revoke term
+  is used. Compare with a separately acquired resource of the same kind under
+  the same live Net class and, for Unix, `FS AFull`. Keep buffer bounds,
+  rights and resource kind valid. Record guarded host-leaf calls and bracket
+  `ResourceRelease` calls.
+- expect: after unification, each revoked held-resource operation returns
+  exactly nullary `ResourceError.Revoked` and makes no guarded host-leaf call;
+  each live control reaches its leaf. The bracket still settles an already
+  acquired resource via `ResourceRelease`.
+- why: this stages the successor projection without treating it as a current
+  constructor or leaving current FS/Net resource-token revocation untested.
 
 ## Interpreter behavior
 

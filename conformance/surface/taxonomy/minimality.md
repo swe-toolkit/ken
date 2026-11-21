@@ -94,7 +94,7 @@ Neither arm is a catch-all (`64 §1`).
 | **`Decimal`** | internal provision: checked transparent compiler-bootstrap type identity required by decimal literals (`30-taxonomy §4`; `35 §2.3`) | canonical checked transparent alias; source-visible by its exact pre-source identity without an import, with no public constructor family. |
 | **`BufferSpan`** | internal provision: public bounded-transfer argument (`38 §1.7.1–2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
 | **`TransferCount`** | internal provision: public read/write progress carrier (`38 §1.7.2`) | native code mints its exact private constructor ID; the scoped type is source-visible, its constructor is not. |
-| **`ResourceError`** | internal provision: public resource-operation result carrier (`38 §1.7.1–2`) | native code produces all twelve exact constructor IDs; source uses scoped `ResourceError.C` paths. |
+| **`ResourceError`** | internal provision: public resource-operation result carrier (`38 §1.7.1–2`) | the current complete family has twelve exact constructor IDs; nullary `ResourceError.Revoked` is a post-unification successor, not a current constructor; source uses scoped `ResourceError.C` paths. |
 | **`ReadProgress`** | internal provision: public bounded-read progress result (`38 §1.7.2`) | checked family; `ReadProgress.ReadSome` and `ReadProgress.ReadEof` are scoped. |
 | **`WriteProgress`** | internal provision: public bounded-write progress result (`38 §1.7.2`) | checked family; `WriteProgress.Wrote` is scoped. |
 | **`ResourceOpenMode`** | internal provision: public resource acquisition mode (`38 §1.7`) | checked family; all three `ResourceOpenMode.C` paths are scoped. |
