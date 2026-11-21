@@ -289,20 +289,22 @@ either management action or the identity they govern.
 
 ### 4.1 One denial identity, type-local public projections
 
-Revocation has one semantic denial identity. Path/capability operations and
-ordinary resource-token operations have two general, type-local public
-projections. The Process host operations of `38 §1.11` have the explicit
-exception stated below. The existing result families remain distinct:
+Revocation has one semantic denial identity, carried through distinct
+error families. The delivered path/capability and ordinary FS/Net
+resource-token projections are:
 
 - a path/capability operation returns
-  `MkFileError <operation> <path> Revoked`, where `Revoked` is a new `IOError`
+  `MkFileError <operation> <path> Revoked`, where `Revoked` is an `IOError`
   cause beside and distinct from `CapabilityDenied`;
-- an ordinary resource-token operation other than a Process host operation
-  returns the nullary constructor `ResourceError.Revoked`, distinct from
-  `Closed`, `MalformedResource`, `RightNotHeld`, `ResourceKindMismatch`,
-  and `ResourceHostIO _`.
+- an ordinary FS/Net resource-token operation returns
+  `ResourceHostIO IOError.Revoked` on a revoked originating grant before
+  admission. After unification, the successor projection is the nullary
+  `ResourceError.Revoked`, distinct from `Closed`, `MalformedResource`,
+  `RightNotHeld`, `ResourceKindMismatch`, and `ResourceHostIO _`. The
+  successor is outside the current complete twelve-case `ResourceError`
+  family; it is not a thirteenth checked constructor today.
 
-**Process host operations are the exception to the second projection.**
+**Process host operations are distinct from the successor projection.**
 Later plan, child and pipe host operations, including `signal_child`,
 return `ResourceHostIO IOError.Revoked` on a revoked originating Process
 grant before admission (`38 §1.11.2–§1.11.4`). They preserve the same
@@ -310,16 +312,18 @@ grant before admission (`38 §1.11.2–§1.11.4`). They preserve the same
 an additional denial identity or an unrelated host-I/O failure. No
 guarded Process backend operation occurs after this denial.
 
-The runtime/host mapping preserves these type-local results. It must not
-collapse a general projection into `CapabilityDenied`,
-`ResourceHostIO CapabilityDenied`, `Closed`, malformed capability/resource,
-stale generation, `RightNotHeld`, or an unrelated host-I/O cause; the
-Process exception likewise preserves `IOError.Revoked` inside its
-`ResourceHostIO` carrier. The discriminator applies when revocation is
-the reason an otherwise well-formed, live, sufficiently-righted
-operation is refused; this supplies a non-degenerate control for each
-neighbouring denial without choosing precedence for an input invalid
-in several independent ways.
+The runtime/host mapping preserves these type-local results. Neither
+current delivery nor the ordinary resource-token successor may collapse
+revocation into `CapabilityDenied`,
+`ResourceHostIO IOError.CapabilityDenied`, `Closed`, malformed
+capability/resource, stale generation, `RightNotHeld`, or an
+unrelated host-I/O cause. The
+delivered resource-token and Process-host carriers deliberately retain
+`IOError.Revoked` inside `ResourceHostIO`; that is not such a collapse.
+The discriminator applies when revocation is the reason an otherwise
+well-formed, live, sufficiently-righted operation is refused; this
+supplies a non-degenerate control for each neighbouring denial without
+choosing precedence for an input invalid in several independent ways.
 
 ### 4.2 Admission and settlement
 
