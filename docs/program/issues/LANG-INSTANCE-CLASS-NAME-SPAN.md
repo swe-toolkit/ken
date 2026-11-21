@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-CLASS-NAME-SPAN
 title: "An instance declaration that names an absent class refuses as UnboundName, but the refusal spans the whole declaration, because Decl::InstanceDecl carries no span for its class name and resolve_class_ref is handed the declaration's span. Carry the class name's own span from the parser to the resolver, so the refusal points at the class name, and re-pin the I4 control from 0..37 to 9..20 deliberately"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
@@ -20,7 +20,7 @@ origin: "LANG-DELETE-LEGACY-RESOLUTION I4 follow-on. Architect span ruling evt_5
 `MissingFlag`, and the refusal's span is the class name's own token,
 `9..20`, not the whole declaration, `0..37`.
 
-## Settled inputs (I4 candidate `9f90042cf`; re-check on the landed squash)
+## Settled inputs (main `fcd7e8156`; anchors re-checked at release)
 
 - **The AST.** `Decl::InstanceDecl` (`ast.rs:395`) holds `class_name:
   String` and one `span` for the whole declaration. `LetBinding.name_span`
@@ -67,6 +67,6 @@ pin. No resolution rule, error variant or spec change.
   its full field list and cannot take the new field mechanically.
 
 Checks: 4 fired. I read the I4 pin, `resolve_class_ref`'s call sites and
-the parser's construction site on `9f90042cf`; the declaration span is
+the parser's construction site on `fcd7e8156`; the declaration span is
 the only span the resolver sees. 8 fired. AC-2's mutant passes AC-3 and
 reddens only the AC-1 rows, so those rows are what pin the localization.
