@@ -242,6 +242,13 @@ evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
     (pre_source_names, then globals, then the private decl_owner). Keyed
     on the one declaration the seam probe readmitted (Architect
     `evt_27kfyeczdy3sg`).
+15. The I1 held missing-class negative was written as UnboundName at the
+    class span, while InstanceDecl carries only the declaration span and
+    resolve_class_ref receives that span. Keyed on a token span the AST
+    does not carry (Architect `evt_5x867hc9pj0x0`). Predicate over 13-15,
+    answered YES: each ruling named state that the plane it relied on does
+    not deliver (a kind ElabResult does not carry, a stable name for every
+    constructed declaration, a token span InstanceDecl does not carry).
 
 ## Stop conditions
 
