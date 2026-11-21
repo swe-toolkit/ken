@@ -311,7 +311,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `UnboundName`: a spelling's presence in the implementation-global table
   alone does not make it visible. A loaded dependency is not implicitly
   imported and units do not inherit each other's imports. The roots-loaded
-  entries and their `_strict` aliases apply this same rule. Each of `IO`,
+  entries `elaborate_module_from_roots` and
+  `elaborate_module_from_roots_v1` apply this same rule. Each of `IO`,
   `write`, `print_line`, `charToInt`, and `leqChar` needs an explicit public
   import from `Capability.Console.Text` or `Core.Classes.LawfulClasses`;
   that import preserves its exact pre-source `GlobalId`. An unimported bare
