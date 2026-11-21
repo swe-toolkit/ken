@@ -1,7 +1,7 @@
 ---
 id: LANG-STRICT-LOCAL-BINDER-BUILTIN-REFUSAL
 title: "Spec 33 forbids any binder from introducing a built-in name, local binders included, but Strict refuses one only at module scope (E0058 from reject_decl_prelude_bindings); every lambda, let, parameter, pattern, Pi/Sigma, where and record-field or class-method binder is pushed through Scope::push_spanned with no check, so `fn lexical (pair_fst : Bool)` is accepted and shadows the floor. Refuse a built-in name at every binder introduction under Strict, migrating the source binders that use one"
-status: active
+status: merged
 owner: verify
 size: L
 tier: T1

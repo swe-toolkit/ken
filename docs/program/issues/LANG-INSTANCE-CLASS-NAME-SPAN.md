@@ -1,7 +1,7 @@
 ---
 id: LANG-INSTANCE-CLASS-NAME-SPAN
 title: "An instance declaration that names an absent class refuses as UnboundName, but the refusal spans the whole declaration, because Decl::InstanceDecl carries no span for its class name and resolve_class_ref is handed the declaration's span. Carry the class name's own span from the parser to the resolver, so the refusal points at the class name, and re-pin the I4 control from 0..37 to 9..20 deliberately"
-status: active
+status: merged
 owner: language
 size: S
 tier: T2
