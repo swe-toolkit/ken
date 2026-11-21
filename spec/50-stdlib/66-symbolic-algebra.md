@@ -19,7 +19,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-MUL §17;
 > SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-CONGRUENCE §18;
 > SPEC-SYMBOLIC-ALGEBRA-EVAL-ABSENT-VARIABLE §19;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20).**
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20;
+> SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE §21).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -1656,3 +1657,77 @@ structural conclusion: a substitution that also maps `v` to
 law asserts no converse and no structural result for an expression
 containing `v` under an arbitrary replacement; equal evaluations
 at one environment do not imply this structural conclusion.
+
+## 21. Evaluation agrees when environments agree on occurring variables
+
+> **Section 21 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE).** Architect's AC-0 on
+> `69458aa89` root-loaded the modified package in detached scratch:
+> four probe rows passed, no `Axiom` was introduced, and the exact
+> trusted `GlobalId` identity sets matched (114 → 114). A changed
+> Boolean projection refused inside the new theorem before the file
+> was restored. These observations do not check this Spec child, the
+> separate catalog or CV seed children, assembled AC-T, official
+> conformance, CI, publication, landing or measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent checked theorem directly after `substitute_absent` and
+before `deriv_substitute`. Its exact name, binder order and type are:
+
+```ken
+pub theorem eval_coincidence
+      (e : Expr) (env1 : Nat → Nat) (env2 : Nat → Nat)
+    : ((w : Nat) → Equal Bool (occurs w e) True → Equal Nat (env1 w) (env2 w))
+      → Equal Nat (eval env1 e) (eval env2 e)
+```
+
+The premise asks for structural equality of the two environments'
+**values** at every index where `occurs w e` answers `True`; they may
+differ at any number of other indices. The result is `Equal Nat` of
+evaluations in the displayed `env1`-then-`env2` direction, not
+function equality of the environments or structural equality of
+expressions. The agreement premise follows the colon so the proof
+can match on the **written** `e` before introducing that premise;
+matching on a computed occurrence would not refine it in the same
+way. Its occurrence test is spelled `Equal Bool (occurs w e) True`,
+not `IsTrue`: the forms are convertible, but this spelling matches
+the public `or_left`/`or_right` premises and §19's explicit Bool
+equation without requiring a source import of `IsTrue` merely to
+state a client's agreement.
+
+The generic proof inducts on `e`. A constant ignores both environments,
+so `Refl` closes. For `EVar v`, private `nat_same_complete v v Refl`
+shows that `v` occurs, letting the agreement premise supply equality
+of its evaluations. For `EAdd a b` and `EMul a b`, the public
+`or_left` and `or_right` of `Core.Classes.LawfulClasses` lift an
+occurrence in either child to an occurrence in the whole expression.
+The induction hypotheses then supply the two child equalities, and
+private `add_cong` or `mul_cong` combines them. No new helper,
+`Axiom`, kernel rule or surface form is needed. This adds one public
+theorem, bringing the package's public checked-theorem roster from
+thirty-nine to **forty**, with its fifteen operations and §§1–20
+operation and law types unchanged.
+
+The §19 `eval_absent` law follows from `eval_coincidence`: if `v` is
+absent, any index occurring in `e` cannot equal `v`, so §19's
+agreement away from `v` supplies this law's premise. `eval_absent`
+retains its separate public export and checked proof; this section
+does not replace or reprove it. The occurrence premise is sufficient,
+not necessary for equal evaluations. In §7's
+`EAdd (EVar Zero) (EMul (EVar (Suc Zero)) (EConst Zero))`, variable
+`Suc Zero` occurs but its product contributes zero. Environments
+that differ there can evaluate identically even though this law
+cannot be applied: they disagree at an occurring variable. No
+converse from evaluation equality to agreement is claimed.
+
+The separately owned seed uses
+`EAdd (EVar 0) (EMul (EConst 2) (EVar 1))` and two environments that
+differ at indices 2 and 3 but agree at the occurring indices 0 and
+1. Both evaluations are 3, and a single `eval_absent` application
+cannot discharge both differences. The refused client changes only
+`EVar 0` to `EVar 2`, holding the environment pair and agreement
+proof form fixed. Index 2 then occurs and the attempted agreement proof must
+refuse in its index-2 arm; the evaluations are independently 9
+and 3. These finite checks test the boundary, not the generic
+quantifier or its trust delta; the assembled package test owes
+unchanged exact trusted-base identities as AC-T before a Decision.

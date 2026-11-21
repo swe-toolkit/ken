@@ -65,7 +65,10 @@ Private Taylor, natural-arithmetic, and product-summand proofs support them.
 The independent-variable law proves zero derivative under semantic invariance;
 the derivative-after-substitution law proves equal evaluated derivatives when
 the distinguished replacement has slope one and all other replacements have
-slope zero at the given environment. Three further public laws state that the
+slope zero at the given environment. `eval_coincidence` says that evaluation
+depends only on the variables that occur: two environments that agree at every
+index where `occurs` answers `True` give the expression equal values. Three
+further public laws state that the
 ordered normalization is transparent to `poly_eq` itself, to differentiation,
 and to substitution. The latter two follow from the first and the existing
 `poly_eq`-preservation laws. `expr_pow` gives the unit constant at Zero and
@@ -81,7 +84,7 @@ structural `Equal Expr`, by induction through `cong`.
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, leq_nat, or_left, or_right)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
 
@@ -1354,6 +1357,41 @@ pub theorem substitute_absent
               b
               (bool_or_false_right (occurs v a) (occurs v b) absent)
               fixed)
+  }
+
+pub theorem eval_coincidence
+      (e : Expr) (env1 : Nat → Nat) (env2 : Nat → Nat)
+    : ((w : Nat) → Equal Bool (occurs w e) True → Equal Nat (env1 w) (env2 w))
+      → Equal Nat (eval env1 e) (eval env2 e) =
+  match e {
+    EConst c ↦ λagree. Refl;
+    EVar v ↦ λagree. agree v (nat_same_complete v v Refl);
+    EAdd a b ↦
+      λagree.
+        add_cong
+          (eval env1 a)
+          (eval env2 a)
+          (eval env1 b)
+          (eval env2 b)
+          (eval_coincidence a env1 env2 (λw. λh. agree w (or_left (occurs w a) (occurs w b) h)))
+          (eval_coincidence
+            b
+            env1
+            env2
+            (λw. λh. agree w (or_right (occurs w a) (occurs w b) h)));
+    EMul a b ↦
+      λagree.
+        mul_cong
+          (eval env1 a)
+          (eval env2 a)
+          (eval env1 b)
+          (eval env2 b)
+          (eval_coincidence a env1 env2 (λw. λh. agree w (or_left (occurs w a) (occurs w b) h)))
+          (eval_coincidence
+            b
+            env1
+            env2
+            (λw. λh. agree w (or_right (occurs w a) (occurs w b) h)))
   }
 
 pub theorem deriv_substitute
@@ -3393,6 +3431,17 @@ products combine the restricted recursive equalities with the private
 structural congruences. Its conclusion is structural `Equal Expr`, not
 equality of evaluations.
 
+The `eval_coincidence` proof inducts on the expression with the agreement
+premise after the colon. The constant case is reflexive. The variable case
+applies agreement at the variable itself, whose occurrence
+`nat_same_complete` proves from `Refl`. Sums and products give each operand
+a restricted agreement: an occurrence in the left operand lifts to the whole
+expression through the public `or_left` of `Core.Classes.LawfulClasses`, and
+one in the right operand through `or_right`. The recursive equalities combine
+with `add_cong` and `mul_cong`. The single-variable `eval_absent` follows from
+it, because an index equal to an occurring one would make the absent decision
+`True`; it keeps its own export and proof.
+
 For derivative after substitution, induction on the expression uses the two
 pointwise derivative premises on a variable. The product case reuses
 `eval_substitute` for its underived factors, then lifts the induction
@@ -3476,7 +3525,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–20 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–21 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3485,6 +3534,9 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [commutation seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-commutation.md),
 [independent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-independent-variable.md),
 [absent-variable seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-absent-variable.md),
+[evaluation-absent seed](../../../../conformance/stdlib/symbolic-algebra/seed-eval-absent-variable.md),
+[substitution-absent seed](../../../../conformance/stdlib/symbolic-algebra/seed-substitute-absent-variable.md),
+[evaluation-coincidence seed](../../../../conformance/stdlib/symbolic-algebra/seed-eval-coincidence.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
 [expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
@@ -3500,7 +3552,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and thirty-nine checked theorems; Horner, substitution and differentiation
+and forty checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3539,7 +3591,11 @@ an isolated occurring-variable refusal. The
 `cat_symbolic_algebra_substitute_absent` package test checks the open
 structural law and exact trust identity set, then accepts absent sum and
 product shapes and the changed present-variable value. Its isolated false
-unchanged-value and false absence-premise claims refuse separately.
+unchanged-value and false absence-premise claims refuse separately. The
+`cat_symbolic_algebra_eval_coincidence` package test checks the open law, its
+exact trust identity set and the `eval_absent` consequence, accepts two
+environments that differ at two absent variables, and refuses the same
+agreement proof once one of those variables occurs.
 
 The normalization-congruence package test checks the new generic public
 law under a selective import, compares exact trusted-`GlobalId` identity
