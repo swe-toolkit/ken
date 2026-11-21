@@ -1793,6 +1793,7 @@ pub(crate) fn resolve_decl_in_unit(
 
         Decl::InstanceDecl {
             class_name,
+            class_name_span: _,
             head_type,
             constraints,
             fields,
