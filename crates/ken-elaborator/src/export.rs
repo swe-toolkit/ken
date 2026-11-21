@@ -588,6 +588,7 @@ pub(crate) enum HostOpFamilyV1 {
     Fs,
     Entropy,
     Process,
+    Net,
 }
 
 pub(crate) const fn host_operation_family_v1(
@@ -637,6 +638,10 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::ProcessTakePipe
         | ken_host::HostOpV1::ProcessWait
         | ken_host::HostOpV1::ProcessSignal => HostOpFamilyV1::Process,
+        ken_host::HostOpV1::NetListen | ken_host::HostOpV1::NetAccept
+        | ken_host::HostOpV1::NetConnect | ken_host::HostOpV1::NetReceive
+        | ken_host::HostOpV1::NetSend | ken_host::HostOpV1::NetShutdown
+        | ken_host::HostOpV1::NetLocalAddress => HostOpFamilyV1::Net,
     }
 }
 
@@ -647,6 +652,7 @@ fn host_operation_family(operation: ken_host::HostOpV1) -> (&'static str, &'stat
         HostOpFamilyV1::Fs => ("FSOp", "FS"),
         HostOpFamilyV1::Entropy => ("EntropyOp", "Entropy"),
         HostOpFamilyV1::Process => ("FSOp", "Process"),
+        HostOpFamilyV1::Net => ("FSOp", "Net"),
     }
 }
 
@@ -737,6 +743,13 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::ProcessTakePipe => "ProcessTakePipe",
         ken_host::HostOpV1::ProcessWait => "ProcessWait",
         ken_host::HostOpV1::ProcessSignal => "ProcessSignal",
+        ken_host::HostOpV1::NetListen => "NetListen",
+        ken_host::HostOpV1::NetAccept => "NetAccept",
+        ken_host::HostOpV1::NetConnect => "NetConnect",
+        ken_host::HostOpV1::NetReceive => "NetReceive",
+        ken_host::HostOpV1::NetSend => "NetSend",
+        ken_host::HostOpV1::NetShutdown => "NetShutdown",
+        ken_host::HostOpV1::NetLocalAddress => "NetLocalAddress",
     }
 }
 
@@ -988,13 +1001,21 @@ const FS_HANDLE_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
     },
 ];
 
-const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
+const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 6] = [
     ResourceLifetimeBindingPoint {
         operation: ken_host::HostOpV1::FsReadAt,
         role: ken_host::ResourceBindingRole::Buffer,
     },
     ResourceLifetimeBindingPoint {
         operation: ken_host::HostOpV1::FsWriteAt,
+        role: ken_host::ResourceBindingRole::Buffer,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::NetReceive,
+        role: ken_host::ResourceBindingRole::Buffer,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::NetSend,
         role: ken_host::ResourceBindingRole::Buffer,
     },
     ResourceLifetimeBindingPoint {
@@ -1024,6 +1045,19 @@ const PIPE_READ_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 2] = [
 ];
 const PIPE_WRITE_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 2] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceStreamWrite, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+
+const SOCKET_LISTENER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetAccept, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetLocalAddress, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+const SOCKET_STREAM_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 5] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetReceive, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetSend, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetShutdown, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetLocalAddress, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
 
@@ -1064,6 +1098,8 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
                 ken_host::HostOpV1::FsReadAt,
                 ken_host::HostOpV1::FsWriteAt,
                 ken_host::HostOpV1::BufferFreeze,
+                ken_host::HostOpV1::NetReceive,
+                ken_host::HostOpV1::NetSend,
             ],
         ) {
             return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
@@ -1123,6 +1159,33 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
             });
         }
     }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
+        && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept) {
+        return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+            resource_kind: ken_host::ResourceKindV1::SocketListener,
+            operation: ken_host::HostOpV1::NetAccept,
+        });
+    }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
+        && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
+        && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect)
+        && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetLocalAddress) {
+        return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+            resource_kind: ken_host::ResourceKindV1::SocketListener,
+            operation: ken_host::HostOpV1::NetLocalAddress,
+        });
+    }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
+        && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect) {
+        if let Some(operation) = first_reachable_operation(alphabet, &[
+            ken_host::HostOpV1::NetReceive, ken_host::HostOpV1::NetSend,
+            ken_host::HostOpV1::NetShutdown,
+        ]) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketStream, operation,
+            });
+        }
+    }
     if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessTakePipe) {
         if let Some(operation) = first_reachable_operation(alphabet, &[
             ken_host::HostOpV1::ResourceStreamRead, ken_host::HostOpV1::ResourceStreamWrite,
@@ -1150,6 +1213,9 @@ fn project_resource_lifetime_obligation(
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessPlanOpen)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessSpawn)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessTakePipe)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
     {
         Ok(Some(project_resource_lifetime_obligation_body(alphabet)))
     } else {
@@ -1205,6 +1271,9 @@ fn project_resource_lifetime_obligation_body(
         (ken_host::ResourceKindV1::ChildProcess, ken_host::HostOpV1::ProcessSpawn, ken_host::ResourceBindingRole::File, PROCESS_CHILD_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::PipeRead, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_READ_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::PipeWrite, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_WRITE_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::SocketListener, ken_host::HostOpV1::NetListen, ken_host::ResourceBindingRole::Target, SOCKET_LISTENER_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetAccept, ken_host::ResourceBindingRole::File, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetConnect, ken_host::ResourceBindingRole::Target, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
     ] {
         if alphabet_contains_host_op(alphabet, operation) {
             plans.push(ResourceLifetimePlan {
@@ -1250,9 +1319,12 @@ fn validate_resource_lifetime_selection(
     let has_process = [ken_host::HostOpV1::ProcessPlanOpen, ken_host::HostOpV1::ProcessSpawn,
         ken_host::HostOpV1::ProcessTakePipe].into_iter()
         .any(|operation| alphabet_contains_host_op(alphabet, operation));
+    let has_socket = [ken_host::HostOpV1::NetListen, ken_host::HostOpV1::NetAccept,
+        ken_host::HostOpV1::NetConnect].into_iter()
+        .any(|operation| alphabet_contains_host_op(alphabet, operation));
 
     match value {
-        Some(value) if has_buffer || has_file || has_mapping || has_process => {
+        Some(value) if has_buffer || has_file || has_mapping || has_process || has_socket => {
             validate_resource_lifetime_obligation(value, alphabet)
         }
         None if has_buffer => Err(ExportError::MissingResourceLifetimePlan {
@@ -1266,6 +1338,9 @@ fn validate_resource_lifetime_selection(
         }),
         None if has_process => Err(ExportError::MissingResourceLifetimePlan {
             resource_kind: ken_host::ResourceKindV1::SpawnPlan,
+        }),
+        None if has_socket => Err(ExportError::MissingResourceLifetimePlan {
+            resource_kind: ken_host::ResourceKindV1::SocketListener,
         }),
         Some(_) => Err(ExportError::InvalidResourceLifetimeObligation),
         None => Ok(()),
@@ -1287,6 +1362,8 @@ fn validate_resource_lifetime_obligation(
         ken_host::ResourceKindV1::ChildProcess,
         ken_host::ResourceKindV1::PipeRead,
         ken_host::ResourceKindV1::PipeWrite,
+        ken_host::ResourceKindV1::SocketListener,
+        ken_host::ResourceKindV1::SocketStream,
     ] {
         let acquisition = match resource_kind {
             ken_host::ResourceKindV1::FsHandle => ken_host::HostOpV1::FsOpen,
@@ -1295,8 +1372,12 @@ fn validate_resource_lifetime_obligation(
             ken_host::ResourceKindV1::SpawnPlan => ken_host::HostOpV1::ProcessPlanOpen,
             ken_host::ResourceKindV1::ChildProcess => ken_host::HostOpV1::ProcessSpawn,
             ken_host::ResourceKindV1::PipeRead | ken_host::ResourceKindV1::PipeWrite => ken_host::HostOpV1::ProcessTakePipe,
+            ken_host::ResourceKindV1::SocketListener => ken_host::HostOpV1::NetListen,
+            ken_host::ResourceKindV1::SocketStream => ken_host::HostOpV1::NetConnect,
         };
-        if alphabet_contains_host_op(alphabet, acquisition)
+        if (alphabet_contains_host_op(alphabet, acquisition)
+            || (resource_kind == ken_host::ResourceKindV1::SocketStream
+                && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)))
             && !value
                 .plans
                 .iter()
@@ -1332,6 +1413,8 @@ const fn canonical_resource_kind_v1(value: ken_host::ResourceKindV1) -> &'static
         ken_host::ResourceKindV1::ChildProcess => "ChildProcess",
         ken_host::ResourceKindV1::PipeRead => "PipeRead",
         ken_host::ResourceKindV1::PipeWrite => "PipeWrite",
+        ken_host::ResourceKindV1::SocketListener => "SocketListener",
+        ken_host::ResourceKindV1::SocketStream => "SocketStream",
     }
 }
 
@@ -1640,6 +1723,74 @@ mod resource_lifetime_hash_tests {
         let mut wrong_status = projected.clone();
         wrong_status.status = "proved";
         assert_ne!(hash(projected), hash(wrong_status));
+    }
+
+    /// Promise class: durable invariant. MEASURED: a live Net alphabet
+    /// projects listener and both stream acquisition identities, with Net
+    /// reads/writes also bound to the same checked buffer; removing listener
+    /// acquisition refuses NetAccept. CLAIMED: the resource-lifetime export
+    /// tracks socket uses as bracket-owned identities, not ambient effects.
+    /// THE GAP: the monitor must enforce the projected role correlations;
+    /// this unit test pins the emitted obligation rather than running Ward.
+    #[test]
+    fn px11_socket_lifetimes_bind_listener_stream_and_buffer_roles() {
+        let alphabet = [
+            ken_host::HostOpV1::BufferAllocate,
+            ken_host::HostOpV1::NetListen,
+            ken_host::HostOpV1::NetAccept,
+            ken_host::HostOpV1::NetConnect,
+            ken_host::HostOpV1::NetReceive,
+            ken_host::HostOpV1::NetSend,
+            ken_host::HostOpV1::NetShutdown,
+            ken_host::HostOpV1::ResourceRelease,
+        ]
+        .map(|operation| canonical_host_perform_signature_v1(operation).to_string())
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        let projected = project_resource_lifetime_obligation(&alphabet)
+            .expect("checked socket alphabet")
+            .expect("socket acquisition projects lifetimes");
+        assert_eq!(
+            projected.plans.iter().map(|plan| plan.resource_kind).collect::<Vec<_>>(),
+            [
+                ken_host::ResourceKindV1::Buffer,
+                ken_host::ResourceKindV1::SocketListener,
+                ken_host::ResourceKindV1::SocketStream,
+                ken_host::ResourceKindV1::SocketStream,
+            ]
+        );
+        let binding = |op, role| ResourceLifetimeBindingPoint { operation: op, role };
+        assert_eq!(
+            projected.plans[1].require_same_at,
+            [
+                binding(ken_host::HostOpV1::NetAccept, ken_host::ResourceBindingRole::Target),
+                binding(ken_host::HostOpV1::ResourceRelease, ken_host::ResourceBindingRole::Target),
+            ]
+        );
+        for stream in &projected.plans[2..] {
+            assert!(stream.require_same_at.contains(&binding(
+                ken_host::HostOpV1::NetReceive,
+                ken_host::ResourceBindingRole::File,
+            )));
+            assert!(stream.require_same_at.contains(&binding(
+                ken_host::HostOpV1::NetSend,
+                ken_host::ResourceBindingRole::File,
+            )));
+        }
+        assert!(projected.plans[0].require_same_at.contains(&binding(
+            ken_host::HostOpV1::NetReceive,
+            ken_host::ResourceBindingRole::Buffer,
+        )));
+        assert_eq!(validate_resource_lifetime_obligation(&projected, &alphabet), Ok(()));
+        let mut missing_listener = alphabet;
+        missing_listener.remove(canonical_host_perform_signature_v1(ken_host::HostOpV1::NetListen));
+        assert_eq!(
+            project_resource_lifetime_obligation(&missing_listener),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketListener,
+                operation: ken_host::HostOpV1::NetAccept,
+            })
+        );
     }
 
     /// Promise class: durable invariant. A child signal without ProcessSpawn

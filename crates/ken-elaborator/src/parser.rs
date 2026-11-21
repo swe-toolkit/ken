@@ -2561,7 +2561,7 @@ impl Parser {
             let mut declarations = Vec::new();
             loop {
                 let (family, family_span) = self.expect_con()?;
-                if family != "FS" && family != "Process" {
+                if family != "FS" && family != "Process" && family != "Net" {
                     return Err(ElabError::UnknownCapabilityFamily {
                         family,
                         span: family_span,
@@ -2576,7 +2576,7 @@ impl Parser {
                         span: family_span,
                     });
                 }
-                let (authority, root) = if family == "FS" {
+                let (authority, root, classes) = if family == "FS" {
                     let (authority, authority_span) = self.expect_con()?;
                     if !matches!(authority.as_str(), "ANone" | "APartial" | "AFull") {
                         return Err(ElabError::InvalidCapabilityAuthority {
@@ -2602,15 +2602,41 @@ impl Parser {
                     } else {
                         None
                     };
-                    (authority, root)
+                    (authority, root, Vec::new())
+                } else if family == "Net" {
+                    // One or more space-separated class names, delimited by
+                    // the next capability comma. `+` is grammar metanotation,
+                    // never a token in the source header.
+                    let mut classes = Vec::new();
+                    let (class, span) = self.expect_con()?;
+                    let mut current = (class, span);
+                    loop {
+                        if !matches!(current.0.as_str(), "Loopback" | "Inet" | "Unix") {
+                            return Err(ElabError::InvalidCapabilityAuthority {
+                                family, authority: current.0, span: current.1,
+                            });
+                        }
+                        if classes.contains(&current.0) {
+                            return Err(ElabError::ParseError {
+                                msg: format!("duplicate Net class '{}'", current.0),
+                                span: current.1,
+                            });
+                        }
+                        end = current.1.end;
+                        classes.push(current.0);
+                        if !matches!(self.peek(), Token::ConId(_)) { break; }
+                        current = self.expect_con()?;
+                    }
+                    (String::new(), None, classes)
                 } else {
                     // Process is an explicit grant, not a second authority family.
                     end = family_span.end;
-                    (String::new(), None)
+                    (String::new(), None, Vec::new())
                 };
                 declarations.push(CapabilityDecl {
                     family,
                     authority,
+                    classes,
                     root,
                 });
                 if !matches!(self.peek(), Token::Comma) {

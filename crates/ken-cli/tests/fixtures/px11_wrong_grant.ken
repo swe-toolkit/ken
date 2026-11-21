@@ -1,0 +1,65 @@
+program capabilities FS AFull, Net Loopback, RootExecution Allow
+
+import Capability.Net.Stream (SocketAddress, socket_unix_path, with_socket_connection)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Error
+  (SystemError,
+    MkSystemError,
+    SocketOp,
+    ConnectSocket,
+    SocketResource,
+    NoSafeContext,
+    socket_error_to_system)
+
+import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult)
+
+fn unexpected
+      (_stream : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn typed_denied_address (address : SocketAddress) (identity : IOError) : Bool =
+  match socket_error_to_system ConnectSocket (Some SocketAddress address) identity {
+    MkSystemError
+      (SocketOp ConnectSocket)
+      (SocketResource (Some _))
+      IOError.CapabilityDenied NoSafeContext ↦
+      True;
+    MkSystemError _ _ _ _ ↦ False
+  }
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Cons path _ ↦
+          match socket_unix_path path {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+            Ok address ↦
+              match caps {
+                ProgramCaps.MkProgramCaps cap ↦
+                  host_bind
+                    AFull
+                    (Result ResourceError (ResourceBracketResult Unit Unit))
+                    ExitCode
+                    (with_socket_connection AFull Unit Unit cap address unexpected)
+                    (λoutcome.
+                      match outcome {
+                        Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+                        Err (ResourceError.ResourceHostIO identity) ↦
+                          match typed_denied_address address identity {
+                            True ↦ host_pure AFull ExitCode ExitCode.Success;
+                            False ↦ host_pure AFull ExitCode (ExitCode.Failure 77)
+                          };
+                        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 78)
+                      })
+              }
+          }
+      }
+  }
