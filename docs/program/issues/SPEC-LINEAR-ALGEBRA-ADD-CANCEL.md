@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-ADD-CANCEL
 title: "Spec 65 gives vector and matrix addition commutativity, associativity and a zero unit, but no cancellation law, so a client holding xs + zs = ys + zs cannot conclude xs = ys without inducting over the vectors itself, although natural addition cancels (add_cancel_r). Rule from a checked D0 at zero trust that vector_add and matrix_add cancel on the right at every dimension, and state both with a seed whose refused row applies the law to a false premise"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
