@@ -7258,8 +7258,8 @@ mod namespace_effect_tests {
     /// checked dictionary ID at the root and through same-file child replay.
     /// CLAIMED: S3 prebind and S5 ordered admission agree on that checked
     /// identity, without global-resolving a binder.
-    /// THE GAP: a missing-class UnboundName at the class span cannot be green
-    /// under Legacy (it gives UnresolvedCon); that negative is held to I4.
+    /// THE GAP: the direct-declaration missing-class refusal is checked by
+    /// `generic_instance_missing_class_refuses_in_declaration_entry`.
     #[test]
     fn generic_instance_head_binder_has_checked_identity_after_child_replay() {
         let mut root = ElabEnv::new().expect("prelude");
@@ -7290,6 +7290,28 @@ mod namespace_effect_tests {
             .instances_by_id
             .values()
             .any(|info| info.instance_id == child_id));
+    }
+
+    /// Promise class: durable invariant (33 §5.3, 39 §6).
+    /// MEASURED: the direct declaration entry refuses an absent generic
+    /// instance class as UnboundName naming the class, where Legacy gave
+    /// UnresolvedCon. The refusal currently spans the whole declaration.
+    /// CLAIMED: a missing class has no ambient fallback on this entry.
+    /// THE GAP: InstanceDecl carries no class-token span, so the pinned 0..37
+    /// is current behaviour, not a localization promise. Pointing at the class
+    /// head is a follow-on AST change (a name span, as LetBinding.name_span
+    /// does), which updates this pin deliberately.
+    #[test]
+    fn generic_instance_missing_class_refuses_in_declaration_entry() {
+        const SOURCE: &str = "instance MissingFlag a { tag = True }";
+        let mut env = ElabEnv::new().expect("checked prelude");
+        match env.elaborate_decl_v1(SOURCE) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "MissingFlag");
+                assert_eq!((span.start, span.end), (0, SOURCE.len()));
+            }
+            other => panic!("missing class must refuse as UnboundName: {other:?}"),
+        }
     }
 
     /// Promise class: durable owner-scope isolation invariant (33 §3.3/§4).
