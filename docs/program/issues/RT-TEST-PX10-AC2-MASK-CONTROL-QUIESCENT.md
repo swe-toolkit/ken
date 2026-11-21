@@ -1,7 +1,7 @@
 ---
 id: RT-TEST-PX10-AC2-MASK-CONTROL-QUIESCENT
 title: "ac2_checked_interpreter_live_child_fd_and_signal_boundary reads the spawning thread's signal mask from /proc after the child publishes readiness, while that thread can still be inside the spawn's all-signals-blocked window, so its SIGUSR1-only control intermittently reads a full block and reddens CI on unrelated candidates. Sample the control at a point where the spawning thread is not spawning, keeping the control able to fail"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T2
