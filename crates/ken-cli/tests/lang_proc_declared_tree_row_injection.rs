@@ -153,9 +153,9 @@ fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
         | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease | BufferAllocate
         | BufferFreeze | MappingAllocate | MappingReadView | MappingWriteView
         | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite | ProcessPlanOpen
-        | ProcessPlanPush | ProcessSpawn | ProcessTakePipe | ProcessWait | ProcessSignal => {
-            (HostTree::Fs, HostTree::Console)
-        }
+        | ProcessPlanPush | ProcessSpawn | ProcessTakePipe | ProcessWait | ProcessSignal
+        | NetListen | NetAccept | NetConnect | NetReceive | NetSend | NetShutdown
+        | NetLocalAddress => (HostTree::Fs, HostTree::Console),
     }
 }
 

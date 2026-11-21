@@ -57,6 +57,13 @@ pub enum HostOpV1 {
     ProcessTakePipe = 0x0604,
     ProcessWait = 0x0605,
     ProcessSignal = 0x0606,
+    NetListen = 0x0701,
+    NetAccept = 0x0702,
+    NetConnect = 0x0703,
+    NetReceive = 0x0704,
+    NetSend = 0x0705,
+    NetShutdown = 0x0706,
+    NetLocalAddress = 0x0707,
 }
 
 impl HostOpV1 {
@@ -161,7 +168,14 @@ impl HostOpV1 {
             Self::ProcessSpawn => Some(Self::ProcessTakePipe),
             Self::ProcessTakePipe => Some(Self::ProcessWait),
             Self::ProcessWait => Some(Self::ProcessSignal),
-            Self::ProcessSignal => None,
+            Self::ProcessSignal => Some(Self::NetListen),
+            Self::NetListen => Some(Self::NetAccept),
+            Self::NetAccept => Some(Self::NetConnect),
+            Self::NetConnect => Some(Self::NetReceive),
+            Self::NetReceive => Some(Self::NetSend),
+            Self::NetSend => Some(Self::NetShutdown),
+            Self::NetShutdown => Some(Self::NetLocalAddress),
+            Self::NetLocalAddress => None,
         }
     }
 
@@ -227,15 +241,31 @@ impl HostOpV1 {
             | Self::ProcessTakePipe
             | Self::ProcessWait
             | Self::ProcessSignal => HostOpAvailabilityV1::NativeTested,
+            Self::NetListen
+            | Self::NetAccept
+            | Self::NetConnect
+            | Self::NetReceive
+            | Self::NetSend
+            | Self::NetShutdown
+            | Self::NetLocalAddress => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
 
-    /// May a Ken program execute the operation through the reference host?
-    /// No operation is interpreter-admitted without native parity evidence.
+    /// Only the seven PX11 Net operations may execute without native parity;
+    /// a declared Net grant is separately refused before native object emission.
     pub const fn executor_admits(self) -> bool {
         match self.availability() {
             HostOpAvailabilityV1::NativeTested => true,
-            HostOpAvailabilityV1::RepresentedUnavailable => false,
+            HostOpAvailabilityV1::RepresentedUnavailable => matches!(
+                self,
+                Self::NetListen
+                    | Self::NetAccept
+                    | Self::NetConnect
+                    | Self::NetReceive
+                    | Self::NetSend
+                    | Self::NetShutdown
+                    | Self::NetLocalAddress
+            ),
         }
     }
 
@@ -283,6 +313,8 @@ impl HostOpV1 {
             Self::EntropyRandomBytes => true,
             Self::ProcessPlanOpen | Self::ProcessPlanPush | Self::ProcessSpawn
             | Self::ProcessTakePipe | Self::ProcessWait | Self::ProcessSignal => false,
+            Self::NetListen | Self::NetAccept | Self::NetConnect | Self::NetReceive
+            | Self::NetSend | Self::NetShutdown | Self::NetLocalAddress => false,
         }
     }
 }
@@ -659,7 +691,14 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
-        | HostOpV1::EntropyRandomBytes => {
+        | HostOpV1::EntropyRandomBytes
+        | HostOpV1::NetListen
+        | HostOpV1::NetAccept
+        | HostOpV1::NetConnect
+        | HostOpV1::NetReceive
+        | HostOpV1::NetSend
+        | HostOpV1::NetShutdown
+        | HostOpV1::NetLocalAddress => {
             return Err(TerminalErrorV1::OperationUnavailable(operation));
         }
     };
@@ -937,6 +976,8 @@ pub enum ResourceKindV1 {
     ChildProcess,
     PipeRead,
     PipeWrite,
+    SocketListener,
+    SocketStream,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -1325,6 +1366,8 @@ pub enum ResourceOwnerV1 {
     Child(ChildOwnerV1),
     PipeRead(std::os::fd::OwnedFd),
     PipeWrite(std::os::fd::OwnedFd),
+    SocketListener(std::os::fd::OwnedFd),
+    SocketStream(std::os::fd::OwnedFd),
 }
 
 #[derive(Debug)]
@@ -1482,6 +1525,20 @@ impl ResourceTableV1 {
             ResourceOwnerV1::SpawnPlan(plan), ResourceKindV1::SpawnPlan,
             crate::RightSet::EXECUTE, Some(provenance),
         )
+    }
+
+    fn insert_socket(
+        &mut self,
+        fd: std::os::fd::OwnedFd,
+        kind: ResourceKindV1,
+        provenance: crate::revocation_v1::RevocationNodeId,
+    ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
+        let owner = match kind {
+            ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener(fd),
+            ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream(fd),
+            _ => unreachable!("socket insertion needs a socket kind"),
+        };
+        self.insert_owner(owner, kind, crate::RightSet::NONE, Some(provenance))
     }
 
     fn insert_child(
@@ -2209,7 +2266,9 @@ impl ResourceTableV1 {
             | ResourceOwnerV1::SpawnPlan(_)
             | ResourceOwnerV1::Child(_)
             | ResourceOwnerV1::PipeRead(_)
-            | ResourceOwnerV1::PipeWrite(_) => None,
+            | ResourceOwnerV1::PipeWrite(_)
+            | ResourceOwnerV1::SocketListener(_)
+            | ResourceOwnerV1::SocketStream(_) => None,
             ResourceOwnerV1::Buffer(buffer) => Some(buffer.capacity() as u64),
             ResourceOwnerV1::Mapping(region) => Some(
                 mapping_accounted_capacity(region.length() as u64)
@@ -2244,7 +2303,8 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Buffer(_) => Ok(()),
             ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
             ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
-            | ResourceOwnerV1::PipeWrite(_) => Ok(()),
+            | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener(_)
+            | ResourceOwnerV1::SocketStream(_) => Ok(()),
             ResourceOwnerV1::Child(child) => backend.process_settle(child.process, false),
         };
         match closed {
@@ -2307,7 +2367,8 @@ impl ResourceTableV1 {
                     ResourceOwnerV1::Buffer(_) => Ok(()),
                     ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
                     ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
-                    | ResourceOwnerV1::PipeWrite(_) => Ok(()),
+                    | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener(_)
+                    | ResourceOwnerV1::SocketStream(_) => Ok(()),
                     ResourceOwnerV1::Child(child) => backend.process_settle(child.process, terminal_error),
                 };
                 Some(match closed {
@@ -2345,7 +2406,8 @@ impl ResourceTableV1 {
                     ResourceKindV1::FsHandle => ResourceKindV1::Buffer,
                     ResourceKindV1::Buffer | ResourceKindV1::Mapping
                     | ResourceKindV1::SpawnPlan | ResourceKindV1::ChildProcess
-                    | ResourceKindV1::PipeRead | ResourceKindV1::PipeWrite => ResourceKindV1::FsHandle,
+                    | ResourceKindV1::PipeRead | ResourceKindV1::PipeWrite
+                    | ResourceKindV1::SocketListener | ResourceKindV1::SocketStream => ResourceKindV1::FsHandle,
                 },
                 actual: *actual,
             });
@@ -2450,6 +2512,7 @@ impl ResourceTableV1 {
         let fd = match pipe_owner {
             ResourceOwnerV1::PipeRead(fd) if kind == ResourceKindV1::PipeRead => fd,
             ResourceOwnerV1::PipeWrite(fd) if kind == ResourceKindV1::PipeWrite => fd,
+            ResourceOwnerV1::SocketStream(fd) if kind == ResourceKindV1::SocketStream => fd,
             _ => return Err(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource)),
         };
         let ResourceSlotStateV1::Live { owner: buffer_owner, kind: buffer_kind, identity: buffer_identity, .. } = &mut buffer_slot.state else {
@@ -2626,6 +2689,34 @@ pub trait HostEffectBackendV1 {
         child.settle(terminal_error).map_err(|error| io_error_identity_v1(&error))
     }
 
+    fn net_listen(&mut self, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::listen(address).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_accept(&mut self, listener: &std::os::fd::OwnedFd) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::accept(listener).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_connect(&mut self, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::connect(address).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_receive(&mut self, stream: &std::os::fd::OwnedFd, bytes: &mut [u8]) -> Result<usize, IoErrorIdentityV1> {
+        crate::net_v1::receive(stream, bytes).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_send(&mut self, stream: &std::os::fd::OwnedFd, bytes: &[u8]) -> Result<usize, IoErrorIdentityV1> {
+        crate::net_v1::send(stream, bytes).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_shutdown(&mut self, stream: &std::os::fd::OwnedFd, how: u64) -> Result<(), IoErrorIdentityV1> {
+        crate::net_v1::shutdown(stream, how).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_local_address(&mut self, stream: &std::os::fd::OwnedFd) -> Result<crate::SocketAddressV1, IoErrorIdentityV1> {
+        crate::net_v1::local_address(stream).map_err(|error| io_error_identity_v1(&error))
+    }
+
     fn resource_stream_read(&mut self, fd: &std::os::fd::OwnedFd, bytes: &mut [u8]) -> Result<usize, IoErrorIdentityV1> {
         crate::process_stream_read_v1(fd, bytes).map_err(|error| io_error_identity_v1(&error))
     }
@@ -2780,6 +2871,7 @@ enum CapabilityRequirementV1 {
     None,
     Fixed(crate::FsCapabilityOperation, crate::Authority),
     FsOpen,
+    Net,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2837,6 +2929,7 @@ impl HostOpV1 {
                 crate::AUTH_FULL,
             ),
             Self::FsOpen => CapabilityRequirementV1::FsOpen,
+            Self::NetListen | Self::NetConnect => CapabilityRequirementV1::Net,
             Self::ProcessPlanOpen => CapabilityRequirementV1::Fixed(
                 crate::FsCapabilityOperation::Spawn,
                 crate::AUTH_FULL,
@@ -2871,6 +2964,11 @@ impl HostOpV1 {
             | Self::ProcessTakePipe
             | Self::ProcessWait
             | Self::ProcessSignal
+            | Self::NetAccept
+            | Self::NetReceive
+            | Self::NetSend
+            | Self::NetShutdown
+            | Self::NetLocalAddress
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
         }
     }
@@ -2888,9 +2986,12 @@ impl HostOpV1 {
             | Self::ProcessPlanPush
             | Self::ProcessTakePipe
             | Self::ProcessWait
-            | Self::ProcessSignal => ResourceAdmissionRequirementV1::Target,
-            Self::FsReadAt | Self::ResourceStreamRead => ResourceAdmissionRequirementV1::FileBuffer,
-            Self::FsWriteAt | Self::ResourceStreamWrite => ResourceAdmissionRequirementV1::FileBufferSpan,
+            | Self::ProcessSignal
+            | Self::NetAccept
+            | Self::NetShutdown
+            | Self::NetLocalAddress => ResourceAdmissionRequirementV1::Target,
+            Self::FsReadAt | Self::ResourceStreamRead | Self::NetReceive => ResourceAdmissionRequirementV1::FileBuffer,
+            Self::FsWriteAt | Self::ResourceStreamWrite | Self::NetSend => ResourceAdmissionRequirementV1::FileBufferSpan,
             Self::FsSeek
             | Self::FsSetLength
             | Self::FsSync
@@ -2918,6 +3019,8 @@ impl HostOpV1 {
             | Self::FsOpen
             | Self::ProcessPlanOpen
             | Self::ProcessSpawn
+            | Self::NetListen
+            | Self::NetConnect
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::MappingAllocate => ResourceAdmissionRequirementV1::None,
@@ -2986,8 +3089,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
+    let required_net = match (operation.capability_requirement(), request) {
+        (CapabilityRequirementV1::Net, CanonicalRequestV1::NetListen { address } | CanonicalRequestV1::NetConnect { address }) => Some(address),
+        (CapabilityRequirementV1::Net, _) => return Err(TerminalErrorV1::MalformedHostAbiField),
+        _ => None,
+    };
     let required = match operation.capability_requirement() {
-        CapabilityRequirementV1::None => None,
+        CapabilityRequirementV1::None | CapabilityRequirementV1::Net => None,
         CapabilityRequirementV1::Fixed(operation, authority) => Some((operation, authority)),
         CapabilityRequirementV1::FsOpen => {
             let CanonicalRequestV1::FsOpen { mode, .. } = request else {
@@ -3004,7 +3112,25 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         }
     };
     let (grant, _admission_lease) = match (required, capability) {
-        (None, None) => (None, None),
+        (None, None) if required_net.is_none() => (None, None),
+        (None, None) => return Ok(error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))),
+        (None, Some(token)) if required_net.is_some() => {
+            let address = required_net.expect("net acquisition has an address");
+            let grant = match capabilities.resolve(token) {
+                Ok(grant) => grant,
+                Err(_) => return Ok(error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))),
+            };
+            let Some(lease) = revocation.admit(grant.revocation_node) else {
+                return Ok(error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::Revoked)));
+            };
+            if !grant.capability.net_scope().admits(address) {
+                return Ok(error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied)));
+            }
+            (Some(grant), Some(lease))
+        }
+        (None, _) if required_net.is_some() => {
+            return Ok(error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied)));
+        }
         (None, Some(_)) | (Some(_), None) => {
             return Ok(if operation == HostOpV1::ProcessPlanOpen {
                 error_denied(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied))
@@ -3058,9 +3184,9 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             HostOpV1::MappingReadView | HostOpV1::MappingWriteView,
             ResourceInputsV1::MappingSpanTarget { .. }
         ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
-            | (HostOpV1::FsReadAt | HostOpV1::ResourceStreamRead, ResourceInputsV1::FileBuffer { .. })
-            | (HostOpV1::FsWriteAt | HostOpV1::ResourceStreamWrite, ResourceInputsV1::FileBufferSpan { .. })
-            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait | HostOpV1::ProcessSignal, ResourceInputsV1::Target(_))
+            | (HostOpV1::FsReadAt | HostOpV1::ResourceStreamRead | HostOpV1::NetReceive, ResourceInputsV1::FileBuffer { .. })
+            | (HostOpV1::FsWriteAt | HostOpV1::ResourceStreamWrite | HostOpV1::NetSend, ResourceInputsV1::FileBufferSpan { .. })
+            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait | HostOpV1::ProcessSignal | HostOpV1::NetAccept | HostOpV1::NetShutdown | HostOpV1::NetLocalAddress, ResourceInputsV1::Target(_))
             | (
                 HostOpV1::BufferAllocate
                     | HostOpV1::MappingAllocate
@@ -3083,7 +3209,9 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     | HostOpV1::FsRename
                     | HostOpV1::FsChangeMode
                     | HostOpV1::FsOpen
-                    | HostOpV1::ProcessPlanOpen,
+                    | HostOpV1::ProcessPlanOpen
+                    | HostOpV1::NetListen
+                    | HostOpV1::NetConnect,
                 ResourceInputsV1::None
             )
     );
@@ -3161,6 +3289,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             | (HostOpV1::ProcessTakePipe, CanonicalRequestV1::ProcessTakePipe { .. })
             | (HostOpV1::ProcessWait, CanonicalRequestV1::ProcessWait)
             | (HostOpV1::ProcessSignal, CanonicalRequestV1::ProcessSignal { .. })
+            | (HostOpV1::NetListen, CanonicalRequestV1::NetListen { .. })
+            | (HostOpV1::NetAccept, CanonicalRequestV1::NetAccept)
+            | (HostOpV1::NetConnect, CanonicalRequestV1::NetConnect { .. })
+            | (HostOpV1::NetReceive, CanonicalRequestV1::NetReceive { .. })
+            | (HostOpV1::NetSend, CanonicalRequestV1::NetSend { .. })
+            | (HostOpV1::NetShutdown, CanonicalRequestV1::NetShutdown { .. })
+            | (HostOpV1::NetLocalAddress, CanonicalRequestV1::NetLocalAddress)
             | (
                 HostOpV1::FsHandleMetadata,
                 CanonicalRequestV1::FsHandleMetadata
@@ -3786,6 +3921,82 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 },
             )
         }
+        (HostOpV1::NetListen, CanonicalRequestV1::NetListen { address })
+        | (HostOpV1::NetConnect, CanonicalRequestV1::NetConnect { address }) => {
+            let acquired = if operation == HostOpV1::NetListen {
+                backend.net_listen(address)
+            } else {
+                backend.net_connect(address)
+            };
+            acquired.map(|fd| {
+                let kind = if operation == HostOpV1::NetListen {
+                    ResourceKindV1::SocketListener
+                } else {
+                    ResourceKindV1::SocketStream
+                };
+                let (token, identity) = resources.insert_socket(
+                    fd, kind, grant.expect("validated Net grant").revocation_node,
+                );
+                minted_resource = Some(token);
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                CanonicalReplyV1::ResourceAcquired {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: kind,
+                    identity,
+                }
+            }).map_err(SemanticErrorV1::Io)
+        }
+        (HostOpV1::NetAccept, CanonicalRequestV1::NetAccept) => {
+            let ResourceInputsV1::Target(listener) = resource else { unreachable!("validated resource shape") };
+            let accepted = (|| {
+                let (owner, identity, provenance) = resources.typed_owner(listener, ResourceKindV1::SocketListener)
+                    .map_err(SemanticErrorV1::Resource)?;
+                let provenance = provenance.ok_or(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::SocketListener(fd) = owner else { unreachable!("validated socket kind") };
+                backend.net_accept(fd).map(|fd| (fd, provenance)).map_err(SemanticErrorV1::Io)
+            })();
+            accepted.map(|(fd, provenance)| {
+                let (token, identity) = resources.insert_socket(fd, ResourceKindV1::SocketStream, provenance);
+                minted_resource = Some(token);
+                resource_bindings.push((ResourceBindingRole::File, identity));
+                CanonicalReplyV1::ResourceAcquired {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::SocketStream,
+                    identity,
+                }
+            })
+        }
+        (HostOpV1::NetShutdown, CanonicalRequestV1::NetShutdown { how }) => {
+            let ResourceInputsV1::Target(token) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                if *how > 2 { return Err(SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput)); }
+                let (owner, identity, _) = resources.typed_owner(token, ResourceKindV1::SocketStream)
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::SocketStream(fd) = owner else { unreachable!("validated socket kind") };
+                backend.net_shutdown(fd, *how).map(|()| CanonicalReplyV1::Unit).map_err(SemanticErrorV1::Io)
+            })()
+        }
+        (HostOpV1::NetLocalAddress, CanonicalRequestV1::NetLocalAddress) => {
+            let ResourceInputsV1::Target(token) = resource else { unreachable!("validated resource shape") };
+            (|| {
+                let (owner, identity, _) = resources.typed_owner(token, ResourceKindV1::SocketListener)
+                    .or_else(|error| match error {
+                        ResourceErrorV1::ResourceKindMismatch { .. } => resources.typed_owner(token, ResourceKindV1::SocketStream),
+                        other => Err(other),
+                    })
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let fd = match owner {
+                    ResourceOwnerV1::SocketListener(fd) | ResourceOwnerV1::SocketStream(fd) => fd,
+                    _ => unreachable!("validated socket kind"),
+                };
+                let address = backend.net_local_address(fd).map_err(SemanticErrorV1::Io)?;
+                address.validate().map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
+                Ok(CanonicalReplyV1::SocketAddress(address))
+            })()
+        }
         (HostOpV1::ProcessPlanOpen, CanonicalRequestV1::ProcessPlanOpen { program }) => {
             crate::SpawnPlanV1::new(program.clone())
                 .map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error)))
@@ -3896,36 +4107,48 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     .map(|()| CanonicalReplyV1::Unit).map_err(SemanticErrorV1::Io)
             })()
         }
-        (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { buffer_start, length }) => {
+        (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { buffer_start, length })
+        | (HostOpV1::NetReceive, CanonicalRequestV1::NetReceive { buffer_start, length }) => {
             let ResourceInputsV1::FileBuffer { file: stream, buffer } = resource else { unreachable!("validated resource shape") };
-            resources.with_pipe_and_buffer_mut(stream, ResourceKindV1::PipeRead, buffer, |fd, stream_id, region, buffer_id| {
+            let kind = if operation == HostOpV1::NetReceive { ResourceKindV1::SocketStream } else { ResourceKindV1::PipeRead };
+            resources.with_pipe_and_buffer_mut(stream, kind, buffer, |fd, stream_id, region, buffer_id| {
                 resource_bindings.extend([(ResourceBindingRole::File, stream_id), (ResourceBindingRole::Buffer, buffer_id)]);
                 let (start, effective) = checked_buffer_range(region.capacity(), *buffer_start, *length).map_err(SemanticErrorV1::Resource)?;
                 region.clear_window();
-                let count = backend.resource_stream_read(fd, &mut region.bytes[start..start + effective]).map_err(SemanticErrorV1::Io)?;
+                let count = if operation == HostOpV1::NetReceive {
+                    backend.net_receive(fd, &mut region.bytes[start..start + effective])
+                } else {
+                    backend.resource_stream_read(fd, &mut region.bytes[start..start + effective])
+                }.map_err(SemanticErrorV1::Io)?;
                 if count > effective { return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds)); }
                 if count == 0 { Ok(CanonicalReplyV1::ReadProgress(ReadProgressV1::ReadEof)) }
                 else {
                     region.install_window(start, count);
                     Ok(CanonicalReplyV1::ReadProgress(ReadProgressV1::ReadSome {
                         span: BufferSpanV1 { start: start as u64, length: count as u64 },
-                        transferred: TransferCountV1::new(count as u64, effective as u64).expect("positive bounded pipe read"),
+                        transferred: TransferCountV1::new(count as u64, effective as u64).expect("positive bounded stream read"),
                     }))
                 }
             })
         }
-        (HostOpV1::ResourceStreamWrite, CanonicalRequestV1::ResourceStreamWrite { buffer_start, length }) => {
+        (HostOpV1::ResourceStreamWrite, CanonicalRequestV1::ResourceStreamWrite { buffer_start, length })
+        | (HostOpV1::NetSend, CanonicalRequestV1::NetSend { buffer_start, length }) => {
             let ResourceInputsV1::FileBufferSpan { file: stream, target_buffer, span_origin } = resource else { unreachable!("validated resource shape") };
-            resources.with_pipe_and_buffer_mut(stream, ResourceKindV1::PipeWrite, target_buffer, |fd, stream_id, region, buffer_id| {
+            let kind = if operation == HostOpV1::NetSend { ResourceKindV1::SocketStream } else { ResourceKindV1::PipeWrite };
+            resources.with_pipe_and_buffer_mut(stream, kind, target_buffer, |fd, stream_id, region, buffer_id| {
                 resource_bindings.extend([(ResourceBindingRole::File, stream_id), (ResourceBindingRole::Buffer, buffer_id)]);
                 let (start, effective) = checked_buffer_range(region.capacity(), *buffer_start, *length).map_err(SemanticErrorV1::Resource)?;
                 checked_span_origin(target_buffer, span_origin).map_err(SemanticErrorV1::Resource)?;
                 let bytes = region.initialized_slice(start, effective).map_err(SemanticErrorV1::Resource)?;
-                let count = backend.resource_stream_write(fd, bytes).map_err(SemanticErrorV1::Io)?;
+                let count = if operation == HostOpV1::NetSend {
+                    backend.net_send(fd, bytes)
+                } else {
+                    backend.resource_stream_write(fd, bytes)
+                }.map_err(SemanticErrorV1::Io)?;
                 if count == 0 { return Err(SemanticErrorV1::Resource(ResourceErrorV1::NoProgress)); }
                 if count > effective { return Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds)); }
                 Ok(CanonicalReplyV1::WriteProgress(WriteProgressV1::Wrote(
-                    TransferCountV1::new(count as u64, effective as u64).expect("positive bounded pipe write"),
+                    TransferCountV1::new(count as u64, effective as u64).expect("positive bounded stream write"),
                 )))
             })
         }
@@ -4260,6 +4483,13 @@ pub enum CanonicalRequestV1 {
     ProcessTakePipe { fd: u64 },
     ProcessWait,
     ProcessSignal { signal: u64 },
+    NetListen { address: crate::SocketAddressV1 },
+    NetAccept,
+    NetConnect { address: crate::SocketAddressV1 },
+    NetReceive { buffer_start: u64, length: u64 },
+    NetSend { buffer_start: u64, length: u64 },
+    NetShutdown { how: u64 },
+    NetLocalAddress,
     ResourceRelease,
 }
 
@@ -4372,6 +4602,7 @@ pub enum CanonicalReplyV1 {
     ReadProgress(ReadProgressV1),
     WriteProgress(WriteProgressV1),
     ChildExit(crate::ChildExitV1),
+    SocketAddress(crate::SocketAddressV1),
     MonotonicInstant(Vec<u8>),
     FilePosition(u64),
     FdInheritancePolicy(FdInheritancePolicyV1),
@@ -4484,6 +4715,7 @@ impl CanonicalOutcomeV1 {
                 | CanonicalReplyV1::ResourceAcquired { .. }
                 | CanonicalReplyV1::ResourceSettlement(_)
                 | CanonicalReplyV1::ChildExit(_)
+                | CanonicalReplyV1::SocketAddress(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
                 | CanonicalReplyV1::FilePosition(_)
                 | CanonicalReplyV1::FdInheritancePolicy(_) => None,
@@ -5058,6 +5290,20 @@ mod tests {
         ) -> Result<(), FileErrorCauseV1> {
             self.0.push(HostOpV1::FsChangeMode);
             Ok(())
+        }
+        fn net_listen(
+            &mut self,
+            _: &crate::SocketAddressV1,
+        ) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+            self.0.push(HostOpV1::NetListen);
+            Err(IoErrorIdentityV1::Unsupported)
+        }
+        fn net_connect(
+            &mut self,
+            _: &crate::SocketAddressV1,
+        ) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+            self.0.push(HostOpV1::NetConnect);
+            Err(IoErrorIdentityV1::Unsupported)
         }
     }
 
@@ -5920,19 +6166,241 @@ mod tests {
     /// no native-unavailable operation gains executor admission. THE GAP:
     /// the shared dispatcher must use executor_admits for each operation.
     #[test]
-    fn executor_admits_exactly_native_tested() {
+    fn executor_admits_exactly_native_tested_plus_px11_interpreter_set() {
         use std::collections::BTreeSet;
-        let widened = HostOpV1::ALL
-            .into_iter()
-            .filter(|op| {
-                op.executor_admits()
-                    && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
-            })
-            .collect::<BTreeSet<_>>();
-        assert_eq!(widened, BTreeSet::new(), "no interpreter-only operation");
+        // Transition sentinel: the immediate native-parity successor retires
+        // this exact seven-operation exception, not the admission invariant.
+        let px11 = [
+            HostOpV1::NetListen, HostOpV1::NetAccept, HostOpV1::NetConnect,
+            HostOpV1::NetReceive, HostOpV1::NetSend, HostOpV1::NetShutdown,
+            HostOpV1::NetLocalAddress,
+        ].into_iter().collect::<BTreeSet<_>>();
+        let interpreter_only = HostOpV1::ALL.into_iter().filter(|op| {
+            op.executor_admits()
+                && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
+        }).collect::<BTreeSet<_>>();
+        assert_eq!(interpreter_only, px11, "exact PX11 interpreter-only set");
         assert!(HostOpV1::ALL.into_iter().all(|op| {
             op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
         }));
+    }
+
+    /// Promise class: durable invariant. MEASURED: the real NetReceive
+    /// dispatcher sees a seven-byte queued stream and a capacity-16 buffer,
+    /// but returns at most four bytes and an effective request of four for a
+    /// bound-4 window. CLAIMED: a caller's receive bound survives dispatch.
+    /// THE GAP: a scheduler may return fewer than four; the test asserts a
+    /// maximum and checks the actual count rather than assuming TCP chunks.
+    #[test]
+    fn px11_net_receive_respects_bound_below_buffer_capacity() {
+        let listener = crate::net_v1::listen(&crate::SocketAddressV1::Inet4 {
+            octets: [127, 0, 0, 1],
+            port: 0,
+        })
+        .unwrap();
+        let connected = crate::net_v1::connect(&crate::net_v1::local_address(&listener).unwrap())
+            .unwrap();
+        let accepted = crate::net_v1::accept(&listener).unwrap();
+        assert_eq!(crate::net_v1::send(&connected, b"abcdefg").unwrap(), 7);
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let grant = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("px11:receive-grant".into()),
+            crate::Cap::mint(crate::AUTH_FULL, "Net")
+                .with_declared_net_grant(&[crate::NetClassV1::Loopback]),
+            &mut revocation,
+        ));
+        let provenance = capabilities.resolve(grant).unwrap().revocation_node;
+        let mut resources = ResourceTableV1::default();
+        let (stream, _) = resources.insert_socket(
+            accepted,
+            ResourceKindV1::SocketStream,
+            provenance,
+        );
+        let (buffer, _) = resources.insert_buffer(16).unwrap();
+        let mut backend = AllOpsBackend::default();
+        let outcome = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            HostOpV1::NetReceive,
+            None,
+            ResourceInputsV1::FileBuffer { file: stream, buffer },
+            &CanonicalRequestV1::NetReceive { buffer_start: 0, length: 4 },
+        )
+        .expect("real bounded socket read is a valid host request");
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadProgress(
+            ReadProgressV1::ReadSome { span, transferred },
+        )) = outcome.outcome else {
+            panic!("expected a positive socket read, got {:?}", outcome.outcome);
+        };
+        assert!(
+            transferred.get() <= 4,
+            "NetReceive returned {} bytes for a bound of four",
+            transferred.get()
+        );
+        assert_eq!(span.start, 0);
+        assert_eq!(span.length, transferred.get());
+        assert_eq!(transferred.effective_request(), 4);
+    }
+
+    /// Promise class: durable invariant. MEASURED: both acquisition ops
+    /// return CapabilityDenied for a Unix address under Loopback and call no
+    /// backend leaf; the same grant reaches each backend on an IPv4 loopback
+    /// address. CLAIMED: Net class denial happens before both socket syscalls.
+    /// THE GAP: the backend spy observes only this dispatch seam; the CLI
+    /// wrong-grant case separately reaches it through a checked Ken program.
+    #[test]
+    fn px11_socket_acquisition_denies_wrong_class_before_backend_call() {
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let token = capabilities.insert(CapabilityGrantV1::mint_root(
+            CapabilityTraceIdentity("px11:net-grant".into()),
+            crate::Cap::mint(crate::AUTH_FULL, "Net")
+                .with_declared_net_grant(&[crate::NetClassV1::Loopback]),
+            &mut revocation,
+        ));
+        let forbidden = crate::SocketAddressV1::Unix {
+            path: b"/tmp/ken-px11-unauthorized.sock".to_vec(),
+        };
+        let permitted = crate::SocketAddressV1::Inet4 {
+            octets: [127, 0, 0, 1],
+            port: 0,
+        };
+        let mut backend = AllOpsBackend::default();
+        let mut resources = ResourceTableV1::default();
+        for operation in [HostOpV1::NetListen, HostOpV1::NetConnect] {
+            let request = |address| match operation {
+                HostOpV1::NetListen => CanonicalRequestV1::NetListen { address },
+                HostOpV1::NetConnect => CanonicalRequestV1::NetConnect { address },
+                _ => unreachable!("closed acquisition fixture"),
+            };
+            let denied = dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                Some(token),
+                ResourceInputsV1::None,
+                &request(forbidden.clone()),
+            )
+            .expect("semantic denial is not a terminal ABI failure");
+            assert_eq!(
+                denied.outcome,
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(
+                    IoErrorIdentityV1::CapabilityDenied
+                )),
+            );
+            assert!(backend.0.is_empty(), "{operation:?} reached a syscall leaf");
+
+            let permitted_result = dispatch_host_op_v1(
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                Some(token),
+                ResourceInputsV1::None,
+                &request(permitted.clone()),
+            )
+            .expect("valid address reaches the backend");
+            assert_eq!(
+                permitted_result.outcome,
+                CanonicalOutcomeV1::Error(SemanticErrorV1::Io(
+                    IoErrorIdentityV1::Unsupported
+                )),
+            );
+            assert_eq!(backend.0, [operation]);
+            backend.0.clear();
+        }
+    }
+
+    /// Spec 38 §1.13, AC-2. Promise class: durable invariant. MEASURED:
+    /// Loopback rejects non-loopback IPv4 before either acquisition backend
+    /// call; Inet reaches the same backend with the identical address.
+    /// CLAIMED: a Loopback grant does not overgrant Internet addresses.
+    /// THE GAP: the backend spy observes dispatch, not a real Linux socket;
+    /// the separate three-family test exercises actual socket acquisition.
+    fn px11_non_loopback_ipv4_requires_inet(operation: HostOpV1) {
+        let mut revocation = RevocationDomain::default();
+        let mut capabilities = CapabilityTableV1::default();
+        let grant =
+            |classes, capabilities: &mut CapabilityTableV1, revocation: &mut RevocationDomain| {
+                capabilities.insert(CapabilityGrantV1::mint_root(
+                    CapabilityTraceIdentity(format!("px11:{classes:?}:{operation:?}")),
+                    crate::Cap::mint(crate::AUTH_FULL, "Net").with_declared_net_grant(classes),
+                    revocation,
+                ))
+            };
+        let loopback = grant(
+            &[crate::NetClassV1::Loopback],
+            &mut capabilities,
+            &mut revocation,
+        );
+        let inet = grant(
+            &[crate::NetClassV1::Inet],
+            &mut capabilities,
+            &mut revocation,
+        );
+        let address = crate::SocketAddressV1::Inet4 {
+            octets: [192, 0, 2, 1],
+            port: 4242,
+        };
+        let request = match operation {
+            HostOpV1::NetListen => CanonicalRequestV1::NetListen { address },
+            HostOpV1::NetConnect => CanonicalRequestV1::NetConnect { address },
+            _ => unreachable!("only socket acquisitions are tested"),
+        };
+        let mut backend = AllOpsBackend::default();
+        let mut resources = ResourceTableV1::default();
+        let denied = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            operation,
+            Some(loopback),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .expect("class denial is a semantic outcome");
+        assert_eq!(
+            denied.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::CapabilityDenied)),
+        );
+        assert!(
+            backend.0.is_empty(),
+            "{operation:?} reached a syscall leaf on Loopback"
+        );
+
+        let permitted = dispatch_host_op_v1(
+            &mut backend,
+            &capabilities,
+            &revocation,
+            &mut resources,
+            operation,
+            Some(inet),
+            ResourceInputsV1::None,
+            &request,
+        )
+        .expect("Inet grant reaches the same address and backend");
+        assert_eq!(
+            permitted.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Io(IoErrorIdentityV1::Unsupported)),
+        );
+        assert_eq!(backend.0, [operation]);
+    }
+
+    #[test]
+    fn px11_non_loopback_ipv4_listen_requires_inet() {
+        px11_non_loopback_ipv4_requires_inet(HostOpV1::NetListen);
+    }
+
+    #[test]
+    fn px11_non_loopback_ipv4_connect_requires_inet() {
+        px11_non_loopback_ipv4_requires_inet(HostOpV1::NetConnect);
     }
 
     #[test]

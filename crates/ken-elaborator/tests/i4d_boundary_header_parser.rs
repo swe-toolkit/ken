@@ -67,6 +67,7 @@ fn fs(authority: &str) -> Vec<CapabilityDecl> {
     vec![CapabilityDecl {
         family: "FS".to_string(),
         authority: authority.to_string(),
+        classes: Vec::new(),
         root: None,
     }]
 }
@@ -221,8 +222,8 @@ fn every_boundary_surface_failure_has_its_named_diagnostic() {
     ));
     assert!(matches!(
         parser::parse_decls("program capabilities Net AFull"),
-        Err(ElabError::UnknownCapabilityFamily { family, .. })
-            if family == "Net"
+        Err(ElabError::InvalidCapabilityAuthority { family, authority, .. })
+            if family == "Net" && authority == "AFull"
     ));
     assert!(matches!(
         parser::parse_decls("program capabilities FS ARoot"),
@@ -242,9 +243,21 @@ fn every_boundary_surface_failure_has_its_named_diagnostic() {
     // merely because the parser stopped after its first recognised clause.
     assert!(matches!(
         parser::parse_decls("program admits P capabilities Net AFull"),
-        Err(ElabError::UnknownCapabilityFamily { family, .. })
-            if family == "Net"
+        Err(ElabError::InvalidCapabilityAuthority { family, authority, .. })
+            if family == "Net" && authority == "AFull"
     ));
+}
+
+#[test]
+fn px11_net_header_admits_exactly_closed_classes() {
+    let header = parsed_header("program capabilities FS AFull, Net Loopback Inet Unix");
+    let net = header.capabilities.unwrap().into_iter().find(|cap| cap.family == "Net").unwrap();
+    assert_eq!(net.classes, ["Loopback", "Inet", "Unix"]);
+    for source in ["program capabilities Net", "program capabilities Net AFull",
+                   "program capabilities Net Loopback Unknown", "program capabilities Net Loopback Loopback"] {
+        assert!(parser::parse_decls(source).is_err(), "malformed Net classes accepted: {source}");
+    }
+    assert_eq!(parsed_header("program capabilities Net Unix").capabilities.unwrap()[0].classes, ["Unix"]);
 }
 
 fn write_provider(root: &FixtureRoot) {

@@ -19,7 +19,8 @@ const SYSTEM_ERROR_IMPORT: &str =
     "import Capability.System.Error (Transience, Transient, Permanent, \
     Idempotence, Idempotent, NonIdempotent, RetryGuidance, RetryAdvised, \
     RetryUnsafeNonIdempotent, DoNotRetryPermanent, Operation, FilesystemOp, \
-    ProcessOp, SignalChild, \
+    ProcessOp, SignalChild, SocketOperation, SocketOp, ConnectSocket, \
+    LocalSocketAddress, SocketResource, \
     ResourceRef, FilesystemResource, SafeContext, NoSafeContext, RedactedSafeContext, \
     SystemError, MkSystemError, file_error_to_system, error_transience, \
     operation_idempotence, retry_guidance)";
@@ -142,6 +143,7 @@ fn fresh_prelude_omits_system_error_and_package_adds_no_trust() {
         "Idempotence",
         "RetryGuidance",
         "Operation",
+        "SocketOperation",
         "ResourceRef",
         "SafeContext",
         "SystemError",
@@ -159,6 +161,8 @@ fn fresh_prelude_omits_system_error_and_package_adds_no_trust() {
         "RetryUnsafeNonIdempotent",
         "DoNotRetryPermanent",
         "FilesystemOp",
+        "SocketOp",
+        "SocketResource",
         "FilesystemResource",
         "NoSafeContext",
         "RedactedSafeContext",
@@ -239,7 +243,7 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
     );
     assert_eq!(
         system_constructor_names(&env, &owned, "Operation"),
-        ["FilesystemOp", "ProcessOp"]
+        ["FilesystemOp", "ProcessOp", "SocketOp"]
     );
     assert_eq!(
         system_inductive(&env, &owned, "Operation").constructors[0].args,
@@ -262,8 +266,21 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
         ]
     );
     assert_eq!(
+        system_constructor_names(&env, &owned, "SocketOperation"),
+        [
+            "ListenSocket",
+            "AcceptSocket",
+            "ConnectSocket",
+            "ReceiveSocket",
+            "SendSocket",
+            "ShutdownSocket",
+            "LocalSocketAddress",
+            "CloseSocket"
+        ]
+    );
+    assert_eq!(
         system_constructor_names(&env, &owned, "ResourceRef"),
-        ["FilesystemResource", "ProcessResource"]
+        ["FilesystemResource", "ProcessResource", "SocketResource"]
     );
     assert_eq!(
         system_inductive(&env, &owned, "ResourceRef").constructors[0].args,
@@ -277,6 +294,23 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
         [Term::app(
             former(env.globals["Option"]),
             Term::const_(env.globals["Bytes"], vec![]),
+        )]
+    );
+    let socket_address = env
+        .env
+        .constructor(env.prelude_env.px11_address_ids[0])
+        .expect("prelude socket address constructor")
+        .0
+        .id;
+    assert_eq!(
+        system_inductive(&env, &owned, "Operation").constructors[2].args,
+        [former(system_id(&env, &owned, "SocketOperation"))]
+    );
+    assert_eq!(
+        system_inductive(&env, &owned, "ResourceRef").constructors[2].args,
+        [Term::app(
+            former(env.globals["Option"]),
+            former(socket_address)
         )]
     );
     assert_eq!(
@@ -378,6 +412,8 @@ theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (Filesyst
 theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetInheritance)) Idempotent = Proved
 theorem px9_duplicate : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpDuplicate)) NonIdempotent = Proved
 theorem px9_signal_child : Equal Idempotence (operation_idempotence (ProcessOp SignalChild)) NonIdempotent = Proved
+theorem px11_connect_socket : Equal Idempotence (operation_idempotence (SocketOp ConnectSocket)) NonIdempotent = Proved
+theorem px11_local_socket_address : Equal Idempotence (operation_idempotence (SocketOp LocalSocketAddress)) Idempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved

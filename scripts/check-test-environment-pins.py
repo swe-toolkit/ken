@@ -48,7 +48,6 @@ ALLOWED: tuple[tuple[str, str, str, str], ...] = (
     ("crates/ken-host/src/effect_wire.rs", "0x1020_3040_5060_7080", "fixture input value", "hand-built effect wire payload"),
     ("crates/ken-host/src/abi_v1.rs", "0xfedc_ba98_7654_3210", "fixture input value", "hand-built trace identity"),
     # The floor and H-family counts are specified inventories, not prelude ID ordinals.
-    ("crates/ken-elaborator/tests/lang_prelude_floor_console_char.rs", "52", "spec-anchored count", "spec 30 section 4 floor including Decimal"),
     ("crates/ken-elaborator/tests/lang_prelude_nonhome_families_home.rs", "55", "spec-anchored count", "spec 30 section 4 H operations and scalar families excluding ClockIO"),
     # These populations belong to the fixture or local enum, not the prelude.
     ("crates/ken-cli/tests/rt_parity_native.rs", "14", "subject-owned count", "fixture-owned capture entries"),

@@ -35,6 +35,8 @@ tag|resource_kind.SpawnPlan|3
 tag|resource_kind.ChildProcess|4
 tag|resource_kind.PipeRead|5
 tag|resource_kind.PipeWrite|6
+tag|resource_kind.SocketListener|7
+tag|resource_kind.SocketStream|8
 tag|mapping_protection.read_only|0
 tag|mapping_protection.writable|1
 tag|stream.stdin|0
@@ -108,3 +110,10 @@ operation|ProcessSpawn|0603|native|ProcessSpawnRequestV1|1|HostReplyV1|1
 operation|ProcessTakePipe|0604|native|ProcessTakePipeRequestV1|2|HostReplyV1|1
 operation|ProcessWait|0605|native|ProcessWaitRequestV1|1|HostReplyV1|1
 operation|ProcessSignal|0606|native|ProcessSignalRequestV1|2|HostReplyV1|1
+operation|NetListen|0701|unavailable|NetListenRequestV1|2|HostReplyV1|1
+operation|NetAccept|0702|unavailable|NetAcceptRequestV1|1|HostReplyV1|1
+operation|NetConnect|0703|unavailable|NetConnectRequestV1|2|HostReplyV1|1
+operation|NetReceive|0704|unavailable|NetReceiveRequestV1|4|HostReplyV1|1
+operation|NetSend|0705|unavailable|NetSendRequestV1|5|HostReplyV1|1
+operation|NetShutdown|0706|unavailable|NetShutdownRequestV1|2|HostReplyV1|1
+operation|NetLocalAddress|0707|unavailable|NetLocalAddressRequestV1|1|HostReplyV1|1
