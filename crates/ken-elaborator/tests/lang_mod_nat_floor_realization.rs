@@ -78,8 +78,10 @@ const FLOOR_CASES: [FloorCase; 10] = [
             "ResourceKind.ChildProcess",
             "ResourceKind.PipeRead",
             "ResourceKind.PipeWrite",
+            "ResourceKind.SocketListener",
+            "ResourceKind.SocketStream",
         ],
-        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.SpawnPlan ; ResourceKind.SpawnPlan |-> ResourceKind.ChildProcess ; ResourceKind.ChildProcess |-> ResourceKind.PipeRead ; ResourceKind.PipeRead |-> ResourceKind.PipeWrite ; ResourceKind.PipeWrite |-> ResourceKind.FsHandle }",
+        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.SpawnPlan ; ResourceKind.SpawnPlan |-> ResourceKind.ChildProcess ; ResourceKind.ChildProcess |-> ResourceKind.PipeRead ; ResourceKind.PipeRead |-> ResourceKind.PipeWrite ; ResourceKind.PipeWrite |-> ResourceKind.SocketListener ; ResourceKind.SocketListener |-> ResourceKind.SocketStream ; ResourceKind.SocketStream |-> ResourceKind.FsHandle }",
     },
     FloorCase {
         name: "Result",
@@ -332,7 +334,7 @@ fn primitive_signature_type_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// arm is producer-closed rather than a selected helper census, and adding the
 /// independently specified internal identities yields exactly the configured
 /// floor. **THE GAP:** the primitive traversal does not derive the internal-
-/// provision witnesses.
+/// provision witnesses, including SocketAddress's shared Net/Error identity.
 #[test]
 fn primitive_signature_inventory_is_executable_and_closed() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -377,6 +379,7 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "ReadProgress",
             "ResourceError",
             "ResourceOpenMode",
+            "SocketAddress",
             "Top",
             "TransferCount",
             "Unit",
