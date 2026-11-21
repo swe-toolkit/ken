@@ -14,96 +14,63 @@ fn env() -> ken_elaborator::ElabEnv {
     env.set_catalog_roots_v1(&[repo_root().join("catalog/packages")])
         .expect("checked catalog root");
     let trusted_before_clients = env.env.trusted_base();
-    // The escape discriminator reaches the same private checked release node
-    // used by `withBuffer`'s finalizer without publishing a raw release name.
-    let release = env.prelude_env.private_resource_release_id;
-    assert!(!env.globals.contains_key("Px8pPrivateResourceRelease"));
-    assert!(!env.globals.values().any(|id| *id == release));
-    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
-    env.globals
-        .insert("Px8pPrivateResourceRelease".to_string(), release);
-    let handle = env.prelude_env.buffer_handle_resource_id;
-    assert!(!env.globals.contains_key("Px8pBufferHandleResource"));
-    assert!(!env.globals.values().any(|id| *id == handle));
-    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
-    env.globals
-        .insert("Px8pBufferHandleResource".to_string(), handle);
     env.elaborate_file(
         r#"import Capability.System.Buffer (BufferHandle)
 import Capability.System.Resource (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr,
   ResourceBracketResult, ResourceBracketOk, ResourceBracketBodyError,
   ResourceBracketReleaseError, ResourceBracketBodyAndReleaseError, withBuffer)
+import Capability.Process.Exit (host_pure, host_bind, host_fs)
 import Capability.Filesystem.Authority (FS)
 fn px8p_ok_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
-    (ResourceBodyOk Unit Unit MkUnit)
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn px8p_error_body (_resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult ResourceError Unit) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult ResourceError Unit)
+  host_pure AFull (ResourceBodyResult ResourceError Unit)
     (ResourceBodyErr ResourceError Unit ResourceError.InvalidBounds)
 
 fn px8p_escape_body (resource : BufferHandle)
   : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
-  ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit (BufferHandle))
+  host_pure AFull (ResourceBodyResult Unit (BufferHandle))
     (ResourceBodyOk Unit (BufferHandle) resource)
 
-proc px8p_private_release (resource : BufferHandle)
-  : HostIO AFull (Result ResourceError Unit) visits [FS] =
-  ITree.Vis (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError Unit)
-    (Coproduct.InL (FSOp AFull) AmbientOp
-      (Px8pPrivateResourceRelease AFull ResourceKind.Buffer
-        (Px8pBufferHandleResource resource)))
-    (\settled. ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) settled)
-
 proc px8p_after_escape_bracket
+  (release : BufferHandle → FS AFull (Result ResourceError Unit))
   (bracket : ResourceBracketResult Unit (BufferHandle))
   : HostIO AFull (Result ResourceError Unit) visits [FS] =
   match bracket {
-    ResourceBracketOk resource |-> px8p_private_release resource;
-    ResourceBracketBodyError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (Err ResourceError Unit ResourceError.MalformedResource);
-    ResourceBracketReleaseError error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (Err ResourceError Unit error);
+    ResourceBracketOk resource |->
+      host_fs AFull (Result ResourceError Unit) (release resource);
+    ResourceBracketBodyError error |-> host_pure AFull (Result ResourceError Unit)
+      (Err ResourceError Unit ResourceError.MalformedResource);
+    ResourceBracketReleaseError error |-> host_pure AFull (Result ResourceError Unit)
+      (Err ResourceError Unit error);
     ResourceBracketBodyAndReleaseError body_error release_error |->
-      ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result ResourceError Unit) (Err ResourceError Unit release_error)
+      host_pure AFull (Result ResourceError Unit) (Err ResourceError Unit release_error)
   }
 
 proc px8p_after_escape_outer
+  (release : BufferHandle → FS AFull (Result ResourceError Unit))
   (outcome : Result ResourceError
     (ResourceBracketResult Unit (BufferHandle)))
   : HostIO AFull (Result ResourceError Unit) visits [FS] =
   match outcome {
-    Err acquire_error |-> ITree.Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (Result ResourceError Unit) (Err ResourceError Unit acquire_error);
-    Ok bracket |-> px8p_after_escape_bracket bracket
+    Err acquire_error |-> host_pure AFull (Result ResourceError Unit)
+      (Err ResourceError Unit acquire_error);
+    Ok bracket |-> px8p_after_escape_bracket release bracket
   }
 
-proc px8p_escape_then_release (capacity : Int)
+proc px8p_escape_then_release
+  (release : BufferHandle → FS AFull (Result ResourceError Unit))
+  (capacity : Int)
   : HostIO AFull (Result ResourceError Unit)
     visits [FS, BufferAllocate, ResourceRelease] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+  host_bind AFull
     (Result ResourceError (ResourceBracketResult Unit (BufferHandle)))
     (Result ResourceError Unit)
     (withBuffer AFull Unit (BufferHandle) capacity px8p_escape_body)
-    (\outcome. px8p_after_escape_outer outcome)
+    (\outcome. px8p_after_escape_outer release outcome)
 "#,
     )
     .expect("checked PX8-P interpreter fixtures elaborate");
@@ -112,9 +79,62 @@ proc px8p_escape_then_release (capacity : Int)
         trusted_before_clients,
         "PX8-P client fixtures must not extend trust"
     );
-    env.globals.remove("Px8pPrivateResourceRelease");
-    env.globals.remove("Px8pBufferHandleResource");
     env
+}
+
+// The escape discriminator reaches the same private checked release node used
+// by `withBuffer`'s finalizer. That node has no source route, so the release
+// action is a kernel term over pre-source ids, and the kernel checks it.
+fn private_release(env: &ken_elaborator::ElabEnv) -> Term {
+    let release = env.prelude_env.private_resource_release_id;
+    assert!(!env.globals.contains_key("PrivateResourceRelease"));
+    assert!(!env.globals.values().any(|id| *id == release));
+    let handle = env.prelude_env.buffer_handle_resource_id;
+    assert!(!env.globals.values().any(|id| *id == handle));
+    let afull = Term::constructor(env.globals["AFull"], vec![]);
+    let op = Term::app(Term::indformer(env.globals["FSOp"], vec![]), afull.clone());
+    let resp = Term::app(Term::const_(env.globals["fs_resp"], vec![]), afull.clone());
+    let result = Term::app(
+        Term::app(
+            Term::indformer(env.prelude_env.result_id, vec![]),
+            Term::indformer(env.globals["ResourceError"], vec![]),
+        ),
+        Term::indformer(env.prelude_env.unit_id, vec![]),
+    );
+    let tree = |constructor| {
+        Term::app(
+            Term::app(
+                Term::app(Term::constructor(constructor, vec![]), op.clone()),
+                resp.clone(),
+            ),
+            result.clone(),
+        )
+    };
+    let label = Term::app(
+        Term::app(
+            Term::app(Term::constructor(release, vec![]), afull.clone()),
+            Term::constructor(env.globals["ResourceKind.Buffer"], vec![]),
+        ),
+        Term::app(Term::const_(handle, vec![]), Term::var(0)),
+    );
+    let settled = Term::lam(
+        Term::app(resp.clone(), label.clone()),
+        Term::app(tree(env.prelude_env.ret_id), Term::var(0)),
+    );
+    let action = Term::lam(
+        Term::indformer(env.globals["BufferHandle"], vec![]),
+        Term::app(Term::app(tree(env.prelude_env.vis_id), label), settled),
+    );
+    let expected = Term::pi(
+        Term::indformer(env.globals["BufferHandle"], vec![]),
+        Term::app(
+            Term::app(Term::const_(env.globals["FS"], vec![]), afull),
+            result,
+        ),
+    );
+    ken_kernel::check(&env.env, &ken_kernel::Context::new(), &action, &expected)
+        .unwrap_or_else(|error| panic!("the private release action must check: {error:?}"));
+    action
 }
 
 fn eval_global(env: &ken_elaborator::ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
@@ -272,7 +292,9 @@ fn malformed_and_policy_invalid_capacities_have_exact_distinct_errors() {
 fn escaped_copy_reaches_exact_closed_after_bracket_settlement() {
     let env = env();
     let mut store = EvalStore::new();
+    let release = eval(&[], &private_release(&env), &env.env, &mut store);
     let mut action = eval_global(&env, &mut store, "px8p_escape_then_release");
+    action = apply(action, release, &env.env, &mut store);
     action = apply(action, EvalVal::Int(8), &env.env, &mut store);
     let result = drive(&env, &mut store, action);
     assert_outer_error(&env, &result, "Closed");
@@ -280,5 +302,4 @@ fn escaped_copy_reaches_exact_closed_after_bracket_settlement() {
     // The production namespace remains locked even though the test reached the
     // private checked identity by immutable GlobalId.
     assert!(!env.globals.contains_key("PrivateResourceRelease"));
-    assert!(!env.globals.contains_key("Px8pPrivateResourceRelease"));
 }

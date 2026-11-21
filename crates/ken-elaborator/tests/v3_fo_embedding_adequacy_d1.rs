@@ -325,6 +325,8 @@ fn intrinsic_connectives_and_adequacy_statement_are_live() {
 fn truncation_conversion_preserves_quotation() {
     let mut env = env_with_fok();
     add_bool_model(&mut env);
+    env.elaborate_file("import Core.Logic.Or")
+        .expect("standalone selects the checked Or module");
     let denotation_source = "fok_denote FokSliceSignature fok_d1_bool_carriers fok_d1_bool_atoms \
          (FokScopedOr FokSliceSignature Zero \
            (FokScopedBottom FokSliceSignature Zero) \

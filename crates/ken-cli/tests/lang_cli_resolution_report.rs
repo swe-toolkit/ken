@@ -81,15 +81,12 @@ fn itree_seq(callee: &str) -> String {
     )
 }
 
-fn itree_report(source: &str, strict: bool) -> (ElabEnv, serde_json::Value) {
+fn itree_report(source: &str) -> (ElabEnv, serde_json::Value) {
     let mut env = ElabEnv::new().expect("pre-source checked identities");
-    let results = if strict {
-        let catalog = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
-        env.elaborate_isolated_file_strict_v1(&[catalog], source)
-            .expect("Strict source checks")
-    } else {
-        env.elaborate_file_v1(source).expect("Legacy source checks")
-    };
+    let catalog = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+    let results = env
+        .elaborate_isolated_file_strict_v1(&[catalog], source)
+        .expect("source checks");
     let text =
         resolution_report(&env, &results, "check", None).expect("report from checked identities");
     (
@@ -102,7 +99,7 @@ fn itree_report(source: &str, strict: bool) -> (ElabEnv, serde_json::Value) {
 /// spelling. This observes the emitted report rather than the source text.
 #[test]
 fn strict_itree_bind_reports_its_pre_source_alias_name_only() {
-    let (_env, doc) = itree_report(&itree_seq("itree_bind"), true);
+    let (_env, doc) = itree_report(&itree_seq("itree_bind"));
     assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
     assert!(
         doc["declarations"].as_array().unwrap().iter().all(|decl| {
@@ -124,23 +121,13 @@ fn strict_user_bind_and_itree_bind_keep_distinct_report_identities() {
         "fn bind (n : Nat) : Nat = n\nfn use_user (n : Nat) : Nat = bind n\n{}",
         itree_seq("itree_bind")
     );
-    let (_env, doc) = itree_report(&source, true);
+    let (_env, doc) = itree_report(&source);
     assert!(has(
         refs(&doc, "use_user"),
         "source-declared",
         "declaration",
         "bind"
     ));
-    assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
-    assert!(!has(refs(&doc, "seq"), "pre-source", "name", "bind"));
-}
-
-/// The display map is keyed by checked identity and shared by both routes.
-/// Legacy still resolves the bare `bind`, but displays that ID as `itree_bind`.
-#[test]
-fn legacy_bare_bind_reports_itree_bind_without_changing_resolution() {
-    let (env, doc) = itree_report(&itree_seq("bind"), false);
-    assert_eq!(env.globals["bind"], env.prelude_env.bind_id);
     assert!(has(refs(&doc, "seq"), "pre-source", "name", "itree_bind"));
     assert!(!has(refs(&doc, "seq"), "pre-source", "name", "bind"));
 }

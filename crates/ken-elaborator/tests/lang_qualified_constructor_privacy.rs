@@ -39,7 +39,7 @@ fn elaborate(entry: Entry, source: &str) -> Result<(), ElabError> {
 fn assert_missing(entry: Entry, source: &str, missing: &str) -> ElabError {
     let err = elaborate(entry, source).expect_err("a hidden constructor must be absent");
     assert!(
-        matches!(&err, ElabError::UnresolvedCon { name, .. } if name == missing),
+        matches!(&err, ElabError::UnboundName { name, .. } if name == missing),
         "{entry:?} `{source}`: wrong refusal for {missing}: {err:?}"
     );
     err
@@ -48,7 +48,7 @@ fn assert_missing(entry: Entry, source: &str, missing: &str) -> ElabError {
 /// Promise class: regression witness. Every arm reached an actual hidden
 /// constructor through T.C on the landed base. The no-public-home auxiliary
 /// types are not named in the untyped reference probes.
-/// MEASURED: both ambient entry points refuse each expression and pattern
+/// MEASURED: both in-memory entry points refuse each expression and pattern
 /// specifically at its checked constructor name. CLAIMED: neither resource
 /// handles nor their span/count/trace representations can be forged or opened
 /// through a qualified prelude family. THE GAP: imported IDs and future source

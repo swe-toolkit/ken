@@ -573,6 +573,8 @@ fn assert_unsinkable_obligation_with_provider(
     let mut standalone = ElabEnv::new().expect("prelude");
     if use_checked_not {
         checked_not::load(&mut standalone);
+        standalone.elaborate_file("import Core.Logic.Not")
+            .expect("standalone selects the checked negation module");
     }
     let before = trusted(&standalone);
     let error = standalone
