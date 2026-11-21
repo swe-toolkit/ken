@@ -18,7 +18,8 @@
 > SPEC-TIME-TRACE-MERGE-ALL-COUNT §16;
 > SPEC-TIME-WINDOW-MERGE-ALL §17;
 > SPEC-TIME-MERGE-ALL-APPEND §18;
-> SPEC-TIME-MERGE-LENGTH §19).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-LENGTH §19;
+> SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE §20).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -1675,3 +1676,71 @@ accepted length-two claim on the same input controls the refusal.
 These finite observations distinguish multiplicity from
 set-like deduplication, but cannot replace the generic checked
 proofs or the separate official conformance and trust gates.
+
+## 20. Merge commutes across distinct timestamps
+
+> **Section 20 status: DRAFT v0
+> (SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE).** Architect's AC-0 on
+> `df433d9ab` checked the generic law, open and closed clients in
+> detached scratch with no `Axiom`, foreign or primitive, and unchanged
+> exact trusted `GlobalId` sets (114 → 114). The different-timestamp
+> client checked; the same-form shared-timestamp premise refused at
+> its own theorem. These results do not check this Spec child, the
+> separate catalog or CV seed children, assembled AC-T, official
+> conformance, CI, publication, landing or measured landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent checked law
+immediately after `trace_merge_all_append` and before the private
+`event_before_skip`. Its exact binder order and public type are:
+
+```ken
+pub theorem trace_merge_distinct_commute
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : ((x : Event p)
+        → list_elem (Event p) x xs
+        → (y : Event p)
+        → list_elem (Event p) y ys
+        → Equal Bool
+            (bool_or
+              (lt_nat (event_time p x) (event_time p y))
+              (lt_nat (event_time p y) (event_time p x)))
+            True)
+      → Equal (List (Event p))
+          (trace_merge p xs ys)
+          (trace_merge p ys xs)
+```
+
+For every member `x` of `xs` and member `y` of `ys`, one timestamp
+must be **strictly earlier** than the other. This pairwise premise
+forbids a time shared across the inputs, but imposes no order within
+either input. The result is structural `Equal (List (Event p))`, not
+mere membership, length equality or equality up to permutation.
+Empty inputs satisfy the premise vacuously. There is **no
+`time_ordered` premise**: §1.2's merge compares current heads and
+does not first sort the inputs; even unordered traces with distinct
+cross-input times satisfy this law. In contrast, §13's separated-append
+law permits equal timestamps and says nothing about swapping operands.
+On a shared timestamp the left-biased tie can put different events in
+different orders when the inputs are swapped; no unconditional
+commutativity is claimed. No operation or law type from §§1–19 changes.
+
+Three private helpers, `trace_merge_distinct_commute_cons`,
+`trace_merge_distinct_commute_step`, and
+`distinct_times_reverse_false`, are proved at zero trust from the
+existing head-insertion lemmas. They follow the public law before
+`event_before_skip`, not as additional public exports. No new import,
+assumption, kernel or surface rule is required.
+
+The separately owned seed compares left `[a@1, c@3]` (payloads True
+and False) with right `[b@2]` (payload True). It independently checks
+that merging in either argument order gives `[a@1, b@2, c@3]` and
+applies the public law after discharging the pairwise premise. The
+refused client changes only the right event's timestamp from 2 to 3,
+keeping its payload True and the same premise/application form. Its
+premise must refuse at the shared time: left-first merge then has
+`[a@1, c@3, b@3]`, while right-first merge has
+`[a@1, b@3, c@3]`, with different payload order at time 3. An
+unsorted left input `[c@3, a@1]` with right `[b@2]` is also covered
+by the generic law; the finite controls do not prove it. The
+assembled package test owes unchanged exact trusted identities as
+AC-T before a Decision.
