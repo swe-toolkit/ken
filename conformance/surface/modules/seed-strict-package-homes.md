@@ -23,7 +23,7 @@ the eight `Data.Numeric.FixedWidth` names.
   home units and a separate catalog-root consumer with these explicit imports.
   Run each client through `elaborate_module_from_roots_strict` and through the
   `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`
-  entrypoints that §3.3 assigns Legacy roots:
+  entrypoints; §33 §3.3 gives every source entry the same import rule:
 
   ```ken
   import Capability.Filesystem.Authority (FS, read_bytes, write_file)
@@ -72,12 +72,12 @@ the eight `Data.Numeric.FixedWidth` names.
   The snapshot is captured before loading any home; no numeric `GlobalId` is
   hardcoded.
 - claimed: each explicit import preserves its exact pre-source identity in
-  both roots modes, and each inductive family exposes its complete checked
-  constructor set under the original parent identity.
+  all roots entrypoints, and each inductive family exposes its complete
+  checked constructor set under the original parent identity.
 - the gap: spelling equality is not identity equality. The oracle compares
   each resolved `GlobalId` with the independent pre-source snapshot and
   records each constructor's parent.
-- expect: the clients accept in both roots modes. Each retained home's
+- expect: the clients accept in all roots entrypoints. Each retained home's
   pre-source ordinary export subset is exactly its listed ordinary names. The
   23 named import bindings equal their pre-source `GlobalId`s; the attached
   proof is checked through its subject in the IO-private case, not as a bare
@@ -99,8 +99,8 @@ the eight `Data.Numeric.FixedWidth` names.
 
 ### surface/modules/strict-package-home-imports-are-required
 
-- promise class: **durable provider-edge invariant** — a Strict client cannot
-  borrow a home name from the flat implementation-global table
+- promise class: **durable provider-edge invariant** — a roots-loaded client
+  cannot borrow a home name from the flat implementation-global table
 - spec: `33 §3.3`
 - given: in fresh catalog-root clients, use these source probes, each in its
   own input. The positive imports are `FS` from
@@ -108,9 +108,9 @@ the eight `Data.Numeric.FixedWidth` names.
   `Capability.System.Buffer`, `write_all_exact_prefix_prop` from
   `Capability.System.IO`, and `ResourceBodyResult` from
   `Capability.System.Resource`. The Buffer negative retains `BufferWindow`
-  and omits only `MkBufferWindow`. Each other Strict negative omits only its
-  named import; all four home roots and other dependencies remain loaded, and
-  the source body stays fixed.
+  and omits only `MkBufferWindow`. Each other roots-loaded negative omits only
+  its named import; all four home roots and other dependencies remain loaded,
+  and the source body stays fixed.
 
   ```ken
   theorem fs_type_probe
@@ -126,27 +126,28 @@ the eight `Data.Numeric.FixedWidth` names.
       (result : ResourceBodyResult e a) : ResourceBodyResult e a = result
   ```
 
-  For each probe, make a positive and a negative Strict-root client that
-  differ only by its home import. Pair `FS` with Authority,
+  For each probe, make a positive and a negative roots-loaded client that
+  differ only by its home import, through all three roots entrypoints. Pair
+  `FS` with Authority,
   `MkBufferWindow` with Buffer, `write_all_exact_prefix_prop` with IO, and
   `ResourceBodyResult` with Resource. The IO probe uses the subject in a
   proposition type; attached-proof visibility is tested separately.
   `FileOperation` is no longer a System.Error home and is tested separately.
 - measured: the exact resolution outcome of each fresh client, with all other
   provider roots and dependencies present.
-- claimed: each specified home edge is necessary in Strict roots; an
-  unimported home name cannot be satisfied by a flat-global fallback.
+- claimed: each specified home edge is necessary on every roots entrypoint;
+  an unimported home name cannot be satisfied by a flat-global fallback.
 - the gap: a negative result alone could come from another missing import or
   type error. The paired client adds only the correct home import; its
   acceptance is the positive control.
-- expect: each Strict client with the selected home import omitted rejects
-  with `UnboundName` naming exactly its target binding. Restoring only that
-  home import accepts the same client.
-- controls: the four import-restored Strict clients isolate each retained
+- expect: each roots-loaded client with the selected home import omitted
+  rejects with `UnboundName` naming exactly its target binding. Restoring only
+  that home import accepts the same client.
+- controls: the four import-restored roots clients isolate each retained
   home edge. The complete import clients in the preceding case are accepted
   controls.
-- why: Strict roots resolve only through explicit imports and the closed
-  prelude; a name held only by a catalog home is not ambient.
+- why: roots-loaded entries resolve only through explicit imports and the
+  closed prelude; a name held only by a catalog home is not ambient.
 
 ### surface/modules/inc2b-mapping-child-homes-preserve-identities
 
@@ -282,46 +283,66 @@ the eight `Data.Numeric.FixedWidth` names.
 - why: Strict roots resolve through explicit imports, built-in vocabulary,
   and the closed prelude, not a flat implementation-global fallback.
 
-### surface/modules/legacy-package-home-bare-uses-remain-until-l2-4
+### surface/modules/package-home-bare-uses-require-import-on-every-root-route
 
-- promise class: **transition sentinel** — the current Legacy bare-use
-  compatibility boundary must be reviewed when the roots entrypoint flips
-- spec: `33 §3.3` (Legacy resolution and the L2-4 strict-entry flip)
-- given: run each of the four source probes from
-  `strict-package-home-imports-are-required` in a fresh catalog-root client
-  with its home import removed and no same-name local declaration. Use the
-  `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`
-  entrypoints that §3.3 currently assigns Legacy roots, with all provider
-  roots loaded.
-- measured: acceptance or the exact surface resolution failure for each
-  bare-use client; no identity comparison is made on this Legacy path.
-- claimed: the home migration preserves the existing representative bare
-  uses in Legacy roots without promising their identities under all load
-  orders.
-- the gap: a passing input must actually use the representative name. The
-  probes use `FS`, `MkBufferWindow`, `write_all_exact_prefix_prop`, and
-  `ResourceBodyResult` respectively. `FileOperation` is now a floor identity,
-  not a home, and its no-import behavior is pinned separately.
-- expect: all four Legacy clients accept. The corresponding Strict clients
-  without home imports reject with `UnboundName`, as specified in the prior
-  case.
-- controls: the imported Legacy clients in the identity case remain the
-  exact-identity controls; the Strict missing-import clients distinguish the
-  Legacy result from ambient availability.
-- why: changing the existing bare-use result is incompatible until the
-  `L2-4` strict-entry flip. That successor owns the transition and must review
-  or replace this sentinel for the named roots entrypoints.
+- promise class: **durable provider-edge invariant** — a checked home is
+  source-visible only through its explicit import on each roots entrypoint
+- spec: `30-taxonomy §4`; `33 §3.3`; `36 §2.5`; `38 §1.3`; `39 §2.0`
+- given: in separate fresh roots-loaded units, pair each use below with a
+  source-identical client retaining a qualified import of its home module but
+  omitting only the selected name's selective import. The positive client
+  adds that selective item; keep all other imports and provider dependencies
+  fixed. Run both arms through
+  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
+  `elaborate_module_from_roots_strict`.
+
+  | home name | home module and imported client use |
+  |---|---|
+  | `FS` | `Capability.Filesystem.Authority`; `fs_type_probe` from `strict-package-home-imports-are-required` |
+  | `read_bytes` | `Capability.Filesystem.Authority`; `read-bytes-untracked-is-type-error`, retaining `FS` |
+  | `write_file` | `Capability.Filesystem.Authority`; token-bearing `cap-op-with-token-accepted` |
+  | `BufferWindow` | `Capability.System.Buffer`; `fn window_id (x : BufferWindow) : BufferWindow = x` |
+  | `MkBufferWindow` | `Capability.System.Buffer`; `const window_probe : BufferWindow = MkBufferWindow 1 2`, retaining `BufferWindow` |
+  | `write_all_exact_prefix_prop` | `Capability.System.IO`; `io_subject_probe` from `strict-package-home-imports-are-required` |
+  | `ResourceBodyResult` | `Capability.System.Resource`; `resource_result_type_probe` from `strict-package-home-imports-are-required` |
+
+  Separately, use `elaborate_file_v1` on a rootless `window_id` client with no
+  import; its matched rootless-import arm adds
+  `import Capability.System.Buffer (BufferWindow)` to that same body.
+- measured: each imported reference's checked `GlobalId`, and the accept or
+  `UnboundName` result for each single-import omission on all three routes.
+- claimed: all three roots-loaded entrypoints use the same source-resolution
+  rule; none satisfies a missing home import from the flat implementation
+  global table.
+- the gap: a negative alone could fail for another missing dependency. Each
+  paired imported client proves the home, body, and provider graph are
+  otherwise valid; separate clients keep every omitted name observable.
+- expect: all imported clients accept at their original pre-source identities.
+  Every omitted-import client refuses with `UnboundName` naming exactly that
+  home name, on all three roots entrypoints. The rootless no-import client refuses
+  with `UnboundName(BufferWindow)` at use; its explicit-import twin refuses
+  with `UnboundName` naming `Capability.System.Buffer` at the import path.
+- controls: the import-restored client is the positive control for each
+  omission. The rootless arms distinguish a missing source name from an
+  unavailable catalog root; the refusal is at the import module path, not a
+  later use.
+- why: all three roots entrypoints share one source-resolution rule. A
+  checked home is not ambient merely because its identity was captured
+  before source loading.
 
 ### surface/modules/system-io-attached-proof-remains-private-to-owner
 
 - promise class: **durable invariant** — an exported subject does not expose
   a private attached proof to external clients
 - spec: `33 §3.3`, `33 §4.1`, and `33 §8.2`
-- given: load the actual `Capability.System.IO` home under Strict and Legacy
-  roots. Its checked `write_all_preserves_exact_prefix` theorem selects
+- given: load the actual `Capability.System.IO` home through
+  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
+  `elaborate_module_from_roots_strict`. Its checked
+  `write_all_preserves_exact_prefix` theorem selects
   `exact_prefix` through `write_all_exact_prefix_prop`; record that internal
-  reference's resolved `GlobalId`. For an external client in each mode,
-  import only `write_all_exact_prefix_prop` and include the accepted
+  reference's resolved `GlobalId`. For an external client through each of
+  these three entrypoints, import only `write_all_exact_prefix_prop` and include
+  the accepted
   `io_subject_probe` from the preceding case. Append one claim per fresh
   copy, leaving the subject import and probe unchanged:
 

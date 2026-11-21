@@ -10,10 +10,14 @@ for this seed.
 
 The effects and tree types below are the existing public families. `IO R`
 stands for the Console tree with return type `R`; `HostIO a R` is the host
-signature indexed by `Auth`. A row remains a declared upper bound, but every
-label in it must inject into the declared tree signature. Host-operation labels
-are members of the host-operation alphabet and inject wherever their family
-does. Examples name `FsOpen`; they do not replace the full alphabet rule.
+signature indexed by `Auth`. Every source client that names `IO` or
+`print_line` includes `import Capability.Console.Text (IO, print_line)`; the
+home-import omission pairs are in `../modules/seed-modules.md`. The FS client
+imports `FS` and `read_bytes` from `Capability.Filesystem.Authority`. A row
+remains a declared upper bound, but every label in it must inject into the
+declared tree signature. Host-operation labels are members of the
+host-operation alphabet and inject wherever their family does. Examples name
+`FsOpen`; they do not replace the full alphabet rule.
 
 ## Declared result with an ITree head
 
@@ -123,7 +127,8 @@ does. Examples name `FsOpen`; they do not replace the full alphabet rule.
 
 ### surface/effects/non-tree-fs-index-from-written-cap
 - spec: `36 §2.5`; `62-authority.md §1`
-- given: an FS producer with the accepted closed index:
+- given: an FS producer with the accepted closed index, importing
+  `FS` and `read_bytes` from `Capability.Filesystem.Authority`:
 
   ```ken
   proc read (cap : Cap APartial) (path : Bytes)

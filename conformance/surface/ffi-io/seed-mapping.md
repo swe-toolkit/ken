@@ -13,7 +13,9 @@ mutation before claiming its discriminator is proven. These references
 identify executable tests, not official conformance-runner execution or
 an approval of the assembled candidate. The source mapping is private;
 window-direct `mapWrite` alone does not establish that writes stay off the
-backing file.
+backing file. Every source client imports the public names it uses from
+`Capability.System.Mapping` and from each other owning module. These behavior
+cases pin runtime behavior, not ambient name availability.
 
 ## Reading disciplines
 

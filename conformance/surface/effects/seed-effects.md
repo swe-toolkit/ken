@@ -283,17 +283,20 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 
 ### surface/effects/cap-op-without-token-rejected (oracle)
 - spec: `36 §2.5` (`perform_E` well-formed only if `Cap E` in scope), `§7.3.2`
-- given: `write_file` declared `using fs : FsCap`; a
-  `proc dump () : Unit visits [FS] = write_file "/x" data` with **no** `Cap FS`
-  in scope (no capability parameter, no enclosing handler provides it).
-- expect: **static error** — `MissingCapability(FsCap)` (kind `(oracle)`,
-  `§7.3.2`): the `perform` is gated on the `Cap E` value's presence, unprovided.
+- given: import `FS` and `write_file` from
+  `Capability.Filesystem.Authority`. Test
+  `proc dump () : Unit visits [FS] = write_file "/x" data` with **no**
+  `Cap FS` value in scope (no capability parameter, no enclosing handler).
+- expect: a static missing-capability refusal under `§7.3.2`; the exact
+  diagnostic variant or payload is not pinned. The FS operation has no
+  `Cap FS` value in scope.
 - why: the **capability-denial path** (`§7.3.2`).
 
 ### surface/effects/cap-op-with-token-accepted (oracle)
 - spec: `36 §2.5`, `§5.1` (a handler provides the capability)
-- given: the same op, but `dump` takes `using fs : FsCap` (or an enclosing
-  handler for `FS` provides it, `§5.1`).
+- given: with the same `FS` and `write_file` home imports, test the same
+  operation, but let `dump` take `using fs : Cap FS` (or an enclosing handler
+  for `FS` provide it, `§5.1`).
 - expect: **accepts** — `Cap FS` is in scope (a Π parameter, `§2.5`); gating
   satisfied.
 - why: the **flip** for `cap-op-without-token-rejected` (the `§7.5.3`
@@ -303,15 +306,18 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 
 ### surface/effects/cap-two-distinct-caps-each-gated (oracle)
 - spec: `36 §2.5` (one `Cap E` parameter per un-handled effect)
-- given: `proc exfil () visits [FS, Net] = { write_file "/x" d ; send sock d }`
-  — `write_file using fs:FsCap`, `send using net:NetCap`. Three variants: (a)
+- given: import `FS` and `write_file` from
+  `Capability.Filesystem.Authority`.
+  Test `proc exfil () visits [FS, Net] = { write_file "/x" d ; send sock d }`
+  — `write_file using fs : Cap FS`, `send using net : Cap Net`. Three variants: (a)
   both caps in scope; (b) only `fs`; (c) only `net`.
-- expect: (a) **accepts**; (b) **rejects** `MissingCapability(NetCap)`; (c)
-  **rejects** `MissingCapability(FsCap)`.
+- expect: (a) **accepts**; (b) refuses because the `Net` capability is
+  absent; (c) refuses because the `FS` capability is absent. Both refusals are
+  classified as missing-capability errors; no payload is pinned.
 - why: ≥2 distinct capabilities, **each independently gated** — one case per
   guard position (COORDINATION §7). A bug checking only the first cap admits
-  (c)'s missing `FsCap`; a bug checking only the last admits (b)'s missing
-  `NetCap`. Each per-cap reject flips independently. (capability-denial on each
+  (c)'s missing `Cap FS`; a bug checking only the last admits (b)'s missing
+  `Cap Net`. Each per-cap reject flips independently. (capability-denial on each
   of two caps.)
 
 ---
@@ -478,16 +484,17 @@ node); **L7 supplies the interpreters** (`§7.2`).
 
 ## EFF6 — the direct `[State s]` effect surface (`OQ-C`·C2, frame AC-State)
 
-A **second door** to the same `State S` denotation (`§2.1`): writing
-`get`/`put`/`runState` **directly** as a first-class monadic effect — the
+A **second door** to the same `State S` denotation (`§2.1`): using the public
+`state_get`/`state_put` tree builders and `run_state` handler directly — the
 `accumulator-factory` shape (VAL2 #10) — instead of through the imperative
-`space` sugar EFF4 pins. It introduces **no new denotation**: `runState` on the
-direct surface is **exactly** `§4.2`'s state-passing `elim_ITree` fold at
-`F = 𝟘` (`§4.5.3`), and `get`/`put` are `§2.1`'s `Get`/`Put` under `§2.2`'s
-`perform` (`§4.5.2`). So EFF6 shares EFF4's trust posture — a bug here is a
+`space` sugar EFF4 pins. It introduces **no new denotation**: `run_state` on
+the direct surface is **exactly** `§4.2`'s state-passing `elim_ITree` fold at
+`F = 𝟘` (`§4.5.3`). `state_get` and `state_put` build declared trees using the
+`StateOp.Get`/`StateOp.Put` operations in §4.5.2; sequencing uses the floor
+`itree_bind`. So EFF6 shares EFF4's trust posture — a bug here is a
 **wrong value in a pure tree**, never a kernel unsoundness (the emitted core is
 the same well-typed `elim_ITree` term); **no case here is `(soundness)`** in the
-kernel-trust-root sense (seed preamble). `runState` is a **derived total
+kernel-trust-root sense (seed preamble). `run_state` is a **derived total
 definition**, not a trusted primitive, so `[State s]` is **zero-`trusted_base`
 delta** (frame AC1) — see `direct-state-kernel-untouched` below.
 
@@ -497,10 +504,11 @@ authoring, git-object-store): the landed **runnable** `ITree` a program
 executes is **Console-hardwired** — `data ITree r = Ret r | Vis ConsoleOp
 (Unit -> ITree r)` (`crates/ken-elaborator/src/prelude.rs:170`, `IO A := ITree
 A`): a **fixed `Unit` response**, not `E`-parameterized, so it cannot yet
-express `get`/`put` with the non-`Unit` `Resp Get = s` (`§4.5.2`). (The
+express `state_get`/`state_put` with the non-`Unit` `Resp Get = s`
+(`§4.5.2`). (The
 elaborator's `effects/itree.rs` is a static-analysis stand-in with a fixed
 `u64` response; the full dependent-`Resp` `ops` version is deferred there too.)
-The interpreter's `runState`-over-`Vis` fold is a **K1.5-IH-deferred
+The interpreter's `run_state`-over-`Vis` fold is a **K1.5-IH-deferred
 placeholder** (`crates/ken-interp/src/lib.rs`
 `eff4_runstate_discharges_in_pure_section3` /
 `eff4_handled_discharges_unhandled_reaches_driver`). So driving `next` through
@@ -508,8 +516,9 @@ the **real interpreter** (frame AC2) **cannot pass today** — it flips green on
 when the build lands the three `§36`-sanctioned **outer-ring** lifts
 (`§4.5.6`): **(a)** the **dependent response** `E.Resp e` (`State s` is the
 first effect whose `Resp Get = s` is non-`Unit`), **(b)** the container
-coproduct `⊕` for `State s ⊕ F`, **(c)** **named-effect dispatch** so `runState`
-peels `State` and passes other ops through. All three are `§36`-normative and
+coproduct `⊕` for `State s ⊕ F`, **(c)** **named-effect dispatch** so
+`run_state` peels `State` and passes other ops through. All three are
+`§36`-normative and
 admitted by K1.5's generic `elim_ITree` (`kernel/tests/k1p5_wstyle.rs`) — **the
 kernel is untouched** (frame AC1). These cases are authored as the deliverable's
 acceptance target — like EFF4's own deferred `eff4_runstate` interp test — **not
@@ -519,70 +528,90 @@ against. The case **defines "done"**; it is correctly red until Runtime/Language
 build it.
 
 ### surface/effects/direct-state-next-post-increment (oracle, build-forcing)
-- spec: `36 §4.5.3` (`runState` = `§4.2` fold at `F = 𝟘`; worked `next`),
-  `§4.5.2` (`get`/`put` = `§2.1` `Get`/`Put` under `perform`), `§2.4` (`𝟘`
-  collapse)
-- given: the direct-surface post-increment `next` — returns the current value,
-  bumps the state:
+- spec: `36 §4.5.3` (`run_state` = `§4.2` fold at `F = 𝟘`; worked `next`),
+  `§4.5.2` (`state_get`/`state_put` build declared trees), and `§2.4`
+  (`𝟘` collapse)
+- given: in a roots-loaded source, import the empty residual effect type and
+  build the post-increment tree with the checked direct-State operations:
 
-  ```
-  next () = bind (get ()) (λ n. bind (put (n + 1)) (λ _. Ret n))
+  ```ken
+  import Core.Logic.EmptyDec (Empty)
+
+  const next : ITree (Coproduct (StateOp Nat) Empty)
+      (resp_coproduct (StateOp Nat) Empty
+        (resp_state Nat) (λ (_ : Empty). Unit)) Nat =
+    itree_bind (Coproduct (StateOp Nat) Empty)
+      (resp_coproduct (StateOp Nat) Empty
+        (resp_state Nat) (λ (_ : Empty). Unit)) Nat Nat
+      (state_get Nat Empty (λ (_ : Empty). Unit) MkUnit)
+      (λ n. itree_bind (Coproduct (StateOp Nat) Empty)
+        (resp_coproduct (StateOp Nat) Empty
+          (resp_state Nat) (λ (_ : Empty). Unit)) Unit Nat
+        (state_put Nat Empty (λ (_ : Empty). Unit) (n + 1))
+        (λ _. ITree.Ret (Coproduct (StateOp Nat) Empty)
+          (resp_coproduct (StateOp Nat) Empty
+            (resp_state Nat) (λ (_ : Empty). Unit)) Nat n)
   ```
 
-  driven through the **real interpreter** under `runState 0` and `runState 41`
-  (not a hand-fed harness — per the build-forcing note above).
-- expect: `runState 0 next` reduces to the pair **`(0, 1)`** and `runState 41
-  next` to **`(41, 42)`** — `(result, final-state)`: the result is the **old**
-  value (`get` observes the pre-increment state), the second component is the
-  **final** state after `put (n+1)`. Re-derive (`§4.2` clauses): `runState 0
-  (Vis Get k) = runState 0 (k 0)` (answer with current `0`) → `k 0 = Vis (Put 1)
-  (λ_. Ret 0)` → `runState 0 (Vis (Put 1) k') = runState 1 (k' tt) = runState 1
-  (Ret 0) = Ret (0, 1)`; at `F = 𝟘` collapses (`§2.4`) to `(0, 1)`.
+  Run `run_state Nat Empty (λ (_ : Empty). Unit) Nat initial next` through
+  the **real interpreter** for `initial = Zero` and `initial = 41` (a fixed
+  natural value; not a hand-fed harness, per the build-forcing note above).
+  The program spells the checked sequencer and constructor by their public
+  floor names and uses the explicit-argument `state_get`/`state_put`
+  source-call route in §36 §4.5.2.
+- expect: `run_state Nat Empty (λ (_ : Empty). Unit) Nat Zero next` reduces
+  to **`(0, 1)`**, and the same call with initial value `41` reduces to
+  **`(41, 42)`**. The pair is `(result, final-state)`: `state_get` reads the
+  pre-increment value and `state_put` adopts its successor. With residual
+  signature `Empty`, the state handler's returned tree collapses to this pair
+  by §2.4. These observations use the §4.2 `Get`/`Put` fold, not a bare
+  source-level `bind`, `get`, `put`, or `Ret`.
 - why: **verdict-independent structural value** — the pair **flips** on the two
   bugs the direct surface must exclude, and (by `result 0 ≠ state 1`, chosen so)
   pins the pair **order** the equal-valued EFF4 `(2,2)` cannot: **(a)** a
-  state-threading bug (`Put` not adopted — `runState s (Vis (Put s') k) =
-  runState s (k tt)`) yields **`(0, 0)`**; **(b)** a pair-order swap
-  (`runState s (Ret r) = Ret (s, r)`) yields **`(1, 0)`**. Both differ from
-  `(0, 1)` regardless of downstream type-checking. Promoted from EFF4's
-  `space-becomes-threads-state` to the **direct monadic door**; the order pin is
-  new. (structural/value assertion; build-forcing.)
+  state-threading bug that fails to adopt the new state yields **`(0, 0)`**;
+  **(b)** a pair-order swap yields **`(1, 0)`**. Both differ from `(0, 1)`.
+  The source client reaches the handler through the checked
+  `state_get`/`state_put` builders and `itree_bind`, with no reliance on a bare
+  alias. (structural/value assertion; build-forcing.)
 - oracle: the denotation returns the **Σ-pair `R × S`** (`§4.2`; interp
   `EvalVal::Pair`), *not* the also-landed inductive `data Prod a b = MkProd a b`
   (`prelude.rs:160`) — a distinct construct (`§4.5.3`). Assert the pair's
-  **components and order** and its Σ-pair denotation; the **surface constructor
-  spelling** is deferred `OQ-syntax` (`§4.5.2`), so do **not** freeze a
-  constructor name (over-freezing a deferred spelling would falsely fail a valid
-  build once the stdlib pair name finalizes).
+  **components and order** and its Σ-pair denotation. The source tree uses the
+  §4.5.2 `ITree.Ret` path with its explicit carrier, response, and result
+  arguments.
 
 ### surface/effects/direct-state-console-commute (oracle, build-forcing)
 - spec: `36 §4.5.4` (composition via `⊕`; handler nesting = discharge order;
   `State`/`Console` commute), `§4.2` (the `Vis (inr o)` pass-through clause)
-- given: a `[State Int, Console]` program that threads state **and** logs —
-  `logged_next () = bind (get ()) (λ n. bind (put (n + 1)) (λ _. bind (perform
-  Console (Write "log")) (λ _. Ret n)))` — discharged two ways: `runState 0
-  (handleConsole m)` (Console peeled first) and `handleConsole (runState 0 m)`
-  (State peeled first).
+- given: a schematic denotational `logged_next` tree with State and Console
+  actions, discharged two ways: `run_state 0 (handleConsole m)` (Console
+  peeled first) and `handleConsole (run_state 0 m)` (State peeled first). The
+  displayed `bind`/`Get`/`Put`/`Ret` names are §2.2 denotational notation, not
+  literal source. Any future source fixture uses the explicit `state_get` and
+  `state_put` builders, `itree_bind`, and qualified constructors from
+  §4.5.2.
 - **[deferred dependency — Console lift, beyond `State-effect-build` #242]:**
   `logged_next` is **not constructible on the build as shipped** —
   `print_line`/`Console`'s type is fixed to standalone
   `ITree ConsoleOp console_resp Unit`, **not** generic over an arbitrary `F`
   combined via `⊕`, and there is no bare-effect→`⊕` lift combinator, so
-  `perform Console …` cannot be `bind`-ed into a `State`-threaded
+  `perform Console …` cannot be grafted into a `State`-threaded
   (`Sum`-combined) computation (language-qa's `wp/State-effect-build` finding).
   This is a **named follow-on** (generalize `Console`/`print_line` over `F`, or
   a bare-effect→`⊕` lift) **outside State-effect-build's scope** ((a)/(b)/(c) +
-  get/put/bind/runState). The composition *mechanism* is proven sound
-  (language-qa's pass-through probe on a fresh inhabited second effect; the
-  companion `direct-state-no-cross-run` exercises the `State` thread). So this
+  state_get/state_put/itree_bind/run_state). The composition *mechanism* is
+  proven sound (language-qa's pass-through probe on a fresh inhabited second
+  effect; the companion `direct-state-no-cross-run` exercises the `State`
+  thread). So this
   case stays **red pending the Console-lift follow-on**, not flippable by #242 —
   fail-closed (the program isn't expressible yet), **not** a soundness gap.
 - expect: **both type-check and thread state identically** — result pair
   `(0, 1)` and one `Console.Write "log"`, whichever handler peels first.
-  `runState` discharges the `State` summand by its `inl` clauses and **passes
+  `run_state` discharges the `State` summand by its `inl` clauses and **passes
   every Console op through untouched** by `§4.2`'s `Vis (inr o) k` clause;
   `handleConsole` never reads `State` ops — so the two handlers **commute**.
-- why: composition (frame AC4) — a bug where `runState`'s pass-through clause
+- why: composition (frame AC4) — a bug where `run_state`'s pass-through clause
   **consumes/drops/reorders** the `Console` op (or mis-threads state across an
   interleaved foreign `Vis`) makes the two discharge orders **diverge** (a
   different final state, or a dropped/duplicated `Write`) — the commutation
@@ -594,14 +623,14 @@ build it.
 - spec: `36 §4.5.5` (purity/totality; result = function of `s₀` + pure tree;
   the C3-forbidden face), `§4.5.6`/`OQ-C` (C3 mutable refs forbidden)
 - given: the **same** pure tree `next` (above) run twice from two initial
-  states in one computation — `runState 0 next` then `runState 41 next` — with
-  **no** `runState` nesting between them (two independent top-level discharges).
+  states in one computation — `run_state` at initial values `0` and `41` — with
+  **no** `run_state` nesting between them (two independent top-level discharges).
 - expect: **two independent results `(0, 1)` and `(41, 42)`** with **no
   cross-run state** — the second run re-threads from `41`, *not* from the first
   run's final state `1`. The result is determined **entirely by `s₀` and the
-  pure tree** (`§4.5.5`); `runState s₀ m` is re-runnable and idempotent in `m`.
+  pure tree** (`§4.5.5`); `run_state s₀ m` is re-runnable and idempotent in `m`.
 - why: the **C2/C3 boundary** the WP must preserve (frame AC3) — state is
-  `runState`'s **parameter**, threaded functionally, never a cell. A bug that
+  `run_state`'s **parameter**, threaded functionally, never a cell. A bug that
   introduced a **shared mutable cell** (the forbidden C3 shape) would leak
   run-1's final state into run-2, yielding **`(1, 2)`** for the second run
   instead of `(41, 42)` — the re-runnability **flips**. The pure fold
@@ -610,15 +639,16 @@ build it.
   mutability, `§4.5.5`). (discriminating on cross-run isolation; build-forcing.)
 
 ### surface/effects/direct-state-kernel-untouched (property)
-- spec: `36 §4.5.3` (`runState` is a derived total def, kernel-re-checked, not a
-  trusted Rust primitive), `§4.5.6` (no new `Term`/`Decl` variant; outer-ring
-  lift only), frame AC1
-- given: the delivered `[State s]` surface — its `get`/`put` denotations, the
-  `runState` handler, and the effect-row machinery for `State s ⊕ F`.
+- spec: `36 §4.5.3` (`run_state` is a derived total def, kernel-re-checked,
+  not a trusted Rust primitive), `§4.5.6` (no new `Term`/`Decl` variant;
+  outer-ring lift only), frame AC1
+- given: the delivered direct-State surface — its `state_get`/`state_put`
+  denotations, the `run_state` handler, and the effect-row machinery for
+  `State s ⊕ F`.
 - expect: **`git diff origin/main -- crates/ken-kernel/` stays empty** and
-  `trusted_base()` is unchanged — no `State`/`Get`/`Put`/`runState` kernel
+  `trusted_base()` is unchanged — no `State`/`Get`/`Put`/`run_state` kernel
   `Term` or `Decl` variant, no new `declare_primitive`/`declare_postulate`.
-  `runState` is an **ordinary total Ken definition** (the `§4.2` `elim_ITree`
+  `run_state` is an **ordinary total Ken definition** (the `§4.2` `elim_ITree`
   fold) the kernel re-checks like any term; the runtime merely *evaluates* it
   (it is **not** an I/O driver like Console's `run_io`, `§7.2` — pure state
   threading performs no I/O).
@@ -627,21 +657,22 @@ build it.
   (grep: no `State` effect machinery in `ken-kernel`; K1.5's generic
   `elim_ITree` already admits the `Vis`-tree), **not** a runtime assertion. If a
   build path ever needs a kernel `Term`/`Decl` variant for state, **that is the
-  finding** (C2 → C3 boundary breach). The `runState`-derived-not-postulated
+  finding** (C2 → C3 boundary breach). The `run_state`-derived-not-postulated
   split is what keeps the direct surface as cheap as EFF4's `space` door.
   (`property`: TCB-surface invariant, no value-flip — asserts the *absence* of a
   kernel delta.)
 
 **Cross-case reconcile (EFF6 ↔ EFF4 — same fold, two doors).**
-EFF4's `space-becomes-threads-state` (`runState 0 {inc;inc;get} = (2,2)`) and
-EFF6's `direct-state-next-post-increment` (`runState 0 next = (0,1)`) exercise
-the **same** `§4.2` `runState` fold through **different surfaces** — the
-imperative `space` sugar (`§4.1`) vs the direct monadic `get`/`put` (`§4.5`).
+EFF4's `space-becomes-threads-state` (`run_state 0 {inc;inc;get} = (2,2)`) and
+EFF6's `direct-state-next-post-increment` (`run_state 0 next = (0,1)`) exercise
+the **same** `§4.2` `run_state` fold through **different surfaces** — the
+imperative `space` sugar (`§4.1`) vs the direct monadic
+`state_get`/`state_put` (`§4.5`).
 They are **not** contradictory: different programs, same handler. EFF6
 **strengthens** the shared mechanism on the **pair-order** dimension EFF4 leaves
 unpinned — EFF4's `(2,2)` has `result == state`, so a pair-order swap is
 invisible to it; EFF6's `result 0 ≠ state 1` makes the swap flip. Mechanism
-check (per V2): both assert `runState s₀ ⟦m⟧ = (result, final-state)` with the
+check (per V2): both assert `run_state s₀ ⟦m⟧ = (result, final-state)` with the
 result the observed value and the second component the final state — the direct
 and space doors **agree on the fold's shape**.
 
