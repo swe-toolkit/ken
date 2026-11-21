@@ -1212,8 +1212,10 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
         BTreeSet::from(["Test.Provider".to_string()])
     );
     assert_eq!(
-        observe_legacy(&root, "Test.Consumer"),
-        LoaderObservation::Succeeded
+        observe_strict(&root, "Test.Consumer"),
+        LoaderObservation::Refused {
+            stage: PipelineStage::Resolution,
+        }
     );
     let mut env = ElabEnv::new().expect("base environment");
     let write_id = env.globals["write"];
@@ -1238,22 +1240,6 @@ fn written_lowercase_name_is_not_hidden_by_imported_closure() {
         .is_empty());
     assert!(!strict_available_ids(&env).contains(&write_id));
 
-    match legacy_evidence(&root, "Test.Consumer", &units["Test.Consumer"], &units) {
-        LegacyIdentityEvidence::ExactLedger {
-            resolved_globals,
-            identity_grounded_prerequisites,
-            ..
-        } => {
-            assert!(resolved_globals.contains(&write_id));
-            assert!(identity_grounded_prerequisites.contains(
-                &IdentityPrerequisite::CanonicalHome {
-                    identity: write_id,
-                    current_names: vec!["write".to_string()],
-                }
-            ));
-        }
-        other => panic!("direct lowercase client must retain exact evidence: {other:?}"),
-    }
     let fixture_top = root
         .parent()
         .and_then(Path::parent)
@@ -1358,7 +1344,7 @@ fn missing_direct_import_edge_keeps_provider_identity_a_prerequisite() {
 /// unrelated clients do not inherit that grant. THE GAP: the Console.Text
 /// real-root positive above independently measures the home exemption.
 #[test]
-fn bare_legacy_write_outside_its_home_stays_a_prerequisite() {
+fn bare_write_outside_its_home_stays_a_prerequisite() {
     let nonce = format!(
         "ken-catalog-console-nonhome-{}-{}",
         std::process::id(),
@@ -1380,33 +1366,11 @@ fn bare_legacy_write_outside_its_home_stays_a_prerequisite() {
     let units = discover_units(&root);
     assert!(units["Consumer"].direct_imports.is_empty());
     assert_eq!(
-        observe_legacy(&root, "Consumer"),
-        LoaderObservation::Succeeded
-    );
-    assert_eq!(
         observe_strict(&root, "Consumer"),
         LoaderObservation::Refused {
             stage: PipelineStage::Resolution,
         }
     );
-    let env = ElabEnv::new().expect("base environment");
-    let write_id = env.globals["write"];
-    match legacy_evidence(&root, "Consumer", &units["Consumer"], &units) {
-        LegacyIdentityEvidence::ExactLedger {
-            resolved_globals,
-            identity_grounded_prerequisites,
-            ..
-        } => {
-            assert!(resolved_globals.contains(&write_id));
-            assert!(identity_grounded_prerequisites.contains(
-                &IdentityPrerequisite::CanonicalHome {
-                    identity: write_id,
-                    current_names: vec!["write".to_string()],
-                }
-            ));
-        }
-        other => panic!("non-home Consumer must have exact legacy evidence: {other:?}"),
-    }
     let fixture_top = root
         .parent()
         .and_then(Path::parent)
