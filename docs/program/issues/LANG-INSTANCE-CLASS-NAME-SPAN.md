@@ -29,14 +29,22 @@ origin: "LANG-DELETE-LEGACY-RESOLUTION I4 follow-on. Architect span ruling evt_5
   at `:3330`.
 - **The resolver.** `synthesized_dictionary_name` (`modules.rs:5338`)
   calls `resolve_class_ref` (`:1744`) with the declaration span at
-  `:5346`. Its callers are `:5733` and `:6835`. Constraint classes already
-  resolve at their own `inner.span()` (`:5391`).
+  `:5346`. Its callers are `:5733` and `:6835`.
 - **The pin.** `generic_instance_missing_class_refuses_in_declaration_entry`
   (`modules.rs:7305`) asserts `(0, SOURCE.len())` and names this change as
   its GAP.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
+
+## Amendment: AC-3 ruling (2026-11-21)
+
+Language Leader `evt_5jcy6rabqrhpa` found one settled input false. `:5391`
+resolves a public `ClassDecl` export, not a constraint. Both constraint
+rewrites pass `&rdecl.span` (`:4277`, `:4439`), and `InstanceConstraint`
+has no class-name span. Steward ruling `evt_5pbprtbjjwmqy`: the constraint
+AST is not extended here. AC-3 below is replaced by the amended AC-3. A
+constraint class-name span is carried, not authorized.
 
 ## Scope
 
@@ -53,8 +61,10 @@ pin. No resolution rule, error variant or spec change.
 - **AC-2 (QA mutation).** Passing the declaration span to
   `resolve_class_ref` again, with everything else unchanged, reddens both
   AC-1 rows. Restore it byte-identically.
-- **AC-3.** A missing class in a `where` constraint still refuses at the
-  constraint's span, and
+- **AC-3 (amended).** A missing class in a `where` constraint still
+  refuses as `UnboundName` naming that class. Its span is the base
+  behaviour, measured on `69458aa89` and pinned as current behaviour with
+  a GAP note. AC-2's mutant leaves this row green, and
   `generic_instance_head_binder_has_checked_identity_after_child_replay`
   passes unchanged.
 - **AC-4.** Full-workspace CI is green on the exact candidate.
