@@ -227,6 +227,23 @@ its representation remains internal. Source needs `Decimal` without
 an import, so this exact checked identity joins the internal-provision
 floor, not a package home or a new primitive.
 
+`SocketAddress` is the checked Net address type of `38 §1.13`. The
+prelude declares it before source, and its exact identity is keyed: the
+checked Net acquisition operations and `socket_local_address` are typed
+against it, and the prelude records its three representation constructor
+IDs as canonical runtime roles. A same-spelled source declaration
+allocates a different identity that those operations reject. Source must
+name the one identity from two homes with no import edge between them:
+`Capability.Net.Stream` and the `SocketResource (Option SocketAddress)`
+case of `Capability.System.Error`'s refusal envelope. So it joins the
+internal-provision floor, not a package home. The family is scoped and
+constructor-private: `PrivateSocketIPv4`, `PrivateSocketIPv6` and
+`PrivateSocketUnix` are hidden at their qualified paths, no bare
+constructor name enters B, and values come only from the Stream smart
+constructors. `Capability.Net.Stream`'s `export SocketAddress`
+republishes the same checked identity and allocates none. Floor
+admission alone adds no postulate or `trusted_base()` entry.
+
 The entrypoint-ABI contract (`33 §3.2.1`) adds five checked, pre-source
 identities under the same internal-provision arm: `ExitCode`,
 `ProcessInput`, `ProgramCaps`, `HostIO`, and `Prod`. The admission check
@@ -337,7 +354,7 @@ These four admissions allocate no new checked identity and add no
 checked `host_bind` and related wrappers without admitting their
 `FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
 
-Thus the closed **floor-identity roster** has fifty-two names: the exact
+Thus the closed **floor-identity roster** has fifty-three names: the exact
 checked identities source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
 ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal,
@@ -345,13 +362,13 @@ ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO,
 IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
 ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
 ReadResult, ResourceError, ResourceKind, ResourceOpenMode, Result,
-StateOp, Top, TransferCount, Unit, Utf8Error, WriteProgress,
+SocketAddress, StateOp, Top, TransferCount, Unit, Utf8Error, WriteProgress,
 console_resp, eqChar, itree_bind, resp_coproduct, resp_state,
 run_state, state_get, state_put}`**. The prior forty-seven identities,
 `ConsoleOp`, `console_resp`, `itree_bind` and `resp_coproduct` are
 re-checked; floor admission alone adds no postulate or `trusted_base()`
 entry. Their qualified constructors and the Pair companions are
-separate from this 52-name count. These identities are not all types:
+separate from this 53-name count. These identities are not all types:
 `Top` and `Bottom` are proposition constants, `Proved` is a proof
 binding, `HostIO` a type-level function, and `console_resp`, `eqChar`,
 `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -386,8 +403,9 @@ the exact floor identity. Abstract or constructor-private visibility still appli
 (`33 §4.2`); qualification cannot expose a hidden constructor. The existing
 `ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
 `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
-`ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and
-`ResourceKind.PipeWrite` are the seven public constructor paths, not
+`ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
+`ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and
+`ResourceKind.SocketStream` are the nine public constructor paths, not
 additional bare names in B. `ExitCode` is scoped:
 `ExitCode.Success` and `ExitCode.Failure` are available, not bare
 `Success`/`Failure`. `ProgramCaps` is scoped: its runner-minted
@@ -501,8 +519,9 @@ information, not submitted for per-name permission. No compiler-provided
 intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
-With `Decimal`'s two witnesses established, the floor is the
-fifty-two-identity set above. Until D0 proves both witness clauses for
+With the two witnesses of `Decimal` and then of `SocketAddress`
+established, the floor is the fifty-three-identity set above. Until D0
+proves both witness clauses for
 another candidate, that candidate has no new ambient availability.
 `BufferWindow`, `ResourceBodyResult`, `ResourceBracketResult`, the `FS`
 source alias, `read_bytes` and `write_file` are source-promised but
@@ -629,7 +648,7 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 
 The two IO advance-start H rows are beyond the historical Increment 3a
 ninety-six-row roster and the later fifty-six non-home additions; neither
-changes those historical counts or the fifty-two-identity floor. They use
+changes those historical counts or the floor-identity roster. They use
 existing checked pre-source identities, not copied package definitions or
 new bare Strict names. A usable home requires the same Strict client to
 state a generic law in imported vocabulary and apply the checked proof;
@@ -744,6 +763,7 @@ closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 **Implementation staging.** Increment 3a fixed the historical
 fifty-one-identity floor and Pair's three checked companions. This
 later node adds `Decimal` to the floor, yielding fifty-two identities.
+PX11 then adds `SocketAddress` (`38 §1.13`), yielding fifty-three.
 The prior forty were delivered before Increment 3a; `ReadResult`,
 `FileMetadata`, `FileKind`, `DirEntry`, `FileOperation`, `StateOp` and
 `ConsoleOp` require complete scoped constructor families and source-path

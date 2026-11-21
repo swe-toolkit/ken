@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative fifty-two-identity prelude and its exact
+> normative fifty-three-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -82,7 +82,7 @@ constructor still has the same checked parent and `GlobalId`.
 
 | Type | Scoped? | Specificity judgment |
 |---|---|---|
-| `ResourceKind` (current floor) | Yes | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite` are the seven public paths; none of their leaf names is reserved bare by this family. |
+| `ResourceKind` (current floor) | Yes | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and `ResourceKind.SocketStream` are the nine public paths; none of their leaf names is reserved bare by this family. |
 | `Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, `Utf8Error` (current floor) | No | The settled bare constructor vocabulary remains available; in particular `True`/`False`, `Zero`/`Suc`, `Nil`/`Cons`, `None`/`Some`, `Ok`/`Err` stay bare. |
 | `IOError` (floor) | Yes | All thirteen causes use `IOError.C`; `NotFound`, `Other`, `Unsupported` and `Revoked` are not bare reservations. |
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
@@ -97,6 +97,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `FileKind` (floor) | Yes | The four native-selected kind cases resolve only as `FileKind.KFile`, `FileKind.KDirectory`, `FileKind.KSymlink` and `FileKind.KOther`. |
 | `DirEntry` (floor) | Yes | The native-selected constructor resolves only as `DirEntry.MkDirEntry`, with no bare reservation. |
 | `FileOperation` (floor; former package home) | Yes | All sixteen checked operation cases resolve only as `FileOperation.Op*` paths; the old bare exports and home rows retire atomically. |
+| `SocketAddress` (floor) | Yes | `PrivateSocketIPv4`, `PrivateSocketIPv6` and `PrivateSocketUnix` are private at their qualified paths and no leaf is bare-reserved; values come only from the `Capability.Net.Stream` smart constructors. |
 | `StateOp` (floor) | Yes | The exact checked State operation carrier resolves as `StateOp.Get` and `StateOp.Put`; neither generic leaf is bare-reserved. `State s` is its signature label, not a separate source type (§36 §4.2). |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
@@ -168,6 +169,7 @@ alone reserves a name.
 | `host_bind` (package) | Checked prelude HostIO sequencing definition homed by the Exit export, not an effect, floor name, or source definition in that package. |
 | `eqChar` (floor operation) | `decimal_char.rs::set_eq_entry` captures its checked ID; the Char `==` plan and character literal patterns read that registration. The string-literal-pattern reader is rekeyed to the same exact ID instead of a mutable spelling lookup. §34 literal equality and §37 Char/string operations require the canonical comparator in source. It is a checked operation, not a type or constructor family. |
 | `Decimal` (floor, checked transparent definition) | The `d` literal reader types against the exact checked pre-source identity, and `+`, `-`, `*` and `==` dispatch to existing checked operations through that identity (`30-taxonomy §4`). §35 §2.3 requires source to name `Decimal` without an import. The representation is internal; no public constructor family is exposed. |
+| `SocketAddress` (floor, scoped, constructor-private) | The checked Net acquisition operations and `socket_local_address` are typed against this exact pre-source identity, and the prelude records its three constructor IDs as canonical runtime roles. `38 §1.13` requires source to name it from both `Capability.Net.Stream` and `Capability.System.Error`, which have no import edge between them. |
 | `StateOp` (floor, scoped) | The space desugarer constructs this exact checked operation carrier (`elab.rs:22321–22336`); §36 §4.2 requires source to name it for direct `run_state` trees. Its checked `Get`/`Put` leaves resolve as `StateOp.Get`/`StateOp.Put`. |
 | `resp_state` (floor operation) | The same desugarer constructs this exact checked response family; §36 §4.2's dependent State response requires it in a direct tree. `resp_state` is a checked definition, not a constructor or separate `State` type. |
 | `Get` (qualified floor constructor) | Exact State operation ID, source `StateOp.Get`, not bare. |
@@ -309,7 +311,8 @@ prior operations plus `StateOp` and `resp_state`), five Increment 3a
 result/FS scoped families, and `ConsoleOp`, `console_resp`, `itree_bind`
 and `resp_coproduct` marked floor above join B alongside the original
 fifteen; the checked transparent `Decimal` joins that earlier
-fifty-one, giving fifty-two counted identities. Their floor spellings
+fifty-one, giving fifty-two counted identities; PX11's `SocketAddress`
+(`38 §1.13`) then gives fifty-three. Their floor spellings
 are protected; scoped case leaves and bare `get`, `put` and `bind` do not
 enter B through the checked operations. The package-home roster's
 Increment 3a target has ninety-six rows: the eighty-one at its base,
