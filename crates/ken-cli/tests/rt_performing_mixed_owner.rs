@@ -1,6 +1,9 @@
 //! Distinct provenance owners at one call execute with interpreter parity.
 #![cfg(target_os = "linux")]
 
+#[path = "support/rt_performing_mixed_owner_relay.rs"]
+mod relay;
+
 /// Promise class: durable invariant. MEASURED: native trace, release set,
 /// exit status, and terminal equal the interpreter's for the distinct-
 /// provenance stage. CLAIMED: W3's instance key admits this program because
@@ -11,6 +14,9 @@
 /// both predeclared and specialization owners: at call 386, source 717 has
 /// provenance Pred4/emission Spec0 while source 731 has Pred5/Pred5. That
 /// same-provenance mixed-emission residual is unexercised by this fixture.
+/// The core term is built in Rust because its private representation has no
+/// source route; its equality with the pre-deletion elaboration was measured
+/// once at 15e57bf39 and is not re-checked here.
 #[test]
 fn distinct_provenance_stage_matches_interpreter_natively() {
     std::thread::Builder::new()
@@ -20,15 +26,11 @@ fn distinct_provenance_stage_matches_interpreter_natively() {
         .stack_size(16 * 1024 * 1024)
         .spawn(|| {
             use std::os::unix::ffi::OsStrExt as _;
-            let source = include_str!("fixtures/rt_performing_mixed_owner_relay.ken");
             let root = tempfile::tempdir().expect("temporary native-build root");
             std::fs::write(root.path().join("source"), b"0123456789abcdef")
                 .expect("the fixture file is readable");
             let mut host = ken_interp::PosixHost::new_at(root.path());
-            let mut interpreter_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
-            let interpreter_results = interpreter_env
-                .elaborate_file_v1(source)
-                .expect("the relay elaborates into a checked core term");
+            let (interpreter_env, interpreter_results) = relay::relay_program();
             let interpreted = ken_cli::run_elaborated_program_effect_observation(
                 interpreter_env,
                 interpreter_results,
@@ -47,14 +49,14 @@ fn distinct_provenance_stage_matches_interpreter_natively() {
                 2,
                 "the interpreter must reach both source reads"
             );
-            let mut native_env = ken_elaborator::ElabEnv::new().expect("checked prelude");
-            let native_results = native_env
-                .elaborate_file_v1(source)
-                .expect("the relay elaborates into a checked core term");
+            let (native_env, native_results) = relay::relay_program();
             let elaborated =
                 ken_elaborator::compiler_driver::ElaboratedNativeProgramV1::from_elaborated_env(
                     native_env,
-                    ken_elaborator::compiler_driver::CompilerSource::new("src/main.ken", source),
+                    ken_elaborator::compiler_driver::CompilerSource::new(
+                        "src/main.ken",
+                        relay::RELAY_TEMPLATE_SOURCE,
+                    ),
                     native_results,
                 );
             let compiled =
