@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-UNION-REACHABLE-ABSORB
 title: "Spec 62 says union only adds reachability (§15) and is invariant under operand order and grouping (§16, §17), but no law says a union adds nothing when one operand's edges are already edges of the other, so a client cannot drop a redundant or repeated operand without proving edge inclusion and monotonicity both ways itself. Rule from a checked D0 at zero trust that, when every edge of h is an edge of g, graph_reachable over graph_union g h equals graph_reachable over g, with union of a graph with itself as the corollary, and state both with a seed that separates an included operand from one adding an edge"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV
 title: "Spec 68 §18 bounds the truncated difference of two enclosed values by the interval's width, but no law takes the limiting case, so a client holding a zero-width enclosure cannot conclude that it has pinned its value exactly without re-deriving order facts from truncated subtraction. Rule from a checked D0 at zero trust that, when interval_width i is rational_equiv to zero, any two values contained in i are rational_equiv, and state it with a seed that separates a zero-width interval from one of positive width"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -22,7 +22,7 @@ rational_zero`, `IsTrue (interval_contains i x)` and
 `IsTrue (interval_contains i y)`, it concludes `rational_equiv x y`. It
 holds at zero trust, and spec 68 states it by its public type.
 
-## Settled inputs (main `15e57bf39`)
+## Settled inputs (main `61b1f0f88`; anchors re-checked at release)
 
 - **The bound.** `interval_width_bounds_sub` (`RationalInterval.ken.md:389`)
   gives `rational_sub y x ≤ interval_width i` for two contained values.
@@ -37,9 +37,9 @@ holds at zero trust, and spec 68 states it by its public type.
   `rational_sub a b ≤ 0` to `a ≤ b`. `interval_width_point` (`:269`) gives
   the converse case, zero width for a point, and nothing goes from zero
   width to equal members.
-- **Spec and tests.** Spec 68 ends with §18 (`68-numerical.md:1703`), so
-  the new section is §19. The seed directory is
-  `conformance/stdlib/numerical/`. The test pattern is
+- **Spec and tests.** Spec 68 ends with §19, hull and intersection
+  idempotence (`68-numerical.md:1771`), so the new section is §20. The
+  seed directory is `conformance/stdlib/numerical/`. The test pattern is
   `crates/ken-elaborator/tests/cat_numeric_interval_width_bounds_sub.rs`.
 
 Treat anchors as perishable. If a settled input is false on the landed
@@ -47,8 +47,8 @@ base, stop and report the mismatch; do not build around it.
 
 ## Scope
 
-Spec 68 §19, the catalog law with any private helper, a seed, a package
-test and the status lines. No §1 to §18 operation or law type moves, and
+Spec 68 §20, the catalog law with any private helper, a seed, a package
+test and the status lines. No §1 to §19 operation or law type moves, and
 no kernel or surface change.
 
 ## Deliverable
@@ -66,7 +66,7 @@ SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE.
     or `rational_leq` of the width to `rational_zero`;
   - where a truncated-subtraction-to-order helper lives, in `Rational` or
     private to the interval package.
-- **AC-1.** §19 states the law by its public type. The Spec Leader and CV
+- **AC-1.** §20 states the law by its public type. The Spec Leader and CV
   review it, with a Decision.
 - **AC-2.** The seed's accepted block applies the law to a closed
   zero-width interval and two contained values that are rational_equiv but
@@ -86,7 +86,7 @@ SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE.
 - The law needs an `Axiom`, a kernel or surface change, or a premise
   beyond zero width and the two containments.
 - AC-T finds `trusted_base()` changed as an identity set.
-- A change to an existing §1 to §18 operation or law type.
+- A change to an existing §1 to §19 operation or law type.
 
 Checks: 3 fired. I listed every public width law and every public
 `Rational` theorem: none goes from zero width, or from a zero truncated
