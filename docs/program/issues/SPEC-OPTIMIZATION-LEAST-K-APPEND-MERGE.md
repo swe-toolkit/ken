@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-LEAST-K-APPEND-MERGE
 title: "Spec 72 splits argmin, argmax and their Option forms over appended parts (§1.6, §1.8, §3.6, §3.8), but least_k has no append law, so a client cannot select the k least of a concatenation from the k least of each part. Rule from a checked D0 at zero trust that least_k cost k (xs ++ ys) equals least_k cost k (least_k cost k xs ++ least_k cost k ys), and state it with a seed that separates re-selection from appending the two part results"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
