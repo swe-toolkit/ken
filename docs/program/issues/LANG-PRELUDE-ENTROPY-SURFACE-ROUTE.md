@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-ENTROPY-SURFACE-ROUTE
 title: "The prelude checks an entropy surface (EntropyIO, random_bytes, host_entropy, ambient_entropy) that no catalog package provides, so once Legacy resolution is deleted, Strict source cannot name it and three test consumers lose their route. Measure every public-shaped prelude action surface with no Strict route, then give each one a ruled route: a capability package home with its spec taxonomy row, or an internal route for its consumers"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
@@ -46,6 +46,27 @@ ruled internal, with its consumers moved to an internal route.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
+
+## Amendment: consumer mechanisms (2026-11-17)
+
+Language Leader `evt_2r7n6b4mv5pka`; Steward ruling in reply. Of the three
+consumers, only `lang_let_hostio_action`'s held row resolves `random_bytes`
+from source, so only it loses its route at I4. `abi_s3_entropy_effect_row`
+reads `effect_rows` and `rt_c5_host_response_result_slots` reads `globals`
+by checked id; both are already on an internal route. AC-0 records each
+consumer's lookup mechanism and confirms that I4's deletion site does not
+reach the map a direct consumer reads.
+
+## Amendment: AC-0 ruling (2026-11-17)
+
+Architect `evt_5r4z1rhn7e414` partitions the 108-name envelope: no home in
+this node, 85 internal (G1 to G10), and 23 package-documented laws (G11)
+split to `LANG-PRELUDE-IO-RESOURCE-LAW-HOMES`. AC-1 is vacuous. AC-2 is the
+P3 refusal pin plus the P4 direct readers unchanged. AC-3 is the P2
+restatement of the held `lang_let_hostio_action` row. No Spec half.
+Source consumers of internal members are I4 dispositions (P5). Entropy and
+monotonic-clock actions are homed when their host operations are admitted
+with a spec contract (carried, S3).
 
 ## Scope
 

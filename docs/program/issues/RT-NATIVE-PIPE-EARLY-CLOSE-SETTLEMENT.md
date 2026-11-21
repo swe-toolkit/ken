@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-PIPE-EARLY-CLOSE-SETTLEMENT
 title: "Closing a child pipe end in the body of withChild and then waiting runs on the interpreter but fails native-build with N0003, a planner invariant the compiler calls its own bug: the relay selector finds two ResourceRelease positions for one forwarded pipe and cannot tell them apart. Name the two positions from a D0, key the selector on the position identity the planner carries, and give native parity for early close on both pipe ends"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

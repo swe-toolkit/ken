@@ -1,7 +1,7 @@
 ---
 id: LANG-PRELUDE-NONHOME-FAMILIES-HOME
 title: "Deleting Legacy resolution would strand pre-source names that tests and the spec treat as public but no package exports: 48 checked and saturating fixed-width operations, RangeError and three ABI-scalar narrowings, Decimal and its operators, isScalar and inRangeBool, and zip. Home each family at its existing identity, or route it through the surface it already has, as the Architect ruled by registration site, so I4 can delete Legacy"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1
