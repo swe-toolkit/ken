@@ -3941,6 +3941,18 @@ it needs no ordering premise. Soundness excludes added events, but ordered
 and sound alone do not characterize this merge: a constant empty result
 satisfies both while violating completeness.
 
+`trace_merge_distinct_commute` requires each cross-trace pair of events to
+have different timestamps: one time must be strictly earlier than the other.
+The proof recurses over the left trace, then over the right trace when both
+have heads. If `event_before` selects the left head, the distinct-time
+premise makes the reverse head comparison false. The existing
+`trace_merge_cons_left` and `trace_merge_cons_right` lemmas expose the same
+left head on both sides, and the left-tail induction hypothesis equates the
+remaining merges. If the comparison is false, `event_before_flip` selects
+the right head in the swapped merge; the same head-insertion lemmas expose
+that head, and the right-tail recursive case equates the remaining merges.
+No ordering premise on either trace is needed.
+
 When every left event is at or before every right event, merge equals
 append, even if the individual traces are unordered. The checked
 `trace_merge_separated` proof inducts on the left trace, using
@@ -4042,6 +4054,12 @@ merging, not window multiplicity.
    `trace_window_merge` and `trace_merge_all_ordered`, with `map` as the
    sole new Derived import; these seven merge-all proofs add no helper.
    The append proof also reuses public `trace_merge_assoc` without ordering.
+   Distinct-time commutation recurses over both trace tails: the pairwise
+   premise rules out a reverse head tie in the True case; the False case
+   uses `event_before_flip`. Existing head-insertion lemmas align the chosen
+   heads, and the corresponding left- or right-tail recursion closes the
+   remaining equality without an ordered-input premise. Its two recursion
+   helpers and timestamp lemma remain private.
    The one-way window-of-merge consequence composes the two checked soundness
    laws and remains private. Window composition reuses checked natural-order
    `max`/`min` bounds and structurally fuses generic list filters. Window
