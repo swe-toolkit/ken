@@ -251,13 +251,11 @@ fn union_absorb_and_idem_open_public_owned_and_trust_neutral() {
 /// MEASURED: two independent reachability values and all open/closed law
 /// applications check; the same-value closed Proved control checks, but the
 /// otherwise identical law application with h_adds refuses in its own theorem.
-/// The same inclusion term is checked independently at its own type: it
-/// accepts for h_sub and refuses for h_adds without any conclusion in scope.
 /// CLAIMED: subgraph inclusion lets the union retain g's reachability, while
 /// adding a genuinely new edge cannot reuse that inclusion proof.
 /// THE GAP: one finite graph does not prove the generic law (the Transparent
-/// proof above does); the independent inclusion refusal identifies the
-/// premise, but the whole-law refusal span is only scoped to its declaration.
+/// proof above does). The separate premise test isolates why the whole-law
+/// refusal occurs; its span alone names only the enclosing declaration.
 #[test]
 fn union_absorb_closed_values_idem_and_added_edge_refusal() {
     let mut accepted = loaded_graph();
@@ -279,9 +277,6 @@ fn union_absorb_closed_values_idem_and_added_edge_refusal() {
     accepted
         .elaborate_file(&law_absorb("h_sub"))
         .expect("closed absorption with true inclusion");
-    accepted
-        .elaborate_file(&inclusion_claim("h_sub"))
-        .expect("the same inclusion term inhabits its own premise");
 
     let mut refused = loaded_graph();
     refused
@@ -309,21 +304,30 @@ fn union_absorb_closed_values_idem_and_added_edge_refusal() {
             && span.end <= wrong.len() => {}
         other => panic!("added edge must refuse at the appended law claim: {other:?}"),
     }
+}
 
-    // Isolate the actual premise: this row has no reachability equality
-    // conclusion, so a mismatch here cannot be blamed on the law's result.
-    let mut premise = loaded_graph();
-    premise
+/// SOURCE: graphs §19 edge-inclusion premise, isolated from the equality.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the same inclusion proof term accepts from h_sub into g_base
+/// and refuses from h_adds into g_base at its own declaration.
+/// CLAIMED: the added V1 → V2 edge invalidates the premise even when no
+/// reachability equality is involved.
+/// THE GAP: a three-vertex witness isolates this premise; the generic law
+/// still rests on its own checked body, not on this finite client.
+#[test]
+fn union_inclusion_premise_distinguishes_added_edge() {
+    let mut positive = loaded_graph();
+    positive.elaborate_file(PREFIX).expect("inclusion prefix");
+    positive
+        .elaborate_file(&inclusion_claim("h_sub"))
+        .expect("subgraph inclusion is checked independently");
+
+    let mut negative = loaded_graph();
+    negative
         .elaborate_file(PREFIX)
         .expect("fresh inclusion prefix");
-    premise
-        .elaborate_file(BASE_MISSES)
-        .expect("base observation remains checked");
-    premise
-        .elaborate_file(ADDS_REACHES)
-        .expect("added-edge observation remains checked");
     let false_inclusion = inclusion_claim("h_adds");
-    match premise.elaborate_file(&false_inclusion) {
+    match negative.elaborate_file(&false_inclusion) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             span,
