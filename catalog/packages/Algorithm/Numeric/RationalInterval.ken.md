@@ -29,9 +29,10 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The width operation and five checked laws, including
-`interval_width_mul`, `interval_width_inside` and `interval_width_bounds_sub`,
-use Rational's truncated subtraction, not a subtraction of intervals. The checked
+source; their operations follow. The width operation and six checked laws,
+including `interval_width_mul`, `interval_width_inside`,
+`interval_width_bounds_sub` and `interval_width_zero_equiv`, use Rational's
+truncated subtraction, not a subtraction of intervals. The checked
 inverted-emptiness and two ordered-endpoint membership laws make the endpoint
 boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
@@ -58,13 +59,19 @@ zero and vice versa, including for inverted intervals.
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, leq_nat)
+
+import Data.Numeric.Nat.Arithmetic (mul)
+
+import Data.Numeric.Nat.Order (sub)
 
 import Core.Logic.Transport (sym, trans, cong)
 
 import Data.Numeric.Rational
   (Rational,
     MkRational,
+    numerator,
+    denominator,
     rational_add,
     rational_sub,
     rational_mul,
@@ -403,6 +410,40 @@ pub theorem interval_width_bounds_sub
             ((proof right for bool_and) (rational_leq lo y) (rational_leq y hi) hy)
             ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) hx)
   }
+
+pub theorem interval_width_zero_equiv
+      (i : Interval) (x : Rational) (y : Rational)
+    : rational_equiv (interval_width i) rational_zero
+      → IsTrue (interval_contains i x)
+      → IsTrue (interval_contains i y)
+      → rational_equiv x y =
+  λzero_width.
+    λhx.
+      λhy.
+        let width_leq_zero : IsTrue (rational_leq (interval_width i) rational_zero) =
+          equiv_leq (interval_width i) rational_zero zero_width
+        in
+          (proof antisym for rational_leq)
+            x
+            y
+            (rational_sub_zero_leq
+              x
+              y
+              ((proof trans for rational_leq)
+                (rational_sub x y)
+                (interval_width i)
+                rational_zero
+                (interval_width_bounds_sub i y x hy hx)
+                width_leq_zero))
+            (rational_sub_zero_leq
+              y
+              x
+              ((proof trans for rational_leq)
+                (rational_sub y x)
+                (interval_width i)
+                rational_zero
+                (interval_width_bounds_sub i x y hx hy)
+                width_leq_zero))
 
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
@@ -1649,6 +1690,67 @@ theorem equiv_leq
         ((proof respect for rational_leq) x x x y ((proof refl for rational_equiv) x) h))
       ((proof refl for rational_leq) x)
 
+theorem nat_sub_zero_leq
+      (a : Nat)
+    : (b : Nat) → IsTrue (leq_nat (sub a b) Zero) → IsTrue (leq_nat a b) =
+  match a {
+    Zero ↦ λb. λh. Proved;
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λh. h;
+          Suc b2 ↦ λh. nat_sub_zero_leq a2 b2 h
+        }
+  }
+
+theorem rational_sub_zero_numerator
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq (rational_sub x y) rational_zero)
+      → IsTrue (leq_nat (numerator (rational_sub x y)) Zero) =
+  λh.
+    let
+      n = numerator (rational_sub x y);
+      d = denominator (rational_sub x y)
+    in
+      trans
+        Bool
+        (leq_nat n Zero)
+        (leq_nat (mul n (Suc Zero)) (mul Zero d))
+        True
+        (sym
+          Bool
+          (leq_nat (mul n (Suc Zero)) (mul Zero d))
+          (leq_nat n Zero)
+          (trans
+            Bool
+            (leq_nat (mul n (Suc Zero)) (mul Zero d))
+            (leq_nat n (mul Zero d))
+            (leq_nat n Zero)
+            (cong
+              Nat
+              Bool
+              (mul n (Suc Zero))
+              n
+              (λv. leq_nat v (mul Zero d))
+              ((proof one_r for mul) n))
+            (cong Nat Bool (mul Zero d) Zero (λv. leq_nat n v) ((proof zero_l for mul) d))))
+        h
+
+theorem rational_sub_zero_leq
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq (rational_sub x y) rational_zero) → IsTrue (rational_leq x y) =
+  match x {
+    MkRational a ax ↦
+      match y {
+        MkRational b by ↦
+          λh.
+            nat_sub_zero_leq
+              (mul a (Suc by))
+              (mul b (Suc ax))
+              (rational_sub_zero_numerator (MkRational a ax) (MkRational b by) h)
+      }
+  }
+
 theorem rational_distrib_r
       (x : Rational) (y : Rational) (z : Rational)
     : rational_equiv
@@ -1827,7 +1929,15 @@ as the premises of `rational_sub_mono`, including when the inner interval is
 inverted and its width truncates to zero. `interval_width_bounds_sub` projects
 the upper comparison from y's containment and the lower comparison from x's
 containment, then applies `rational_sub_mono` once to bound their truncated
-difference by the interval's width.
+difference by the interval's width. If that width is equivalent to zero,
+`interval_width_zero_equiv` applies the bound in both argument orders and
+turns each truncated difference's zero comparison into a value comparison.
+Rational order antisymmetry then equates the two contained values. Its
+private subtraction helpers expose this order consequence of truncation;
+no new Rational or Nat API is required. Composing the public law with
+`interval_width_point` shows that any two members of a point interval are
+value-equivalent, even if their Rational spellings differ. Neither theorem
+claims structural equality of those spellings.
 
 ## 5. Design notes
 
@@ -1869,17 +1979,18 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and fifty-nine
+   `interval_hull`, `interval_intersect`, `interval_inside` and sixty
    checked interval laws, including `interval_width_mul`,
-   `interval_width_inside` and `interval_width_bounds_sub`, form the public
-   contract.
+   `interval_width_inside`, `interval_width_bounds_sub` and
+   `interval_width_zero_equiv`, form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
    including endpoint inclusion, its witnessed converse, the four
    distributivity/factoring inclusions, hull/intersection regrouping, the
    four point-unit inclusions, two point-zero absorption inclusions,
-   and the point, ordered-addition and inside-monotonicity width proofs.
+   and the point, ordered-addition, inside-monotonicity and zero-width
+   member-equivalence proofs.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -1907,7 +2018,13 @@ interval subtraction are not.
    inclusion comparisons as its only premises. Product width uses checked
    multiplication monotonicity and distributivity over addition, then public
    Rational right-add cancellation to remove the common `lo1·lo2`.
-4. **Trusted-base delta.** Zero: all fifty-nine laws have checked proof bodies,
+   The [§20 zero-width law](../../../../spec/50-stdlib/68-numerical.md)
+   composes the two public contained-difference bounds with zero width;
+   private `nat_sub_zero_leq`, `rational_sub_zero_numerator` and
+   `rational_sub_zero_leq` turn both truncated differences into order
+   comparisons, and public Rational antisymmetry concludes value
+   equivalence. These helpers are not part of the public API.
+4. **Trusted-base delta.** Zero: all sixty laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
@@ -1960,7 +2077,10 @@ interval subtraction are not.
    The width-bound package test checks the open law and two closed bounds,
    including a tight endpoint case. It accepts the same narrow interval and
    x with y=2, then refuses the false y-containment proof for y=5. The
-   The interval-idempotence seed and
+   zero-width package test checks the public open law and exact trust
+   identities, then contrasts equivalent contained members in a point-width
+   interval with a positive-width interval that cannot supply the zero-width
+   premise. The interval-idempotence seed and
    `cat_numeric_interval_hull_intersect_idempotent` package test check both
    open laws and stored values at three intervals, and isolate the false
    equal-value-but-different-spelling claim.
