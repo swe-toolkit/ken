@@ -230,6 +230,12 @@ evt_13j52ac43jrw8; §1a 4 at evt_4em1d5vqwab2p).
     measured residual pass, keyed on each row's stated subject; the Steward
     authorized it as the I4 recut (`evt_wrat3hqvkrm9`), retaining every
     green row.
+13. A relay template was ruled per fixture kind, with the
+    template-cannot-typecheck fallback enumerated by name (file, stage),
+    while a third declaration's kind-bound row check (visits [FS]) cannot
+    be stated against abstract binders. Keyed on the declarations I had
+    read as failing, not on the property that makes a template fail
+    (Architect `evt_yhsy7045ft1d`). The predicate question is due at 15.
 
 ## Stop conditions
 
