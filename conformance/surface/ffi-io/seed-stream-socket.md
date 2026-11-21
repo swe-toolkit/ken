@@ -78,27 +78,35 @@ before object emission.
 
 - promise class: durable invariant.
 - spec: §1.13 and AUTH-NET-SURFACE.
-- given: under `Net Loopback`, try listen and connect on `127.0.0.1` and `::1`
-  as positive controls; repeat those endpoints under `Net Inet` to exercise
-  its Loopback implication. For both operations, use the same non-loopback
-  addresses `192.0.2.1:4242` and IPv6 `2001:db8::1` at port `4242` under
-  `Loopback` and `Inet`; also try an absolute Unix path under `Loopback` and
-  `Unix`. Use a backend spy for the address-class boundary. Separately, test
-  `Net Unix` admission with `FS AFull`, `FS APartial` and `FS ANone`, keeping
-  that class fixed. `Net AFull` is an invented class control.
-- expect: for each loopback address, both listen and connect reach the
-  backend under `Loopback` and `Inet`, with exactly one backend call per
-  request. Each non-loopback IP address returns exactly
-  `ResourceHostIO IOError.CapabilityDenied` under `Loopback`, with zero backend
-  calls, and reaches the backend under `Inet`. A Unix address returns exactly
-  `ResourceHostIO IOError.CapabilityDenied` under `Loopback`, with zero backend
-  calls, and reaches the backend under `Unix` with `FS AFull`. `FS APartial`
-  and `FS ANone` with `Net Unix` are refused at admission; `Net AFull` is
-  rejected as an invalid header. No diagnostic spelling is pinned where
-  §1.13 does not specify one.
-- why: each address-class pair holds the address and operation fixed while the
-  grant changes. The Unix authority pair holds `Net Unix` fixed while varying
-  only the FS authority.
+- given: under `Net Loopback`, try listen and connect on
+  `127.0.0.1:4242`, `127.1.2.3:4243` and `[::1]:4242` as positive controls;
+  repeat those endpoints under `Net Inet` to exercise its Loopback
+  implication. For both operations, also try `128.0.0.0:4243`, just beyond
+  the upper edge of `127.0.0.0/8`, under `Loopback` and `Inet`. Use the same
+  non-loopback controls `192.0.2.1:4242` and IPv6 `2001:db8::1:4242` under both
+  grants; also try an absolute Unix path under
+  `Loopback` and `Unix`. Use a backend spy for the address-class boundary.
+  Separately, test `Net Unix` admission with `FS AFull`, `FS APartial` and
+  `FS ANone`, keeping that class fixed. `Net AFull` is an invented class
+  control.
+- expect: for each in-range loopback address, including `127.1.2.3:4243`,
+  both listen and connect reach the backend under `Loopback` and `Inet`, with
+  exactly one backend call per request. `128.0.0.0:4243` is refused under
+  `Loopback` as exactly `ResourceHostIO IOError.CapabilityDenied`, with zero
+  backend calls, and reaches the backend under `Inet`. The other non-loopback
+  IP addresses have the same refusal/reachability split. A Unix address
+  returns exactly `ResourceHostIO IOError.CapabilityDenied` under `Loopback`,
+  with zero backend calls, and reaches the backend under `Unix` with `FS
+  AFull`. `FS APartial` and `FS ANone` with `Net Unix` are refused at
+  admission; `Net AFull` is rejected as an invalid header. No diagnostic
+  spelling is pinned where §1.13 does not specify one.
+- why: `127.1.2.3` distinguishes the specified `/8` membership from an
+  implementation special-cased to `127.0.0.1`. The boundary address is
+  out-of-range under Loopback but has an Inet positive control; both operations
+  use a spy, so the observations do not depend on OS reachability. Each
+  address-class pair holds the address and operation fixed while the grant
+  changes. The Unix authority pair holds `Net Unix` fixed while varying only
+  the FS authority.
 
 ### surface/ffi-io/socket-wildcard-addresses-require-inet
 
@@ -230,6 +238,89 @@ before object emission.
   establishes that the lift preserves its address.
 - why: an error in a different operation or a second identity family does not
   meet the typed failure contract.
+
+### surface/ffi-io/socket-operation-idempotence-is-exact
+
+- promise class: normative compatibility vector — exact mapping of the closed
+  `SocketOperation` family.
+- spec: §1.13 `SocketOperation` and operation idempotence; `38 §1.8` retry
+  guidance.
+- given: import the public `SocketOperation` constructors, `Operation`,
+  `SocketOp`, `Idempotent`, `NonIdempotent`, `RetryAdvised`,
+  `RetryUnsafeNonIdempotent`, `operation_idempotence`, `retry_guidance` and
+  `Transient` from `Capability.System.Error`; construct one value for each of
+  `ListenSocket`, `AcceptSocket`, `ConnectSocket`, `ReceiveSocket`,
+  `SendSocket`,
+  `ShutdownSocket`, `LocalSocketAddress` and `CloseSocket`. Use an exhaustive
+  match with one arm per constructor and no catch-all, and evaluate
+  `operation_idempotence (SocketOp operation)` in each arm. Also pass the
+  `LocalSocketAddress` and `ListenSocket` results to `retry_guidance` with the
+  same `Transient` input.
+- expect: the exact mapping is `ListenSocket`, `AcceptSocket`,
+  `ConnectSocket`, `ReceiveSocket`, `SendSocket`, `ShutdownSocket` and
+  `CloseSocket` to `NonIdempotent`; `LocalSocketAddress` maps to
+  `Idempotent`. For the shared `Transient` input, the LocalSocketAddress and
+  ListenSocket retry results are respectively `RetryAdvised` and
+  `RetryUnsafeNonIdempotent`.
+- control: `LocalSocketAddress` is the positive idempotence arm;
+  `ListenSocket` is the negative arm under the identical `Transient` input. A
+  mapping that makes all socket operations idempotent or all non-idempotent
+  cannot produce both expected retry verdicts.
+- why: the exact inventory asserts the classification of every current socket
+  operation, including `CloseSocket`. The exhaustive match makes the case
+  require an explicit arm if the closed family changes.
+
+### surface/ffi-io/socket-errors-map-to-exact-system-error-context
+
+- promise class: normative compatibility vector — specified Linux errno
+  mappings and System.Error fields.
+- spec: §1.13 socket error mapping and `socket_error_to_system`.
+- given: import `socket_error_to_system`, `SystemError`, `MkSystemError`,
+  `SocketOp`, `SocketResource`, `IOError.Other` and `NoSafeContext` from
+  `Capability.System.Error`. Use four independent, otherwise-valid cases
+  with `Net Loopback` and the same backend spy. Build addresses through
+  `socket_ipv4` from `Capability.Net.Stream` and bind the returned values as
+  `connectAddress` = `127.0.0.1:4243`, `listenAddress` =
+  `127.0.0.1:4242`, `receiveAddress` = `127.0.0.1:4244`, and
+  `shutdownAddress` = `127.0.0.1:4245`. At the final host syscall boundary,
+  inject the raw error without pre-converting it to `IOError`: `ECONNREFUSED`
+  from `NetConnect`; `EADDRINUSE` from `NetListen`; `ECONNRESET` from
+  `NetReceive` on an outbound stream connected to `receiveAddress`; and
+  `ENOTCONN` from `NetShutdown` on an outbound stream connected to
+  `shutdownAddress`. Pair each injected error with the same operation and
+  address under a backend-success response. For each error, take the resulting
+  `ResourceError.ResourceHostIO` cause and apply `socket_error_to_system`
+  with its exact operation and known address.
+- expect: each control reaches its host leaf exactly once and succeeds. The
+  four error paths produce these exact nested causes and System.Error fields:
+  - `ECONNREFUSED` gives
+    `ResourceError.ResourceHostIO (IOError.Other 111)` and `MkSystemError`
+    fields `SocketOp ConnectSocket`,
+    `SocketResource (Some connectAddress)`, `IOError.Other 111`, and
+    `NoSafeContext`.
+  - `EADDRINUSE` gives `ResourceError.ResourceHostIO (IOError.Other 98)` and
+    `MkSystemError` fields `SocketOp ListenSocket`,
+    `SocketResource (Some listenAddress)`, `IOError.Other 98`, and
+    `NoSafeContext`.
+  - `ECONNRESET` gives
+    `ResourceError.ResourceHostIO (IOError.Other 104)` and `MkSystemError`
+    fields `SocketOp ReceiveSocket`,
+    `SocketResource (Some receiveAddress)`, `IOError.Other 104`, and
+    `NoSafeContext`.
+  - `ENOTCONN` gives
+    `ResourceError.ResourceHostIO (IOError.Other 107)` and `MkSystemError`
+    fields `SocketOp ShutdownSocket`,
+    `SocketResource (Some shutdownAddress)`, `IOError.Other 107`, and
+    `NoSafeContext`.
+- control: the backend-success partner for each row keeps the operation,
+  address, grant and resource valid while changing only the host result. A
+  wrong errno conversion, operation, address, or cause fails its exact typed
+  observation; a missing host-leaf call cannot satisfy the success partner.
+- why: `SystemError` must retain the operation and known socket address as
+  well as the canonical cause and `NoSafeContext`. The four distinct
+  addresses make address or operation swaps observable. These are controlled
+  host-boundary error cases, not claims that a particular live OS setup
+  naturally produces each errno.
 
 ### surface/ffi-io/socket-closed-peer-send-preserves-broken-pipe
 
