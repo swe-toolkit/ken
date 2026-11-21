@@ -1,0 +1,125 @@
+program capabilities FS ANone, Net Loopback
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+import Capability.Net.Stream
+  (socket_ipv4,
+    socket_ipv6,
+    SocketAddress,
+    with_socket_listener,
+    with_socket_accept,
+    with_socket_connection,
+    socket_local_address,
+    ListeningSocket)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk)
+
+import Capability.System.Error
+  (SystemError, SocketOp, ConnectSocket, SocketResource, socket_error_to_system)
+
+const local4 : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      (127 : UInt8)
+      (VCons
+        UInt8
+        (Suc (Suc Zero))
+        (0 : UInt8)
+        (VCons UInt8 (Suc Zero) (0 : UInt8) (VCons UInt8 Zero (1 : UInt8) (VNil UInt8)))))
+    (0 : UInt16)
+
+const absent : SystemError =
+  socket_error_to_system ConnectSocket (Some SocketAddress local4) IOError.NotFound
+
+proc accepted_body
+      (_stream : Resource ResourceKind.SocketStream)
+    : HostIO ANone (ResourceBodyResult Unit Unit)
+    visits [Net] =
+  host_pure ANone (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+proc connected_body
+      (listener : Resource ResourceKind.SocketListener)
+      (_stream : Resource ResourceKind.SocketStream)
+    : HostIO ANone (ResourceBodyResult Unit Unit)
+    visits [Net] =
+  host_bind
+    ANone
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (with_socket_accept ANone Unit Unit listener accepted_body)
+    (λaccepted.
+      match accepted {
+        Ok (ResourceBracketOk _) ↦
+          host_pure ANone (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+        Ok _ ↦
+          host_pure ANone (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+        Err _ ↦
+          host_pure ANone (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+      })
+
+proc listener_body
+      (cap : Cap ANone) (listener : Resource ResourceKind.SocketListener)
+    : HostIO ANone (ResourceBodyResult Unit Unit)
+    visits [Net] =
+  host_bind
+    ANone
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult Unit Unit)
+    (socket_local_address ANone (ListeningSocket listener))
+    (λanswer.
+      match answer {
+        Ok address ↦
+          host_bind
+            ANone
+            (Result ResourceError (ResourceBracketResult Unit Unit))
+            (ResourceBodyResult Unit Unit)
+            (with_socket_connection ANone Unit Unit cap address (connected_body listener))
+            (λconnected.
+              match connected {
+                Ok (ResourceBracketOk _) ↦
+                  host_pure
+                    ANone
+                    (ResourceBodyResult Unit Unit)
+                    (ResourceBodyOk Unit Unit MkUnit);
+                Ok _ ↦
+                  host_pure
+                    ANone
+                    (ResourceBodyResult Unit Unit)
+                    (ResourceBodyErr Unit Unit MkUnit);
+                Err _ ↦
+                  host_pure
+                    ANone
+                    (ResourceBodyResult Unit Unit)
+                    (ResourceBodyErr Unit Unit MkUnit)
+              });
+        Err _ ↦
+          host_pure ANone (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+      })
+
+proc main
+      (_input : ProcessInput) (caps : ProgramCaps ANone)
+    : HostIO ANone ExitCode
+    visits [Net] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      host_bind
+        ANone
+        (Result ResourceError (ResourceBracketResult Unit Unit))
+        ExitCode
+        (with_socket_listener ANone Unit Unit cap local4 (listener_body cap))
+        (λoutcome.
+          match outcome {
+            Ok (ResourceBracketOk _) ↦ host_pure ANone ExitCode ExitCode.Success;
+            Ok _ ↦ host_pure ANone ExitCode (ExitCode.Failure 71);
+            Err _ ↦ host_pure ANone ExitCode (ExitCode.Failure 72)
+          })
+  }

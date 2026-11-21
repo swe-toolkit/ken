@@ -26,6 +26,7 @@ pub struct CheckedMainDescriptor {
     pub authority: capabilities::Authority,
     pub fs_root_spec: ken_host::FsRootSpec,
     pub process_declared: bool,
+    pub net_classes: Vec<ken_host::NetClassV1>,
     pub allow_root_execution: bool,
 }
 
@@ -37,6 +38,7 @@ pub enum ProgramAdmissionError {
     DuplicateCapability { effect: &'static str },
     UnsupportedEffectRow,
     ProcessRequiresFullFs,
+    NetUnixRequiresFullFs,
     InvalidMainAbi { authority: String },
 }
 
@@ -50,6 +52,7 @@ fn checked_prelude_entry_abi(
     authority: capabilities::Authority,
     fs_root_spec: ken_host::FsRootSpec,
     process_declared: bool,
+    net_classes: Vec<ken_host::NetClassV1>,
     allow_root_execution: bool,
 ) -> CheckedMainDescriptor {
     let roles = &prelude.runtime_roles;
@@ -80,6 +83,7 @@ fn checked_prelude_entry_abi(
         authority,
         fs_root_spec,
         process_declared,
+        net_classes,
         allow_root_execution,
     }
 }
@@ -149,6 +153,17 @@ pub fn admit_selected_main(
     if process_declared && authority != capabilities::AUTH_FULL {
         return Err(ProgramAdmissionError::ProcessRequiresFullFs);
     }
+    let net_classes = capabilities.iter().filter(|cap| cap.family == "Net")
+        .flat_map(|cap| cap.classes.iter())
+        .map(|name| match name.as_str() {
+            "Loopback" => ken_host::NetClassV1::Loopback,
+            "Inet" => ken_host::NetClassV1::Inet,
+            "Unix" => ken_host::NetClassV1::Unix,
+            other => unreachable!("parser admitted invalid Net class {other}"),
+        }).collect::<Vec<_>>();
+    if net_classes.contains(&ken_host::NetClassV1::Unix) && authority != capabilities::AUTH_FULL {
+        return Err(ProgramAdmissionError::NetUnixRequiresFullFs);
+    }
     let fs_root_spec = declaration
         .root
         .as_deref()
@@ -165,6 +180,9 @@ pub fn admit_selected_main(
         if process_declared {
             granted.insert("Process");
         }
+        if !net_classes.is_empty() {
+            granted.insert("Net");
+        }
         if !row.row_vars().is_empty() || !row.concrete_effects().is_subset_of(&granted) {
             return Err(ProgramAdmissionError::UnsupportedEffectRow);
         }
@@ -177,6 +195,7 @@ pub fn admit_selected_main(
         authority,
         fs_root_spec,
         process_declared,
+        net_classes,
         header.allow_root_execution,
     );
 

@@ -11,7 +11,7 @@ use ken_kernel::{convert, Context, Decl, GlobalId, Term};
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
 
-const TYPE_FLOOR: [&str; 52] = [
+const TYPE_FLOOR: [&str; 53] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -50,6 +50,7 @@ const TYPE_FLOOR: [&str; 52] = [
     "ResourceKind",
     "ResourceOpenMode",
     "Result",
+    "SocketAddress",
     "StateOp",
     "Top",
     "TransferCount",
@@ -67,7 +68,7 @@ const TYPE_FLOOR: [&str; 52] = [
 ];
 
 const COMPANIONS: [&str; 3] = ["mk_pair", "pair_fst", "pair_snd"];
-const INTERNAL_FLOOR: [&str; 44] = [
+const INTERNAL_FLOOR: [&str; 45] = [
     "Nat",
     "Pair",
     "Coproduct",
@@ -95,6 +96,7 @@ const INTERNAL_FLOOR: [&str; 44] = [
     "ReadProgress",
     "ResourceError",
     "ResourceOpenMode",
+    "SocketAddress",
     "TransferCount",
     "Top",
     "WriteProgress",

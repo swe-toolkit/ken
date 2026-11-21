@@ -466,6 +466,7 @@ impl ElabEnv {
         elab.with_owner("prelude::safe_bytes".into(), |elab| {
             bytes::register_safe_bytes_ops(&mut elab.env, &mut elab.globals, &mut elab.bytes_env)
         })?;
+        elab.with_owner("prelude::net_address".into(), prelude::register_postbytes_net)?;
         // Literal plans read the registered carriers/views and the prelude's
         // checked List family, never the source-mutable flat globals map.
         elab.numeric_env.install_literal_plan_ids(numbers::LiteralPlanIds {

@@ -199,7 +199,8 @@ fn normalize_outcome(
                 | CanonicalReplyV1::MonotonicInstant(_)
                 | CanonicalReplyV1::FilePosition(_)
                 | CanonicalReplyV1::FdInheritancePolicy(_)
-                | CanonicalReplyV1::ChildExit(_) => {
+                | CanonicalReplyV1::ChildExit(_)
+                | CanonicalReplyV1::SocketAddress(_) => {
                     NormalizedReply::Other(reply.clone())
                 }
             })
@@ -280,7 +281,9 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                 ResourceKindV1::SpawnPlan
                 | ResourceKindV1::ChildProcess
                 | ResourceKindV1::PipeRead
-                | ResourceKindV1::PipeWrite => {
+                | ResourceKindV1::PipeWrite
+                | ResourceKindV1::SocketListener
+                | ResourceKindV1::SocketStream => {
                     panic!("this control only constructs FS/Buffer/Mapping acquisitions")
                 }
             },
@@ -299,7 +302,9 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                 ResourceKindV1::SpawnPlan
                 | ResourceKindV1::ChildProcess
                 | ResourceKindV1::PipeRead
-                | ResourceKindV1::PipeWrite => {
+                | ResourceKindV1::PipeWrite
+                | ResourceKindV1::SocketListener
+                | ResourceKindV1::SocketStream => {
                     panic!("this control only constructs FS/Buffer/Mapping acquisitions")
                 }
             },

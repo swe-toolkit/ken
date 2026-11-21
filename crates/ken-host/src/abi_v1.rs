@@ -1522,6 +1522,8 @@ fn resource_kind_tag(kind: crate::ResourceKindV1) -> u64 {
         crate::ResourceKindV1::ChildProcess => 4,
         crate::ResourceKindV1::PipeRead => 5,
         crate::ResourceKindV1::PipeWrite => 6,
+        crate::ResourceKindV1::SocketListener => 7,
+        crate::ResourceKindV1::SocketStream => 8,
     }
 }
 
@@ -1587,6 +1589,8 @@ fn decode_resource_error_reply(
         4 => Some(crate::ResourceKindV1::ChildProcess),
         5 => Some(crate::ResourceKindV1::PipeRead),
         6 => Some(crate::ResourceKindV1::PipeWrite),
+        7 => Some(crate::ResourceKindV1::SocketListener),
+        8 => Some(crate::ResourceKindV1::SocketStream),
         _ => None,
     };
     let all_zero = payload == ResourceErrorReplyV1::default();
@@ -3253,6 +3257,8 @@ mod tests {
                 "resource_kind.PipeWrite",
                 6,
             ),
+            (crate::ResourceKindV1::SocketListener, "resource_kind.SocketListener", 7),
+            (crate::ResourceKindV1::SocketStream, "resource_kind.SocketStream", 8),
         ];
         for (kind, binding, tag) in kinds {
             match kind {
@@ -3262,7 +3268,9 @@ mod tests {
                 | crate::ResourceKindV1::SpawnPlan
                 | crate::ResourceKindV1::ChildProcess
                 | crate::ResourceKindV1::PipeRead
-                | crate::ResourceKindV1::PipeWrite => {}
+                | crate::ResourceKindV1::PipeWrite
+                | crate::ResourceKindV1::SocketListener
+                | crate::ResourceKindV1::SocketStream => {}
             }
             assert_eq!(effect_binding("tag", binding), tag, "catalog {binding}");
             assert_eq!(resource_kind_tag(kind), tag, "encoder {kind:?}");
@@ -3552,6 +3560,8 @@ mod tests {
             (crate::ResourceKindV1::ChildProcess, 4),
             (crate::ResourceKindV1::PipeRead, 5),
             (crate::ResourceKindV1::PipeWrite, 6),
+            (crate::ResourceKindV1::SocketListener, 7),
+            (crate::ResourceKindV1::SocketStream, 8),
         ] {
             assert_eq!(
                 project(crate::ResourceErrorV1::ReleaseFailed {

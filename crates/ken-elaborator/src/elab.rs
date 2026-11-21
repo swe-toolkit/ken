@@ -23073,7 +23073,7 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         "Console" => return Some(RowSummand::Console),
         "Clock" => return Some(RowSummand::Clock),
         "Entropy" => return Some(RowSummand::Entropy),
-        "FS" | "Process" => return Some(RowSummand::HostAuth),
+        "FS" | "Process" | "Net" => return Some(RowSummand::HostAuth),
         _ => {}
     }
     let op = ken_host::HostOpV1::ALL
@@ -23091,7 +23091,8 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView
         | MappingWriteView | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite
         | ProcessPlanOpen | ProcessPlanPush | ProcessSpawn | ProcessTakePipe
-        | ProcessWait | ProcessSignal => RowSummand::HostAuth,
+        | ProcessWait | ProcessSignal | NetListen | NetAccept | NetConnect
+        | NetReceive | NetSend | NetShutdown | NetLocalAddress => RowSummand::HostAuth,
     })
 }
 
