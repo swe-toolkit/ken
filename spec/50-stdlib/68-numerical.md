@@ -15,7 +15,11 @@
 > SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13;
 > SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY §14;
 > SPEC-NUMERICAL-INTERVAL-WIDTH §15;
-> SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO §16).** The §1–2
+> SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO §16;
+> SPEC-NUMERICAL-INTERVAL-WIDTH-MUL §17;
+> SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE §18;
+> SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT §19;
+> SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20).** The §1–2
 > operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
@@ -1865,3 +1869,64 @@ interval. The scratch refusal distinguishes this boundary, not a
 proof of the open law. The checked generic proofs and their trust
 boundary, the CV seed and package test, and the assembled-tip gates
 remain separate.
+
+## 20. A zero-width enclosure fixes the value of its members
+
+> **Section 20 status: DRAFT v0
+> (SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV).** Architect's AC-0
+> on `61b1f0f88` checked the generic law and open client in a detached
+> scratch worktree with no `Axiom`; the exact trusted `GlobalId` set was
+> unchanged at 114 → 114. Its zero-width closed client checked, while
+> the same-form positive-width application refused. These scratch
+> observations do not check this Spec child, a catalog or CV seed child,
+> assembled AC-T, official conformance, CI, publication, landing or
+> measured landed trust.
+
+`Algorithm.Numeric.RationalInterval` must export one public Transparent
+checked theorem after `interval_width_bounds_sub` and before
+`interval_contains`. Its exact name, binder order and public type are:
+
+```ken
+pub theorem interval_width_zero_equiv
+      (i : Interval) (x : Rational) (y : Rational)
+    : rational_equiv (interval_width i) rational_zero
+      → IsTrue (interval_contains i x)
+      → IsTrue (interval_contains i y)
+      → rational_equiv x y
+```
+
+The zero-width premise uses **`rational_equiv`** to `rational_zero`,
+not `rational_leq` or structural equality of stored rationals. Both
+members must be contained, first `x`, then `y`; there is no endpoint
+order premise. The conclusion is equivalence **by rational value**,
+not `Equal Rational x y`. In particular, two different stored
+representations of the same value can satisfy it. An inverted interval
+has no contained members (§13), so the containment pair cannot hold
+there; the law needs no special inverted-interval premise. The
+§18 theorem roster of fifty-seven and §19 roster of fifty-nine remain
+historical. §20 adds one public theorem and no operation, giving
+**sixty public interval theorems** through §20, with no change to
+an operation or law type from §§1–19.
+
+The theorem is proved at zero trust from §15's truncated subtraction
+and §18's `interval_width_bounds_sub`. Its zero-width premise is the
+same proposition that public `interval_width_point x` supplies for
+`interval_point x` (§15). Thus for a point interval, that law gives
+the width premise, and this theorem takes two proofs of membership to
+conclude the members are rationally equivalent. No public Nat or
+Rational helper, new assumption, kernel or surface rule is required;
+internal proof staging is not an additional public contract.
+
+The separately owned seed compares the stored zero-width interval
+`[1/2, 2/4]` with positive-width `[1/2, 1]`, holding the enclosed
+members `1/2` and `2/4` fixed. The first accepts the zero-width
+premise, both containment proofs and the theorem, concluding
+`rational_equiv` between the differently stored rationals. In the
+second, both containments remain true but the same-form theorem
+application with a claimed zero-width proof must refuse at that
+premise: the interval's width is positive. The refused row differs
+only in the interval and does not falsely claim the members are
+inequivalent. These closed checks discriminate the premise, not the
+open theorem or an interval's stored-identity property. The assembled
+package test separately owes unchanged exact trusted identities as
+AC-T before a Decision.
