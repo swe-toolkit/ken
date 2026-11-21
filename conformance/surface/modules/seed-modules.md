@@ -700,7 +700,7 @@ unrelated `ElabEnv` does not satisfy them.
   companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
   path to register the transparent Ken definition `def Ambient = Bool` under
-  the bare implementation-global spelling `Ambient`. Then invoke all three
+  the bare implementation-global spelling `Ambient`. Then invoke both
   `elaborate_module_from_roots` and `elaborate_module_from_roots_v1` on
   the controlled arms below. The rootless no-import
   arm uses the same bare spelling through
