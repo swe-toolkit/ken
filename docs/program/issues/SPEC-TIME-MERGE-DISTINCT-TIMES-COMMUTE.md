@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE
 title: "Spec 69 states trace_merge's ordering, membership, count, length and associativity, but no law says when argument order does not matter, so a client merging two event sources must fix an order even when no timestamp is shared. Rule from a checked D0 at zero trust that trace_merge p xs ys equals trace_merge p ys xs when no event of xs shares a timestamp with an event of ys, and state it with a seed that separates distinct timestamps from a shared one"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

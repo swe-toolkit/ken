@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE
 title: "Spec 66 §19 says changing the environment at one absent variable leaves eval unchanged, but no law says eval depends only on the variables that occur, so a client whose two environments differ at several unused variables must chain eval_absent once per variable. Rule from a checked D0 at zero trust that eval env1 e equals eval env2 e whenever env1 and env2 agree at every variable occurring in e, and state it with a seed that separates agreement on the occurring variables from a disagreement at one of them"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -22,7 +22,7 @@ For every `e`, `env1` and `env2`, if `env1 w` equals `env2 w` for every
 `Equal Nat`. It holds at zero trust, and spec 66 states it by its public
 type.
 
-## Settled inputs (main `df433d9ab`; re-check anchors at release)
+## Settled inputs (main `0f7c7761f`; anchors re-checked at release)
 
 - **The operations.** `eval` (`NatPolynomial.ken.md:118`) and `occurs`
   (`:1175`) recurse over the four `Expr` constructors. `occurs` is
@@ -87,7 +87,7 @@ SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE.
 - AC-T finds `trusted_base()` changed as an identity set.
 - A change to an existing §1 to §20 operation or law type.
 
-Checks: 3 fired. I listed every public `NatPolynomial` law on `df433d9ab`;
+Checks: 3 fired. I listed every public `NatPolynomial` law on `0f7c7761f`;
 the three that mention an unused variable each fix exactly one. AC-0
 sweeps the consumer roots by the sibling law, because Numerical's first QA
 pass found an exported law missing from a roster. 4 fired. I read `eval`
