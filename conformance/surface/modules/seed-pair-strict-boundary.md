@@ -391,7 +391,7 @@ to execute and remain evidence for the unchanged kernel behavior.
 
 - The current floor-identity roster is the exact 53-name roster in
   `minimality.md`; not all roster members are type formers. Its
-  internal-provision arm has 44 identities. Pair's companion bindings remain
+  internal-provision arm has 45 identities. Pair's companion bindings remain
   exactly
   `{mk_pair, pair_fst, pair_snd}`.
 - The four names reuse one compiler-installed transparent declaration family.

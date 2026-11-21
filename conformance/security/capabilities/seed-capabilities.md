@@ -269,23 +269,40 @@ transport, or distributed claim.
   generic denial or empty trace alone cannot pass: the exact constructor and
   the live/neighbor controls make every ruled collapse observable.
 
-### security/capabilities/revoked-resource-operation-is-distinct-resourceerror
+### security/capabilities/revoked-resource-operation-uses-current-hostio-carrier
 - spec: `62 §4.1`/`§4.2`, `38 §1.3.1`/`§1.7.2`
 - given: acquire a live, sufficiently-righted resource under a live grant and
-  issue one ordinary resource operation. Repeat after the host revokes that
-  grant before admission. Controlled neighbours instead use a released token,
-  a never-minted token, insufficient rights, a live wrong-kind token, or a
-  backend forced to return a known host I/O error.
+  issue one ordinary FS or Net resource operation. Repeat after the host
+  revokes that grant before admission. Controlled neighbours instead use a
+  released token, a never-minted token, insufficient rights, a live wrong-kind
+  token, or a backend forced to return a known host I/O error.
 - expect: the live control reaches the backend. The revoked arm returns exactly
-  nullary `ResourceError.Revoked` and has no backend operation. The five
-  neighbours respectively remain `Closed`, `MalformedResource`,
-  `RightNotHeld`, `ResourceKindMismatch`, and `ResourceHostIO <known-error>`;
-  stale generation remains the lifetime identity `Closed`. None becomes
-  `Revoked`, and revocation is never wrapped as `ResourceHostIO Revoked` or
-  `ResourceHostIO CapabilityDenied`.
-- why: (soundness) this binds the second type-local projection without inventing
-  a shared sum. Holding the operation well formed, live, and sufficiently
-  righted in the revoked arm avoids unspecified precedence among invalid inputs.
+  `ResourceError.ResourceHostIO IOError.Revoked` and has no backend operation.
+  The five neighbours respectively remain `Closed`, `MalformedResource`,
+  `RightNotHeld`, `ResourceKindMismatch`, and
+  `ResourceError.ResourceHostIO <known-error>`; stale generation remains
+  `Closed`. None becomes `Revoked` or `CapabilityDenied`.
+- why: (soundness) this pins the delivered carrier in the current twelve-case
+  `ResourceError` family. The same `IOError.Revoked` cause identifies the
+  denial; the nullary `ResourceError.Revoked` is a staged successor, not a
+  current constructor. Holding the operation well formed and sufficiently
+  righted avoids unspecified precedence among invalid inputs.
+
+### security/capabilities/revoked-resource-operation-successor-projection
+- spec: `62 §4.1`/`§4.2`, `38 §1.3.1`/`§1.7.2`
+- fixture: GATED on ABI-REVOKE resource-token projection unification. The
+  current `ResourceError.ResourceHostIO IOError.Revoked` carrier is pinned by
+  the live case above.
+- given: acquire a live, sufficiently-righted resource under a live grant and
+  issue one ordinary FS or Net resource operation. Repeat after the host
+  revokes that grant before admission. Keep the live, released, malformed,
+  insufficient-rights, wrong-kind and known-host-error controls from the
+  current-carrier case.
+- expect: after unification, the live control reaches the backend and the
+  revoked arm returns exactly nullary `ResourceError.Revoked` with no backend
+  operation. The invalid neighbours retain their existing identities.
+- why: this pins the staged type-local successor without treating it as a
+  thirteenth current constructor or weakening the live current-carrier case.
 
 ### security/capabilities/revoke-admission-race-preserves-real-settlement
 - spec: `62 §4.2`/`§4.3`, ADR 0021 settlement discipline
@@ -296,13 +313,14 @@ transport, or distributed claim.
   known result and commit a known byte change. Attempt one new operation through
   the same lineage while the admitted operation drains. Configure settlement
   once for close success and once for a known `ReleaseFailed` outcome.
-- expect: revoke-wins returns `ResourceError.Revoked` with no backend trace.
+- expect: revoke-wins returns exactly
+  `ResourceError.ResourceHostIO IOError.Revoked` with no backend trace.
   Admission-wins returns the backend's real result, records exactly one backend
   write/known side effect, and is never rewritten to `Revoked`; the new operation
-  is denied as `ResourceError.Revoked` without another backend call. The owned
-  resource is not closed while admitted work remains, then records exactly one
-  close success or one configured `ReleaseFailed`. Settlement failure never
-  reopens authority.
+  is denied as `ResourceError.ResourceHostIO IOError.Revoked` without another
+  backend call. The owned resource remains open while admitted work remains;
+  settlement then records exactly one close success or one configured
+  `ReleaseFailed`. Settlement failure never reopens authority.
 - why: (soundness) the two controlled schedules flip at admission, the normative
   linearization point. The result, side-effect trace, new-admission trace, and
   exactly-once terminal settlement jointly reject rollback, cancellation,
