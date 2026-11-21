@@ -87,6 +87,7 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "ResourceKind",
             "ResourceOpenMode",
             "Result",
+            "SocketAddress",
             "StateOp",
             "Top",
             "TransferCount",

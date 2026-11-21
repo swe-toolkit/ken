@@ -67,32 +67,27 @@ Each case below carries the non-conforming implementation it must red.
   liveness hazard (an unbounded retry of a permanently-failing operation), not
   cosmetic.
 
-### surface/ffi-io/revoked-single-identity (unification)
+### surface/ffi-io/revoked-single-identity (current carriers)
 
 - promise class: **normative property** — one `Revoked` identity across the error
   surface
-- spec: `38 §1.8` (property 2); `38 §1.3.1`; `38 §1.7.2`;
+- spec: `38 §1.8` (property 2); `38 §1.3.1`; `38 §1.7.2`/`§1.11`;
   `../../../docs/program/10-linux-abi-completion.md §7`
-- given: the revocation observable reached through a path/capability operation
-  (`IOError.Revoked`), a resource-token operation (`ResourceError.Revoked`), and
-  the host-boundary progress/error partition.
-- fixture: **GATED on source/spec shape mismatch** — this seed and `38 §1.3.1`
-  name nullary `ResourceError.Revoked`; landed
-  `crates/ken-elaborator/src/prelude.rs:1664` and
-  `crates/ken-elaborator/tests/px9_revoked_unification.rs:127` use
-  `ResourceHostIO Revoked`. Keep this case gated until the spec and source
-  agree on the resource revocation constructor.
-- expect: all three resolve to **one** `Revoked` semantic identity, classified
-  `Permanent`; the conforming surface exposes exactly one `Revoked`, and the
-  check names that single identity.
-- control: a triplicated-revoked surface — three distinct `Revoked` constructors
-  — is non-conformant and reds the single-identity check. Unification is not
-  collapse: the check must equally red a surface that maps `Revoked` into
-  `CapabilityDenied`, `Closed`, or a host I/O failure (`38 §1.7.2`), which loses
-  the identity in the other direction.
-- why: three carriers for one observable is the pre-PX9 state; a client cannot
-  match one `Revoked` if the surface names three, and cannot trust a single one
-  if it silently aliases a neighbour.
+- given: the current revocation observable reached through a path/capability
+  operation (`IOError.Revoked`), an ordinary FS/Net resource-token operation
+  (`ResourceError.ResourceHostIO IOError.Revoked`), a Process-host operation
+  (`ResourceHostIO IOError.Revoked`), and the host-boundary progress/error
+  partition.
+- expect: all current carriers resolve to **one** `Revoked` semantic identity,
+  classified `Permanent`. The nullary `ResourceError.Revoked` is a staged
+  post-unification projection, not a current checked constructor; its carrier
+  transition is pinned by the separately gated resource-token cases.
+- control: a surface that assigns different `Revoked` identities to the same
+  current `IOError.Revoked` cause, or maps it into `CapabilityDenied`,
+  `Closed`, or an unrelated host-I/O failure (`38 §1.7.2`), is non-conformant.
+- why: the current carrier shapes differ by operation family but retain the
+  same cause. The staged resource-token projection changes the carrier, not the
+  semantic denial or its `Permanent` classification.
 
 ## Provenance
 

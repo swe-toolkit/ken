@@ -2166,15 +2166,16 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
     assert_ne!(actual, MALFORMED_DYNAMIC_CONSTRUCTOR_STATUS);
 }
 
-/// The host operations planning represents: every operation the reference
-/// executor admits, read from `ken_host`. After B2's six-op promotion this
-/// is exactly the NativeTested set. The emitted native F rows and the
-/// separately checked ResourceStreamWrite write/error rows, not this
-/// inventory, establish executable effects.
-fn executor_admitted_host_operations() -> BTreeSet<ken_host::HostOpV1> {
+/// The native-tested host operations this Cranelift lowering represents,
+/// read from the closed host inventory. PX11's seven interpreter-admitted Net
+/// operations remain RepresentedUnavailable and have no native seat contract.
+/// Native F rows and ResourceStreamWrite tests, not this set, prove execution.
+fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
     ken_host::HostOpV1::ALL
         .into_iter()
-        .filter(|operation| operation.executor_admits())
+        .filter(|operation| {
+            operation.availability() == ken_host::HostOpAvailabilityV1::NativeTested
+        })
         .collect()
 }
 
@@ -2182,7 +2183,7 @@ fn executor_admitted_host_operations() -> BTreeSet<ken_host::HostOpV1> {
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
         CRANELIFT_HOST_EFFECT_CONSUMERS_V1.into_iter().collect::<BTreeSet<_>>(),
-        executor_admitted_host_operations()
+        native_tested_host_operations()
     );
     for operation in CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
         let layout = ken_host::host_effect_wire_layout_v1(operation).unwrap();
@@ -3479,31 +3480,24 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// **`RT-DECL-CLOSURE-PORT` `D7` — the seat contract is total over the admitted
 /// set, and it is derived from the operation and the slot alone.**
 ///
-/// ⛔ **Nothing here compiles or runs a program.** The point of the seat
-/// authority is that the population is STATIC: it is a fact about the 18
-/// admitted operations, not about the arms some execution happened to take. A
-/// control that established it by compiling a fixture would prove the property
-/// only for the seats that fixture reaches, which is the row-driven discovery
-/// the frame forbids.
+/// This is a static table check, not an execution case. Every native-tested
+/// operation, not the interpreter-only Net family, needs a Cranelift seat.
 ///
-/// MEASURED: for each admitted operation the ordinals carrying a contract are
-/// exactly `0..n`; `ClockWallNow` is the sole zero-arity operation, every other
-/// admitted operation has `n >= 1`, the capability slot carries one for exactly
-/// the eleven FS-path operations and `ProcessPlanOpen`, and no unadmitted lane
-/// carries one at any slot.
+/// MEASURED: for each native-tested operation the ordinals with a contract
+/// are exactly `0..n`; ClockWallNow alone is zero-arity, other native-tested
+/// operations have `n >= 1`, and only the eleven FS-path operations and
+/// ProcessPlanOpen carry a capability slot. No native-unavailable lane has
+/// a seat contract.
 ///
-/// CLAIMED: the table has no hole and no wildcard, so an operation cannot be
-/// admitted while some seat of it silently has no contract.
-///
-/// THE GAP: this says nothing about whether `n` is the arity the emitter reads
-/// -- that is the ledger's per-body occurrence completeness law, which is a
-/// statement about a compilation and cannot be made here.
+/// CLAIMED: no native-tested operation is missing a seat contract.
+/// THE GAP: the ledger's per-body occurrence completeness law, not this
+/// inventory, checks whether `n` matches the arity an emitter actually reads.
 #[test]
-fn every_admitted_host_operation_has_a_gapless_seat_contract_derived_from_its_key() {
-    // The admitted set itself comes from `ken_host`, not from this backend.
+fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_its_key() {
+    // The NativeTested set comes from `ken_host`, not this backend.
     assert_eq!(
         CRANELIFT_HOST_EFFECT_CONSUMERS_V1.into_iter().collect::<BTreeSet<_>>(),
-        executor_admitted_host_operations()
+        native_tested_host_operations()
     );
     let capability_bearing = [
         ken_host::HostOpV1::FsReadFile,

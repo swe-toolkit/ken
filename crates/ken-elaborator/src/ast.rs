@@ -488,6 +488,8 @@ pub enum BoundaryKind {
 pub struct CapabilityDecl {
     pub family: String,
     pub authority: String,
+    /// Net classes admitted by the checked Program header. Empty for FS and Process.
+    pub classes: Vec<String>,
     /// Optional checked filesystem-root spelling. Absence preserves the v1
     /// execution-start cwd root.
     pub root: Option<Vec<u8>>,

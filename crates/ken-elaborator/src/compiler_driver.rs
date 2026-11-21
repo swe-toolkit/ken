@@ -258,6 +258,7 @@ pub struct NativeEntrypointPlanV1 {
     pub(crate) authority_name: String,
     pub(crate) fs_root_spec: ken_host::FsRootSpec,
     pub(crate) process_declared: bool,
+    pub(crate) net_declared: bool,
     pub(crate) allow_root_execution: bool,
 }
 
@@ -981,7 +982,8 @@ fn collect_checked_perform_nodes(
                         {
                             crate::export::HostOpFamilyV1::Clock => self.clock_family.clone(),
                             crate::export::HostOpFamilyV1::Console => self.console_family.clone(),
-                            crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => self.fs_family.clone(),
+                            crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process
+                            | crate::export::HostOpFamilyV1::Net => self.fs_family.clone(),
                             crate::export::HostOpFamilyV1::Entropy => self.entropy_family.clone(),
                         };
                         self.nodes.insert(CheckedPerformNodeV1::Host {
@@ -2639,6 +2641,24 @@ fn prepare_native_program_from_elaborated(
         .map_err(NativeProgramBuildError::Driver)?;
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
+    // Arm I: no native socket opcode exists. Reject a declared Net grant
+    // before planning or object emission, even when its first operation is
+    // hidden behind a checked helper rather than visible at the entrypoint.
+    if plan.net_declared {
+        let unavailable = ken_host::HostOpV1::ALL
+            .into_iter()
+            .filter(|operation| {
+                crate::export::host_operation_family_v1(*operation)
+                    == crate::export::HostOpFamilyV1::Net
+            })
+            .map(|operation| format!("{operation:?}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
+            "host_effect_lowering_unavailable",
+            format!("{unavailable} are RepresentedUnavailable for native execution (declared Net)"),
+        )));
+    }
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
     // Gate 4a: retained on the preparation so a control can compare the EMBEDDED
     // plan bytes against a full native build's, rather than recomputing them.
@@ -4221,6 +4241,7 @@ fn native_entrypoint_plan(
         authority_name: checked.authority_name.clone(),
         fs_root_spec: checked.fs_root_spec.clone(),
         process_declared: checked.process_declared,
+        net_declared: !checked.net_classes.is_empty(),
         allow_root_execution: checked.allow_root_execution,
     })
 }
@@ -4355,6 +4376,13 @@ fn checked_host_spine_v1(
         (prelude.px10_op_ids[6], ken_host::HostOpV1::ResourceStreamRead),
         (prelude.px10_op_ids[7], ken_host::HostOpV1::ResourceStreamWrite),
         (prelude.px10_op_ids[8], ken_host::HostOpV1::ProcessSignal),
+        (prelude.px11_op_ids[0], ken_host::HostOpV1::NetListen),
+        (prelude.px11_op_ids[1], ken_host::HostOpV1::NetAccept),
+        (prelude.px11_op_ids[2], ken_host::HostOpV1::NetConnect),
+        (prelude.px11_op_ids[3], ken_host::HostOpV1::NetReceive),
+        (prelude.px11_op_ids[4], ken_host::HostOpV1::NetSend),
+        (prelude.px11_op_ids[5], ken_host::HostOpV1::NetShutdown),
+        (prelude.px11_op_ids[6], ken_host::HostOpV1::NetLocalAddress),
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
@@ -4723,6 +4751,7 @@ fn canonical_native_entrypoint_plan_bytes(plan: &NativeEntrypointPlanV1) -> Vec<
     }
     out.push(u8::from(plan.allow_root_execution));
     out.push(u8::from(plan.process_declared));
+    out.push(u8::from(plan.net_declared));
     out.extend_from_slice(&plan.fs_root_spec.tag_v1().to_le_bytes());
     out.extend_from_slice(&(plan.fs_root_spec.bytes().len() as u64).to_le_bytes());
     out.extend_from_slice(plan.fs_root_spec.bytes());
@@ -8761,6 +8790,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             authority_name: "AFull".to_string(),
             fs_root_spec: ken_host::FsRootSpec::default(),
             process_declared: false,
+            net_declared: false,
             allow_root_execution: false,
         };
         let stale_hash = fingerprint(&canonical_native_entrypoint_plan_bytes(&plan));

@@ -3,7 +3,7 @@
 Format: `../../README.md`. These cases pin the general internal-provision arm,
 the historical ten-type Pair slice and its first compiler-origin member
 (`30 §4`, `33 §3.3`, `34 §"Canonical non-dependent pair floor family"`,
-`39 §2.0`). Pair is one member of the current 52-name
+`39 §2.0`). Pair is one member of the current 53-name
 floor-identity roster; this seed's Pair-specific evidence does not establish
 the rest of that roster.
 They supersede this seed's former exact-nine, bare-name rejection, and future
@@ -20,7 +20,7 @@ The Pair floor required by the acceptance rows below was realized by
 `LANG-MOD-CANONICAL-PAIR-PACKAGE` and joined the then-current fifteen-name
 floor at `0a94e80dc11c1fab00d6b0b14addb55b0a47192e`. These rows describe Pair
 behavior; they do not independently establish the other members of the current
-52-name roster. The Pair landing authorizes no package, alias, registry, or
+53-name roster. The Pair landing authorizes no package, alias, registry, or
 ambient fallback. The representation-only transparent-Sigma controls continue
 to execute and remain evidence for the unchanged kernel behavior.
 
@@ -73,7 +73,7 @@ to execute and remain evidence for the unchanged kernel behavior.
 - why: Pair acceptance must be attributable to the closed floor, not to cached
   globals or a hidden import leak.
 
-## AC2 — derive the exact 52-name floor-identity roster and Pair companions
+## AC2 — derive the exact 53-name floor-identity roster and Pair companions
 
 ### surface/taxonomy/prelude-internal-provision-inventory-is-executable-and-closed
 
@@ -86,9 +86,12 @@ to execute and remain evidence for the unchanged kernel behavior.
   the configured floor-identity roster as their union. Derive companion
   bindings separately from the admitted type contract and checked identity
   references. Record the declaration kind and pre-source `GlobalId` for each
-  member and every constructor id/parent in the 52-name target, including the
-  complete scoped-family closure. The Pair companion bindings remain a separate
-  three-identity inventory.
+  member and every constructor id/parent in the 53-name target, including the
+  complete scoped-family closure. For `SocketAddress`, record the parents of
+  `PrivateSocketIPv4`, `PrivateSocketIPv6`, and `PrivateSocketUnix`; verify their
+  qualified and bare source spellings are unavailable, with public smart-
+  constructor controls. The
+  Pair companion bindings remain a separate three-identity inventory.
 - expect: the signature inventory is exactly
   `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`. The
   exact floor-identity roster, in `PRELUDE_FLOOR_NAMES` order, is
@@ -97,10 +100,10 @@ to execute and remain evidence for the unchanged kernel behavior.
   FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
   Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
   ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
-  ResourceKind, ResourceOpenMode, Result, StateOp, Top, TransferCount,
-  Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
+  ResourceKind, ResourceOpenMode, Result, SocketAddress, StateOp, Top,
+  TransferCount, Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
   resp_coproduct, resp_state, run_state, state_get, state_put}`. These are
-  52 floor identities: 8 signature and 44 internal-provision identities. The
+  53 floor identities: 8 signature and 45 internal-provision identities. The
   roster includes non-types such as `Top`,
   `Bottom`, `Proved`, `HostIO`, and `eqChar`. `Nat` is kernel-origin, `Pair`
   is compiler-bootstrap-origin, and `Decimal` is a checked transparent
@@ -109,7 +112,11 @@ to execute and remain evidence for the unchanged kernel behavior.
   identities. The exact scoped constructor closure also contains the complete
   `ReadProgress`, `WriteProgress`, `ResourceOpenMode`, `MappingProt`,
   `ChildExit`, `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry`,
-  `FileOperation`, `StateOp`, and `ConsoleOp` families. Their path inventory
+  `FileOperation`, `StateOp`, `ConsoleOp`, and `SocketAddress`
+  representation families. `SocketAddress.PrivateSocketIPv4`,
+  `SocketAddress.PrivateSocketIPv6`, and `SocketAddress.PrivateSocketUnix` are
+  private at qualified paths, and none is bare-reserved. Their
+  path inventory
   is pinned with the corresponding surface and home cases; no same-shaped
   family substitutes for these recorded parents. `resp_state`, `console_resp`,
   `itree_bind`, and `resp_coproduct` are checked operations, not constructor
@@ -373,7 +380,7 @@ to execute and remain evidence for the unchanged kernel behavior.
   and fresh Strict catalog closure. The Pair floor landed at
   `0a94e80dc11c1fab00d6b0b14addb55b0a47192e` as part of the then-current
   fifteen-name roster. This historical claim does not measure the current
-  52-name floor or 96-name H roster.
+  53-name floor or 96-name H roster.
 - **THE GAP for this seed:** Pair-specific behavior does not establish the
   other floor identities, constructor closure, or package homes. Their exact
   inventories and source controls are specified in `minimality.md`,
@@ -382,9 +389,9 @@ to execute and remain evidence for the unchanged kernel behavior.
 
 ## Consistency and realization boundary
 
-- The current floor-identity roster is the exact 52-name roster in
+- The current floor-identity roster is the exact 53-name roster in
   `minimality.md`; not all roster members are type formers. Its
-  internal-provision arm has 44 identities. Pair's companion bindings remain
+  internal-provision arm has 45 identities. Pair's companion bindings remain
   exactly
   `{mk_pair, pair_fst, pair_snd}`.
 - The four names reuse one compiler-installed transparent declaration family.

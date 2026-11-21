@@ -155,10 +155,10 @@ two landed, ordinary surface witnesses used by this clause are:
 | `print_line` | `visits [Console]` |
 
 Their complete result and capability types are defined by the landed FS and
-Console floors; this clause fixes the operation-to-row association. Ken has no
-landed `Net` operation in this round. A `Net`-specific operation-binding witness
-is deferred until a real `Net` producer lands; conformance must not synthesize
-one merely to preserve an old oracle.
+Console floors; this clause fixes the operation-to-row association. The later
+PX11 stream-socket producers (§1.13) carry `visits [Net]` and supply a real
+`Net` operation-binding witness. They do not retroactively alter the L6
+`FS` and `Console` witnesses.
 
 - **The no-untracked-I/O guard is the `36 §1.4` escape check — L6 introduces no
   new gate.** Each I/O operation is a `perform_E` site (`36 §1.2`): it is the
@@ -237,30 +237,35 @@ Raw attenuation and revocation are trusted runner/host management actions over
 non-Ken-visible grant identities (`62 §4`), not source operations. Attenuation
 records child lineage; revocation closes the selected identity and its
 descendants. A program observes neither action directly. It observes revocation
-only when a later existing capability-consuming operation returns one of these
-exact type-local projections:
+only when a later existing capability-consuming operation returns a
+revocation result in its type-local error family:
 
 - a path/capability operation returns
-  `MkFileError <operation> <path> Revoked`, where `Revoked` is a new `IOError`
+  `MkFileError <operation> <path> Revoked`, where `Revoked` is an `IOError`
   cause beside and distinct from `CapabilityDenied`;
-- an ordinary resource-token operation, other than the Process host
-  operations of §1.11, returns the nullary constructor
-  `ResourceError.Revoked`.
+- an ordinary FS or Net resource-token operation currently returns
+  `ResourceHostIO IOError.Revoked` when its originating grant is revoked
+  before admission. The successor contract, after error unification,
+  projects this same denial as the nullary `ResourceError.Revoked`, distinct
+  from `Closed`, `MalformedResource`, `RightNotHeld`,
+  `ResourceKindMismatch`, and `ResourceHostIO _`. This successor is not a
+  constructor of the currently complete twelve-case `ResourceError` family.
 
-**Process host operations are the exception to the second projection.**
+**Process host operations remain distinct from the successor projection.**
 Later plan, child and pipe operations, including `signal_child`, return
 `ResourceHostIO IOError.Revoked` when the originating Process grant is
 revoked before admission (§1.11.2–§1.11.4). This retains the same
 `IOError.Revoked` cause through the Process classification of §1.11.3;
 it does not introduce a new semantic denial identity or permit the
 signal to reach the child. The two enclosing error families remain
-distinct; no shared sum is introduced. For the two general projections,
-the runtime/host mapping never substitutes `CapabilityDenied`,
-`ResourceHostIO CapabilityDenied`, `Closed`, malformed capability or
-resource, stale generation, `RightNotHeld`, `ResourceKindMismatch`,
-`ResourceHostIO _`, or another host I/O failure. The Process-host
-exception preserves `IOError.Revoked` inside `ResourceHostIO` rather
-than collapsing it to an unrelated host-I/O cause.
+distinct; no shared sum is introduced. Neither current nor successor
+mapping substitutes `CapabilityDenied`,
+`ResourceHostIO IOError.CapabilityDenied`, `Closed`, malformed
+capability or resource, stale generation, `RightNotHeld`,
+`ResourceKindMismatch`, or another host-I/O cause for revocation.
+For delivered resource-token and Process-host cases, `ResourceHostIO`
+**with the exact `IOError.Revoked` cause** is the intentional carrier,
+not a collapse of that cause.
 
 ### 1.4 Text is explicit `bytes_encode` / `bytes_decode` — no hidden charset
 
@@ -404,7 +409,8 @@ rule** (`§1.1`); **no `foreign`** (that is L7, `§2`–`§3`).
   — a **verdict flip**.
 - **AC3 — `[Console]` tracked.** `print_line` (`visits [Console]`) — the
   **same** flip on a **distinct**, real effect (the ≥2-effect discrimination of
-  `36 §1.4`). A `Net` witness remains deferred until a real producer lands.
+  `36 §1.4`). The later PX11 `Net` witness (§1.13) is distinct from this
+  historical L6 `Console` acceptance pair.
 - **AC4 — no hidden charset.** Producing text from `Bytes` **requires** the
   named `bytes_decode`; an implicit/hidden-charset path is **rejected** (or
   absent), and invalid input produces `Err`.
@@ -771,19 +777,21 @@ the reason the negative form matters: `error_transience Revoked = Permanent` —
 a revoked authority is gone, so retry cannot help, and `Revoked` is never
 `Transient`.
 
-**(2) `Revoked` is a single identity.** The revocation observable named today by
-three carriers — `IOError.Revoked` (`§1.3.1`), `ResourceError.Revoked`
-(`§1.3.1`), and the host-boundary revoked of the progress/error partition
-(`§1.7.2`) — is **one** semantic identity: an otherwise well-formed, live,
+**(2) `Revoked` is a single identity.** The path-level
+`IOError.Revoked` (§1.3.1) and the delivered resource-token and
+Process-host `ResourceHostIO IOError.Revoked` (§1.3.1, §1.11) carry
+**one** semantic denial: an otherwise well-formed, live,
 sufficiently-righted operation that lost at the `../60-security/62 §4.2`
-admission boundary. A conforming error surface exposes exactly **one** `Revoked`
-identity, classified `Permanent`. This is the unification `ABI-REVOKE` sequences
-before PX9 (`../../docs/program/10-linux-abi-completion.md §7`), and it
-**preserves** the `Revoked` identity rather than collapsing it — the opposite of
-mapping `Revoked` into `CapabilityDenied`, `Closed`, or an unrelated
-host-I/O cause, which `§1.7.2` already forbids. The Process-host
-`ResourceHostIO IOError.Revoked` projection (§1.11) carries this same
-identity through the existing `IOError` cause; it is not such a collapse.
+admission boundary. The host-boundary revoked of the progress/error
+partition (§1.7.2) retains that cause. The successor
+`ResourceError.Revoked` is a type-local projection of the same identity,
+not a third current checked constructor or a different denial. A conforming
+error surface exposes exactly **one** `Revoked` identity, classified
+`Permanent`. The `ABI-REVOKE` unification preserves it rather than
+collapsing it into `CapabilityDenied`, `Closed`, or an unrelated host-I/O
+cause, which §1.7.2 already forbids. The Process-host projection stays
+`ResourceHostIO IOError.Revoked` even when the ordinary resource-token
+projection changes; it is not such a collapse.
 
 These are behavioral contracts on the error surface, introducing no kernel
 feature: PX9's type and laws are re-checked Ken (the foundation deliverable),
@@ -1450,6 +1458,202 @@ identity; Conjunction's exported `And` is its own checked definition
 not via a package home. Per-name Strict-entry pins and held non-exact
 shapes are recorded in §30 §4; no host operation constructor or State
 signature is homed by analogy.
+
+### 1.13 Typed stream sockets (PX11 first slice)
+
+> **PX11 status: specified, not implemented or trust-measured here.**
+> Seven `Net` host operations are admitted on the checked interpreter
+> under an exact enumerated exception set, but remain
+> `RepresentedUnavailable` for native. A declared `Net` grant refuses
+> native build before object emission; native parity is the immediate
+> successor and closes that exception set. This interpreter-only slice
+> does not count as practical PX11 value under the native-lane bar.
+> No seed execution, official conformance, CI, publication, landing or
+> trusted-base measurement is claimed by this Spec addition.
+
+`SocketAddress` is a closed, opaque three-arm type: IPv4 carries four
+`UInt8` octets and a `UInt16` port; IPv6 carries sixteen `UInt8`
+octets and a `UInt16` port; Unix carries an **absolute pathname** as
+`Bytes`. Checked smart constructors provide those three cases, while
+the representation constructors remain private. The IPv6 scope ID and
+flowinfo are zero in this slice; scoped link-local addresses are a
+successor. A Unix path starts with `/`, contains no zero byte, and is
+2–107 bytes long: Linux's 108-byte `sun_path` includes the terminating
+zero. An invalid path returns `IOError.InvalidInput` without creating
+a socket. The host validates a decoded address again before any socket
+syscall. Neither a relative Unix path nor the abstract namespace is
+admitted: abstract names lack this slice's filesystem-scoped authority
+model. No arbitrary address-family number, raw `sockaddr` pointer,
+implicit character decoding or truncated path enters Ken. The
+abstract namespace needs its own authority class in a successor.
+
+`SocketAddress` is a prelude-floor identity (`30-taxonomy §4`), so
+`Capability.System.Error` names it without importing this home. The
+`Capability.Net.Stream` home exposes the three smart constructors,
+re-exports that same `SocketAddress` identity, and provides the socket
+resource operations below and a closed shutdown-direction family.
+`ResourceKind` gains the two scoped cases `ResourceKind.SocketListener`
+and `ResourceKind.SocketStream`, for nine in all. The contract shapes are:
+
+```ken
+pub fn socket_ipv4 (octets : Vec UInt8 4) (port : UInt16) : SocketAddress
+pub fn socket_ipv6 (octets : Vec UInt8 16) (port : UInt16) : SocketAddress
+pub fn socket_unix_path (path : Bytes) : Result IOError SocketAddress
+
+pub data SocketShutdown = ShutdownRead | ShutdownWrite | ShutdownBoth
+export ShutdownRead, ShutdownWrite, ShutdownBoth
+pub data SocketTarget = ListeningSocket (Resource ResourceKind.SocketListener)
+  | ConnectedSocket (Resource ResourceKind.SocketStream)
+export ListeningSocket, ConnectedSocket
+
+proc with_socket_listener (a : Auth) (e : Type) (r : Type)
+    (cap : Cap a) (address : SocketAddress)
+    (body : Resource ResourceKind.SocketListener
+      -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Net]
+proc with_socket_accept (a : Auth) (e : Type) (r : Type)
+    (listener : Resource ResourceKind.SocketListener)
+    (body : Resource ResourceKind.SocketStream
+      -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Net]
+proc with_socket_connection (a : Auth) (e : Type) (r : Type)
+    (cap : Cap a) (address : SocketAddress)
+    (body : Resource ResourceKind.SocketStream
+      -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Net]
+proc receive_socket (a : Auth) (stream : Resource ResourceKind.SocketStream)
+    (buffer : BufferHandle) (window : BufferWindow)
+  : HostIO a (Result ResourceError ReadProgress) visits [Net]
+proc send_socket (a : Auth) (stream : Resource ResourceKind.SocketStream)
+    (buffer : BufferHandle) (span : BufferSpan)
+  : HostIO a (Result ResourceError WriteProgress) visits [Net]
+proc shutdown_socket (a : Auth) (stream : Resource ResourceKind.SocketStream)
+    (how : SocketShutdown)
+  : HostIO a (Result ResourceError Unit) visits [Net]
+proc socket_local_address (a : Auth) (target : SocketTarget)
+  : HostIO a (Result ResourceError SocketAddress) visits [Net]
+```
+
+A program declares its network authority with the header form
+`program capabilities Net <class>+`, where `<class>` is exactly one of
+`Loopback`, `Inet` or `Unix`. The `+` is grammar metanotation requiring
+at least one class, not a source token. Thus
+`program capabilities Net Loopback` is a complete single-class form;
+no other class member, including `AFull`, is admitted as a `Net` class.
+The runner mints those declared classes onto the existing `Cap a`, not
+a separate `Cap_Net` value. `Loopback` permits
+IPv4 `127.0.0.0/8` and IPv6 `::1`; `Inet` covers all IPv4/IPv6
+addresses and implies `Loopback`; `Unix` covers absolute Unix paths.
+Both listen and connect use the address's class; `0.0.0.0` and `::`
+need `Inet`, not `Loopback`. A `Unix` declaration also requires
+`FS AFull`; `Loopback` and `Inet` do not. At `NetListen` and
+`NetConnect` acquisition, an address outside the held class returns
+`ResourceHostIO IOError.CapabilityDenied`, and a revoked grant returns
+`ResourceHostIO IOError.Revoked`, before any socket syscall. The
+listener or stream retains the originating grant's provenance. On a
+revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
+`NetShutdown` and `NetLocalAddress` return the delivered FS/Net
+resource-token carrier `ResourceHostIO IOError.Revoked` before any
+guarded host leaf. They are not Process host operations (§62 §4.1).
+After unification, their successor projection is
+`ResourceError.Revoked`; it is not a current checked constructor or a
+thirteenth member of the present `ResourceError` family. Bracket
+settlement still uses `ResourceRelease`. The
+`a : Auth` argument and `HostIO a` are the existing authority-indexed
+carrier; Net-class
+membership is checked on the decoded address at admission, not
+inferred from a string or from the effect row alone.
+
+All seven operations declare `visits [Net]`; the existing §36 §1.4
+escape check rejects a caller without `Net` in its row. Acquiring a
+listener or connected stream also takes `Cap a`, and acceptance is
+confined to an already-held listener. A listener bound to IPv4 or IPv6
+port zero reports its OS-assigned port through `socket_local_address`;
+peer-address readback is not part of this slice. Each bracket settles
+its acquired resource via the existing `ResourceRelease`, even when
+the body returns an error; the bracket's result retains the existing
+four-way body/release distinction. A Unix pathname created by bind is
+**not** unlinked on release: deleting it is a separate FS act. Listener
+and stream resources are opaque and expose no raw descriptor. The
+backend uses blocking stream sockets, with no implicit `SO_REUSEADDR`
+or other option. A connection failure closes the newly created socket
+before returning the error.
+
+`receive_socket` and `send_socket` have their own `Net` operation
+identities rather than reusing the Process-labelled
+`ResourceStreamRead`/`ResourceStreamWrite` codes. They reuse those
+operations' buffer bounds, replies and progress partition (§1.7.2).
+Receive with a zero effective bound or a host zero result yields
+`ReadProgress.ReadEof`; positive progress returns exactly the live
+span and count, never more than the admitted `BufferWindow`. Send
+returns `WriteProgress.Wrote` with a positive count not exceeding the
+admitted `BufferSpan`; a short send leaves the remainder to the
+caller, while a zero send yields `NoProgress`. Sending on a closed
+peer returns `ResourceHostIO IOError.BrokenPipe` without SIGPIPE
+terminating Ken (`MSG_NOSIGNAL`). After `ShutdownWrite` and queued
+bytes have been received, the peer sees `ReadEof`; `ShutdownRead` and
+`ShutdownBoth` choose their corresponding directions. `withBuffer`
+still carries `[FS]`, so a socket client acquiring its own buffer
+needs the combined `[FS, Net]` row, even though the transfer itself
+carries only `[Net]`.
+
+Every listener, outbound stream and accepted stream descriptor is
+created with close-on-exec (`SOCK_CLOEXEC` or `accept4` with that flag),
+without a descriptor-inheritance window. An exec'd PX10 child sees
+none of those sockets; PX10's independent closefrom step is not a
+substitute for the close-on-exec property on each descriptor.
+
+`Capability.System.Error` keeps its canonical `IOError` family and
+extends the existing operation and resource sums, without a parallel
+socket-error family:
+
+```ken
+pub data SocketOperation = ListenSocket | AcceptSocket | ConnectSocket
+  | ReceiveSocket | SendSocket | ShutdownSocket | LocalSocketAddress
+  | CloseSocket
+pub data Operation = FilesystemOp FileOperation
+  | ProcessOp ProcessOperation | SocketOp SocketOperation
+pub data ResourceRef = FilesystemResource (Option Bytes)
+  | ProcessResource (Option Bytes) | SocketResource (Option SocketAddress)
+
+pub fn socket_error_to_system
+    (operation : SocketOperation) (address : Option SocketAddress)
+    (cause : IOError) : SystemError =
+  MkSystemError (SocketOp operation) (SocketResource address)
+    cause NoSafeContext
+```
+
+The operation identity distinguishes the seven Net operations and
+resource closure; `LocalSocketAddress` is idempotent, while the other
+socket operations, including close, are non-idempotent for retry
+classification. The address is carried when known, never a raw fd;
+accepted peers need not disclose their remote address. Only a
+`ResourceHostIO` cause lifts into this envelope. `Closed`,
+`ResourceKindMismatch` and `InvalidBounds` remain resource errors.
+Connecting to an absent Unix pathname returns `IOError.NotFound` and
+lifts with `SocketOp ConnectSocket` and `SocketResource (Some address)`;
+connect to an existing endpoint refusing the connection maps
+`ECONNREFUSED` to `IOError.Other 111`. `EADDRINUSE`, `ECONNRESET` and
+`ENOTCONN` map to `IOError.Other 98`, `Other 104` and `Other 107`.
+No new `IOError` constructor or trust-bearing rule is introduced.
+
+The seven new host operations are `NetListen`, `NetAccept`, `NetConnect`,
+`NetReceive`, `NetSend`, `NetShutdown` and `NetLocalAddress`. Their
+host-family codes are `0x0701` through `0x0707` in that order.
+`ResourceKind.SocketListener` and `ResourceKind.SocketStream` are new
+opaque resource kinds; resource release uses the existing operation.
+These seven operations, **and no others**, form the named
+interpreter-admission exception while each remains
+`RepresentedUnavailable` for the native lane. A native build of a
+program **declaring Net**, even one whose branch does not take a socket
+operation at runtime, refuses before object emission with the typed
+`host_effect_lowering_unavailable` reason naming the unavailable Net
+operations. No artifact is emitted. The immediate PX11 native-parity
+successor closes this interpreter-only set; datagrams, typed option
+families, an injected resolver and DNS boundary, nonblocking/readiness
+and abstract Unix names remain subsequent work. No new kernel rule or
+trusted postulate is authorized. Any required trust growth is an
+operator stop.
 
 ## 2. The FFI surface — the `foreign` declaration
 
