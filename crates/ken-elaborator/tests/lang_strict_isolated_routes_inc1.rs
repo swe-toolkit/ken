@@ -3,12 +3,12 @@
 
 use std::path::{Path, PathBuf};
 
-use ken_elaborator::modules::{catalog_module_from_path, discover_source_path, SourcePathKind};
-use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, CompilerDriverError, CompilerManifest,
-    CompilerSource, CompilerTargetKind, TargetSelector,
-};
 use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
+use ken_elaborator::compiler_driver::{
+    compile_ken_package_sources, CompilerDriverError, CompilerManifest, CompilerSource,
+    CompilerTargetKind, TargetSelector,
+};
+use ken_elaborator::modules::{catalog_module_from_path, discover_source_path, SourcePathKind};
 use ken_elaborator::{ElabEnv, ElabError};
 
 fn discovered_isolated_root(path: &Path) -> Option<PathBuf> {

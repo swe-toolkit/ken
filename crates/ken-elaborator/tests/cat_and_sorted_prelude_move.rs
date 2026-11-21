@@ -13,7 +13,10 @@ fn contains(term: &Term, id: ken_kernel::GlobalId) -> bool {
         Term::Const { id: found, .. }
         | Term::IndFormer { id: found, .. }
         | Term::Constructor { id: found, .. }
-            if *found == id => true,
+            if *found == id =>
+        {
+            true
+        }
         Term::Elim { fam, .. } if *fam == id => true,
         _ => term.children().into_iter().any(|child| contains(child, id)),
     }
@@ -171,7 +174,16 @@ fn sortedness_is_derived_checked_and_rejects_an_unordered_pair() {
          theorem bare_sorted : is_sorted Nat ordered empty = Proved",
     )
     .expect("a bare import binds the catalog identity uniquely");
-    let (_, ty) = env.env.const_type(env.globals["bare_sorted"]).expect("bare_sorted type");
-    assert!(contains(&ty, sorted), "bare import must select the catalog ID");
-    assert!(!contains(&ty, prelude_sorted), "bare import must not select pre-source ID");
+    let (_, ty) = env
+        .env
+        .const_type(env.globals["bare_sorted"])
+        .expect("bare_sorted type");
+    assert!(
+        contains(&ty, sorted),
+        "bare import must select the catalog ID"
+    );
+    assert!(
+        !contains(&ty, prelude_sorted),
+        "bare import must not select pre-source ID"
+    );
 }

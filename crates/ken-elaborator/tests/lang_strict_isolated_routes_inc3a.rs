@@ -111,7 +111,10 @@ fn generic_effect_floor_uses_captured_id_and_leaves_bare_bind_for_users() {
     let baseline = ElabEnv::new().expect("checked prelude");
     let bind = baseline.prelude_env.bind_id;
     assert_eq!(baseline.globals["itree_bind"], bind);
-    assert_eq!(baseline.globals["bind"], bind, "pre-source spelling survives");
+    assert_eq!(
+        baseline.globals["bind"], bind,
+        "pre-source spelling survives"
+    );
     assert_eq!(
         baseline.globals["resp_coproduct"],
         baseline.prelude_env.resp_coproduct_id

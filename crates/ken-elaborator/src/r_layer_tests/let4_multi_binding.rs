@@ -180,7 +180,7 @@ fn ac4_strict_evaluation_and_effectful_lowering_keep_source_order() {
     let selected_console = || {
         let mut env = ElabEnv::new().expect("prelude");
         env.set_catalog_roots_v1(&[
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages"),
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
         ])
         .expect("checked catalog root");
         env.elaborate_file("import Capability.Console.Text (print_line)")
