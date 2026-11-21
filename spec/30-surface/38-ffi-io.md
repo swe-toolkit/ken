@@ -1480,9 +1480,13 @@ model. No arbitrary address-family number, raw `sockaddr` pointer,
 implicit character decoding or truncated path enters Ken. The
 abstract namespace needs its own authority class in a successor.
 
-The `Capability.Net.Stream` home exposes the three smart constructors,
-`SocketAddress`, the socket resource operations below and a closed
-shutdown-direction family. The contract shapes are:
+`SocketAddress` is a prelude-floor identity (`30-taxonomy §4`), so
+`Capability.System.Error` names it without importing this home. The
+`Capability.Net.Stream` home exposes the three smart constructors,
+re-exports that same `SocketAddress` identity, and provides the socket
+resource operations below and a closed shutdown-direction family.
+`ResourceKind` gains the two scoped cases `ResourceKind.SocketListener`
+and `ResourceKind.SocketStream`, for nine in all. The contract shapes are:
 
 ```ken
 pub fn socket_ipv4 (octets : Vec UInt8 4) (port : UInt16) : SocketAddress

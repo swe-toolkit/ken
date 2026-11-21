@@ -104,11 +104,12 @@ The loader proceeds as follows:
    FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
    Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
    ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
-   ResourceKind, ResourceOpenMode, Result, StateOp, Top, TransferCount,
+   ResourceKind, ResourceOpenMode, Result, SocketAddress, StateOp, Top,
+   TransferCount,
    Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
    resp_coproduct, resp_state, run_state, state_get, state_put}`
-   (`30-taxonomy §4`; `33 §3.3`). These fifty-two checked identities
-   are ambiently nameable in source, not fifty-two types: `Top`
+   (`30-taxonomy §4`; `33 §3.3`). These fifty-three checked identities
+   are ambiently nameable in source, not fifty-three types: `Top`
    and `Bottom` are proposition constants, `Proved` is a proof binding,
    `HostIO` is a type-level function, and `console_resp`, `eqChar`,
    `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -127,7 +128,8 @@ The loader proceeds as follows:
    `ResourceKind` is scoped: `ResourceKind.FsHandle`,
    `ResourceKind.Buffer`, `ResourceKind.Mapping`,
    `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
-   `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite` use its exact
+   `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
+   `ResourceKind.SocketListener`, and `ResourceKind.SocketStream` use its exact
    parent; their bare spellings are not reserved. `ExitCode.Success` and
    `ExitCode.Failure` are scoped; `ProgramCaps.MkProgramCaps` is scoped
    but remains runner-minted and is not made public by qualification.
@@ -140,7 +142,7 @@ The loader proceeds as follows:
    spelling do not enter B. `ConsoleOp` is scoped as four exact paths:
    `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
    `ConsoleOp.IsTerminal`; their bare cases do not enter B. Scoped
-   constructors do not increase the fifty-two-name count. `IOError`'s
+   constructors do not increase the fifty-three-name count. `IOError`'s
    complete thirteen-cause family, `CreatePolicy`'s three cases and
    `ResourceError`'s complete
    twelve-case family are scoped: their public constructor paths are
@@ -188,7 +190,7 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing a floor member or Pair companion is a resolution operation over
-declarations that already exist. The loader reuses all fifty-two exact
+declarations that already exist. The loader reuses all fifty-three exact
 checked prelude-floor identities, including `Top` and `Bottom` as
 proposition constants, `Proved`'s proof-term identity, the registered
 `eqChar` comparator ID, the three prior State-operation IDs, and the
