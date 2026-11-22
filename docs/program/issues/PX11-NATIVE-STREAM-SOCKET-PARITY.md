@@ -1,7 +1,7 @@
 ---
 id: PX11-NATIVE-STREAM-SOCKET-PARITY
 title: "PX11's first slice runs stream sockets only on the interpreter: the seven Net operations are RepresentedUnavailable, executor_admits carries a named exception for exactly them, and a native build of any Net-declared program refuses with host_effect_lowering_unavailable, so under the operator's bar the slice delivers no PX11 value yet. Lower the seven operations natively with interpreter parity, promote them to NativeTested and close the interpreter-admission set again"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
