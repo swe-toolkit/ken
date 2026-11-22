@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER
 title: "Spec 67 §4 says area is zero when either axis is inverted, and a box containing a point has a derived positive area, but no law gives the converse, so a client holding a box of positive area cannot conclude it holds any point. Rule from a checked D0 at zero trust that a box whose area is at least one contains its low corner, and state it with a seed that separates a valid box from one inverted on a single axis"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

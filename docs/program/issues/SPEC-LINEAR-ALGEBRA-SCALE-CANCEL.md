@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-SCALE-CANCEL
 title: "Spec 65 §20 cancels a shared summand from vector and matrix sums, but no law cancels a shared nonzero scaling factor, so a client holding vector_scale n (Suc k) xs = vector_scale n (Suc k) ys cannot conclude xs = ys without reasoning entry by entry. Rule from a checked D0 at zero trust that scaling by a successor factor is injective on vectors and on matrices, and state both with a seed that separates a successor factor from a zero one"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -24,7 +24,7 @@ origin: "Operator 2026-10-08: \"start l3 on the establish catalog program\"; ope
 
 Both hold at zero trust, and spec 65 states them by their public types.
 
-## Settled inputs (main `1b5e4183e`; anchors re-checked at release)
+## Settled inputs (main `3af64d87b`; anchors re-checked at release)
 
 - **The operations.** `vector_scale` (`NatMatrix.ken.md:57`) is `map (mul
   factor)` over `Vec Nat n`. `matrix_scale` (`:532`) maps `vector_scale`
