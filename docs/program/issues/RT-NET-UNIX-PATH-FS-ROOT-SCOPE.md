@@ -1,7 +1,7 @@
 ---
 id: RT-NET-UNIX-PATH-FS-ROOT-SCOPE
 title: "A program declaring FS AFull on a root and Net Unix can listen on or connect to a Unix socket path anywhere on the host, because NetScopeV1::admits checks only the Unix class bit and never the Cap's FS root. The same program's file acts are refused outside that root. Rule from a D0 whether a Unix path is confined beneath the declared root or stated as unbounded, as Process is, and make the host, spec 38 and a pin agree"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
@@ -23,7 +23,7 @@ the root is refused at acquisition and creates no inode, or (b) spec 38
 states, as it does for Process, that a `Unix` grant is not bounded by the
 FS root, and a pin holds that reach. AC-0 rules which.
 
-## Settled inputs (main `99d594ff7`; anchors re-checked at release)
+## Settled inputs (main `fe713d1ba`; anchors re-checked at release)
 
 - **The guard.** `NetScopeV1::admits` (`crates/ken-host/src/capability.rs`
   ~`:248`) admits every `SocketAddressV1::Unix` on the class bit alone. The
