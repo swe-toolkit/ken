@@ -264,7 +264,7 @@ abstract Unix address.
   listener keeps its inode and remains live.
 - controls: in a paired fresh run, keep the same class, grant and lexical
   path but leave `D/jail/alias.sock` absent instead of symlinked; listen
-  succeeds. The AC-2 raw-path bypass reaches the existing outside socket name.
+  succeeds.
 - why: this applies the final-component symlink refusal to `NetListen`;
   the connect leaf-symlink row tests only `NetConnect`.
 
@@ -335,8 +335,10 @@ absolute-path `bind` and `connect`, bypassing root resolution. It must make
 exactly the two outside rows and all four guard rows—`..`, parent-symlink
 connect, leaf-symlink connect and leaf-symlink listen—fail their refusal
 expectations, while both in-root rows stay green. Under the bypass, outside
-listen creates the inode and all outside connects reach the live listener. This
-is a mutation expectation, not an executed test or mutation.
+listen creates the inode and all outside connects reach the live listener. The
+listener-leaf row reaches `bind` at the existing outside socket name, so it
+cannot return the required pre-syscall `CapabilityDenied`. This is a mutation
+expectation, not an executed test or mutation.
 
 ### surface/ffi-io/socket-loopback-exchange-and-eof
 
