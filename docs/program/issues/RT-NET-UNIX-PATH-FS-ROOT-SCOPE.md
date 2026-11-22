@@ -62,6 +62,19 @@ AC-2 with the amended AC-2 below. Runtime QA `evt_5cn3mhwe95433` found no
 row for a listener whose final component is a symlink. Steward ruling
 `evt_4f920kttaaamj` adds that row to AC-1 and to AC-2's reddening set.
 
+CV CHANGE `evt_1b4g7h5y88f6j` found every symlink row pointing outside
+`R`. Steward ruling `evt_4v0kccgpay1n7` amends the WP in place:
+- AC-1 gains an in-root-target symlink row for connect and one for
+  listen.
+- AC-2's reddening set becomes the two outside rows plus six guards.
+- The CV seed covers the path-error contract.
+
+Correction `evt_76tb33g4165r7` withdraws that ruling's spec item. The
+"no diagnostic code" sentence was in the seed, not spec 38, and is
+reconciled there. CV CHANGE `evt_6rt664n0p4yas` added a seed-only row: a
+spelling that reaches `R` through a symlinked ancestor refuses with
+`CapabilityDenied`.
+
 ## Scope
 
 The Net acquisition check and the Unix `bind` and `connect` path in
@@ -87,13 +100,15 @@ classes, the abstract namespace, or the FS act semantics.
   socket file exists outside the root afterwards. A listen on
   `R/jail/alias.sock`, a symlink to a live outside socket, refuses with
   `IOError.CapabilityDenied` before any socket syscall and leaves the path
-  state unchanged. Under (b), all four
+  state unchanged. So do a connect and a listen through an in-root alias
+  symlink whose live target is also inside `R`. Under (b), all four
   succeed, and spec 38 states the unbounded reach.
 - **AC-2 (QA mutation, amended).** Route Unix listen and connect through
   the raw absolute-path `bind` and `connect` again, with everything else
-  unchanged. Both outside rows and four guard rows redden: `..`, parent
-  symlink on connect, leaf symlink on connect, and leaf symlink on listen.
-  Both inside rows stay green. Restore it byte-identically.
+  unchanged. Both outside rows and six guard rows redden: `..`, parent
+  symlink on connect, leaf symlink on connect, leaf symlink on listen, and
+  in-root-target symlink on connect and on listen. Both inside rows stay
+  green. Restore it byte-identically.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions

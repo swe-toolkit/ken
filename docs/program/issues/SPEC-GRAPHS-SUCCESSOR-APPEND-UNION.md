@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-SUCCESSOR-APPEND-UNION
 title: "Spec 62 builds a graph from successor lists (§14) and unions two graphs (§15), but no law relates the two, so a client merging two adjacency sources by appending their lists cannot use the union's reachability laws without re-proving list membership over the append. Rule from a checked D0 at zero trust that the adaptor over pointwise-appended successor lists has the edges of the union of the two adaptors, and state it with a seed that separates the union from either operand alone"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -25,7 +25,7 @@ g)`. It holds at zero trust, and spec 62 states it by its public type.
 With it, the union's reachability laws apply to a graph built from merged
 adjacency lists.
 
-## Settled inputs (main `72f02b12a`; anchors re-checked at release)
+## Settled inputs (main `061cb4b50`; anchors re-checked at release)
 
 - **The operations.** `graph_from_successors` (`Dependency.ken.md:940`)
   is `MkGraph` of `contains q d t (successors s)`. `contains` (`:652`)
