@@ -76,10 +76,9 @@ abstract namespace remains unchanged and is not used in these rows.
   case. Give each request the same `FS AFull` root `R` and `Net Unix` authority.
   Pair each with the same operation using the valid absolute address `R/x`.
   Record socket-backend calls.
-- expect: each invalid decoded address is refused before any socket syscall;
-  each valid control reaches its backend exactly once. No particular
-  diagnostic code is asserted because §1.13 does not specify one for this
-  boundary input.
+- expect: each invalid decoded address returns exactly
+  `ResourceHostIO IOError.InvalidInput` before any socket syscall; each valid
+  control reaches its backend exactly once.
 - why: builder rejection happens before the host boundary and cannot establish
   that the host revalidates a decoded address.
 
@@ -217,7 +216,7 @@ abstract namespace remains unchanged and is not used in these rows.
 
 ## Interpreter behavior
 
-The eight root-scope rows below use fresh runs of the ruled AC-1 fixture.
+The eight AC-1 confinement rows below use fresh runs of the ruled fixture.
 Let canonical CWD be `D`; create real directories `D/jail` and writable
 `D/outside`. Choose `D` so the valid and adversarial pathname spellings are
 2–107 bytes. The host harness supplies `FS AFull` rooted at `./jail`,
@@ -227,6 +226,9 @@ at `R/svc.sock` and
 `R/made.sock` and `D/outside/made.sock` absent before the listen rows.
 Record socket-backend calls. These pathname cases do not add or change an
 abstract Unix address.
+
+The additional pathname-contract rows below use separate stated fixtures.
+They do not change AC-2's two outside rows or four guard rows.
 
 ### surface/ffi-io/socket-unix-root-listen-inside
 
@@ -340,6 +342,121 @@ listener-leaf row reaches `bind` at the existing outside socket name, so it
 cannot return the required pre-syscall `CapabilityDenied`. This is a mutation
 expectation, not an executed test or mutation.
 
+These additional rows are not part of the eight-row AC-1 matrix; each uses
+its stated fresh fixture. For each root `R`, choose a canonical spelling so
+all addresses stay within 2–107 bytes; the 82-byte case states its tighter
+bound.
+
+### surface/ffi-io/socket-unix-empty-or-final-dot-name
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition path names.
+- given: in a fresh AC-1 fixture, submit decoded Unix addresses `R/` and
+  `R/.` at the host boundary, bypassing `socket_unix_path`. Choose `D` so
+  both absolute spellings contain no zero byte and lie within the constructor's
+  2–107-byte total path bounds. Try both `NetListen` and `NetConnect`; pair each
+  operation with its valid in-root control (`R/made.sock` for listen and the
+  live listener at `R/svc.sock` for connect).
+- expect: each empty or final-dot name returns exactly
+  `ResourceHostIO IOError.InvalidInput`. Both valid controls succeed.
+- controls: each control holds the operation, root and Net class fixed while
+  changing only the final component to a valid socket name.
+- why: §1.13 rejects an empty or final-dot socket name, not the root or the
+  Unix class; the valid controls distinguish that boundary.
+
+### surface/ffi-io/socket-unix-listener-final-component-bound
+
+- promise class: durable invariant.
+- spec: §1.13 Unix listener final-component bound.
+- given: in a fresh root fixture, use an existing, non-symlink parent `R`
+  and an ASCII `x` leaf of 82 bytes, then one of 83 bytes. Choose `R` to be
+  at most 23 bytes, so the 83-byte leaf keeps the absolute path within 107.
+  Construct both addresses with
+  `socket_unix_path`, keep both leaves absent, then listen under the same
+  `FS AFull` root and `Net Unix` grant.
+- expect: the 82-byte leaf is accepted and creates a listener. The 83-byte
+  leaf returns exactly `ResourceHostIO IOError.InvalidInput`.
+- controls: the two requests use the same operation, root, parent and path
+  form; only the final-component length changes by one byte.
+- why: this isolates the listener-specific 82-byte bound from the general
+  107-byte `sun_path` limit.
+
+### surface/ffi-io/socket-unix-missing-parent-is-not-found
+
+- promise class: durable invariant.
+- spec: §1.13 Unix parent errors.
+- given: in a fresh AC-1 fixture, leave `R/parent` absent and request
+  `R/parent/made.sock` with `NetListen` and `R/parent/svc.sock` with
+  `NetConnect`, under the same `FS AFull` root and `Net Unix` grant. Construct
+  both addresses with `socket_unix_path`. In paired fresh runs, make the same
+  `R/parent` an existing directory; keep `made.sock` absent and the `svc.sock`
+  listener live.
+- expect: each absent-parent request returns exactly
+  `ResourceHostIO IOError.NotFound`; the same-spelling existing-parent
+  controls succeed.
+- controls: path, operation, grant and root stay fixed; only the parent
+  directory's existence changes.
+- why: a missing parent has the specified `NotFound` identity, distinct from
+  the outside-root and symlink refusals.
+
+### surface/ffi-io/socket-unix-nondirectory-parent-is-notdirectory
+
+- promise class: durable invariant.
+- spec: §1.13 Unix parent errors.
+- given: in a fresh AC-1 fixture, make `R/parent` a regular file and request
+  `R/parent/made.sock` with `NetListen` and `R/parent/svc.sock` with
+  `NetConnect`, under the same `FS AFull` root and `Net Unix` grant. Construct
+  both addresses with `socket_unix_path`. In paired fresh runs, make the same
+  `R/parent` a directory; keep `made.sock` absent and the `svc.sock` listener
+  live.
+- expect: each file-parent request returns exactly
+  `ResourceHostIO IOError.NotDirectory`; the same-spelling directory-parent
+  controls succeed.
+- controls: path, operation, grant and root stay fixed; only the parent
+  directory's type changes.
+- why: a file used as a parent has the specified `NotDirectory` identity,
+  not the missing-parent `NotFound` identity.
+
+### surface/ffi-io/socket-unix-unreadable-or-deleted-root
+
+- promise class: durable invariant.
+- spec: §1.13 Unix root errors.
+- given: construct `SocketAddress` values for `R/made.sock` and
+  `R/svc.sock` with `socket_unix_path`; mint `FS AFull` for readable root
+  `R` with `Net Unix`. Bind `R/svc.sock` while readable and keep its listener
+  descriptor open. In paired fresh runs, after minting the capability, either
+  remove `R`'s read/search access for the host process or unlink its socket
+  path and remove `R` while retaining the listener descriptor. Attempt
+  `NetListen` at `R/made.sock` and `NetConnect` to `R/svc.sock`. In paired
+  controls with a readable root, listen at `R/made.sock` and connect to
+  `R/svc.sock`.
+- expect: both root-failure states return exactly
+  `ResourceHostIO IOError.CapabilityDenied` for listen and connect. The
+  readable-root controls succeed.
+- controls: the address, operations and Net class are fixed; only root
+  readability or existence changes.
+- why: an unreadable or deleted root has the specified `CapabilityDenied`
+  identity, distinct from ordinary missing-parent errors.
+
+### surface/ffi-io/socket-unix-default-root-is-execution-start-cwd
+
+- promise class: durable invariant.
+- spec: §1.13 default FS root.
+- given: create a canonical scratch directory `D` beneath `/tmp`, a `D/sub`
+  directory, and a live listener at `D/svc.sock`. Choose `D` so the absolute
+  address is 2–107 bytes. Construct it with `socket_unix_path`. Run with no
+  explicit FS root and execution-start CWD
+  `/`, then connect to `D/svc.sock`. Pair with
+  a fresh run using the same address and listener but execution-start CWD
+  `D/sub`; both programs declare `FS AFull` and `Net Unix`.
+- expect: the CWD `/` run connects successfully. The `D/sub` run returns
+  exactly `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the live outside listener receives no connection.
+- controls: the endpoint, peer, FS declaration and Net class stay fixed;
+  only execution-start CWD, hence the default root, changes.
+- why: without an explicit root, the execution-start CWD is the root; `/`
+  admits this non-symlink path, while `D/sub` does not.
+
 ### surface/ffi-io/socket-loopback-exchange-and-eof
 
 - promise class: durable invariant.
@@ -347,15 +464,18 @@ expectation, not an executed test or mutation.
 - given: for each of IPv4 `127.0.0.1`, IPv6 `::1` and the Unix path
   `R/exchange.sock` beneath its default `FS AFull` root, listen and connect to
   the resulting listener; read the OS-assigned IP port with
-  `socket_local_address`. Accept through a bracket.
+  `socket_local_address`. For Unix, compare the returned `SocketAddress`
+  with the requested address and use it to connect. Accept through a bracket.
   Send a known seven-byte chunk in each direction. Receive into a checked
   buffer and compare every octet to the known chunk; after write shutdown,
   read again. Include a first receive bound of four and drain the remainder.
 - expect: both received streams contain exactly the sent bytes, the first
   bounded read exposes at most four bytes, and the peer observes `ReadEof`.
+  Unix `socket_local_address` equals the validated requested address.
   Releasing a Unix listener closes the descriptor but leaves its pathname.
 - why: one live Ken program for each family reaches the interpreter's seven
   socket operations, typed resource brackets and bounded stream-transfer path.
+  The Unix readback must be usable as the address clients observe.
 
 ### surface/ffi-io/socket-error-preserves-address-and-canonical-cause
 
@@ -594,3 +714,6 @@ expectation, not an executed test or mutation.
   result.
 - why: rejecting every native build satisfies a negative-only refusal case;
   this paired positive case would reject such an implementation.
+
+Clean-room provenance: no external references were consulted. This amendment
+is grounded in §1.13, the settled AC-0 ruling and first-principles behavior.
