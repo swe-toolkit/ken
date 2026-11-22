@@ -124,12 +124,22 @@ operations, and each one is a chance for a hand-maintained list to drift.
 | **ABI-A1** | Promote `ConsoleRead` and `ClockWallNow` to `NativeTested` with differential evidence. | Runtime | M |
 | **ABI-A2** | Promote `FsAppendFile`, `FsMetadata`, `FsRename`. | Runtime | M |
 | **ABI-A3** | Promote `FsReadDirectory`, `FsCreateDirectory`, `FsRemoveFile`, `FsRemoveDirectory`. | Runtime | M |
+| **RT-CLOCK-OP-NATIVE-PROMOTION** | Promote ABI-S3's `ClockMonotonicNow`, `ClockSleepUntil` and `EntropyRandomBytes`, with non-exact comparators. Precedes PX12, whose deadlines read the monotonic clock. | Runtime | L |
+| **RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC** | ABI-S1's `FsSeek`, `FsSetLength`, `FsSync`: AC-0 rules a checked surface and promotion, or retirement, per operation. | Runtime | L |
+| **RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE** | ABI-S1's `FsGetInheritance`, `FsSetInheritance`, `FsDuplicate`: the same ruling, against PX10's spawn-plan descriptor map. | Runtime | L |
 
 Split by evidence shape rather than by count: ABI-A1 is
 console/clock (nondeterministic observation, needs normalized comparison), ABI-A2
 is metadata/rename (path-policy interaction), ABI-A3 is directory mutation
 (ordering and partial-failure semantics). **ABI-A3 depends on ABI-R3** so the
 promotions land against a derived inventory rather than a hand-edited one.
+
+**The last three rows were added on 2026-11-22.** ABI-S1 and ABI-S3 merged
+host implementations of nine operations but left them
+`RepresentedUnavailable`. That is the state §6 forbids: unavailable only
+because nobody promoted them. Neither the interpreter nor a native build
+runs them. ABI-M2's probes are for operations the kernel genuinely lacks,
+so these nodes precede it.
 
 ### Track M — manifest v2, native-target only
 
@@ -164,6 +174,7 @@ re-touching every operation added in between.
 | **PX10** | Processes: spawn/exec/wait with explicit argv and environment bytes, pipe and descriptor-map construction, close-on-exec and **deny-by-default inheritance**, `pidfd` identity and signalling where available, typed child-exit and signal observation. Surface is a **declarative spawn plan** — a raw post-`fork` Ken callback is not acceptable, because it exposes a restricted process state in which runtime invariants are unstateable. Plan must be extensible to later attach namespaces, credentials, cgroups, and sandbox policy before the Ken runtime starts. | Runtime + Foundation | L |
 | **PX11** | Sockets: typed IPv4/IPv6/Unix addresses, stream and datagram kinds, bounded send/receive, accept/connect/listen/shutdown, socket-error context, explicit socket **option families** rather than integer pairs, and an **injected resolver capability** whose trust source and policy are visible. DNS is a service boundary, not a syscall. | Runtime + Foundation | L |
 | **PX12** | Readiness: nonblocking-mode transitions, `epoll`/`eventfd`/`timerfd`/`signalfd` resources, explicit one-shot/level/edge registration, **cancellation and timeout in the operation type rather than in prose**, normalized event observations for differential tests. | Runtime + Foundation | L |
+| **LINUX-ABI-EXIT-SERVICE-SUPERVISOR** | The §6 exit itself: the network service and the process supervisor, built natively and proved. Framed when PX12 nears landing. | Runtime + Foundation | L |
 
 ## 4.1 ⛔ ABI-R2 WITHDRAWN — the rename premise was false
 
@@ -220,6 +231,10 @@ flowchart TD
     PX11[PX11 sockets and resolver]
     PX12[PX12 nonblocking and event loop]
     ABI_REVOKE[ABI-REVOKE runtime revocation membrane]
+    CLOCK_PROMO[RT-CLOCK-OP-NATIVE-PROMOTION clock and entropy]
+    DESC_SLS[RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC]
+    DESC_INH[RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE]
+    EXIT[LINUX-ABI-EXIT-SERVICE-SUPERVISOR program exit]
 
     ABI_R3 --> ABI_REVOKE
     ABI_REVOKE --> ABI_A1
@@ -242,6 +257,16 @@ flowchart TD
     PX10 --> PX12
     PX11 --> PX12
     ABI_S3 --> PX12
+    ABI_S3 --> CLOCK_PROMO
+    CLOCK_PROMO --> PX12
+    ABI_S1 --> DESC_SLS
+    DESC_SLS --> DESC_INH
+    PX10 --> DESC_INH
+    PX12 --> EXIT
+    DESC_INH --> EXIT
+    ABI_M2 --> EXIT
+    ABI_S2 --> EXIT
+    ABI_S4 --> EXIT
 ```
 
 ABI-R1 is documentation-only and depends on nothing. (ABI-R2 was withdrawn — §4.1.)
@@ -277,7 +302,8 @@ Plus, from the reconciliation and floor work:
 - lifetime claims say `runtime-enforced` and `tested`, never `proved`, per
   the charter's PX7 honesty rule.
 
-Linux ABI II (L2-4 … L2-8) starts from there.
+`LINUX-ABI-EXIT-SERVICE-SUPERVISOR` delivers the two programs. Linux ABI II
+(L2-4 … L2-8) starts from there.
 
 ## 7. Token efficiency — the Steward's concern
 
