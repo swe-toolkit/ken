@@ -217,7 +217,7 @@ abstract namespace remains unchanged and is not used in these rows.
 
 ## Interpreter behavior
 
-The seven root-scope rows below use fresh runs of the ruled AC-1 fixture.
+The eight root-scope rows below use fresh runs of the ruled AC-1 fixture.
 Let canonical CWD be `D`; create real directories `D/jail` and writable
 `D/outside`. Choose `D` so the valid and adversarial pathname spellings are
 2–107 bytes. The host harness supplies `FS AFull` rooted at `./jail`,
@@ -251,6 +251,21 @@ abstract Unix address.
 - controls: the in-root listen succeeds with the same operation, grant and
   fixture. The existing writable parent rules out a missing-directory error.
 - why: this pins outside bind refusal and the absence of an outside inode.
+
+### surface/ffi-io/socket-unix-root-listen-leaf-symlink
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, make `D/jail/alias.sock` a symlink to
+  `../outside/svc.sock`, keep the outside listener live, and listen at
+  `D/jail/alias.sock`.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the alias keeps its symlink target and inode, and the outside
+  listener keeps its inode and remains live.
+- controls: the in-root listen succeeds with the same operation and grant;
+  the AC-2 raw-path bypass reaches the existing outside socket name.
+- why: this applies the final-component symlink refusal to `NetListen`;
+  the connect leaf-symlink row tests only `NetConnect`.
 
 ### surface/ffi-io/socket-unix-root-connect-inside
 
@@ -316,7 +331,8 @@ abstract Unix address.
 
 The effective AC-2 mutation routes Unix listen and connect through raw
 absolute-path `bind` and `connect`, bypassing root resolution. It must make
-exactly the two outside rows and all three guard rows fail their refusal
+exactly the two outside rows and all four guard rows—`..`, parent-symlink
+connect, leaf-symlink connect and leaf-symlink listen—fail their refusal
 expectations, while both in-root rows stay green. Under the bypass, outside
 listen creates the inode and all outside connects reach the live listener. This
 is a mutation expectation, not an executed test or mutation.
