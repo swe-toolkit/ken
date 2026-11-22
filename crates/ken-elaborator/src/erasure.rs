@@ -4992,7 +4992,8 @@ fn decode_checked_host_operation<'a>(
     let expected_family = match crate::export::host_operation_family_v1(operation) {
         crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
         crate::export::HostOpFamilyV1::Console => &spine.console_family,
-        crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
+        crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process
+        | crate::export::HostOpFamilyV1::Net => &spine.fs_family,
         crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
     };
     if &constructor.family_symbol != expected_family {
@@ -5112,7 +5113,8 @@ fn lower_runtime_selected_host_operation(
             let expected_family = match crate::export::host_operation_family_v1(host_operation) {
                 crate::export::HostOpFamilyV1::Clock => &spine.clock_family,
                 crate::export::HostOpFamilyV1::Console => &spine.console_family,
-                crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process => &spine.fs_family,
+                crate::export::HostOpFamilyV1::Fs | crate::export::HostOpFamilyV1::Process
+                | crate::export::HostOpFamilyV1::Net => &spine.fs_family,
                 crate::export::HostOpFamilyV1::Entropy => &spine.entropy_family,
             };
             if family != expected_family {

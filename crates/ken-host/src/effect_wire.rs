@@ -338,6 +338,34 @@ fn put_request(
         CanonicalRequestV1::ProcessTakePipe { fd } => { put_u8(out, 40); put_u64(out, *fd); }
         CanonicalRequestV1::ProcessWait => put_u8(out, 41),
         CanonicalRequestV1::ProcessSignal { signal } => { put_u8(out, 42); put_u64(out, *signal); },
+        CanonicalRequestV1::NetListen { address } => { put_u8(out, 43); put_socket_address(out, address)?; }
+        CanonicalRequestV1::NetAccept => put_u8(out, 44),
+        CanonicalRequestV1::NetConnect { address } => { put_u8(out, 45); put_socket_address(out, address)?; }
+        CanonicalRequestV1::NetReceive { buffer_start, length } => { put_u8(out, 46); put_u64(out, *buffer_start); put_u64(out, *length); }
+        CanonicalRequestV1::NetSend { buffer_start, length } => { put_u8(out, 47); put_u64(out, *buffer_start); put_u64(out, *length); }
+        CanonicalRequestV1::NetShutdown { how } => { put_u8(out, 48); put_u64(out, *how); }
+        CanonicalRequestV1::NetLocalAddress => put_u8(out, 49),
+    }
+    Ok(())
+}
+
+fn put_socket_address(out: &mut Vec<u8>, address: &crate::SocketAddressV1) -> Result<(), EffectTraceWireError> {
+    address.validate().map_err(|_| EffectTraceWireError)?;
+    match address {
+        crate::SocketAddressV1::Inet4 { octets, port } => {
+            put_u8(out, 0);
+            out.extend_from_slice(octets);
+            put_u16(out, *port);
+        }
+        crate::SocketAddressV1::Inet6 { octets, port } => {
+            put_u8(out, 1);
+            out.extend_from_slice(octets);
+            put_u16(out, *port);
+        }
+        crate::SocketAddressV1::Unix { path } => {
+            put_u8(out, 2);
+            put_bytes(out, path)?;
+        }
     }
     Ok(())
 }
@@ -426,6 +454,10 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
             put_u64(out, transferred.get());
             put_u64(out, transferred.effective_request());
         }
+        CanonicalReplyV1::SocketAddress(address) => {
+            put_u8(out, 16);
+            put_socket_address(out, address)?;
+        }
         CanonicalReplyV1::ChildExit(exit) => {
             put_u8(out, 15);
             match exit {
@@ -454,6 +486,8 @@ fn put_resource_kind(out: &mut Vec<u8>, kind: ResourceKindV1) {
         ResourceKindV1::ChildProcess => put_u8(out, 4),
         ResourceKindV1::PipeRead => put_u8(out, 5),
         ResourceKindV1::PipeWrite => put_u8(out, 6),
+        ResourceKindV1::SocketListener => put_u8(out, 7),
+        ResourceKindV1::SocketStream => put_u8(out, 8),
     }
 }
 
@@ -1000,8 +1034,32 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         40 => CanonicalRequestV1::ProcessTakePipe { fd: cursor.u64()? },
         41 => CanonicalRequestV1::ProcessWait,
         42 => CanonicalRequestV1::ProcessSignal { signal: cursor.u64()? },
+        43 => CanonicalRequestV1::NetListen { address: get_socket_address(cursor)? },
+        44 => CanonicalRequestV1::NetAccept,
+        45 => CanonicalRequestV1::NetConnect { address: get_socket_address(cursor)? },
+        46 => CanonicalRequestV1::NetReceive { buffer_start: cursor.u64()?, length: cursor.u64()? },
+        47 => CanonicalRequestV1::NetSend { buffer_start: cursor.u64()?, length: cursor.u64()? },
+        48 => CanonicalRequestV1::NetShutdown { how: cursor.u64()? },
+        49 => CanonicalRequestV1::NetLocalAddress,
         _ => return Err(EffectTraceWireError),
     })
+}
+
+fn get_socket_address(cursor: &mut Cursor<'_>) -> Result<crate::SocketAddressV1, EffectTraceWireError> {
+    let address = match cursor.u8()? {
+        0 => crate::SocketAddressV1::Inet4 {
+            octets: cursor.take(4)?.try_into().map_err(|_| EffectTraceWireError)?,
+            port: cursor.u16()?,
+        },
+        1 => crate::SocketAddressV1::Inet6 {
+            octets: cursor.take(16)?.try_into().map_err(|_| EffectTraceWireError)?,
+            port: cursor.u16()?,
+        },
+        2 => crate::SocketAddressV1::Unix { path: cursor.bytes()? },
+        _ => return Err(EffectTraceWireError),
+    };
+    address.validate().map_err(|_| EffectTraceWireError)?;
+    Ok(address)
 }
 
 /// Fail-closed correlation the reply decoder cannot perform on its own: it
@@ -1020,6 +1078,7 @@ fn validate_transfer_request_bound(
         Some(crate::TransferRequestBoundV1::ReadAt(transferred)) => match request {
             CanonicalRequestV1::FsReadAt { length, .. }
             | CanonicalRequestV1::ResourceStreamRead { length, .. }
+            | CanonicalRequestV1::NetReceive { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -1029,6 +1088,7 @@ fn validate_transfer_request_bound(
         Some(crate::TransferRequestBoundV1::WriteAt(transferred)) => match request {
             CanonicalRequestV1::FsWriteAt { length, .. }
             | CanonicalRequestV1::ResourceStreamWrite { length, .. }
+            | CanonicalRequestV1::NetSend { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -1049,6 +1109,7 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
         12 => CanonicalReplyV1::MonotonicInstant(cursor.bytes()?),
         13 => CanonicalReplyV1::FilePosition(cursor.u64()?),
         14 => CanonicalReplyV1::FdInheritancePolicy(get_inheritance_policy(cursor)?),
+        16 => CanonicalReplyV1::SocketAddress(get_socket_address(cursor)?),
         15 => CanonicalReplyV1::ChildExit(match cursor.u8()? {
             0 => crate::ChildExitV1::Exited(cursor.u8()?),
             1 => crate::ChildExitV1::Signaled(cursor.u8()?),
@@ -1120,6 +1181,8 @@ fn get_resource_kind(cursor: &mut Cursor<'_>) -> Result<ResourceKindV1, EffectTr
         4 => Ok(ResourceKindV1::ChildProcess),
         5 => Ok(ResourceKindV1::PipeRead),
         6 => Ok(ResourceKindV1::PipeWrite),
+        7 => Ok(ResourceKindV1::SocketListener),
+        8 => Ok(ResourceKindV1::SocketStream),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1664,6 +1727,62 @@ mod tests {
         }
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: seven Net
+    /// request tags and two address families have independent known-answer
+    /// bytes, decode consumes the whole request, and an invalid Unix path
+    /// refuses instead of round-tripping. CLAIMED: the trace wire preserves
+    /// typed socket requests and rejects invalid decoded addresses. THE GAP:
+    /// the dispatcher independently verifies operation/request compatibility.
+    #[test]
+    fn px11_socket_wire_request_and_reply_tags_are_typed_and_fail_closed() {
+        let ipv4 = crate::SocketAddressV1::Inet4 {
+            octets: [127, 0, 0, 1],
+            port: 0x0123,
+        };
+        let unix = crate::SocketAddressV1::Unix {
+            path: b"/tmp/s".to_vec(),
+        };
+        let cases = [
+            (CanonicalRequestV1::NetListen { address: ipv4.clone() }, 43),
+            (CanonicalRequestV1::NetAccept, 44),
+            (CanonicalRequestV1::NetConnect { address: unix.clone() }, 45),
+            (CanonicalRequestV1::NetReceive { buffer_start: 3, length: 7 }, 46),
+            (CanonicalRequestV1::NetSend { buffer_start: 5, length: 9 }, 47),
+            (CanonicalRequestV1::NetShutdown { how: 2 }, 48),
+            (CanonicalRequestV1::NetLocalAddress, 49),
+        ];
+        for (request, tag) in cases {
+            let mut bytes = Vec::new();
+            put_request(&mut bytes, &request).unwrap();
+            assert_eq!(bytes[0], tag, "{request:?} tag");
+            let mut cursor = Cursor { bytes: &bytes, position: 0 };
+            assert_eq!(get_request(&mut cursor), Ok(request));
+            assert_eq!(cursor.position, bytes.len());
+        }
+        let mut ipv4_wire = Vec::new();
+        put_request(&mut ipv4_wire, &CanonicalRequestV1::NetListen { address: ipv4 }).unwrap();
+        assert_eq!(ipv4_wire, [43, 0, 127, 0, 0, 1, 0x23, 0x01]);
+        let mut unix_wire = Vec::new();
+        put_request(&mut unix_wire, &CanonicalRequestV1::NetConnect { address: unix }).unwrap();
+        assert_eq!(&unix_wire[..10], &[45, 2, 6, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(&unix_wire[10..], b"/tmp/s");
+        unix_wire[10] = b'x';
+        let mut cursor = Cursor { bytes: &unix_wire, position: 0 };
+        assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
+        let reply = CanonicalReplyV1::SocketAddress(crate::SocketAddressV1::Inet6 {
+            octets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            port: 0x1234,
+        });
+        let mut bytes = Vec::new();
+        put_reply(&mut bytes, &reply).unwrap();
+        assert_eq!(&bytes[..2], &[16, 1]);
+        assert_eq!(&bytes[2..18], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        assert_eq!(&bytes[18..], &[0x34, 0x12]);
+        let mut cursor = Cursor { bytes: &bytes, position: 0 };
+        assert_eq!(get_reply(&mut cursor), Ok(reply));
+        assert_eq!(cursor.position, bytes.len());
+    }
+
     /// Promise class: normative compatibility vector. MEASURED: all three D3
     /// Mapping requests round-trip with distinct append-only request tags,
     /// ReadOnly/Writable encode as 0/1, and an unknown protection byte is
@@ -2045,6 +2164,8 @@ mod tests {
             ),
             (ResourceKindV1::PipeRead, "resource_kind.PipeRead", 5),
             (ResourceKindV1::PipeWrite, "resource_kind.PipeWrite", 6),
+            (ResourceKindV1::SocketListener, "resource_kind.SocketListener", 7),
+            (ResourceKindV1::SocketStream, "resource_kind.SocketStream", 8),
         ];
         for (kind, name, tag) in kinds {
             match kind {
@@ -2054,7 +2175,9 @@ mod tests {
                 | ResourceKindV1::SpawnPlan
                 | ResourceKindV1::ChildProcess
                 | ResourceKindV1::PipeRead
-                | ResourceKindV1::PipeWrite => {}
+                | ResourceKindV1::PipeWrite
+                | ResourceKindV1::SocketListener
+                | ResourceKindV1::SocketStream => {}
             }
             let catalog_tag = crate::HOST_EFFECT_ABI_V1_BINDINGS
                 .iter()

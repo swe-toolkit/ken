@@ -5,7 +5,8 @@ from a transient error paired with an idempotent operation. The checked
 [converse theorem](#classification-laws) proves the "only from" direction,
 and the [revoked theorem](#classification-laws) proves that
 `error_transience Revoked = Permanent`. The envelope wraps filesystem and
-child-process errors without changing the canonical `IOError` identities.
+child-process and socket errors without changing the canonical `IOError`
+identities.
 Import this surface as `Capability.System.Error`, beside `Capability.System.IO`.
 
 ## Contents
@@ -73,13 +74,39 @@ data ProcessOperation =
   | WaitChild
   | SignalChild
 
-export Operation, FilesystemOp, ProcessOp
+export SocketOperation,
+  ListenSocket,
+  AcceptSocket,
+  ConnectSocket,
+  ReceiveSocket,
+  SendSocket,
+  ShutdownSocket,
+  LocalSocketAddress,
+  CloseSocket
 
-data Operation = FilesystemOp FileOperation | ProcessOp ProcessOperation
+data SocketOperation =
+  ListenSocket
+  | AcceptSocket
+  | ConnectSocket
+  | ReceiveSocket
+  | SendSocket
+  | ShutdownSocket
+  | LocalSocketAddress
+  | CloseSocket
 
-export ResourceRef, FilesystemResource, ProcessResource
+export Operation, FilesystemOp, ProcessOp, SocketOp
 
-data ResourceRef = FilesystemResource (Option Bytes) | ProcessResource (Option Bytes)
+data Operation =
+  FilesystemOp FileOperation
+  | ProcessOp ProcessOperation
+  | SocketOp SocketOperation
+
+export ResourceRef, FilesystemResource, ProcessResource, SocketResource
+
+data ResourceRef =
+  FilesystemResource (Option Bytes)
+  | ProcessResource (Option Bytes)
+  | SocketResource (Option SocketAddress)
 
 export SafeContext, NoSafeContext, RedactedSafeContext
 
@@ -192,6 +219,17 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
         ClosePipe ↦ NonIdempotent;
         WaitChild ↦ Idempotent;
         SignalChild ↦ NonIdempotent
+      };
+    SocketOp socket_operation ↦
+      match socket_operation {
+        ListenSocket ↦ NonIdempotent;
+        AcceptSocket ↦ NonIdempotent;
+        ConnectSocket ↦ NonIdempotent;
+        ReceiveSocket ↦ NonIdempotent;
+        SendSocket ↦ NonIdempotent;
+        ShutdownSocket ↦ NonIdempotent;
+        LocalSocketAddress ↦ Idempotent;
+        CloseSocket ↦ NonIdempotent
       }
   }
 
@@ -209,6 +247,11 @@ pub fn process_error_to_system
       (operation : ProcessOperation) (program_bytes : Option Bytes) (cause : IOError)
     : SystemError =
   MkSystemError (ProcessOp operation) (ProcessResource program_bytes) cause NoSafeContext
+
+pub fn socket_error_to_system
+      (operation : SocketOperation) (address : Option SocketAddress) (cause : IOError)
+    : SystemError =
+  MkSystemError (SocketOp operation) (SocketResource address) cause NoSafeContext
 ```
 
 ## Using it

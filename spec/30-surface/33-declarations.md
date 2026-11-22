@@ -434,14 +434,14 @@ is a **surface error** (`24`) — it never reaches the kernel:
   FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
   MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
   Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
-  ResourceOpenMode, Result, StateOp, Top, TransferCount, Unit,
+  ResourceOpenMode, Result, SocketAddress, StateOp, Top, TransferCount, Unit,
   Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
   resp_coproduct, resp_state, run_state, state_get, state_put}`.
-  This floor subset contains fifty-two exact identities: the historical
+  This floor subset contains fifty-three exact identities: the historical
   Increment 3a fifty-one (the prior forty-seven plus `ConsoleOp`,
-  `console_resp`, `itree_bind` and `resp_coproduct`), and `Decimal`
-  (`30-taxonomy §4`). It is the ambiently nameable checked-identity
-  roster, not a roster of fifty-two types. `Top`
+  `console_resp`, `itree_bind` and `resp_coproduct`), `Decimal`, and
+  `SocketAddress` (`30-taxonomy §4`). It is the ambiently nameable checked-identity
+  roster, not a roster of fifty-three types. `Top`
   and `Bottom` are proposition constants, `Proved` is a proof binding,
   `HostIO` is a type-level function, and `console_resp`, `eqChar`,
   `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -459,8 +459,9 @@ is a **surface error** (`24`) — it never reaches the kernel:
   reserved. There is no per-constructor subset choice. `ResourceKind` is scoped:
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
   `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
-  `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, and
-  `ResourceKind.PipeWrite` are its seven public paths. None is a bare
+  `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
+  `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and
+  `ResourceKind.SocketStream` are its nine public paths. None is a bare
   reserved name.
   `ExitCode` is scoped: `ExitCode.Success` and `ExitCode.Failure` resolve,
   but bare `Success` and `Failure` do not enter B. `ProgramCaps` is scoped:

@@ -695,7 +695,7 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the thirty pre-existing
   floor members are closed in this fixture's two directions
-- spec: `30-taxonomy §4` (current 52-name floor; this fixture tests the
+- spec: `30-taxonomy §4` (current 53-name floor; this fixture tests the
   thirty pre-existing members), `33 §3.3` (the exact floor, three Pair
   companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -714,7 +714,9 @@ unrelated `ElabEnv` does not satisfy them.
      typed by `Cap a` and `Resource k`. Constructor coverage includes bare
      `MkUnit` and `MkFileError`; scoped `Coproduct.InL`/`InR`,
      `Instant.MkInstant`, `ITree.Ret`/`Vis`, all thirteen `IOError.C` cases,
-     all three `CreatePolicy.C` cases, and all twelve `ResourceError.C` cases.
+     all three `CreatePolicy.C` cases, and all twelve current
+     `ResourceError.C` cases; the post-unification `ResourceError.Revoked`
+     successor is not a current constructor.
      The `BufferSpan` and `TransferCount` types are reached while their exact
      constructor ids and parents are recorded as private and unavailable to
      source. Bare `InL`, `InR`, `MkInstant`, `Ret`, and `Vis` are not prelude
@@ -822,7 +824,7 @@ sentinel beside the current contract.
   thirty-name subset and each constructor's scope are contract values; reuse
   of checked identities, allocator accounting, and trust remain durable
   relations
-- spec: `30-taxonomy §4` (current 52-name floor; this vector covers the
+- spec: `30-taxonomy §4` (current 53-name floor; this vector covers the
   original thirty-member subset), `33 §3.3`, `39 §2.0`,
   `38 §1.11.1–§1.11.2`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
@@ -837,7 +839,7 @@ sentinel beside the current contract.
   `trusted_base()`. Through strict roots elaborate an entry with checked
   declarations that reach every source-visible recorded id, including actual
   `bytes_at`/`bytes_slice`/`bytes_decode`, `Cap`, and `Resource` signatures.
-  For each of the seven `ResourceKind` constructors, pair an accepted
+  For each of the nine `ResourceKind` constructors, pair an accepted
   qualified value in expected type `ResourceKind` with a rejection of the bare
   leaf in the same position, using separate fresh source units.
   `SpawnPlan` is an explicit home, not a floor name. Through both roots
@@ -864,7 +866,8 @@ sentinel beside the current contract.
   `ResourceKind` is scoped: its constructor paths are
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
   `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
-  `ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`; none is a bare
+  `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
+  `ResourceKind.SocketListener`, and `ResourceKind.SocketStream`; none is a bare
   constructor path. An imported `SpawnPlan` type in type position is distinct
   from the `ResourceKind.SpawnPlan` constructor. The inductive
   members and their exact constructors are:
@@ -883,7 +886,7 @@ sentinel beside the current contract.
   | `List` | `Nil`, `Cons` |
   | `Nat` | `Zero`, `Suc` |
   | `Option` | `None`, `Some` |
-  | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite` |
+  | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, `ResourceKind.SocketStream` |
   | `ExitCode` | `ExitCode.Success`, `ExitCode.Failure` |
   | `Instant` | `Instant.MkInstant` |
   | `ITree` | `ITree.Ret`, `ITree.Vis` |
@@ -899,8 +902,11 @@ sentinel beside the current contract.
   their checked IDs, while bare `Ret` and `Vis` are not reserved and may be
   bound by source. `FileError` is unscoped and keeps bare `MkFileError`;
   `IOError`, `CreatePolicy`, and `ResourceError` use only their qualified
-  constructor paths. `BufferSpan` and `TransferCount` retain private
-  constructors, with no bare or qualified source constructor path. Each bare
+  constructor paths. The table lists the twelve current `ResourceError`
+  constructors; nullary `ResourceError.Revoked` is a post-unification
+  successor, not a current checked constructor. `BufferSpan` and `TransferCount`
+  retain private constructors, with no bare or qualified source constructor
+  path. Each bare
   `ResourceKind` leaf in value position rejects against its accepted qualified
   control. The `SpawnPlan` type accepts only through its explicit selective
   import; the retained qualified module import alone does not bind it. Each
@@ -929,7 +935,7 @@ sentinel beside the current contract.
   and unchanged `trusted_base()` identities.
   A change to these thirty identities or their constructor scopes is a
   **contract change**, not routine test maintenance. A change to the complete
-  52-name roster is also a contract change and belongs in the full inventory
+  53-name roster is also a contract change and belongs in the full inventory
   case in `minimality.md` plus the dedicated increment cases below; do not
   broaden this historical subset silently. Never refresh a roster or
   constructor table merely because the implementation reports a new value.
@@ -945,7 +951,7 @@ sentinel beside the current contract.
   FS/resource additions and their constructor dispositions. The later scoped
   families, State, Console/Char, and Inc3a additions are covered by dedicated
   route cases and
-  the exact 52-name inventory in `minimality.md`. This is a conformance
+  the exact 53-name inventory in `minimality.md`. This is a conformance
   expectation, not a
   measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
@@ -1307,7 +1313,9 @@ duplicates a checked definition.
 - promise class: **normative compatibility vector** — the original checked
   carrier and comparator identities survive surface admission
 - spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`; `36 §1`
-- given: in each of the three fresh source routes, elaborate:
+- given: in three fresh units, elaborate the following through
+  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`,
+  and rootless `elaborate_file_v1`, respectively:
 
   ```ken
   fn keep_stream (stream : ConsoleStream) : ConsoleStream = stream
@@ -2451,8 +2459,8 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 52-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
-| current floor inventory | the signature traversal and internal-provision set close to 52 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 44 internal-provision identities and adds no trust | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
+| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 53-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
+| current floor inventory | the signature traversal and internal-provision set close to 53 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 45 internal-provision identities and adds no trust; `SocketAddress` is internal-provision, and its three representation constructors are private at qualified paths with no bare names reserved | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
 | Inc3a direct-tree vocabulary | roots-loaded and rootless entry resolve ConsoleOp's four cases, response reductions, itree_bind and resp_coproduct; bare bind is unbound on every route | the scoped families and operation names are the source contract; bare constructors and bind each have same-route positive controls | same-route qualified positives, local-family controls, and captured itree_bind identity; no ambient `bind` alias is claimed |
 | State direct operations | two routes use typed state_get, state_put, and run_state references; each protected operation has a collision control and local get/put declarations remain legal | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
 | Inc3a package homes | each of 24 ordinary H names has its own import/omission pair; eight FixedWidth conversions have separate range vectors | the target home set is 96: 81 base rows minus 17 retired FileOperation rows plus 32 additions | `seed-strict-package-homes.md` covers the exact new names and ranges; the counts are normative targets, not test-run measurements |
@@ -3236,10 +3244,11 @@ claimed for this corpus.
 The original executable closure derives the signature eight and exact
 internal `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` independently; it
 never widens resolution from compiler-global presence. Constructor capture
-remains exact-parent-derived, including the seven scoped `ResourceKind` paths:
+remains exact-parent-derived, including the nine scoped `ResourceKind` paths:
 `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
 `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
-`ResourceKind.PipeRead`, and `ResourceKind.PipeWrite`. Pair-family capture
+`ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
+`ResourceKind.SocketListener`, and `ResourceKind.SocketStream`. Pair-family capture
 reuses the four pre-source ids and keys every companion type to the exact Pair
 id. The fifteen-name landing closes the strict-Pair rows and every Pair-binding
 clash before allocation. Canonical `Ord Nat`, `Ord Pair`, and `DecEq Pair`
