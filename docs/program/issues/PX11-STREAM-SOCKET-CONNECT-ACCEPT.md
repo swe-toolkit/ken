@@ -1,7 +1,7 @@
 ---
 id: PX11-STREAM-SOCKET-CONNECT-ACCEPT
 title: "A Ken program cannot open a network connection: HostOpV1 has no Net operation, spec 38 records that no Net producer has landed, and System.Error has no socket context. Give PX11 its first slice: typed IPv4, IPv6 and Unix-domain addresses, stream sockets with listen, accept, connect, bounded send and receive, and shutdown, each failure a System.Error with a socket context, on the interpreter"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
