@@ -10,7 +10,8 @@ laws. The factor-two clients exercise the public laws at arbitrary
 vector and matrix dimensions; closed equal-input controls and
 independent value oracles ground the factor and premise forms. The
 Zero-factor cases keep a true scaled-equality premise while changing
-only the factor from two to Zero. Each refusal is at the whole
+only the premise factor from two to Zero. Each law call keeps predecessor
+`one`. Each refusal is at the whole
 appended declaration, not a token-exact span. The seed has not been
 executed.
 
@@ -144,8 +145,9 @@ The accepted client above checks that the Zero-factor premise is true:
 `zero2`, and the corresponding one-row matrix premise also accepts
 with `Refl`. Append each refused declaration below separately to a
 fresh copy of the entire accepted client. Each has the same form as its
-factor-two client, with only the factor changed from two to Zero; the
-law's predecessor argument changes from `one` to `Zero` accordingly.
+factor-two client except that `h` equates Zero-scaled inputs. The law
+call keeps predecessor `one`, so it still expects factor two; only the
+premise factor differs.
 
 ### stdlib/linear-algebra/reject-vector-scale-cancel-zero-factor
 
@@ -153,8 +155,9 @@ law's predecessor argument changes from `one` to `Zero` accordingly.
 - promise class: durable invariant.
 - given: the accepted client and only the declaration below.
 - expect: refuse with `TypeMismatch` over the whole appended
-  declaration. Do not assert a finer source span. The premise is an
-  inhabited Zero-factor equality, but this law accepts only `Suc k`.
+  declaration. Do not assert a finer source span. The call keeps
+  predecessor `one` and expects factor two; `h` is an inhabited
+  Zero-factor equality, so the mismatch is only at its premise.
 - why: Zero scaling identifies the distinct vectors `[1,2]` and
   `[3,4]`; their equal images do not license cancellation.
 
@@ -163,7 +166,7 @@ theorem vector_cancel_at_zero
     (h : Equal (Vec Nat two)
       (vector_scale two Zero v12) (vector_scale two Zero v34))
   : Equal (Vec Nat two) v12 v34 =
-      vector_scale_cancel two Zero v12 v34 h
+      vector_scale_cancel two one v12 v34 h
 ```
 
 ### stdlib/linear-algebra/reject-matrix-scale-cancel-zero-factor
@@ -172,8 +175,9 @@ theorem vector_cancel_at_zero
 - promise class: durable invariant.
 - given: the accepted client and only the declaration below.
 - expect: refuse with `TypeMismatch` over the whole appended
-  declaration. Do not assert a finer source span. The matrix premise
-  is inhabited, but this law accepts only `Suc k`.
+  declaration. Do not assert a finer source span. The call keeps
+  predecessor `one` and expects factor two; `h` is an inhabited
+  Zero-factor matrix equality, so the mismatch is only at its premise.
 - why: Zero scaling maps both one-row matrices to the same zero
   matrix, while their original rows differ.
 
@@ -183,7 +187,7 @@ theorem matrix_cancel_at_zero
       (matrix_scale one two Zero m12)
       (matrix_scale one two Zero m34))
   : Equal (Vec (Vec Nat two) one) m12 m34 =
-      matrix_scale_cancel one two Zero m12 m34 h
+      matrix_scale_cancel one two one m12 m34 h
 ```
 
 ## Separate false-conclusion control
