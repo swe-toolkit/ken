@@ -11,6 +11,14 @@ native parity and trusted-base measurement are not claimed by this seed. The
 first slice deliberately refuses native execution for a Net-declared program
 before object emission.
 
+The root-scope rows follow the ruled RT-NET-UNIX-PATH-FS-ROOT-SCOPE AC-0.
+For existing valid Unix addresses, the harness uses a fresh short canonical
+scratch CWD `D` and its spelling `R` as the default `FS AFull` root, keeping
+valid path spellings within 2–107 bytes. For the confinement fixture, use
+canonical CWD `D`, `FS AFull "./jail"`, and
+`R = canonicalize(D/jail)`, with a pre-created sibling `D/outside`. The
+abstract namespace remains unchanged and is not used in these rows.
+
 ## Surface and authority
 
 ### surface/ffi-io/socket-address-builders-enforce-indexed-lengths
@@ -65,8 +73,9 @@ before object emission.
 - given: at the host-operation boundary, submit otherwise well-formed
   `NetListen` and `NetConnect` requests whose decoded Unix address bypasses
   `socket_unix_path`, exercising each invalid path property from the preceding
-  case. Pair each with the same operation using a valid `/x` address, `Net Unix`
-  authority and `FS AFull`. Record socket-backend calls.
+  case. Give each request the same `FS AFull` root `R` and `Net Unix` authority.
+  Pair each with the same operation using the valid absolute address `R/x`.
+  Record socket-backend calls.
 - expect: each invalid decoded address is refused before any socket syscall;
   each valid control reaches its backend exactly once. No particular
   diagnostic code is asserted because §1.13 does not specify one for this
@@ -84,10 +93,12 @@ before object emission.
   implication. For both operations, also try `128.0.0.0:4243`, just beyond
   the upper edge of `127.0.0.0/8`, under `Loopback` and `Inet`. Use the same
   non-loopback controls `192.0.2.1:4242` and IPv6 `2001:db8::1:4242` under both
-  grants; also try an absolute Unix path under
-  `Loopback` and `Unix`. Use a backend spy for the address-class boundary.
-  Separately, test `Net Unix` admission with `FS AFull`, `FS APartial` and
-  `FS ANone`, keeping that class fixed. `Net AFull` is an invented class
+  grants; also try the same absolute Unix path `R/class.sock` beneath the
+  supplied `FS AFull` root under `Loopback` and `Unix`. Use a backend spy for
+  the address-class boundary.
+  Separately, test `Net Unix` admission at the same in-root path `R/class.sock`
+  with `FS AFull`, `FS APartial` and `FS ANone`, keeping the path and Net class
+  fixed. `Net AFull` is an invented class
   control.
 - expect: for each in-range loopback address, including `127.1.2.3:4243`,
   both listen and connect reach the backend under `Loopback` and `Inet`, with
@@ -170,9 +181,9 @@ before object emission.
   `NetShutdown` and `NetLocalAddress` on a stream. A test harness revokes the
   originating grant out of band before admission; no Ken-callable revoke term
   is used. Compare with a separately acquired resource of the same kind under
-  the same live Net class and, for Unix, `FS AFull`. Keep buffer bounds,
-  rights and resource kind valid. Record guarded host-leaf calls and bracket
-  `ResourceRelease` calls.
+  the same live Net class and, for Unix, `FS AFull` with its socket path beneath
+  root `R`. Keep buffer bounds, rights and resource kind valid. Record guarded
+  host-leaf calls and bracket `ResourceRelease` calls.
 - expect: each revoked held-resource operation returns exactly
   `ResourceError.ResourceHostIO IOError.Revoked` and makes no guarded host-leaf
   call; each live control reaches its leaf. When a body operation returns the
@@ -194,9 +205,9 @@ before object emission.
   `NetShutdown` and `NetLocalAddress` on a stream. A test harness revokes the
   originating grant out of band before admission; no Ken-callable revoke term
   is used. Compare with a separately acquired resource of the same kind under
-  the same live Net class and, for Unix, `FS AFull`. Keep buffer bounds,
-  rights and resource kind valid. Record guarded host-leaf calls and bracket
-  `ResourceRelease` calls.
+  the same live Net class and, for Unix, `FS AFull` with its socket path beneath
+  root `R`. Keep buffer bounds, rights and resource kind valid. Record guarded
+  host-leaf calls and bracket `ResourceRelease` calls.
 - expect: after unification, each revoked held-resource operation returns
   exactly nullary `ResourceError.Revoked` and makes no guarded host-leaf call;
   each live control reaches its leaf. The bracket still settles an already
@@ -206,13 +217,118 @@ before object emission.
 
 ## Interpreter behavior
 
+The seven root-scope rows below use fresh runs of the ruled AC-1 fixture.
+Let canonical CWD be `D`; create real directories `D/jail` and writable
+`D/outside`. Choose `D` so the valid and adversarial pathname spellings are
+2–107 bytes. The host harness supplies `FS AFull` rooted at `./jail`,
+so `R=canonicalize(D/jail)`, and the program declares `Net Unix`. Keep listeners
+at `R/svc.sock` and
+`D/outside/svc.sock` live for the connect and guard rows. Keep
+`R/made.sock` and `D/outside/made.sock` absent before the listen rows.
+Record socket-backend calls. These pathname cases do not add or change an
+abstract Unix address.
+
+### surface/ffi-io/socket-unix-root-listen-inside
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, listen at the absent in-root path
+  `R/made.sock`.
+- expect: listen succeeds, reaches its socket backend, and creates
+  `R/made.sock`; bracket release closes the descriptor but leaves the path.
+- controls: the outside-listen row keeps the operation, grant and fixture
+  fixed while moving only the path outside `R`.
+- why: the in-root row guards against a fix that refuses every Unix path.
+
+### surface/ffi-io/socket-unix-root-listen-outside
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the same AC-1 fixture, `D/outside` exists and is writable;
+  listen at the absent sibling path `D/outside/made.sock`.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; `D/outside/made.sock` remains absent.
+- controls: the in-root listen succeeds with the same operation, grant and
+  fixture. The existing writable parent rules out a missing-directory error.
+- why: this pins outside bind refusal and the absence of an outside inode.
+
+### surface/ffi-io/socket-unix-root-connect-inside
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, keep a listener live at `R/svc.sock` and
+  connect to that in-root address.
+- expect: connect succeeds and reaches its socket backend exactly once.
+- controls: the outside-connect row uses the same class, grant and fixture
+  with a live outside peer; only the target path crosses `R`.
+- why: this positive row guards against an over-broad root refusal.
+
+### surface/ffi-io/socket-unix-root-connect-outside
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, keep a host-harness listener live at
+  `D/outside/svc.sock`; connect to that outside address.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the live outside listener receives no connection.
+- controls: the in-root connect succeeds. The live peer distinguishes root
+  denial from `NotFound` or connection refusal.
+- why: the outside path is otherwise valid and its peer is reachable.
+
+### surface/ffi-io/socket-unix-root-connect-dotdot
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, keep `D/outside/svc.sock` live and connect to
+  `D/jail/../outside/svc.sock`.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the outside listener receives no connection.
+- controls: the in-root connect succeeds; the AC-2 raw-path bypass reaches
+  this live outside listener.
+- why: the address contains a `..` component even though it resolves to the
+  outside socket.
+
+### surface/ffi-io/socket-unix-root-connect-parent-symlink
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, make `D/jail/link` a symlink to `../outside`,
+  keep `D/outside/svc.sock` live, and connect to `D/jail/link/svc.sock`.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the outside listener receives no connection.
+- controls: the in-root connect succeeds; the AC-2 raw-path bypass follows
+  this parent symlink to the outside listener.
+- why: the requested address contains no `..`; refusal pins parent-symlink
+  handling.
+
+### surface/ffi-io/socket-unix-root-connect-leaf-symlink
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: in the AC-1 fixture, make `D/jail/alias.sock` a symlink to
+  `../outside/svc.sock`, keep the outside listener live, and connect to
+  `D/jail/alias.sock`.
+- expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
+  syscall; the outside listener receives no connection.
+- controls: the in-root connect succeeds; the AC-2 raw-path bypass follows
+  this leaf symlink to the outside listener.
+- why: this isolates the final-component symlink guard from parent walking.
+
+The effective AC-2 mutation routes Unix listen and connect through raw
+absolute-path `bind` and `connect`, bypassing root resolution. It must make
+exactly the two outside rows and all three guard rows fail their refusal
+expectations, while both in-root rows stay green. Under the bypass, outside
+listen creates the inode and all outside connects reach the live listener. This
+is a mutation expectation, not an executed test or mutation.
+
 ### surface/ffi-io/socket-loopback-exchange-and-eof
 
 - promise class: durable invariant.
 - spec: §1.13.
-- given: for each of IPv4 `127.0.0.1`, IPv6 `::1` and a Unix path in a
-  scratch directory, listen and connect to the resulting listener; read the
-  OS-assigned IP port with `socket_local_address`. Accept through a bracket.
+- given: for each of IPv4 `127.0.0.1`, IPv6 `::1` and the Unix path
+  `R/exchange.sock` beneath its default `FS AFull` root, listen and connect to
+  the resulting listener; read the OS-assigned IP port with
+  `socket_local_address`. Accept through a bracket.
   Send a known seven-byte chunk in each direction. Receive into a checked
   buffer and compare every octet to the known chunk; after write shutdown,
   read again. Include a first receive bound of four and drain the remainder.
@@ -226,11 +342,11 @@ before object emission.
 
 - promise class: durable invariant.
 - spec: §1.13 System.Error and absent-path behavior.
-- given: connect to an absolute Unix pathname not created in a fresh scratch
-  directory. Classify the returned `ResourceHostIO` cause with
-  `socket_error_to_system ConnectSocket (Some SocketAddress address)`. Pair
-  with a wrong-class request whose backend spy would report an attempted
-  syscall.
+- given: connect to the absent absolute Unix pathname `R/absent.sock` inside
+  the fresh default-root fixture. Classify the returned `ResourceHostIO` cause
+  with `socket_error_to_system ConnectSocket (Some SocketAddress address)`.
+  Pair with a wrong-class request to the in-root path `R/wrong-class.sock`,
+  whose backend spy would report an attempted syscall.
 - expect: the absent path yields `SocketOp ConnectSocket`,
   `SocketResource` naming that same address, canonical `IOError.NotFound`,
   and no safe context. The wrong-class request yields
