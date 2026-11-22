@@ -1,65 +1,103 @@
 ---
 id: ABI-FSCREATE-RECURSIVE-CONTRACT
-title: "FsCreateDirectory's `recursive` flag is structurally inert -- resolve the behavioral contract: give it `mkdir -p` meaning, or retire the dead field"
-status: draft
-owner: spec
-size: S
-gate: none
+title: "create_directory takes a recursive Bool that the surface, the wire, the interpreter, native lowering and ken-verify all carry, but both host implementations drop it, so recursive=True silently creates one leaf and refuses a missing parent. Rule from an AC-0 whether the flag gains parent-chain meaning under the filesystem root confinement or leaves the operation, and land the ruled result on both lanes"
+status: ready
+owner: language
+size: M
+tier: T1
+gate: architect
 depends_on: []
-blocks: []
+blocks: [LINUX-ABI-EXIT-SERVICE-SUPERVISOR]
 github: null
-origin: "Registered by the Steward 2026-09-07 from ABI-A3's D0 hard-stop (runtime-implementer evt_4k04typ5a45mg) and the Architect's §6 contract ruling (evt_3hfxk94v9f9n7). ABI-A3 blessed the INERT BEHAVIOR as its promoted NativeTested contract; the Architect explicitly did NOT bless the inert FIELD as an intended-forever contract, and directed that its resolution is a separate Spec-owned behavioral-contract question routed via the Steward -- not ABI-A3's scope."
+origin: "Registered by the Steward 2026-09-07 from ABI-A3's D0 hard stop (runtime-implementer evt_4k04typ5a45mg) and the Architect's §6 contract ruling (evt_3hfxk94v9f9n7), which blessed the inert behaviour as A3's NativeTested contract but not the inert field. Framed 2026-11-22 for the L1b track on the Language ring (operator: \"Approved. Use the language ring.\"), the first of the filesystem nodes that run alongside the native chain. L1 Linux ABI program, Steward order."
 ---
 
-> ## This is a tracker node, not a shovel-ready frame.
->
-> It registers a measured contract-completeness gap so it is not lost. The
-> behavioral-contract call (give the flag meaning, or retire it) is the Spec
-> enclave's (`COORDINATION §4`: behavioral contract is Spec's lane). No frame is
-> authored, and no work is released, until the operator's lane roster admits it —
-> it queues behind the active lanes. Filed low-priority; nothing is blocked on it.
+# create_directory's recursive flag
 
-## The gap
+## Objective
 
-`FsCreateDirectory` (`0x0306`) carries the `recursive:u64` field of
-`FsRecursivePathRequestV1` (`abi_v1.rs:200`). At `origin/main = e9fc7fcad` that
-field is **structurally inert**: the landed `lib.rs::create_directory(parent,
-leaf)` is a single `mkdirat` with no recursive parameter, so the flag has no
-branch to reach. `recursive=true` and `recursive=false` behave identically —
-single leaf; `NotFound` on a missing parent; `AlreadyExists` on an existing
-target — and the interpreter matches.
+`create_directory` either honours `recursive = True` by creating the
+missing parent chain inside the capability's root, or no longer takes the
+flag. In both cases the interpreter and a native build agree, and spec 38
+states the result. No caller can pass a flag that changes nothing.
 
-ABI-A3 promoted `FsCreateDirectory` to `NativeTested` on the honest ground that
-**native execution agrees with the interpreter** over this inert behavior
-(`native==interpreter`, both `NotFound` on a missing parent). That promotion is
-correct and complete; it is a **faithfulness** claim, not a **completeness**
-claim about the create semantics.
+## Settled inputs (main `7e8e1cc38`; anchors re-checked at release)
 
-## Why it still needs a ruling
+- **The surface carries it.** The prelude declares `proc create_directory
+  (a : Auth) (cap : Cap a) (recursive : Bool) (path : Bytes)`
+  (`prelude.rs` ~`:2800`), whose package home is
+  `Capability.Filesystem.Authority` (spec 38 ~`:1445`).
+- **The wire carries it.** `FsCreateDirectory` (`0x0306`) uses
+  `FsRecursivePathRequestV1 { recursive: u64, path }` (`abi_v1.rs:197`),
+  decoded at ~`:1836`. `FsRemoveDirectory` shares the struct.
+- **Both hosts drop it.** The ABI host takes `_recursive` and calls one
+  `create_directory(parent, leaf)` (`abi_v1.rs:696`). The interpreter's
+  real host does the same (`eval.rs` ~`:4615`). `ken_host::create_directory`
+  is a single `mkdirat` (`lib.rs:513`). The sibling remove path does
+  branch: `recursive` selects `remove_directory_tree` (`abi_v1.rs:719`).
+- **Evidence records it.** `ken-verify` records the flag
+  (`host.rs` ~`:467`, `scenario.rs` ~`:3158`), and native lowering
+  marshals it (`lowering/effects.rs`). The operation is `NativeTested` on
+  the inert behaviour (ABI-A3).
+- **The spec is silent.** Spec 38 names `create_directory` only in the
+  package-home list. No sentence gives `recursive` a meaning.
 
-A promoted op carries an ABI request field with no observable effect. A future
-caller passing `recursive=true` expecting `mkdir -p` semantics silently gets
-single-leaf `NotFound` instead — a latent surface gap on a shipped op. Two
-honest resolutions, and the choice is a behavioral-contract call:
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch; do not build around it.
 
-1. **Give the flag meaning** — `recursive=true` creates the missing parent chain
-   (`mkdir -p`). This is a **new capability** (a parent-chain primitive beyond
-   the landed single `mkdirat`), and would be its own build WP once the spec
-   owes it.
-2. **Retire the dead field** — if the spec does not owe parent-chain creation,
-   the `recursive` field on `FsCreateDirectory` is dead weight and its removal is
-   a wire/schema change (arity 3 → 2 for this op), also spec-governed.
+## Scope
 
-Ground the choice against the ABI/FS chapter of the spec and
-`docs/program/10-linux-abi-completion.md`; report what the spec settles versus
-what it leaves open, the same shape ABI-A3's own `D1` fork used.
+The flag's meaning or removal across the prelude, `ken-host` (wire, ABI
+host, `lib.rs`), `ken-interp`, native lowering, `ken-verify`, spec 38,
+and the consumers AC-0 sweeps. No change to `FsRemoveDirectory`'s
+recursive removal, or to the root confinement rules themselves.
 
-## What this is NOT
+## Deliverable
 
-- **Not ABI-A3's scope.** A3 is a promotion; it does not give the flag meaning
-  or grow the ABI. This node is where that question lives. See the A3 frame's §3
-  `FsCreateDirectory` clause and `AC-2`.
-- **Not a blocker.** A3 completes independently; this node can be resolved before
-  or after A3 lands, on the operator's schedule.
-- **Not a soundness or TCB item.** No `trusted_base()` delta; a host/ABI
-  behavioral-contract completeness question.
+One candidate with the ruled contract, both lanes agreeing, and the spec
+38 sentence as a Spec co-turn.
+
+## Acceptance
+
+- **AC-0 (Architect, with the Spec Leader, before code).** Rule meaning or
+  retirement against PRINCIPLES' subsume-don't-proliferate item. A client
+  can already create a chain by calling `create_directory` once per
+  prefix. The ruling weighs that against what one host call buys:
+  atomicity against a concurrent rename, and confinement checked once per
+  component. If it rules meaning, it states:
+  - the error for an existing non-directory component;
+  - that an existing target directory is either `AlreadyExists` or success;
+  - how each created component stays beneath the root, with no symlink
+    followed out of it.
+  If it rules retirement, it states the wire change, a new request struct
+  or the shared struct with a fixed field, and whether `0x0306`'s arity
+  moves. Either way, sweep every consumer across `crates/`, `catalog/`,
+  `conformance/`, `examples/` and the CLI fixtures.
+- **AC-1 (meaning).** A row creates `R/a/b/c` with `recursive = True`
+  where only `R` exists, and all three directories exist afterwards, on
+  both lanes. The same call with `recursive = False` refuses `NotFound`
+  and creates nothing. A row whose chain passes through a symlink to a
+  directory outside `R` refuses, and nothing is created outside `R`.
+- **AC-1 (retirement).** No surface, wire, host or evidence path carries
+  the flag. A source that passes it fails to elaborate, and
+  `create_directory` keeps its single-leaf behaviour on both lanes.
+- **AC-2.** Full-workspace CI is green on the exact candidate.
+
+## Stop conditions
+
+- Meaning needs a confinement primitive the host does not have, such as
+  creating beneath a root without following symlinks. Report it, and do
+  not create through `/proc/self/fd` path concatenation.
+- Retirement needs a change to `FsRemoveDirectory`'s request.
+
+Checks: 3 fired. I grepped `crates/`, `catalog/`, `conformance/`,
+`examples/` and the CLI tests for `create_directory` and
+`FsCreateDirectory` on `7e8e1cc38`. Seventeen crate source files and at
+least seven test files name the operation, so AC-0 owns a whole-root
+sweep. 2 fired. The guarded property is "nothing is created outside the
+root". Its fan-in under meaning is every component the chain creates, not
+only the leaf. AC-1's symlink row covers an intermediate component.
+8 fired. A host that still ignores the flag fails AC-1's three-level row.
+A retirement that drops the flag from the surface but leaves it on the
+wire passes an elaboration row alone, so AC-1's retirement row names the
+surface, the wire, the host and the evidence paths.
