@@ -245,6 +245,14 @@ impl NetScopeV1 {
         Self(bits)
     }
 
+    pub fn bits(self) -> u8 {
+        self.0
+    }
+
+    pub fn from_bits_v1(bits: u64) -> Option<Self> {
+        (bits <= 7).then_some(Self(bits as u8))
+    }
+
     pub fn admits(self, address: &crate::SocketAddressV1) -> bool {
         match address {
             crate::SocketAddressV1::Unix { .. } => self.0 & 4 != 0,
@@ -292,8 +300,11 @@ impl Cap {
         self
     }
     /// Only the runner calls this after checked Program admission.
-    pub fn with_declared_net_grant(mut self, classes: &[NetClassV1]) -> Self {
-        self.net = NetScopeV1::from_classes(classes);
+    pub fn with_declared_net_grant(self, classes: &[NetClassV1]) -> Self {
+        self.with_declared_net_scope(NetScopeV1::from_classes(classes))
+    }
+    pub fn with_declared_net_scope(mut self, scope: NetScopeV1) -> Self {
+        self.net = scope;
         self
     }
     pub fn net_scope(&self) -> NetScopeV1 {

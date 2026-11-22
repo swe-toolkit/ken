@@ -1750,6 +1750,52 @@ mod tests {
         }
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: each of the
+    /// three trace-wire address family bytes equals its separately authored
+    /// catalog binding. CLAIMED: trace and native ABI agree on family tags.
+    /// THE GAP: this does not test native decoding or address byte lengths;
+    /// those have independent native request known-answer tests.
+    #[test]
+    fn px11_trace_socket_families_equal_catalog_tags() {
+        let cases = [
+            (
+                crate::SocketAddressV1::Inet4 {
+                    octets: [127, 0, 0, 1],
+                    port: 37,
+                },
+                "socket_family.inet4",
+                0_u64,
+            ),
+            (
+                crate::SocketAddressV1::Inet6 {
+                    octets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    port: 37,
+                },
+                "socket_family.inet6",
+                1,
+            ),
+            (
+                crate::SocketAddressV1::Unix {
+                    path: b"/tmp/px11-family".to_vec(),
+                },
+                "socket_family.unix",
+                2,
+            ),
+        ];
+        for (address, name, expected) in cases {
+            let tag = crate::HOST_EFFECT_ABI_V1_BINDINGS
+                .iter()
+                .find_map(|(kind, binding, value)| {
+                    (*kind == "tag" && *binding == name).then_some(*value)
+                })
+                .unwrap_or_else(|| panic!("missing catalog tag {name}"));
+            assert_eq!(tag, expected, "catalog {name}");
+            let mut wire = Vec::new();
+            put_socket_address(&mut wire, &address).unwrap();
+            assert_eq!(u64::from(wire[0]), tag, "trace family {name}");
+        }
+    }
+
     /// Promise class: normative compatibility vector. MEASURED: seven Net
     /// request tags and two address families have independent known-answer
     /// bytes, decode consumes the whole request, and an invalid Unix path

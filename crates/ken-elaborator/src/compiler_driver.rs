@@ -258,7 +258,7 @@ pub struct NativeEntrypointPlanV1 {
     pub(crate) authority_name: String,
     pub(crate) fs_root_spec: ken_host::FsRootSpec,
     pub(crate) process_declared: bool,
-    pub(crate) net_declared: bool,
+    pub(crate) net_scope: u8,
     pub(crate) allow_root_execution: bool,
 }
 
@@ -2644,7 +2644,7 @@ fn prepare_native_program_from_elaborated(
     // Arm I: no native socket opcode exists. Reject a declared Net grant
     // before planning or object emission, even when its first operation is
     // hidden behind a checked helper rather than visible at the entrypoint.
-    if plan.net_declared {
+    if plan.net_scope != 0 {
         let unavailable = ken_host::HostOpV1::ALL
             .into_iter()
             .filter(|operation| {
@@ -3222,6 +3222,7 @@ fn emit_native_program_preparation(
             },
             fs_root_spec: plan.fs_root_spec.clone(),
             process_declared: plan.process_declared,
+            net_scope: plan.net_scope,
             fs_root_binding: ken_runtime::fs_root_plan_binding_v1(
                 *plan_transport_hash,
                 &plan.fs_root_spec,
@@ -4241,7 +4242,7 @@ fn native_entrypoint_plan(
         authority_name: checked.authority_name.clone(),
         fs_root_spec: checked.fs_root_spec.clone(),
         process_declared: checked.process_declared,
-        net_declared: !checked.net_classes.is_empty(),
+        net_scope: ken_host::NetScopeV1::from_classes(&checked.net_classes).bits(),
         allow_root_execution: checked.allow_root_execution,
     })
 }
@@ -4751,7 +4752,7 @@ fn canonical_native_entrypoint_plan_bytes(plan: &NativeEntrypointPlanV1) -> Vec<
     }
     out.push(u8::from(plan.allow_root_execution));
     out.push(u8::from(plan.process_declared));
-    out.push(u8::from(plan.net_declared));
+    out.push(plan.net_scope);
     out.extend_from_slice(&plan.fs_root_spec.tag_v1().to_le_bytes());
     out.extend_from_slice(&(plan.fs_root_spec.bytes().len() as u64).to_le_bytes());
     out.extend_from_slice(plan.fs_root_spec.bytes());
@@ -8790,7 +8791,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             authority_name: "AFull".to_string(),
             fs_root_spec: ken_host::FsRootSpec::default(),
             process_declared: false,
-            net_declared: false,
+            net_scope: 0,
             allow_root_execution: false,
         };
         let stale_hash = fingerprint(&canonical_native_entrypoint_plan_bytes(&plan));
