@@ -951,6 +951,20 @@ pub theorem graph_from_successors_complete
     : list_elem q t (successors s)
       → Equal Bool (edge q (graph_from_successors q d successors) s t) True =
   contains_complete q d t (successors s)
+
+pub fn successors_append (q : Type) (f : q → List q) (g : q → List q) (v : q) : List q =
+  list_append q (f v) (g v)
+
+pub theorem graph_from_successors_append
+      (q : Type) (d : DecEq q) (f : q → List q) (g : q → List q) (s : q) (t : q)
+    : Equal Bool
+        (edge q (graph_from_successors q d (successors_append q f g)) s t)
+        (edge
+          q
+          (graph_union q (graph_from_successors q d f) (graph_from_successors q d g))
+          s
+          t) =
+  contains_append q d t (f s) (g s)
 ```
 
 ## 3. Using it
@@ -1045,6 +1059,13 @@ from the union back to `g`: the private `graph_union_edge_absorb` splits a
 union edge with `graph_union_edge_cases`, keeps a `g` edge as it is, and sends
 an `h` edge through the edge-inclusion premise. `graph_union_reachable_idem`
 is that law at `h := g`, with the identity inclusion.
+
+For successor lists, `contains` over `list_append` is the `bool_or` of
+membership in the two inputs. Private `contains_append` inducts on the first
+list; its Cons step carries the induction hypothesis by `cong` and uses
+private `bool_or_regroup` to reassociate the results. The public
+`graph_from_successors_append` law applies this equation to the two lists at
+the source vertex, identifying the appended graph's edge with the union's.
 
 For dependency order, a finite pair scan either constructs a cycle from an
 edge and a return walk or returns a checked no-cycle condition for *all*
@@ -3047,6 +3068,37 @@ theorem ordered_list_forward
           (contains_sound q d x (ordered_list q fq d g) (ordered_list_covers q fq d g x))
           (contains_sound q d y (ordered_list q fq d g) (ordered_list_covers q fq d g y))
           (edge_rank_strict q fq d g no_cycles x y edge_xy)
+
+theorem contains_append
+      (q : Type) (d : DecEq q) (x : q) (xs : List q) (ys : List q)
+    : Equal Bool
+        (contains q d x (list_append q xs ys))
+        (bool_or (contains q d x xs) (contains q d x ys)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons y rest ↦
+      trans
+        Bool
+        (bool_or (d.eq x y) (contains q d x (list_append q rest ys)))
+        (bool_or (d.eq x y) (bool_or (contains q d x rest) (contains q d x ys)))
+        (bool_or (bool_or (d.eq x y) (contains q d x rest)) (contains q d x ys))
+        (cong
+          Bool
+          Bool
+          (contains q d x (list_append q rest ys))
+          (bool_or (contains q d x rest) (contains q d x ys))
+          (λc. bool_or (d.eq x y) c)
+          (contains_append q d x rest ys))
+        (bool_or_regroup (d.eq x y) (contains q d x rest) (contains q d x ys))
+  }
+
+theorem bool_or_regroup
+      (b : Bool) (c : Bool) (e : Bool)
+    : Equal Bool (bool_or b (bool_or c e)) (bool_or (bool_or b c) e) =
+  match b {
+    True ↦ Proved;
+    False ↦ Refl
+  }
 ```
 
 ## 5. Design notes
@@ -3081,7 +3133,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–19](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–20](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3113,17 +3165,22 @@ removes a shortcut edge while keeping the ordered list and refuses inclusion
 of an added backward edge. The §19
 [seed](../../../../conformance/stdlib/graphs/seed-graph-union-reachable-absorb.md)
 checks absorption with a proper subgraph, idempotence, and refusal when the
-second graph adds an edge. The public API exports six data families (`Graph`,
-`Walk`, `Cycle`, `ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
+second graph adds an edge. The §20
+[seed](../../../../conformance/stdlib/graphs/seed-graph-successor-append-union.md)
+checks that an appended successor list has the union's edge, in both operand
+orders, and that neither operand alone supplies the missing edge. The public
+API exports six data families (`Graph`, `Walk`, `Cycle`, `ReachWitness`,
+`TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
-`MkTopoOrder`, `HasOrder`, `HasCycle`). Its seventeen functions are `edge`,
+`MkTopoOrder`, `HasOrder`, `HasCycle`). Its eighteen functions are `edge`,
 `walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors`. Thirty-five kernel-checked theorems expose their laws,
-including successor-list soundness and completeness. Every other helper is
-private to this package.
+`graph_from_successors` and `successors_append`. Thirty-six kernel-checked
+theorems expose their laws, including successor-list soundness, completeness,
+and the appended-list edge equation. Every other helper is private to this
+package.
 
 | Reader task | Section |
 |---|---|
@@ -3168,9 +3225,13 @@ The union-grouping package test checks the open law and both closed groupings,
 refuses the claim that the three-way union reaches only where
 `graph_union g_only h_only` does, and confirms both regroup lemmas remain
 private. The union-absorption package test applies both public laws to open
-and closed graphs, compares exact trusted identities, and isolates the added-edge
-inclusion refusal. The reverse-swap package test checks the open law and both closed
-endpoint pairs on a directed chain, refuses swapping without graph reversal,
-and confirms the one-direction helper remains private. These package tests do
-not stand in for official conformance-runner execution or CI, and do not
-establish execution of the §2 seed.
+and closed graphs, compares exact trusted identities, and isolates the
+added-edge inclusion refusal. The reverse-swap package test checks the open
+law and both closed endpoint pairs on a directed chain, refuses swapping
+without graph reversal,
+and confirms the one-direction helper remains private. The successor-append
+package test checks the open edge law, both operand orders and independent edge
+values, refuses each operand-alone claim on a fresh accepted prefix, compares
+exact trusted identities and keeps both proof helpers private. These package
+tests do not stand in for official conformance-runner execution or CI, and do
+not establish execution of the §2 seed.
