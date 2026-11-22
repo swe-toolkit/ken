@@ -18,7 +18,8 @@
 > SPEC-GEOMETRY-BOX-INSIDE-INTERSECT-HULL §16;
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE §17;
 > SPEC-GEOMETRY-NAT-ORIENTATION §18;
-> SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19).** Sections 1–4,
+> SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19;
+> SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1609,3 +1610,80 @@ must refuse both when asserted by `Proved` and when supplied via
 point's `x` relative to the accepted shared-`x` row. These are
 CV-owned seed discriminators, not evidence that the D0 ran that seed
 or that a generic law follows from closed examples.
+
+## 20. Positive area supplies a stored corner as a member
+
+> **Section 20 status: DRAFT v0
+> (SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER).** Architect's
+> AC-0 `evt_74t8r7pkyncdg` root-loaded the generic law on detached
+> scratch at `1b5e4183e`: the new owner was Transparent, no `Axiom`
+> was added, and the exact trusted `GlobalId` sets before and after
+> NatBox were equal (114 → 114). A proof-breaking private-helper
+> mutation refused inside that helper and was restored. These are
+> scratch checks, not execution of this Spec child, the separate
+> catalog/test or CV seed children, assembled AC-T, official
+> conformance, CI, publication, landing or measured landed trust.
+> The §1a chain remains at zero: D0 preceded this text and caused
+> no hard stop.
+
+`Algorithm.Geometry.NatBox` must export one public Transparent checked
+theorem immediately after `area_point_box` and before private
+`axis_within`. Its exact binder order, single premise and type are:
+
+```ken
+pub theorem area_positive_contains_lo_corner
+      (lo : Point) (hi : Point)
+    : IsTrue (leq_nat (Suc Zero) (area (MkBox lo hi)))
+      → IsTrue (contains (MkBox lo hi) lo)
+```
+
+The premise says that the **inclusive natural-coordinate area** of
+this stored box is at least one. It is the existing public `leq_nat`
+decision, not an additional validity, point-membership or ordered-
+endpoints premise. The conclusion gives `lo` itself as a member of
+`MkBox lo hi`; it does not change the box or return an arbitrary
+point. An inverted axis has span zero and cannot satisfy the
+premise, even if the other axis has positive span. The theorem adds
+no axiom, kernel or surface rule, no new public Nat helper and no
+§§1–19 operation or law type change. NatBox's public checked-theorem
+count grows from forty-two to forty-three; four per-axis and
+positive-product helpers stay private in NatBox.
+
+The checked proof destructures the **written** `lo` and `hi` into
+coordinates. Since area is the product of the two inclusive axis
+spans (§4.1), a positive product has positive factors on both axes.
+For each axis, a positive `sub (Suc h) l` span orders `l ≤ h`;
+private induction on the endpoints supplies this implication.
+Reflexivity gives `l ≤ l`, and `bool_and` introduction combines
+these two comparisons for each `axis_contains` and then the two
+axes for `contains`. There is no second public per-axis law:
+`axis_span` and its proof obligations remain private to NatBox.
+
+The high corner follows without a second export. For any positive-
+area witness `h`, the public §11 theorem can use the low-corner
+member just obtained:
+
+```ken
+contains_hi_corner lo hi lo (area_positive_contains_lo_corner lo hi h)
+```
+
+This yields `IsTrue (contains (MkBox lo hi) hi)`; the original
+`contains_hi_corner` remains exported and unchanged. Conversely,
+§15 already derives `IsTrue (leq_nat (Suc Zero) (area c))` from a
+member of `c` via `inside_complete`, `area_inside` and
+`area_point_box`. Thus positive area and existence of a member
+coincide **at these two implication types**; neither direction
+adds a general point-set quotient or equates different boxes.
+
+A closed boundary pair changes only the upper y coordinate.
+For `MkBox (MkPoint 1 2) (MkPoint 3 2)`, area is three and
+`MkPoint 1 2` is contained; the positive-area premise checks and
+the law applies. For `MkBox (MkPoint 1 2) (MkPoint 3 1)`, the
+y axis is inverted, area is zero and even its own low corner is
+not contained. An attempted same-form application must refuse at
+the positive-area premise, not by requiring a second condition.
+Architect's D0 observed declaration-level `TypeMismatch` for this
+refusal, not an expression-exact span; the separate CV-owned seed
+must not claim finer localization from that measurement. The
+finite pair shows why the premise cannot be dropped; it does not
+replace a generic checked proof or an assembled trust gate.
