@@ -18,7 +18,7 @@ fn load_landed_surface(env: &mut ElabEnv) {
         .join("../..")
         .join("catalog/packages");
     for module in ["Capability.System.IO", "Capability.System.Buffer"] {
-        env.elaborate_module_from_roots_strict(&[root.clone()], module)
+        env.elaborate_module_from_roots(&[root.clone()], module)
             .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
     }
 }

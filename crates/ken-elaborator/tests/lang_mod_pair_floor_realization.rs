@@ -195,7 +195,7 @@ fn strict_one(source: &str) -> Result<ElabEnv, ElabError> {
     let root = FixtureRoot::new("one");
     root.write("Entry", source);
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")?;
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")?;
     Ok(env)
 }
 
@@ -204,7 +204,7 @@ fn strict_one_with_proof_terminal(source: &str) -> Result<ElabEnv, ElabError> {
     root.write("Entry", &format!("import ProofTerms (Proved)\n{source}"));
     root.write("ProofTerms", "export Proved");
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")?;
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")?;
     Ok(env)
 }
 
@@ -253,7 +253,7 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
             env.elaborate_file("module ProofTerms { export Proved }")
                 .expect("separate legacy in-memory module");
         }
-        match env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry") {
+        match env.elaborate_module_from_roots(&[root.0.clone()], "Entry") {
             Err(ElabError::UnboundName { name, span }) => {
                 assert_eq!(name, "ProofTerms");
                 assert_eq!(
@@ -366,7 +366,7 @@ fn strict_bare_pair_floor_name_matrix_accepts_exact_ids() {
         let declarations_before = env.env.declarations().len();
         let next_before = env.env.next_global_id();
         let trusted_before = env.env.trusted_base();
-        env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
             .unwrap_or_else(|error| panic!("bare {name} must resolve in Strict: {error}"));
         assert_eq!(env.globals[name], canonical);
         let witness = env.globals["Entry.witness"];
@@ -405,18 +405,18 @@ fn pair_floor_remains_available_after_unrelated_loads() {
 
     let mut env = ElabEnv::new().expect("base environment");
     let ids = PAIR_BINDINGS.map(|name| env.globals[name]);
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Provider")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Provider")
         .expect("unrelated provider");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Facade")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Facade")
         .expect("unrelated facade");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("Pair floor after unrelated loads");
     assert_eq!(PAIR_BINDINGS.map(|name| env.globals[name]), ids);
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Leaky")
+        .elaborate_module_from_roots(&[root.0.clone()], "Leaky")
         .expect_err("loaded provider declaration must not leak");
     assert!(matches!(error, ElabError::UnboundName { ref name, .. } if name == "provided"));
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Explicit")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Explicit")
         .expect("explicit import remains lawful");
 }
 
@@ -429,7 +429,7 @@ fn assert_collision(source: &str, name: &str) {
     let next_before = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("Pair-floor binding collision must reject");
     assert!(
         matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
@@ -526,13 +526,13 @@ fn closed_floor_accepts_pair_and_prod_but_not_arbitrary_globals() {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_file("def Ambient = Bool")
         .expect("register unrelated checked implementation global");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "PairEntry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "PairEntry")
         .expect("Pair type floor member");
     let ambient = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "AmbientEntry")
+        .elaborate_module_from_roots(&[root.0.clone()], "AmbientEntry")
         .expect_err("arbitrary implementation global must remain unavailable");
     assert!(matches!(ambient, ElabError::UnboundName { ref name, .. } if name == "Ambient"));
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "ProdEntry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "ProdEntry")
         .expect("Prod is a distinct source-required entrypoint ABI member");
     let prod_witness = env.globals["ProdEntry.X"];
     let (_, prod_body) = env
@@ -560,11 +560,11 @@ fn pair_reexport_is_identity_preserving_republication() {
     let ids = PAIR_BINDINGS.map(|name| env.globals[name]);
     let declarations_before = env.env.declarations().len();
     let next_before = env.env.next_global_id();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Facade")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Facade")
         .expect("floor facade");
     assert_eq!(env.env.declarations().len(), declarations_before);
     assert_eq!(env.env.next_global_id(), next_before);
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("floor facade consumer");
     assert_eq!(PAIR_BINDINGS.map(|name| env.globals[name]), ids);
 }
@@ -634,7 +634,7 @@ fn pair_floor_closure_is_rederived_after_realization() {
     ] {
         let mut env = ElabEnv::new().expect("base environment");
         let pair_bindings = PAIR_BINDINGS.map(|name| env.globals[name]);
-        let result = env.elaborate_module_from_roots_strict(&[root.clone()], module);
+        let result = env.elaborate_module_from_roots(&[root.clone()], module);
         assert!(
             result.is_ok(),
             "{module} must load through its checked providers: {result:?}"
@@ -668,7 +668,7 @@ fn pair_floor_closure_is_rederived_after_realization() {
         .elaborate_file("def Ambient = Bool")
         .expect("register checked non-floor global");
     let ambient = ambient_env
-        .elaborate_module_from_roots_strict(&[ambient_root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[ambient_root.0.clone()], "Entry")
         .expect_err("arbitrary checked global must not enter closure authority");
     assert!(matches!(ambient, ElabError::UnboundName { ref name, .. } if name == "Ambient"));
 }

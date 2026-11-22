@@ -94,7 +94,7 @@ fn strict_same_unit_instance_and_derive_names_select_the_synthesized_canonicals(
 
     let mut env = ElabEnv::new().expect("base environment");
     let trust_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("strict roots bind both generated dictionary names in their own unit");
 
     let instance = env.globals["Classes.C_instance_Entry.Local"];
@@ -129,7 +129,7 @@ fn earlier_inline_class_import_replay_binds_the_exact_instance_dictionary() {
 
     let mut env = ElabEnv::new().expect("base environment");
     let trust_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("earlier inline owner and replayed import must bind its dictionary alias");
     // Both the checked class and its dictionary keep the inline owner path.
     let class = env.globals["Entry.Classes.C"];
@@ -167,11 +167,11 @@ fn later_inline_class_import_refuses_an_external_file_provider() {
         let mut env = ElabEnv::new().expect("base environment");
         let trust_before = env.env.trusted_base();
         if preload {
-            env.elaborate_module_from_roots_strict(&[root.0.clone()], "Classes")
+            env.elaborate_module_from_roots(&[root.0.clone()], "Classes")
                 .expect("independent file-backed class is checked");
         }
         let error = env
-            .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+            .elaborate_module_from_roots(&[root.0.clone()], "Entry")
             .expect_err("later inline owner must not inherit external availability");
         match error {
             ElabError::UnboundName { name, span } => {
@@ -229,7 +229,7 @@ fn imported_head_uses_its_qualified_synthesis_identity_and_exports_that_identity
     );
 
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Consumer")
         .expect("qualified generated identity is locally bound, exported, and imported");
 
     let canonical = env.globals["Owner.C_instance_Types.Remote"];
@@ -266,7 +266,7 @@ fn selective_import_supports_explicit_argument_and_superclass_wiring() {
     let mut strict = ElabEnv::new().expect("strict environment");
     let strict_trust = strict.env.trusted_base();
     let strict_ids = strict
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
+        .elaborate_module_from_roots(&[root.0.clone()], "Consumer")
         .expect("both cross-module dictionary use shapes resolve under strict roots");
     let dictionary = strict.globals["Provider.C_instance_Option"];
     assert!(term_mentions_global(
@@ -319,7 +319,7 @@ fn both_cross_module_shapes_require_the_dictionary_import() {
     for entry in ["MissingExplicit", "MissingSuperclass"] {
         let mut env = ElabEnv::new().expect("base environment");
         let error = env
-            .elaborate_module_from_roots_strict(&[root.0.clone()], entry)
+            .elaborate_module_from_roots(&[root.0.clone()], entry)
             .expect_err("loading a provider is not an implicit dictionary import");
         assert_unbound(error, "C_instance_Option");
     }
@@ -336,7 +336,7 @@ fn undeclared_dictionary_import_is_rejected() {
 
     let mut env = ElabEnv::new().expect("base environment");
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
+        .elaborate_module_from_roots(&[root.0.clone()], "Consumer")
         .expect_err("an undeclared dictionary must not enter the export surface");
     assert_unbound(error, "Provider.C_instance_Option");
 }
@@ -355,7 +355,7 @@ fn private_class_dictionary_stays_off_the_owner_surface() {
 
     let mut env = ElabEnv::new().expect("base environment");
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Consumer")
+        .elaborate_module_from_roots(&[root.0.clone()], "Consumer")
         .expect_err("a private class must not leak its synthesized dictionary");
     assert_unbound(error, "Provider.Private_instance_Bool");
 }
@@ -375,7 +375,7 @@ fn distinct_local_collision_rejects_before_allocating_or_trusting_either_name() 
     let mut env = ElabEnv::new().expect("base environment");
     let trust_before = env.env.trusted_base();
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("a distinct local cannot shadow the synthesized dictionary alias");
     assert!(
         matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "C_instance_Local"),
@@ -401,7 +401,7 @@ fn duplicate_structure_dictionary_is_rejected_by_exact_class_head() {
     let mut env = ElabEnv::new().expect("base environment");
     let trust_before = env.env.trusted_base();
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("one synthesis canonical cannot be registered twice");
     assert!(
         matches!(

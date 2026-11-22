@@ -685,7 +685,7 @@ fn d1_annotation_trunc_mixed_precedence_predicate_reassociates_under_truncation(
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("catalog/packages");
-    env.elaborate_module_from_roots_strict(&[root], "Core.Classes.LawfulClasses")
+    env.elaborate_module_from_roots(&[root], "Core.Classes.LawfulClasses")
         .expect("checked predicate provider roots-loads in existing Strict mode");
     let err = env
         .elaborate_file(

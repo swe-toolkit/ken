@@ -38,7 +38,7 @@ fn family_and_transparent_home_require_import() {
                 fn count (n : TransferCount) : Nat = transfer_count_nat n\n";
     fs::write(root.path().join("Entry.ken"), bare).expect("bare entry");
     let mut strict = ElabEnv::new().expect("pre-source environment");
-    assert!(matches!(strict.elaborate_module_from_roots_strict(
+    assert!(matches!(strict.elaborate_module_from_roots(
         &[root.path().to_path_buf()], "Entry"),
         Err(ElabError::UnboundName { name, .. }) if name == "BufferWindow"));
 
@@ -54,7 +54,7 @@ fn family_and_transparent_home_require_import() {
     let constructor = imported.globals["MkBufferWindow"];
     let projection = imported.globals["transfer_count_nat"];
     imported
-        .elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")
+        .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect("strict imported checked identities");
     let (_, imported_type) = imported
         .env

@@ -15,7 +15,7 @@ fn elaborate_into(env: &mut ElabEnv, source: &str, mode: &str) -> Result<(), Ela
             let root = tempfile::tempdir().expect("effect floor fixture directory");
             fs::write(root.path().join("Entry.ken"), source).expect("effect floor fixture");
             if mode == "strict-roots" {
-                env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")?;
+                env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")?;
             } else {
                 env.elaborate_module_from_roots_v1(&[root.path().to_path_buf()], "Entry")?;
             }

@@ -340,7 +340,7 @@ fn native_build_file(
                 let mut env = ken_elaborator::ElabEnv::new()
                     .map_err(CompilerDriverError::Elaboration)
                     .map_err(NativeProgramBuildError::Driver)?;
-                env.elaborate_module_from_roots_strict_v1(&[unit.root.clone()], &unit.entry)
+                env.elaborate_module_from_roots_v1(&[unit.root.clone()], &unit.entry)
                     .map_err(CompilerDriverError::Elaboration)
                     .map_err(NativeProgramBuildError::Driver)?;
                 let name = match format {
@@ -586,7 +586,7 @@ fn elaborate_cli_file(
         ken_elaborator::modules::SourcePathKind::CatalogUnit(unit) => {
             let roots = [unit.root.clone()];
             elab_env
-                .elaborate_module_from_roots_strict_v1(&roots, &unit.entry)
+                .elaborate_module_from_roots_v1(&roots, &unit.entry)
                 .and_then(|mut results| {
                     results.extend(elab_env.execute_loaded_entry_checked_fences_v1(&unit.entry)?);
                     Ok(results)

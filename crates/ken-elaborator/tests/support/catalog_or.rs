@@ -186,13 +186,13 @@ pub fn owned_references(env: &ElabEnv, owned: &BTreeSet<GlobalId>) -> BTreeSet<G
 }
 
 pub fn load_core_logic_or(env: &mut ElabEnv) {
-    env.elaborate_module_from_roots_strict(&[catalog_root()], "Core.Logic.Or")
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Or")
         .expect("Core.Logic.Or must load through strict catalog resolution");
 }
 
 pub fn load_fokripke_providers(env: &mut ElabEnv) {
     load_core_logic_or(env);
-    env.elaborate_module_from_roots_strict(&[catalog_root()], "Core.Logic.Transport")
+    env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Transport")
         .expect("Core.Logic.Transport must load through strict catalog resolution");
 }
 

@@ -110,7 +110,7 @@ fn catalog_runnable_entry_owns_main_and_runs_and_native_builds() {
     let entry = write(&root, "Demo/App.ken", ENTRY);
     let isolated = write(dir.path(), "src/main.ken", ENTRY);
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict_v1(&[root], "Demo.App")
+    env.elaborate_module_from_roots_v1(&[root], "Demo.App")
         .expect("load the entry once");
     let own = env
         .module_state
@@ -258,7 +258,7 @@ pub fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
         ),
     );
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict_v1(&[root], "Demo.App")
+    env.elaborate_module_from_roots_v1(&[root], "Demo.App")
         .unwrap();
     let own = env
         .module_state
@@ -296,7 +296,7 @@ fn duplicate_catalog_entry_main_maps_to_duplicate_entrypoint() {
         &format!("{PURE_MAIN}{second_main}"),
     );
     let mut env = ElabEnv::new().unwrap();
-    match env.elaborate_module_from_roots_strict_v1(&[root], "Demo.Duplicate") {
+    match env.elaborate_module_from_roots_v1(&[root], "Demo.Duplicate") {
         Err(ElabError::DuplicateDefinition { name, .. }) => assert_eq!(name, "Demo.Duplicate.main"),
         other => panic!("wrong duplicate-name carrier: {other:?}"),
     }

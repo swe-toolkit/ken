@@ -279,7 +279,7 @@ fn failure_stage(error: &ElabError) -> Option<PipelineStage> {
 
 fn observe_strict(root: &Path, module: &str) -> LoaderObservation {
     let mut env = ElabEnv::new().expect("base environment");
-    match env.elaborate_module_from_roots_strict(&[root.to_path_buf()], module) {
+    match env.elaborate_module_from_roots(&[root.to_path_buf()], module) {
         Ok(_) => LoaderObservation::Succeeded,
         Err(error) => LoaderObservation::Refused {
             stage: failure_stage(&error)

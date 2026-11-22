@@ -236,7 +236,7 @@ fn strict_admits_local_counterparts_for_globals_and_class_representations() {
          export local_value",
     );
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("each strict representation accepts its local/floor counterpart");
 }
 
@@ -263,7 +263,7 @@ fn strict_admits_floor_kernel_locals_and_explicit_imports_without_new_trust() {
 
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("strict mode admits import, local, floor, and kernel vocabulary");
     assert_eq!(env.env.trusted_base(), trusted_before);
 
@@ -297,7 +297,7 @@ fn strict_overapplied_j_keeps_its_kernel_head() {
     );
     let mut env = ElabEnv::new().expect("base environment");
     let trusted_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("Strict J with a function-valued motive accepts an extra argument");
     assert!(env.globals.contains_key("Entry.cast_function"));
     assert!(env.globals.contains_key("Entry.cast_apply"));
@@ -313,7 +313,7 @@ fn strict_exact_j_function_motive_still_elaborates() {
     let root = FixtureRoot::new("j-exact");
     root.write("Entry.ken", J_FUNCTION_SOURCE);
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("the exact J sugar arity remains accepted");
     assert!(env.globals.contains_key("Entry.cast_function"));
 }
@@ -332,7 +332,7 @@ fn strict_underapplied_j_without_binding_is_unbound() {
     );
     let mut env = ElabEnv::new().expect("base environment");
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("two-argument J is not a completed kernel sugar spine");
     assert_unbound(error, "J");
 }

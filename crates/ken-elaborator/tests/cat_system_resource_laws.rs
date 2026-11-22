@@ -337,7 +337,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
         "Capability.System.Buffer",
         "Capability.System.Mapping",
     ] {
-        env.elaborate_module_from_roots_strict(&[root.clone()], module)
+        env.elaborate_module_from_roots(&[root.clone()], module)
             .unwrap_or_else(|error| panic!("checked `{module}` Strict route: {error:?}"));
     }
     let conjunction = env.globals["Core.Logic.Conjunction.and"];

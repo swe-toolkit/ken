@@ -238,7 +238,7 @@ fn strict_roots(source: &str) -> Result<ElabEnv, ElabError> {
     let root = tempfile::tempdir().expect("Strict root");
     fs::write(root.path().join("Entry.ken"), source).expect("write source");
     let mut env = ElabEnv::new().expect("checked prelude");
-    env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "Entry")?;
+    env.elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")?;
     Ok(env)
 }
 

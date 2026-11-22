@@ -455,7 +455,7 @@ fn strict_roots_accept_original_ten_canonical_families_and_constructors() {
         let next_id_before = env.env.next_global_id();
         let trusted_before = env.env.trusted_base();
 
-        env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
             .unwrap_or_else(|error| panic!("strict floor {} must elaborate: {error}", case.name));
 
         assert_eq!(env.globals[case.name], family_id);
@@ -498,7 +498,7 @@ fn strict_floor_export_allocates_nothing_and_nonmember_and_rejects() {
     let declarations_before = env.env.declarations().len();
     let next_id_before = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("strict floor names must export without declarations");
     assert_eq!(LANDED_FLOOR_NAMES.map(|name| env.globals[name]), ids_before);
     assert_eq!(env.env.declarations().len(), declarations_before);
@@ -509,7 +509,7 @@ fn strict_floor_export_allocates_nothing_and_nonmember_and_rejects() {
     nonmember.write("fn witness (x : And) : And = x");
     let error = ElabEnv::new()
         .expect("base environment")
-        .elaborate_module_from_roots_strict(&[nonmember.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[nonmember.0.clone()], "Entry")
         .expect_err("unkeyed nonmember And must remain unavailable in strict roots");
     assert!(
         matches!(error, ElabError::UnboundName { ref name, .. } if name == "And"),
@@ -537,7 +537,7 @@ fn assert_floor_collision_rejects_before_allocation(label: &str, source: &str, n
     let trusted_before = env.env.trusted_base();
 
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("a same-spelling floor binding must reject under the non-empty Entry prefix");
     assert!(
         matches!(error, ElabError::AmbiguousReference { name: ref rejected, .. } if rejected == name),
@@ -607,7 +607,7 @@ fn assert_renamed_family_accepts(case: &CollisionCase) {
     let canonical_ids = floor_ids(&env);
     let trusted_before = env.env.trusted_base();
 
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .unwrap_or_else(|error| panic!("all-renamed {} must elaborate: {error}", case.parent));
 
     let local_parent = env.globals[&format!("Entry.{}", case.renamed_parent)];
@@ -683,7 +683,7 @@ fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
     let explicit_floor = floor_ids(&explicit_env);
     let explicit_trusted = explicit_env.env.trusted_base();
     explicit_env
-        .elaborate_module_from_roots_strict(&[explicit.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[explicit.0.clone()], "Entry")
         .expect("all-renamed explicit family must elaborate");
     let explicit_parent = explicit_env.globals["Entry.ExplicitLocalNat"];
     let explicit_constructor = explicit_env.globals["Entry.ExplicitLocalZero"];
@@ -704,7 +704,7 @@ fn floor_parent_and_constructor_clash_matrix_is_fail_closed() {
     let declarations_before = env.env.declarations().len();
     let next_id_before = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect("renamed constructor-free Char lookalike must elaborate");
     let local_char = env.globals["Entry.LocalChar"];
     assert!(!floor.contains(&local_char));
@@ -889,7 +889,7 @@ fn every_executable_top_level_binding_route_is_floor_immutable() {
         root.write(route.renamed_source);
         let mut env = ElabEnv::new().expect("base environment");
         let canonical_ids = floor_ids(&env);
-        env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        env.elaborate_module_from_roots(&[root.0.clone()], "Entry")
             .unwrap_or_else(|error| {
                 panic!(
                     "renamed {} binding route must elaborate: {error}",
@@ -939,13 +939,13 @@ fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_acc
     let mut same_env = ElabEnv::new().expect("base environment");
     let canonical_nil = same_env.globals["Nil"];
     same_env
-        .elaborate_module_from_roots_strict(&[same.0.clone()], "Provider")
+        .elaborate_module_from_roots(&[same.0.clone()], "Provider")
         .expect("provider must re-export the canonical Nil identity");
     let declarations_before_same_import = same_env.env.declarations().len();
     let next_id_before_same_import = same_env.env.next_global_id();
     let trusted_before_same_import = same_env.env.trusted_base();
     let same_ids = same_env
-        .elaborate_module_from_roots_strict(&[same.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[same.0.clone()], "Entry")
         .expect("a second path to the same canonical Nil identity must be idempotent");
     assert_eq!(same_env.globals["Nil"], canonical_nil);
     let same_witness = *same_ids.last().expect("same-identity witness");
@@ -971,13 +971,13 @@ fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_acc
     );
     root.write("import Provider (LocalZero as Zero)");
     let mut env = ElabEnv::new().expect("base environment");
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Provider")
+    env.elaborate_module_from_roots(&[root.0.clone()], "Provider")
         .expect("all-renamed provider must elaborate");
     let declarations_before = env.env.declarations().len();
     let next_id_before = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
     let error = env
-        .elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[root.0.clone()], "Entry")
         .expect_err("a selective import may not bind a floor constructor spelling");
     assert!(
         matches!(error, ElabError::AmbiguousReference { ref name, .. } if name == "Zero"),
@@ -997,7 +997,7 @@ fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_acc
     );
     ElabEnv::new()
         .expect("base environment")
-        .elaborate_module_from_roots_strict(&[renamed.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[renamed.0.clone()], "Entry")
         .expect("per-item renaming must preserve lawful access");
 
     let qualified = FixtureRoot::new("qualified-import");
@@ -1008,6 +1008,6 @@ fn selective_import_floor_collision_rejects_but_renamed_and_qualified_access_acc
     qualified.write("import Provider\nconst witness : Provider.LocalNat = Provider.LocalZero");
     ElabEnv::new()
         .expect("base environment")
-        .elaborate_module_from_roots_strict(&[qualified.0.clone()], "Entry")
+        .elaborate_module_from_roots(&[qualified.0.clone()], "Entry")
         .expect("qualified access must preserve the provider identity without a bare collision");
 }

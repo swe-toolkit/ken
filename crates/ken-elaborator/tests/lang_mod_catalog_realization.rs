@@ -97,7 +97,7 @@ fn strict_slice_stays_closed_and_floor_nat_reuses_existing_identity() {
     ] {
         let mut env = ElabEnv::new().expect("base environment");
         let trusted_before = env.env.trusted_base();
-        env.elaborate_module_from_roots_strict(&[catalog_root()], module)
+        env.elaborate_module_from_roots(&[catalog_root()], module)
             .unwrap_or_else(|error| panic!("{module} must load standalone-strict: {error}"));
         assert_eq!(
             env.env.trusted_base(),
@@ -119,7 +119,7 @@ fn strict_slice_stays_closed_and_floor_nat_reuses_existing_identity() {
     let next_id = env.env.next_global_id();
     let trusted_before = env.env.trusted_base();
 
-    env.elaborate_module_from_roots_strict(&root.roots(), "StrictNat")
+    env.elaborate_module_from_roots(&root.roots(), "StrictNat")
         .expect("strict roots must admit the canonical Nat floor identity");
 
     assert_eq!(env.globals["Nat"], nat);

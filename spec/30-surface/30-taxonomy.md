@@ -762,8 +762,8 @@ or aliases remain package identities: `IO`, `write`, and
 `Core.Classes.LawfulClasses`. These existing homes export the captured
 checked IDs, not copied definitions or synthetic substitute globals.
 Catalog clients migrate to explicit provider imports on both roots routes.
-Every source entry (including `elaborate_module_from_roots` and its
-`_strict` aliases, in-memory files, declarations, REPL and standalone
+Every source entry (including `elaborate_module_from_roots` and
+`elaborate_module_from_roots_v1`, in-memory files, declarations, REPL and
 expressions) refuses an unimported bare use of any of the five with
 `UnboundName`; an explicit provider import resolves to its exact
 pre-source ID. The checked identity's presence in implementation globals

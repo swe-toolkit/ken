@@ -37,7 +37,7 @@ impl Mode {
         match self {
             Self::StrictRoots => {
                 fs::write(root.path().join("Client.ken"), client).expect("write client file");
-                env.elaborate_module_from_roots_strict(&roots, "Client")?;
+                env.elaborate_module_from_roots(&roots, "Client")?;
             }
             Self::DefaultRoots => {
                 fs::write(root.path().join("Client.ken"), client).expect("write client file");

@@ -528,7 +528,7 @@ pub fn landed_surface() -> ElabEnv {
     let mut checked = Vec::new();
     for module in ["Capability.System.IO", "Capability.System.Buffer"] {
         let owned = env
-            .elaborate_module_from_roots_strict(&[root.clone()], module)
+            .elaborate_module_from_roots(&[root.clone()], module)
             .unwrap_or_else(|error| panic!("{module} must roots-load: {error:?}"));
         assert!(!owned.is_empty(), "{module} checks no declaration");
         checked.extend(owned);

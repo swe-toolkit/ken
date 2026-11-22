@@ -255,7 +255,7 @@ fn pair_floor_and_conjunction_close_strict_compare_boundary() {
     let mut strict = ElabEnv::new().expect("base environment");
     let canonical_pair = strict.globals["Pair"];
     let owned = strict
-        .elaborate_module_from_roots_strict(&[root], COMPARE)
+        .elaborate_module_from_roots(&[root], COMPARE)
         .expect("Compare must close through checked Conjunction after Pair's floor realization");
     assert_eq!(strict.globals["Pair"], canonical_pair);
     assert!(

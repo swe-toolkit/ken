@@ -21,9 +21,9 @@ the eight `Data.Numeric.FixedWidth` names.
 - given: in a fresh pre-source environment, record the `GlobalId` for each
   listed identity before loading any catalog source. Load the four retained
   home units and a separate catalog-root consumer with these explicit imports.
-  Run each client through `elaborate_module_from_roots_strict` and through the
-  `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`
-  entrypoints; §33 §3.3 gives every source entry the same import rule:
+  Run each client through `elaborate_module_from_roots` and
+  `elaborate_module_from_roots_v1`; §33 §3.3 gives every source entry
+  the same import rule:
 
   ```ken
   import Capability.Filesystem.Authority (FS, read_bytes, write_file)
@@ -127,7 +127,7 @@ the eight `Data.Numeric.FixedWidth` names.
   ```
 
   For each probe, make a positive and a negative roots-loaded client that
-  differ only by its home import, through all three roots entrypoints. Pair
+  differ only by its home import, through both roots entrypoints. Pair
   `FS` with Authority,
   `MkBufferWindow` with Buffer, `write_all_exact_prefix_prop` with IO, and
   `ResourceBodyResult` with Resource. The IO probe uses the subject in a
@@ -157,7 +157,7 @@ the eight `Data.Numeric.FixedWidth` names.
 - spec: `30-taxonomy §4`; `38 §1.9, §1.11`; `33 §3.3`
 - given: in a fresh pre-source environment, snapshot the `GlobalId` for each
   of the 20 names below before loading catalog sources. Load both home units
-  and a separate client through `elaborate_module_from_roots_strict` with
+  and a separate client through `elaborate_module_from_roots` with
   these explicit imports:
 
   ```ken
@@ -293,8 +293,7 @@ the eight `Data.Numeric.FixedWidth` names.
   omitting only the selected name's selective import. The positive client
   adds that selective item; keep all other imports and provider dependencies
   fixed. Run both arms through
-  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
-  `elaborate_module_from_roots_strict`.
+  `elaborate_module_from_roots` and `elaborate_module_from_roots_v1`.
 
   | home name | home module and imported client use |
   |---|---|
@@ -310,8 +309,8 @@ the eight `Data.Numeric.FixedWidth` names.
   import; its matched rootless-import arm adds
   `import Capability.System.Buffer (BufferWindow)` to that same body.
 - measured: each imported reference's checked `GlobalId`, and the accept or
-  `UnboundName` result for each single-import omission on all three routes.
-- claimed: all three roots-loaded entrypoints use the same source-resolution
+  `UnboundName` result for each single-import omission on both routes.
+- claimed: both roots-loaded entrypoints use the same source-resolution
   rule; none satisfies a missing home import from the flat implementation
   global table.
 - the gap: a negative alone could fail for another missing dependency. Each
@@ -319,14 +318,14 @@ the eight `Data.Numeric.FixedWidth` names.
   otherwise valid; separate clients keep every omitted name observable.
 - expect: all imported clients accept at their original pre-source identities.
   Every omitted-import client refuses with `UnboundName` naming exactly that
-  home name, on all three roots entrypoints. The rootless no-import client refuses
+  home name, on both roots entrypoints. The rootless no-import client refuses
   with `UnboundName(BufferWindow)` at use; its explicit-import twin refuses
   with `UnboundName` naming `Capability.System.Buffer` at the import path.
 - controls: the import-restored client is the positive control for each
   omission. The rootless arms distinguish a missing source name from an
   unavailable catalog root; the refusal is at the import module path, not a
   later use.
-- why: all three roots entrypoints share one source-resolution rule. A
+- why: both roots entrypoints share one source-resolution rule. A
   checked home is not ambient merely because its identity was captured
   before source loading.
 
@@ -336,12 +335,12 @@ the eight `Data.Numeric.FixedWidth` names.
   a private attached proof to external clients
 - spec: `33 §3.3`, `33 §4.1`, and `33 §8.2`
 - given: load the actual `Capability.System.IO` home through
-  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`, and
-  `elaborate_module_from_roots_strict`. Its checked
+  `elaborate_module_from_roots` and
+  `elaborate_module_from_roots_v1`. Its checked
   `write_all_preserves_exact_prefix` theorem selects
   `exact_prefix` through `write_all_exact_prefix_prop`; record that internal
   reference's resolved `GlobalId`. For an external client through each of
-  these three entrypoints, import only `write_all_exact_prefix_prop` and include
+  these two entrypoints, import only `write_all_exact_prefix_prop` and include
   the accepted
   `io_subject_probe` from the preceding case. Append one claim per fresh
   copy, leaving the subject import and probe unchanged:
