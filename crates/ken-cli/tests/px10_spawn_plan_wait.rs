@@ -806,14 +806,15 @@ impl Drop for HeldChild {
 }
 
 /// Promise class: durable invariant. MEASURED: after verified non-CLOEXEC fd
-/// 9 and independently verified spawning-thread signal actions/mask, a live
-/// checked `withChild` process holds only fds 0–2, has default SIGPIPE,
-/// inherited ignored SIGHUP, reset caught SIGUSR2, and the exact inherited
-/// SIGUSR1-only mask while its Ken body blocks on wait. CLAIMED: spawning
-/// closes every unselected descriptor and preserves the inherited signal
-/// boundary without clearing the mask. THE GAP: this observes one controlled
-/// shell child on Linux; the two independent production-side mutations below
-/// test the fd and SIGPIPE directions of this same live-child pin.
+/// 9 and independently verified spawning-thread signal actions/mask before
+/// Ken runs, a live checked `withChild` process holds only fds 0–2, has
+/// default SIGPIPE, inherited ignored SIGHUP, reset caught SIGUSR2, and
+/// the exact inherited SIGUSR1-only mask while its Ken body blocks on wait.
+/// CLAIMED: spawning closes every unselected descriptor and preserves the
+/// inherited signal boundary without clearing the mask. THE GAP: this observes
+/// one controlled shell child on Linux; the two independent production-side
+/// mutations below test the fd and SIGPIPE directions of this same live-child
+/// pin.
 #[test]
 fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
     use std::os::unix::ffi::OsStrExt;
@@ -837,7 +838,13 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
         .spawn(move || {
             let _signals = SignalBoundary::install();
             let tid = unsafe { libc::syscall(libc::SYS_gettid) } as libc::pid_t;
-            sender.send(tid).expect("publish spawning thread tid");
+            // Snapshot this same thread after installing the signal boundary,
+            // before Ken can begin spawning its child.
+            let parent_status = std::fs::read_to_string(format!("/proc/self/task/{tid}/status"))
+                .expect("quiescent spawning-thread control status");
+            sender
+                .send(parent_status)
+                .expect("publish quiescent spawning-thread status");
             let mut host = ken_interp::PosixHost::new_at(root.path());
             ken_cli::run_program_effect_observation(
                 &source,
@@ -851,9 +858,9 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
             .map_err(|error| format!("{error:?}"))
         })
         .expect("stated interpreter fixture stack");
-    let tid = receiver
+    let parent_status = receiver
         .recv_timeout(Duration::from_secs(10))
-        .expect("spawn worker establishes signals before Ken executes");
+        .expect("spawn worker samples signals before Ken executes");
     let deadline = Instant::now() + Duration::from_secs(30);
     // The shell writes to stdout before publishing its PID file: seeing the
     // file proves the pipe has data before this test terminates the child.
@@ -868,8 +875,6 @@ fn ac2_checked_interpreter_live_child_fd_and_signal_boundary() {
         std::thread::sleep(Duration::from_millis(10));
     };
     let child_guard = HeldChild(pid);
-    let parent_status = std::fs::read_to_string(format!("/proc/self/task/{tid}/status"))
-        .expect("spawning-thread control status");
     let child_status = std::fs::read_to_string(format!("/proc/{pid}/status"))
         .expect("child remains live for signal inspection");
     let mut fds = std::fs::read_dir(format!("/proc/{pid}/fd"))
