@@ -226,10 +226,22 @@ candidate is routed and unpublished:
     set_interval(seconds=120,
       prompt="[monitor tick] 1. Is my publisher process still running
       (pgrep -af scripted-pr-automerge)? If it has exited, read its log: on a
-      landing, finish M6-M9 for it now; on a red, attribute it (M5). 2. If no
-      publisher is running and a routed candidate is unpublished, start the next
-      one in the Steward's order in this same turn. 3. Reap dead monitors. If
-      the queue is empty and nothing is owed, do nothing.")
+      landing, finish M6-M9 for it now; on a red, attribute it (M5); on
+      neither, the candidate is stalled, not done: read the PR's checks and
+      its latest CI run, and if the run completed green, close and reopen the
+      PR and start one fresh publisher on the same SHA in this turn;
+      otherwise report the log tail to the Steward. 2. If no publisher is
+      running and a routed candidate is unpublished, start the next one in
+      the Steward's order in this same turn. 3. Reap dead monitors. If the
+      queue is empty and nothing is owed, do nothing.")
+
+Use that prompt as written. Do not narrow it, for example to "inspect only
+the PID and the log" or "do not read GitHub". On 2026-11-22 a narrowed tick
+read a publisher that had exited with neither a landing nor a red as "no
+further action", tick after tick. A stuck check had held a green run for
+about 90 minutes, and the candidate sat until the Steward roused the seat
+twice. **A Steward message in your session outranks a tick.** Finish the act
+it asks for, even when a tick arrives mid-turn.
 
 It is the **same sanctioned, provider-agnostic mechanism the Steward uses**
 (`COORDINATION §13`) — it works identically on Claude-Code and terra/Codex
