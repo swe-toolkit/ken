@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE
 title: "Spec 66 §19 says changing the environment at one absent variable leaves eval unchanged, but no law says eval depends only on the variables that occur, so a client whose two environments differ at several unused variables must chain eval_absent once per variable. Rule from a checked D0 at zero trust that eval env1 e equals eval env2 e whenever env1 and env2 agree at every variable occurring in e, and state it with a seed that separates agreement on the occurring variables from a disagreement at one of them"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

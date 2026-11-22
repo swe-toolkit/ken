@@ -1,7 +1,7 @@
 ---
 id: LANG-RETIRE-STRICT-ROOTS-ALIASES
 title: "The elaborator has one resolution mode, but ElabEnv and modules still export elaborate_module_from_roots_strict and elaborate_module_from_roots_strict_v1, aliases that forward to the ordinary roots entries. Their names advertise a second mode that no longer exists, and 37 elaborator files plus other crates and three conformance seeds call through them. Delete both aliases and move every caller to the ordinary entry"
-status: active
+status: merged
 owner: language
 size: M
 tier: T2
@@ -37,6 +37,16 @@ same behaviour results.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
+
+## Amendment: Spec child (2026-11-21)
+
+Language implementer `evt_4wne1edv0x30g` stopped at the `spec/` condition:
+`spec/30-surface/33-declarations.md:314` and `30-taxonomy.md:766` name the
+`_strict` aliases as live entries. Spec Leader `evt_6fp5mjep6hwtj` confirmed.
+Steward ruling `evt_70xphqdhcqhtq`: scope adds a Spec child on those two
+paths only, aligning each sentence with the surviving roots entries with no
+rule change. The Language Leader assembles it with WIP `e879141da`. The
+Architect votes on `/spec` as well, and AC-1's sweep extends to `spec/`.
 
 ## Scope
 
