@@ -262,8 +262,9 @@ abstract Unix address.
 - expect: return `ResourceHostIO IOError.CapabilityDenied` before any socket
   syscall; the alias keeps its symlink target and inode, and the outside
   listener keeps its inode and remains live.
-- controls: the in-root listen succeeds with the same operation and grant;
-  the AC-2 raw-path bypass reaches the existing outside socket name.
+- controls: in a paired fresh run, keep the same class, grant and lexical
+  path but leave `D/jail/alias.sock` absent instead of symlinked; listen
+  succeeds. The AC-2 raw-path bypass reaches the existing outside socket name.
 - why: this applies the final-component symlink refusal to `NetListen`;
   the connect leaf-symlink row tests only `NetConnect`.
 
