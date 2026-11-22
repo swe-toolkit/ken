@@ -793,10 +793,56 @@ ci_wait_seconds() {
   fi
 }
 
+# A check can read pending after its workflow run has finished. On PR #5441
+# (2026-11-22), GitHub left run 45015302548's "build + test" check-run at
+# status in_progress with conclusion success after the run had completed
+# green. wait_for_green_checks polled it for 90 minutes and the publisher
+# exited without a landing or a red.
+#
+# Reads the run behind each pending check, from the check's Actions link, and
+# prints one answer:
+#   running             a pending check has no Actions run link, or its run
+#                       is still going, or the run cannot be read. This is a
+#                       genuine wait.
+#   finished            every pending check belongs to a run that completed
+#                       with success.
+#   failed <conclusion> a pending check belongs to a run that completed with
+#                       any other conclusion.
+# `finished` only ends the poll. classify_tested_run still decides whether the
+# latest green run authorizes the merge, so this cannot merge on its own.
+pending_check_runs_state() {
+  local checks_json="$1" ids id view
+  ids="$(printf '%s\n' "$checks_json" | jq -r '
+      [.[] | select(.bucket == "pending")
+       | ([(.link // "") | capture("/actions/runs/(?<id>[0-9]+)/") | .id]
+          | first // "none")]
+      | unique | .[]' 2>/dev/null)" || { printf 'running\n'; return 0; }
+  [ -n "$ids" ] || { printf 'running\n'; return 0; }
+  for id in $ids; do
+    [ "$id" != none ] || { printf 'running\n'; return 0; }
+    view="$(gh api "repos/{owner}/{repo}/actions/runs/$id" \
+      --jq '"\(.status) \(.conclusion)"' 2>/dev/null)" ||
+      { printf 'running\n'; return 0; }
+    case "$view" in
+      "completed success") ;;
+      completed\ *) printf 'failed %s\n' "${view#completed }"; return 0 ;;
+      *) printf 'running\n'; return 0 ;;
+    esac
+  done
+  printf 'finished\n'
+}
+
+# Polls of a stuck check (above) to see before the wait ends. At 15s a poll,
+# four is a minute's grace for GitHub's check roll-up to catch up with a run
+# that has just finished.
+STUCK_CHECK_POLLS="${PUBLISHER_STUCK_CHECK_POLLS:-4}"
+
 # Poll the PR's checks until none is pending. Dies on any failing or cancelled
-# check, after printing the failing jobs' logs.
+# check, after printing the failing jobs' logs. A check that stays pending
+# after its run has completed green ends the wait (pending_check_runs_state).
 wait_for_green_checks() {
   local checks_json checks_status pending_count failing failing_count
+  local run_state stuck_polls=0
   while :; do
     refresh_gh_token
     set +e
@@ -824,6 +870,24 @@ wait_for_green_checks() {
     if [ "$pending_count" -eq 0 ]; then
       return 0
     fi
+
+    run_state="$(pending_check_runs_state "$checks_json")"
+    case "$run_state" in
+      finished)
+        stuck_polls=$((stuck_polls + 1))
+        if [ "$stuck_polls" -ge "$STUCK_CHECK_POLLS" ]; then
+          printf 'PR #%s: %s check(s) still read pending, but every CI run they belong to completed with success (%s polls); ending the wait. The tested-base gate decides the merge.\n' \
+            "$pr_number" "$pending_count" "$stuck_polls"
+          return 0
+        fi
+        ;;
+      failed\ *)
+        die "PR #$pr_number has a check still pending whose CI run concluded '${run_state#failed }'."
+        ;;
+      *)
+        stuck_polls=0
+        ;;
+    esac
 
     printf 'PR #%s checks still pending (%s); polling again in 15s.\n' "$pr_number" "$pending_count"
     sleep 15

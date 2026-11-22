@@ -119,7 +119,8 @@ classify_tested_run|probe 13 (current, stale, pending, and each fail-closed refu
 retrigger_ci_by_reopen|probe 13 (returns on a newer run; dies if reopen fails)
 retrigger_if_latest_run_red|probe 14 (fresh run on a red or cancelled latest run only)
 ci_wait_seconds|probe 14 (sized from the latest successful full run only)
-wait_for_green_checks|EXCLUDED: thin poll over gh pr checks, moved verbatim from the unprobed top-level flow
+pending_check_runs_state|probe 15 (running, finished and failed runs behind a pending check)
+wait_for_green_checks|probe 15 (a check stuck pending on a green run ends the wait; a live run does not)
 sync_primary_checkout|EXCLUDED: writes to the real primary checkout at /workspaces/ken, unsafe to drive here
 "
 declared_cov="$(printf '%s' "$COVERAGE" | sed '/^$/d' | cut -d'|' -f1 | sort -u)"
@@ -662,6 +663,75 @@ out="$(T_RUNLIST="$(runs 121 130)" wait_case)"
 if grep -q 'WAIT=60$' <<<"$out"; then ok "with no full successful run the wait falls back to 60s"; else bad "fallback wait wrong: $out"; fi
 out="$(T_RUNLIST='not json' wait_case)"
 if grep -q 'WAIT=60$' <<<"$out"; then ok "an unreadable run list falls back to 60s"; else bad "unreadable run list not handled: $out"; fi
+
+# ---------------------------------------------------------------------------
+# PROBE 15 -- a check stuck at pending after its run finished (PR #5441,
+# 2026-11-22: run 45015302548 completed green, its "build + test" check-run
+# stayed in_progress, and the poll waited 90 minutes). Only `gh`, `sleep` and
+# the token refresh are stubbed. S_RUN is the run behind the pending check:
+# "<status> <conclusion>".
+# ---------------------------------------------------------------------------
+head_ "Probe 15 -- a check pending on a finished run is read from its run"
+build_sandbox
+STUCK_STUB='
+  refresh_gh_token() { :; }
+  sleep() { :; }
+  S_LINK="${S_LINK:-https://github.com/o/r/actions/runs/700/job/9}"
+  S_POLLS_FILE="$(mktemp)"; echo 0 > "$S_POLLS_FILE"
+  gh() {
+    case "$1 $2" in
+      "pr checks")
+        n=$(( $(cat "$S_POLLS_FILE") + 1 )); echo "$n" > "$S_POLLS_FILE"
+        if [ -n "${S_CLEARS_AFTER:-}" ] && [ "$n" -gt "$S_CLEARS_AFTER" ]; then
+          printf "%s\n" "[{\"name\":\"build + test\",\"bucket\":\"pass\",\"state\":\"SUCCESS\",\"link\":\"$S_LINK\"}]"
+        else
+          printf "%s\n" "[{\"name\":\"shard\",\"bucket\":\"pass\",\"state\":\"SUCCESS\",\"link\":\"x\"},{\"name\":\"build + test\",\"bucket\":\"pending\",\"state\":\"IN_PROGRESS\",\"link\":\"$S_LINK\"}]"
+        fi ;;
+      "api repos/{owner}/{repo}/actions/runs/"*)
+        [ -z "${S_APIFAIL:-}" ] || return 1
+        printf "%s\n" "${S_RUN:-completed success}" ;;
+      *) echo "unexpected gh call: $*" >&2; return 9 ;;
+    esac
+  }
+'
+state_case() {
+  run_gate "$STUCK_STUB"'
+  echo "STATE=$(pending_check_runs_state "$(gh pr checks 9001)")"'
+}
+out="$(state_case)"
+if grep -q 'STATE=finished$' <<<"$out"; then ok "a pending check on a run that completed green reads finished"; else bad "stuck check on a green run not finished: $out"; fi
+out="$(S_RUN='in_progress null' state_case)"
+if grep -q 'STATE=running$' <<<"$out"; then ok "a pending check on a live run reads running"; else bad "live run not running: $out"; fi
+out="$(S_RUN='completed failure' state_case)"
+if grep -q 'STATE=failed failure$' <<<"$out"; then ok "a pending check on a red run reads failed"; else bad "red run not failed: $out"; fi
+out="$(S_LINK='https://example.invalid/status/1' state_case)"
+if grep -q 'STATE=running$' <<<"$out"; then ok "a pending check with no Actions run link stays a genuine wait"; else bad "non-Actions pending check not running: $out"; fi
+out="$(S_APIFAIL=1 state_case)"
+if grep -q 'STATE=running$' <<<"$out"; then ok "an unreadable run stays a genuine wait (fails closed)"; else bad "unreadable run not running: $out"; fi
+
+wait_case15() {
+  run_gate "$STUCK_STUB"'
+  PUBLISHER_STUCK_CHECK_POLLS=4 STUCK_CHECK_POLLS=4
+  wait_for_green_checks && echo "RETURNED polls=$(cat "$S_POLLS_FILE")"'
+}
+out="$(wait_case15)"
+if grep -q 'ending the wait' <<<"$out" && grep -q 'RETURNED polls=4$' <<<"$out"; then
+  ok "the wait ends after four polls of a check stuck on a green run"
+else
+  bad "stuck check on a green run did not end the wait at four polls: $out"
+fi
+out="$(S_RUN='completed failure' wait_case15 2>&1)"
+if grep -q "concluded 'failure'" <<<"$out" && ! grep -q RETURNED <<<"$out"; then
+  ok "a check stuck on a red run stops the publish"
+else
+  bad "a check stuck on a red run did not stop: $out"
+fi
+out="$(S_RUN='in_progress null' S_CLEARS_AFTER=6 wait_case15)"
+if grep -q 'RETURNED polls=7$' <<<"$out" && ! grep -q 'ending the wait' <<<"$out"; then
+  ok "control: a live run is waited out until its checks pass"
+else
+  bad "a live run did not wait until its checks passed: $out"
+fi
 
 printf '\n=== %s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
