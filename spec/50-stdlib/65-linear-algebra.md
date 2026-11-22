@@ -19,7 +19,8 @@
 > SPEC-LINEAR-ALGEBRA-MATRIX-VECTOR-SCALE §17;
 > SPEC-LINEAR-ALGEBRA-TRACE §18;
 > SPEC-LINEAR-ALGEBRA-TRACE-PRODUCT-COMM §19;
-> SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20;
+> SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1809,3 +1810,86 @@ generic proofs. The two additions take the §19 roster of twelve
 operations and fifty-six laws to twelve operations, fifty-eight
 laws and seventy public names; §19's sixty-eight-name count remains
 historical.
+
+## 21. Cancellation of successor scaling on vectors and matrices
+
+> **Section 21 status: DRAFT v0
+> (SPEC-LINEAR-ALGEBRA-SCALE-CANCEL).** Architect's AC-0
+> `evt_2twr47xg6kkf6` root-loaded both generic proofs in detached
+> scratch on `72f02b12a`. Both owners were Transparent, three private
+> helpers refused selective import, no `Axiom` was added, and exact
+> trusted `GlobalId` identity sets agreed before and after NatMatrix
+> (109 → 109). A proof-breaking multiplication-commutation mutation
+> refused at load and was restored. These scratch results are not
+> execution of this Spec child, separate catalog or CV seed children,
+> assembled AC-T, official conformance, CI, publication, landing or
+> measured landed trust. The §1a chain remains at zero: AC-0 preceded
+> this text and caused no hard stop.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export two public checked
+Transparent theorems. The dimension binders and the predecessor of
+the positive factor come before the colon; inputs and their **sole**
+scaled-equality premise follow in dependent Pi telescopes. Their
+exact public types are:
+
+```ken
+pub theorem vector_scale_cancel
+      (n : Nat) (k : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_scale n (Suc k) xs) (vector_scale n (Suc k) ys)
+      → Equal (Vec Nat n) xs ys
+
+pub theorem matrix_scale_cancel
+      (m : Nat) (n : Nat) (k : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_scale m n (Suc k) a) (matrix_scale m n (Suc k) b)
+      → Equal (Vec (Vec Nat n) m) a b
+```
+
+`vector_scale_cancel` follows `vector_add_cancel_right` and precedes
+`vector_scale_zero` in the public law sequence;
+`matrix_scale_cancel` follows `matrix_add_cancel_right` and
+precedes `matrix_vector_zero_matrix`. The conclusions are structural
+equalities of the original indexed vectors or matrices, not just
+equality of their dimensions. The same factor
+`Suc k` scales both operands, and no premise beyond their scaled
+equality is needed. Dimensions may be zero, and entries may be zero.
+A caller with a general factor and a separate positivity proof needs
+a separate conversion to this successor form; this law neither
+assumes an unprovided `Nat.Order` premise nor adds an import to
+NatMatrix's existing three providers.
+
+The vector proof uses the existing `vector_scale` map of left
+multiplication by `Suc k`. The private `mul_cancel_left` commutes
+both products and applies public `cancel_r for mul` to cancel the
+now-right successor factor; private `map_injective` lifts entry
+injectivity through `Vec` by dimension recursion, using private
+`map_view` and existing vector cons/eta equalities. The matrix law
+uses the **public vector law** as its injective row function and
+the same private map-injectivity step over `m` rows. There is no
+second per-entry matrix cancellation proof, no public left-mul or
+map-injectivity helper, and no new `Axiom`, kernel or surface rule.
+All §§1–20 operation and law types remain unchanged.
+
+The successor factor is essential. Scaling `[1,2]` and `[3,4]`
+by `Zero` produces `[0,0]` on both sides, so the scaled-equality
+premise is inhabited, while the original vectors are unequal.
+One-row matrices made from these vectors give the same
+counterexample for matrix scaling. At factor two (`Suc one`), the
+public vector and matrix laws cancel from a supplied scaled-equality
+premise; the equal-input closed controls check. A Zero-factor
+application in that same form must refuse for a factor mismatch,
+not because its scaled premise is false. The D0 observed a
+whole-declaration `TypeMismatch` for each such refusal, not an
+expression-exact span. A separate false-conclusion control refuses
+`[1,2] = [3,4]` independently. The finite pair discriminates the
+factor boundary but does not prove the generic theorems or execute
+the CV-owned seed.
+
+The current roster after these two new laws is **twelve operations,
+sixty laws and seventy-two public names**. Section 20's
+fifty-eight-law/seventy-name count describes the historical §20
+step, not the current package floor; neither it nor §19's older
+count is rewritten in place.

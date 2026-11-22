@@ -96,6 +96,81 @@ const CANCEL_FALSE_SUM: &str = r#"theorem cancel_false_sum : Equal (Vec Nat two)
   vector_add_cancel_right two v12 v21 v00 Refl
 "#;
 
+// The same fixed operands expose the factor boundary independently of the
+// cancellation law: factor two is injective here, factor Zero maps distinct
+// inputs to the same zero vector or zero matrix.
+const SCALE_ACCEPTED: &str = r#"import Data.Vector.Vector (Vec, VNil, VCons)
+import Algorithm.LinearAlgebra.NatMatrix
+  (vector_scale, matrix_scale, vector_scale_cancel, matrix_scale_cancel)
+
+const one : Nat = Suc Zero
+const two : Nat = Suc one
+const three : Nat = Suc two
+const four : Nat = Suc three
+fn pair (x : Nat) (y : Nat) : Vec Nat two =
+  VCons Nat one x (VCons Nat Zero y (VNil Nat))
+const v12 : Vec Nat two = pair one two
+const v34 : Vec Nat two = pair three four
+const m12 : Vec (Vec Nat two) one =
+  VCons (Vec Nat two) Zero v12 (VNil (Vec Nat two))
+const m34 : Vec (Vec Nat two) one =
+  VCons (Vec Nat two) Zero v34 (VNil (Vec Nat two))
+
+theorem vector_scale_open
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+      (h : Equal (Vec Nat n)
+        (vector_scale n two xs) (vector_scale n two ys))
+    : Equal (Vec Nat n) xs ys = vector_scale_cancel n one xs ys h
+theorem matrix_scale_open
+      (rows : Nat) (cols : Nat)
+      (a : Vec (Vec Nat cols) rows) (b : Vec (Vec Nat cols) rows)
+      (h : Equal (Vec (Vec Nat cols) rows)
+        (matrix_scale rows cols two a) (matrix_scale rows cols two b))
+    : Equal (Vec (Vec Nat cols) rows) a b =
+  matrix_scale_cancel rows cols one a b h
+
+theorem vector_scale_two_value : Equal (Vec Nat two)
+  (vector_scale two two v12) (pair two four) = Refl
+theorem vector_scale_zero_equal : Equal (Vec Nat two)
+  (vector_scale two Zero v12) (vector_scale two Zero v34) = Refl
+theorem vector_scale_zero_value : Equal (Vec Nat two)
+  (vector_scale two Zero v34) (pair Zero Zero) = Refl
+theorem matrix_scale_zero_equal : Equal (Vec (Vec Nat two) one)
+  (matrix_scale one two Zero m12) (matrix_scale one two Zero m34) = Refl
+
+theorem vector_scale_closed : Equal (Vec Nat two) v12 v12 =
+  vector_scale_cancel two one v12 v12 Refl
+theorem matrix_scale_closed : Equal (Vec (Vec Nat two) one) m12 m12 =
+  matrix_scale_cancel one two one m12 m12 Refl
+theorem vector_scale_empty : Equal (Vec Nat Zero) (VNil Nat) (VNil Nat) =
+  vector_scale_cancel Zero one (VNil Nat) (VNil Nat) Proved
+
+theorem vector_cancel_at_factor
+      (h : Equal (Vec Nat two) (vector_scale two two v12) (vector_scale two two v34))
+    : Equal (Vec Nat two) v12 v34 =
+  vector_scale_cancel two one v12 v34 h
+theorem matrix_cancel_at_factor
+      (h : Equal (Vec (Vec Nat two) one)
+        (matrix_scale one two two m12) (matrix_scale one two two m34))
+    : Equal (Vec (Vec Nat two) one) m12 m34 =
+  matrix_scale_cancel one two one m12 m34 h
+"#;
+
+const SCALE_VECTOR_ZERO_REFUSED: &str = r#"theorem vector_cancel_at_zero
+      (h : Equal (Vec Nat two) (vector_scale two Zero v12) (vector_scale two Zero v34))
+    : Equal (Vec Nat two) v12 v34 =
+  vector_scale_cancel two one v12 v34 h
+"#;
+
+const SCALE_MATRIX_ZERO_REFUSED: &str = r#"theorem matrix_cancel_at_zero
+      (h : Equal (Vec (Vec Nat two) one)
+        (matrix_scale one two Zero m12) (matrix_scale one two Zero m34))
+    : Equal (Vec (Vec Nat two) one) m12 m34 =
+  matrix_scale_cancel one two one m12 m34 h
+"#;
+
+const SCALE_FALSE_CONCLUSION: &str = "theorem v12_is_v34 : Equal (Vec Nat two) v12 v34 = Refl";
+
 fn term_contains_const(term: &Term, owner: GlobalId) -> bool {
     let mut pending = vec![term];
     while let Some(term) = pending.pop() {
@@ -242,7 +317,7 @@ fn matrix_env() -> ElabEnv {
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of seventy public identities is selectively
+/// MEASURED: the exact set of seventy-two public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
 /// the §14 law has a separate exact generic client in its named test;
@@ -329,6 +404,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_add_zero_left",
         "vector_add_zero_right",
         "vector_add_cancel_right",
+        "vector_scale_cancel",
         "vector_scale_zero",
         "dot_zero_left",
         "dot_zero_right",
@@ -338,6 +414,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "matrix_add_zero_left",
         "matrix_add_zero_right",
         "matrix_add_cancel_right",
+        "matrix_scale_cancel",
         "matrix_vector_zero_matrix",
         "matrix_product_zero_left",
         "matrix_product_zero_right",
@@ -377,7 +454,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has seventy checked names and no private helper"
+        "the exact public set has seventy-two checked names and no private helper"
     );
     env.elaborate_file(
         r#"
@@ -955,5 +1032,123 @@ fn false_sum_premise_refuses_at_its_own_refl_after_fresh_accepted_prefix() {
             && failure.start == refl
             && failure.end == refl + "Refl".len() => {}
         other => panic!("false sum premise must reject at its Refl: {other:?}"),
+    }
+}
+
+/// SOURCE: Architect AC-0 §6 and pending spec/50-stdlib/65-linear-algebra.md
+/// §21. PROMISE CLASS: durable invariant.
+/// MEASURED: the NatMatrix-owned Transparent laws are used by open selective-
+/// import clients at arbitrary dimensions; both checked client bodies cite
+/// the exact owner GlobalId. Closed factor-two and factor-Zero observations,
+/// nonempty law applications, and an empty vector application check together.
+/// All three private helpers refuse selective import. The inventory row above
+/// independently compares exact provider-first trusted GlobalId identities.
+/// CLAIMED: successor scaling cancels on vectors and matrices without new
+/// trust or an exported helper. THE GAP: inherited provider trust remains;
+/// these finite values do not replace the two generic checked proofs.
+#[test]
+fn successor_scale_cancel_public_clients_and_opposite_values_check() {
+    let mut env = matrix_env();
+    env.elaborate_file(SCALE_ACCEPTED)
+        .expect("complete accepted scale-cancellation prefix checks");
+    for (name, client) in [
+        ("vector_scale_cancel", "vector_scale_open"),
+        ("matrix_scale_cancel", "matrix_scale_open"),
+    ] {
+        let id = env.globals[&format!("{MATRIX}.{name}")];
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[client])
+            .expect("checked client");
+        assert!(
+            term_contains_const(&body, id),
+            "{client} cites its exact law owner"
+        );
+    }
+    for name in [
+        "vector_scale_two_value",
+        "vector_scale_zero_equal",
+        "vector_scale_zero_value",
+        "matrix_scale_zero_equal",
+        "vector_scale_closed",
+        "matrix_scale_closed",
+        "vector_scale_empty",
+        "vector_cancel_at_factor",
+        "matrix_cancel_at_factor",
+    ] {
+        assert!(matches!(
+            env.env.lookup(env.globals[name]),
+            Some(Decl::Transparent { .. })
+        ));
+    }
+    for helper in ["map_injective", "map_view", "mul_cancel_left"] {
+        let id = env.globals[&format!("{MATRIX}.{helper}")];
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{MATRIX}.{helper}"));
+            }
+            other => panic!("{helper} must stay private: {other:?}"),
+        }
+    }
+}
+
+/// SOURCE: Architect AC-0 §6 and pending spec 65 §21.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: each factor-Zero refusal starts after a fresh entire accepted
+/// prefix. The same-form factor-two clients check, while the otherwise
+/// unchanged vector and matrix applications with Zero rather than two reject
+/// as KernelRejected TypeMismatch in their own theorem declarations. Direct
+/// closed Refl proves both factor-Zero premises, and a separate Refl refusal
+/// establishes that the common v12 = v34 conclusion is false on these inputs.
+/// CLAIMED: successor factor is required for cancellation; Zero is not enough.
+/// THE GAP: rejection spans cover whole declarations, not just the h token;
+/// the independent value controls constrain the reason for the contrast.
+#[test]
+fn zero_factor_vector_and_matrix_cancel_refuse_after_fresh_controls() {
+    for (source, name) in [
+        (SCALE_VECTOR_ZERO_REFUSED, "vector_cancel_at_zero"),
+        (SCALE_MATRIX_ZERO_REFUSED, "matrix_cancel_at_zero"),
+    ] {
+        let parsed = parse_decls(source).expect("isolated factor-Zero refusal parses");
+        let [SourceDecl::TheoremDecl {
+            name: parsed_name,
+            span: claim,
+            ..
+        }] = parsed.as_slice()
+        else {
+            panic!("exactly one false factor-Zero theorem");
+        };
+        assert_eq!(parsed_name, name);
+        let mut env = matrix_env();
+        env.elaborate_file(SCALE_ACCEPTED)
+            .expect("fresh complete factor-two and Zero-value controls check");
+        match env
+            .elaborate_file(source)
+            .expect_err("factor-Zero law use rejects")
+        {
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                span,
+            } if span.start >= claim.start && span.end <= claim.end && span.start < span.end => {}
+            other => panic!("{name} must reject at its own theorem: {other:?}"),
+        }
+    }
+    let mut env = matrix_env();
+    env.elaborate_file(SCALE_ACCEPTED)
+        .expect("fresh accepted prefix for independent false conclusion");
+    let refl = SCALE_FALSE_CONCLUSION
+        .rfind("Refl")
+        .expect("false proof token");
+    match env
+        .elaborate_file(SCALE_FALSE_CONCLUSION)
+        .expect_err("distinct vector fixtures are not equal")
+    {
+        ElabError::TypeMismatch { reason, span }
+            if reason == "Refl expects an `Eq`-shaped goal"
+                && span.start == refl
+                && span.end == refl + "Refl".len() => {}
+        other => panic!("distinct vector conclusion must fail at Refl: {other:?}"),
     }
 }
