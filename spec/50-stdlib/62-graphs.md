@@ -18,7 +18,8 @@
 > SPEC-GRAPHS-UNION-REACHABLE-COMM §16;
 > SPEC-GRAPHS-UNION-REACHABLE-ASSOC §17;
 > SPEC-GRAPHS-REACHABLE-REVERSE-SWAP §18;
-> SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19;
+> SPEC-GRAPHS-SUCCESSOR-APPEND-UNION §20).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1789,3 +1790,93 @@ finite witness does not decompose union reachability, and neither
 its own acceptance nor its refusal establishes the generic theorem.
 The assembled package test owes the exact trusted-base identity-set
 AC-T gate before a Decision.
+
+## 20. Appended successor lists give the union's edges
+
+> **Section 20 status: DRAFT v0
+> (SPEC-GRAPHS-SUCCESSOR-APPEND-UNION).** Architect's AC-0
+> `evt_7b0ghzv1kwss6` root-loaded the generic proof on detached
+> scratch at `ccfc01de1c0d`: no `Axiom` was added and exact trusted
+> `GlobalId` identity sets agreed (114 → 114). Both new owners were
+> Transparent, both private helpers refused import, and a regrouping
+> mutation refused at load before restoration. These are scratch
+> measurements, not a check of this Spec child, the separate catalog/
+> test or CV seed children, assembled AC-T, official conformance, CI,
+> publication, landing or measured landed trust. The §1a chain
+> remains at zero: D0 preceded this text and was not a hard stop.
+
+`Algorithm.Graphs.Dependency` must export one public Transparent
+function and one public Transparent checked theorem, directly after
+`graph_from_successors_complete` in its §2 public block. Their
+exact public declarations and the function's defining equation are:
+
+```ken
+pub fn successors_append (q : Type) (f : q → List q) (g : q → List q) (v : q) : List q =
+  list_append q (f v) (g v)
+
+pub theorem graph_from_successors_append
+      (q : Type) (d : DecEq q) (f : q → List q) (g : q → List q) (s : q) (t : q)
+    : Equal Bool
+        (edge q (graph_from_successors q d (successors_append q f g)) s t)
+        (edge
+          q
+          (graph_union q (graph_from_successors q d f) (graph_from_successors q d g))
+          s
+          t) =
+  contains_append q d t (f s) (g s)
+```
+
+`successors_append q f g` lists `f v` before `g v` for each `v`;
+it neither removes duplicate list entries nor imposes an order on
+vertices. The frame's anonymous function
+`λv. list_append q (f v) (g v)` is the **defining term** here;
+unfolding the named function makes that lambda convertible to
+`successors_append q f g`. The type grammar does not admit a
+lambda where this theorem must state its graph argument; naming
+the function in the public type lets clients state the same law
+without changing surface grammar. This adds exactly one public
+operation, no new import, axiom, kernel or surface rule.
+
+The theorem is an equality of **Boolean edge decisions** at the
+written `(s,t)`, without a `Finite q` or caller premise. Unfolding
+the adaptor and union reduces it to the private `contains_append`
+equation: membership by `contains` in `list_append q (f s) (g s)`
+is `bool_or` of membership in the two separate lists. The private
+proof inducts on the **written** first list; `Nil` closes by
+`Refl`, while `Cons` transports the induction hypothesis with
+`cong` and regroups `bool_or` with private `bool_or_regroup`.
+The True regrouping arm uses `Proved` because the equality reduces
+past the Eq shape; the False arm and the Nil case use `Refl`.
+Neither helper becomes a Derived law: `contains` is owned by
+Dependency and Derived does not export a Boolean-membership
+operation. No §§1–19 operation or law type changes.
+
+Pointwise edge equality lets clients derive a reachability
+consequence from §7's `graph_reachable_graph_monotone` in both
+directions, with the existing private Boolean-iff equality step.
+That consequence is **not** a second public reachability-equality
+export. It would specialize the more general graph principle that
+pointwise equal edges have equal reachability; this §20 exports
+only the edge law, not graph structural equality or a decomposition
+of union reachability into operand reachabilities.
+
+For a finite discriminator, take `q = Bool`, let `f` list nothing,
+and let `g` list `False` at `True` and nothing at `False`.
+The edge from `True` to `False` is `True` in the appended adaptor
+and the union, but `False` in the `f` adaptor alone. A same-form
+claim replacing the right-hand union with `f` alone must refuse
+at its own declaration. In this fixture, `g` alone **does** agree
+with the appended edge, so it cannot test dropping the first
+operand. Swap the input functions: now the right-hand union still
+agrees, while the `g = none_out` operand in second position has a
+`False` edge and a same-form right-only claim must refuse. Each
+refusal needs a fresh accepted prefix; Architect's D0 measured
+whole-declaration `KernelRejected TypeMismatch`, not an
+expression-exact span. These controls separate the union from
+either input alone without asserting an untested graph equality.
+
+The current roster is **18 public functions and 36 public
+theorems**. Section 19's 17-function, 35-theorem count remains
+the historical §19 step, not a current total. The closed controls
+and scratch D0 do not replace the independently owned seed or the
+assembled package test's exact trust-identity gate.
