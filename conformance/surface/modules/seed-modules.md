@@ -1313,7 +1313,9 @@ duplicates a checked definition.
 - promise class: **normative compatibility vector** — the original checked
   carrier and comparator identities survive surface admission
 - spec: `30-taxonomy §4`; `33 §3.3`; `34 §1.1`; `36 §1`
-- given: in each of the three fresh source routes, elaborate:
+- given: in three fresh units, elaborate the following through
+  `elaborate_module_from_roots`, `elaborate_module_from_roots_v1`,
+  and rootless `elaborate_file_v1`, respectively:
 
   ```ken
   fn keep_stream (stream : ConsoleStream) : ConsoleStream = stream
