@@ -1,0 +1,77 @@
+program capabilities FS AFull "./jail", Net Unix, RootExecution Allow
+
+import Capability.Net.Stream
+  (SocketAddress, socket_unix_path, with_socket_listener, with_socket_connection)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, ResourceBracketOk)
+
+fn listener_body
+      (_listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn connection_body
+      (_stream : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn classify (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok _ ↦ ExitCode.Failure 81;
+    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ ExitCode.Failure 84;
+    Err (ResourceError.ResourceHostIO IOError.NotFound) ↦ ExitCode.Failure 85;
+    Err _ ↦ ExitCode.Failure 86
+  }
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons operation rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons path _ ↦
+              match socket_unix_path path {
+                Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+                Ok address ↦
+                  match caps {
+                    ProgramCaps.MkProgramCaps cap ↦
+                      match bytes_at operation (0 : Int) {
+                        None ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+                        Some first ↦
+                          match eq_int (uint8_to_int first) (108 : Int) {
+                            True ↦
+                              host_bind
+                                AFull
+                                (Result ResourceError (ResourceBracketResult Unit Unit))
+                                ExitCode
+                                (with_socket_listener AFull Unit Unit cap address listener_body)
+                                (λoutcome. host_pure AFull ExitCode (classify outcome));
+                            False ↦
+                              host_bind
+                                AFull
+                                (Result ResourceError (ResourceBracketResult Unit Unit))
+                                ExitCode
+                                (with_socket_connection
+                                  AFull
+                                  Unit
+                                  Unit
+                                  cap
+                                  address
+                                  connection_body)
+                                (λoutcome. host_pure AFull ExitCode (classify outcome))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }

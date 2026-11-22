@@ -7,6 +7,15 @@
 use std::io;
 use std::mem::{offset_of, size_of};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::unix::ffi::OsStrExt;
+
+use crate::{FsHandle, IoErrorIdentityV1, OpenRequest, PathComponent, RootedHandle};
+
+type NetResult<T> = Result<T, IoErrorIdentityV1>;
+
+fn io_identity(error: io::Error) -> IoErrorIdentityV1 {
+    crate::io_error_identity_v1(&error)
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SocketAddressV1 {
@@ -146,13 +155,22 @@ fn socket(address: &SocketAddressV1) -> io::Result<OwnedFd> {
     Ok(unsafe { OwnedFd::from_raw_fd(fd) })
 }
 
-pub fn listen(address: &SocketAddressV1) -> io::Result<OwnedFd> {
+// Only the IP arms reach this raw bind; Unix must resolve beneath the pinned root.
+fn listen_ip(address: &SocketAddressV1) -> io::Result<OwnedFd> {
     let (raw, length) = address.as_sockaddr()?;
     let fd = socket(address)?;
+    bind_and_listen(fd, &raw, length)
+}
+
+fn bind_and_listen(
+    fd: OwnedFd,
+    raw: &libc::sockaddr_storage,
+    length: libc::socklen_t,
+) -> io::Result<OwnedFd> {
     if unsafe {
         libc::bind(
             fd.as_raw_fd(),
-            &raw as *const _ as *const libc::sockaddr,
+            raw as *const _ as *const libc::sockaddr,
             length,
         )
     } != 0
@@ -163,6 +181,127 @@ pub fn listen(address: &SocketAddressV1) -> io::Result<OwnedFd> {
         return Err(io::Error::last_os_error());
     }
     Ok(fd)
+}
+
+fn unix_parent(root: &RootedHandle, path: &[u8]) -> NetResult<(RootedHandle, Vec<u8>)> {
+    let root_link = std::fs::read_link(format!("/proc/self/fd/{}", root.as_fd().as_raw_fd()))
+        .map_err(|_| IoErrorIdentityV1::CapabilityDenied)?;
+    let spelling = root_link.as_os_str().as_bytes();
+    if !spelling.starts_with(b"/") || spelling.ends_with(b" (deleted)") {
+        return Err(IoErrorIdentityV1::CapabilityDenied);
+    }
+    if path == spelling {
+        return Err(IoErrorIdentityV1::InvalidInput);
+    }
+    let rest = if spelling == b"/" {
+        path.strip_prefix(b"/".as_slice())
+    } else {
+        path.strip_prefix(spelling)
+            .and_then(|suffix| suffix.strip_prefix(b"/".as_slice()))
+    }
+    .ok_or(IoErrorIdentityV1::CapabilityDenied)?;
+    if rest.is_empty() || rest.ends_with(b"/") || rest.ends_with(b"/.") {
+        return Err(IoErrorIdentityV1::InvalidInput);
+    }
+    let mut components = rest
+        .split(|byte| *byte == b'/')
+        .filter(|part| !part.is_empty() && *part != b".")
+        .map(|part| {
+            if part == b".." {
+                return Err(IoErrorIdentityV1::CapabilityDenied);
+            }
+            PathComponent::new(part)
+                .map_err(|error| io_identity(error.into_io_error()))
+                .map(|_| part)
+        })
+        .collect::<NetResult<Vec<_>>>()?;
+    let leaf = components.pop().ok_or(IoErrorIdentityV1::InvalidInput)?;
+    let mut parent = root.clone();
+    for name in components {
+        let component =
+            PathComponent::new(name).map_err(|error| io_identity(error.into_io_error()))?;
+        if crate::readlink_at(&parent, &component).is_ok() {
+            return Err(IoErrorIdentityV1::CapabilityDenied);
+        }
+        parent =
+            crate::open_at(&parent, &component, OpenRequest::ReadDirectory).map_err(|error| {
+                let error = error.into_io_error();
+                if error.raw_os_error() == Some(libc::ELOOP) {
+                    IoErrorIdentityV1::CapabilityDenied
+                } else {
+                    io_identity(error)
+                }
+            })?;
+    }
+    Ok((parent, leaf.to_vec()))
+}
+
+fn deny_symlink_leaf(parent: &RootedHandle, leaf: &[u8]) -> NetResult<()> {
+    let component = PathComponent::new(leaf).map_err(|error| io_identity(error.into_io_error()))?;
+    if crate::readlink_at(parent, &component).is_ok() {
+        Err(IoErrorIdentityV1::CapabilityDenied)
+    } else {
+        Ok(())
+    }
+}
+
+fn listen_unix(root: &RootedHandle, path: &[u8]) -> NetResult<OwnedFd> {
+    let (parent, leaf) = unix_parent(root, path)?;
+    // /proc/self/fd/ (14 bytes), at most ten decimal fd digits, slash,
+    // and 82 leaf bytes fit Linux's 107-byte terminated sun_path limit.
+    if leaf.len() > 82 {
+        return Err(IoErrorIdentityV1::InvalidInput);
+    }
+    deny_symlink_leaf(&parent, &leaf)?;
+    let mut proc_path = format!("/proc/self/fd/{}/", parent.as_fd().as_raw_fd()).into_bytes();
+    proc_path.extend_from_slice(&leaf);
+    let resolved = SocketAddressV1::Unix { path: proc_path };
+    let (raw, length) = resolved.as_sockaddr().map_err(io_identity)?;
+    let fd = socket(&resolved).map_err(io_identity)?;
+    bind_and_listen(fd, &raw, length).map_err(io_identity)
+}
+
+fn connect_unix(root: &RootedHandle, path: &[u8]) -> NetResult<OwnedFd> {
+    let (parent, leaf) = unix_parent(root, path)?;
+    deny_symlink_leaf(&parent, &leaf)?;
+    let name = std::ffi::CString::new(leaf).expect("validated path component has no NUL");
+    let raw_fd = unsafe {
+        libc::openat(
+            parent.as_fd().as_raw_fd(),
+            name.as_ptr(),
+            libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if raw_fd < 0 {
+        return Err(io_identity(io::Error::last_os_error()));
+    }
+    let pinned_leaf = unsafe { OwnedFd::from_raw_fd(raw_fd) };
+    let mut metadata: libc::stat = unsafe { std::mem::zeroed() };
+    if unsafe { libc::fstat(pinned_leaf.as_raw_fd(), &mut metadata) } != 0 {
+        return Err(io_identity(io::Error::last_os_error()));
+    }
+    if metadata.st_mode & libc::S_IFMT == libc::S_IFLNK {
+        return Err(IoErrorIdentityV1::CapabilityDenied);
+    }
+    let resolved = SocketAddressV1::Unix {
+        path: format!("/proc/self/fd/{}", pinned_leaf.as_raw_fd()).into_bytes(),
+    };
+    let (raw, length) = resolved.as_sockaddr().map_err(io_identity)?;
+    let fd = socket(&resolved).map_err(io_identity)?;
+    connect_raw(fd, &raw, length).map_err(io_identity)
+}
+
+pub fn listen(root: &FsHandle, address: &SocketAddressV1) -> NetResult<OwnedFd> {
+    address.validate().map_err(io_identity)?;
+    match address {
+        SocketAddressV1::Inet4 { .. } | SocketAddressV1::Inet6 { .. } => {
+            listen_ip(address).map_err(io_identity)
+        }
+        SocketAddressV1::Unix { path } => match root {
+            FsHandle::Posix(root) => listen_unix(root, path),
+            FsHandle::Virtual(_) => Err(IoErrorIdentityV1::CapabilityDenied),
+        },
+    }
 }
 
 pub fn accept(listener: &OwnedFd) -> io::Result<OwnedFd> {
@@ -180,13 +319,22 @@ pub fn accept(listener: &OwnedFd) -> io::Result<OwnedFd> {
     Ok(unsafe { OwnedFd::from_raw_fd(fd) })
 }
 
-pub fn connect(address: &SocketAddressV1) -> io::Result<OwnedFd> {
+// Only the IP arms reach this raw connect; Unix pins the leaf before socket().
+fn connect_ip(address: &SocketAddressV1) -> io::Result<OwnedFd> {
     let (raw, length) = address.as_sockaddr()?;
     let fd = socket(address)?;
+    connect_raw(fd, &raw, length)
+}
+
+fn connect_raw(
+    fd: OwnedFd,
+    raw: &libc::sockaddr_storage,
+    length: libc::socklen_t,
+) -> io::Result<OwnedFd> {
     if unsafe {
         libc::connect(
             fd.as_raw_fd(),
-            &raw as *const _ as *const libc::sockaddr,
+            raw as *const _ as *const libc::sockaddr,
             length,
         )
     } != 0
@@ -194,6 +342,19 @@ pub fn connect(address: &SocketAddressV1) -> io::Result<OwnedFd> {
         return Err(io::Error::last_os_error());
     }
     Ok(fd)
+}
+
+pub fn connect(root: &FsHandle, address: &SocketAddressV1) -> NetResult<OwnedFd> {
+    address.validate().map_err(io_identity)?;
+    match address {
+        SocketAddressV1::Inet4 { .. } | SocketAddressV1::Inet6 { .. } => {
+            connect_ip(address).map_err(io_identity)
+        }
+        SocketAddressV1::Unix { path } => match root {
+            FsHandle::Posix(root) => connect_unix(root, path),
+            FsHandle::Virtual(_) => Err(IoErrorIdentityV1::CapabilityDenied),
+        },
+    }
 }
 
 pub fn receive(stream: &OwnedFd, buffer: &mut [u8]) -> io::Result<usize> {
@@ -282,7 +443,14 @@ mod tests {
             std::thread::current().id()
         ));
         std::fs::create_dir(&dir).unwrap();
-        let unix_path = dir.join("s").into_os_string().into_encoded_bytes();
+        let canonical_dir = std::fs::canonicalize(&dir).unwrap();
+        let root = crate::FsHandle::Posix(
+            crate::open_root(&crate::RootPath::new(&canonical_dir).unwrap()).unwrap(),
+        );
+        let unix_path = canonical_dir
+            .join("s")
+            .into_os_string()
+            .into_encoded_bytes();
         for address in [
             SocketAddressV1::Inet4 {
                 octets: [127, 0, 0, 1],
@@ -296,9 +464,13 @@ mod tests {
                 path: unix_path.clone(),
             },
         ] {
-            let listener = listen(&address).unwrap();
+            let listener = listen(&root, &address).unwrap();
             assert_cloexec(&listener);
-            let assigned = local_address(&listener).unwrap();
+            let assigned = if matches!(address, SocketAddressV1::Unix { .. }) {
+                address.clone()
+            } else {
+                local_address(&listener).unwrap()
+            };
             if !matches!(address, SocketAddressV1::Unix { .. }) {
                 assert!(matches!(
                     assigned,
@@ -306,7 +478,7 @@ mod tests {
                         | SocketAddressV1::Inet6 { port: 1.., .. }
                 ));
             }
-            let outbound = connect(&assigned).unwrap();
+            let outbound = connect(&root, &assigned).unwrap();
             assert_cloexec(&outbound);
             let accepted = accept(&listener).unwrap();
             assert_cloexec(&accepted);
@@ -338,12 +510,16 @@ mod tests {
     fn px11_live_px10_child_has_no_parent_socket_descriptors() {
         use crate::process_v1::{ChildStdioV1, SpawnPlanV1};
 
-        let listener = listen(&SocketAddressV1::Inet4 {
-            octets: [127, 0, 0, 1],
-            port: 0,
-        })
+        let root = crate::FsHandle::Virtual(0);
+        let listener = listen(
+            &root,
+            &SocketAddressV1::Inet4 {
+                octets: [127, 0, 0, 1],
+                port: 0,
+            },
+        )
         .unwrap();
-        let connected = connect(&local_address(&listener).unwrap()).unwrap();
+        let connected = connect(&root, &local_address(&listener).unwrap()).unwrap();
         let accepted = accept(&listener).unwrap();
         let socket_inodes = [&listener, &connected, &accepted]
             .into_iter()
@@ -388,6 +564,110 @@ mod tests {
         child.wait().expect("reap child after releasing stdin");
     }
 
+    /// Promise class: durable invariant. MEASURED: the rooted Unix dispatcher
+    /// distinguishes valid pinning, invalid leaf length, missing parent,
+    /// non-directory parent, and occupied listener name. CLAIMED: confinement
+    /// does not conflate path/input errors with capability denial. THE GAP:
+    /// this is a host-unit boundary; the CLI cases exercise checked Ken.
+    #[test]
+    fn rooted_unix_errors_preserve_path_and_existing_name_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "ken-px11-root-errors-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let dir = std::fs::canonicalize(dir).unwrap();
+        let root =
+            crate::FsHandle::Posix(crate::open_root(&crate::RootPath::new(&dir).unwrap()).unwrap());
+        let address = |path: std::path::PathBuf| SocketAddressV1::Unix {
+            path: path.into_os_string().into_encoded_bytes(),
+        };
+        assert_eq!(
+            listen(
+                &crate::FsHandle::Virtual(0),
+                &address(dir.join("virtual.sock"))
+            )
+            .unwrap_err(),
+            IoErrorIdentityV1::CapabilityDenied
+        );
+        assert_eq!(
+            listen(&root, &address(dir.clone())).unwrap_err(),
+            IoErrorIdentityV1::InvalidInput
+        );
+        assert_eq!(
+            connect(&root, &address(dir.join("."))).unwrap_err(),
+            IoErrorIdentityV1::InvalidInput
+        );
+        assert_eq!(
+            connect(&root, &address(dir.join("missing/svc.sock"))).unwrap_err(),
+            IoErrorIdentityV1::NotFound
+        );
+        std::fs::write(dir.join("file"), b"not a directory").unwrap();
+        assert_eq!(
+            connect(&root, &address(dir.join("file/svc.sock"))).unwrap_err(),
+            IoErrorIdentityV1::NotDirectory
+        );
+        let slash_root =
+            crate::FsHandle::Posix(crate::open_root(&crate::RootPath::new("/").unwrap()).unwrap());
+        let long_leaf = SocketAddressV1::Unix {
+            path: [b"/".as_slice(), vec![b'x'; 83].as_slice()].concat(),
+        };
+        long_leaf
+            .validate()
+            .expect("full path fits the original sun_path bound");
+        assert_eq!(
+            listen(&slash_root, &long_leaf).unwrap_err(),
+            IoErrorIdentityV1::InvalidInput
+        );
+        let slash_socket = address(dir.join("slash.sock"));
+        let _from_slash = listen(&slash_root, &slash_socket).unwrap();
+        std::fs::remove_file(dir.join("slash.sock")).unwrap();
+        let socket = address(dir.join("occupied.sock"));
+        let _first = listen(&root, &socket).unwrap();
+        assert_eq!(
+            listen(&root, &socket).unwrap_err(),
+            IoErrorIdentityV1::Other(98)
+        );
+        std::fs::remove_file(dir.join("occupied.sock")).unwrap();
+        std::fs::remove_file(dir.join("file")).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
+
+    /// Promise class: durable invariant. MEASURED: an opened root whose name
+    /// was deleted, or a virtual root, refuses Unix acquisition on both arms.
+    /// CLAIMED: an unreadable/deleted root cannot regain path authority.
+    /// THE GAP: this checks deletion and virtuality, not every readlink error.
+    #[test]
+    fn deleted_and_virtual_roots_refuse_both_unix_acquisitions() {
+        let dir = std::env::temp_dir().join(format!(
+            "ken-px11-deleted-root-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let dir = std::fs::canonicalize(dir).unwrap();
+        let root =
+            crate::FsHandle::Posix(crate::open_root(&crate::RootPath::new(&dir).unwrap()).unwrap());
+        let address = SocketAddressV1::Unix {
+            path: dir
+                .join("absent.sock")
+                .into_os_string()
+                .into_encoded_bytes(),
+        };
+        std::fs::remove_dir(&dir).unwrap();
+        for root in [&root, &crate::FsHandle::Virtual(0)] {
+            assert_eq!(
+                listen(root, &address).unwrap_err(),
+                IoErrorIdentityV1::CapabilityDenied
+            );
+            assert_eq!(
+                connect(root, &address).unwrap_err(),
+                IoErrorIdentityV1::CapabilityDenied
+            );
+        }
+    }
+
     #[test]
     fn invalid_unix_path_is_rejected_before_a_socket_exists() {
         for path in [
@@ -398,14 +678,20 @@ mod tests {
             vec![b'/'; 108],
         ] {
             assert_eq!(
-                listen(&SocketAddressV1::Unix { path: path.clone() })
-                    .unwrap_err()
-                    .kind(),
-                io::ErrorKind::InvalidInput
+                listen(
+                    &crate::FsHandle::Virtual(0),
+                    &SocketAddressV1::Unix { path: path.clone() }
+                )
+                .unwrap_err(),
+                IoErrorIdentityV1::InvalidInput
             );
             assert_eq!(
-                connect(&SocketAddressV1::Unix { path }).unwrap_err().kind(),
-                io::ErrorKind::InvalidInput
+                connect(
+                    &crate::FsHandle::Virtual(0),
+                    &SocketAddressV1::Unix { path }
+                )
+                .unwrap_err(),
+                IoErrorIdentityV1::InvalidInput
             );
         }
         for len in [2, 107] {

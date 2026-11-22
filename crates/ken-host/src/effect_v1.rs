@@ -1366,7 +1366,10 @@ pub enum ResourceOwnerV1 {
     Child(ChildOwnerV1),
     PipeRead(std::os::fd::OwnedFd),
     PipeWrite(std::os::fd::OwnedFd),
-    SocketListener(std::os::fd::OwnedFd),
+    SocketListener {
+        fd: std::os::fd::OwnedFd,
+        address: Option<crate::SocketAddressV1>,
+    },
     SocketStream(std::os::fd::OwnedFd),
 }
 
@@ -1532,9 +1535,10 @@ impl ResourceTableV1 {
         fd: std::os::fd::OwnedFd,
         kind: ResourceKindV1,
         provenance: crate::revocation_v1::RevocationNodeId,
+        address: Option<crate::SocketAddressV1>,
     ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
         let owner = match kind {
-            ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener(fd),
+            ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener { fd, address },
             ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream(fd),
             _ => unreachable!("socket insertion needs a socket kind"),
         };
@@ -2267,7 +2271,7 @@ impl ResourceTableV1 {
             | ResourceOwnerV1::Child(_)
             | ResourceOwnerV1::PipeRead(_)
             | ResourceOwnerV1::PipeWrite(_)
-            | ResourceOwnerV1::SocketListener(_)
+            | ResourceOwnerV1::SocketListener { .. }
             | ResourceOwnerV1::SocketStream(_) => None,
             ResourceOwnerV1::Buffer(buffer) => Some(buffer.capacity() as u64),
             ResourceOwnerV1::Mapping(region) => Some(
@@ -2303,7 +2307,7 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Buffer(_) => Ok(()),
             ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
             ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
-            | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener(_)
+            | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener { .. }
             | ResourceOwnerV1::SocketStream(_) => Ok(()),
             ResourceOwnerV1::Child(child) => backend.process_settle(child.process, false),
         };
@@ -2367,7 +2371,7 @@ impl ResourceTableV1 {
                     ResourceOwnerV1::Buffer(_) => Ok(()),
                     ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
                     ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
-                    | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener(_)
+                    | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener { .. }
                     | ResourceOwnerV1::SocketStream(_) => Ok(()),
                     ResourceOwnerV1::Child(child) => backend.process_settle(child.process, terminal_error),
                 };
@@ -2689,16 +2693,16 @@ pub trait HostEffectBackendV1 {
         child.settle(terminal_error).map_err(|error| io_error_identity_v1(&error))
     }
 
-    fn net_listen(&mut self, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
-        crate::net_v1::listen(address).map_err(|error| io_error_identity_v1(&error))
+    fn net_listen(&mut self, root: &crate::FsHandle, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::listen(root, address)
     }
 
     fn net_accept(&mut self, listener: &std::os::fd::OwnedFd) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
         crate::net_v1::accept(listener).map_err(|error| io_error_identity_v1(&error))
     }
 
-    fn net_connect(&mut self, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
-        crate::net_v1::connect(address).map_err(|error| io_error_identity_v1(&error))
+    fn net_connect(&mut self, root: &crate::FsHandle, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::connect(root, address)
     }
 
     fn net_receive(&mut self, stream: &std::os::fd::OwnedFd, bytes: &mut [u8]) -> Result<usize, IoErrorIdentityV1> {
@@ -3923,10 +3927,12 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         }
         (HostOpV1::NetListen, CanonicalRequestV1::NetListen { address })
         | (HostOpV1::NetConnect, CanonicalRequestV1::NetConnect { address }) => {
+            let grant = grant.expect("validated Net grant");
+            let root = &grant.capability.scope().root;
             let acquired = if operation == HostOpV1::NetListen {
-                backend.net_listen(address)
+                backend.net_listen(root, address)
             } else {
-                backend.net_connect(address)
+                backend.net_connect(root, address)
             };
             acquired.map(|fd| {
                 let kind = if operation == HostOpV1::NetListen {
@@ -3934,8 +3940,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 } else {
                     ResourceKindV1::SocketStream
                 };
+                let requested_address = match (kind, address) {
+                    (ResourceKindV1::SocketListener, crate::SocketAddressV1::Unix { .. }) =>
+                        Some(address.clone()),
+                    _ => None,
+                };
                 let (token, identity) = resources.insert_socket(
-                    fd, kind, grant.expect("validated Net grant").revocation_node,
+                    fd, kind, grant.revocation_node, requested_address,
                 );
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::Target, identity));
@@ -3953,11 +3964,11 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     .map_err(SemanticErrorV1::Resource)?;
                 let provenance = provenance.ok_or(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
-                let ResourceOwnerV1::SocketListener(fd) = owner else { unreachable!("validated socket kind") };
+                let ResourceOwnerV1::SocketListener { fd, .. } = owner else { unreachable!("validated socket kind") };
                 backend.net_accept(fd).map(|fd| (fd, provenance)).map_err(SemanticErrorV1::Io)
             })();
             accepted.map(|(fd, provenance)| {
-                let (token, identity) = resources.insert_socket(fd, ResourceKindV1::SocketStream, provenance);
+                let (token, identity) = resources.insert_socket(fd, ResourceKindV1::SocketStream, provenance, None);
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::File, identity));
                 CanonicalReplyV1::ResourceAcquired {
@@ -3988,11 +3999,13 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     })
                     .map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
-                let fd = match owner {
-                    ResourceOwnerV1::SocketListener(fd) | ResourceOwnerV1::SocketStream(fd) => fd,
+                let address = match owner {
+                    ResourceOwnerV1::SocketListener { address: Some(address), .. } => address.clone(),
+                    ResourceOwnerV1::SocketListener { fd, address: None }
+                    | ResourceOwnerV1::SocketStream(fd) =>
+                        backend.net_local_address(fd).map_err(SemanticErrorV1::Io)?,
                     _ => unreachable!("validated socket kind"),
                 };
-                let address = backend.net_local_address(fd).map_err(SemanticErrorV1::Io)?;
                 address.validate().map_err(|_| SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
                 Ok(CanonicalReplyV1::SocketAddress(address))
             })()
@@ -5293,6 +5306,7 @@ mod tests {
         }
         fn net_listen(
             &mut self,
+            _: &crate::FsHandle,
             _: &crate::SocketAddressV1,
         ) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
             self.0.push(HostOpV1::NetListen);
@@ -5300,6 +5314,7 @@ mod tests {
         }
         fn net_connect(
             &mut self,
+            _: &crate::FsHandle,
             _: &crate::SocketAddressV1,
         ) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
             self.0.push(HostOpV1::NetConnect);
@@ -6218,12 +6233,13 @@ mod tests {
     /// maximum and checks the actual count rather than assuming TCP chunks.
     #[test]
     fn px11_net_receive_respects_bound_below_buffer_capacity() {
-        let listener = crate::net_v1::listen(&crate::SocketAddressV1::Inet4 {
+        let root = crate::FsHandle::Virtual(0);
+        let listener = crate::net_v1::listen(&root, &crate::SocketAddressV1::Inet4 {
             octets: [127, 0, 0, 1],
             port: 0,
         })
         .unwrap();
-        let connected = crate::net_v1::connect(&crate::net_v1::local_address(&listener).unwrap())
+        let connected = crate::net_v1::connect(&root, &crate::net_v1::local_address(&listener).unwrap())
             .unwrap();
         let accepted = crate::net_v1::accept(&listener).unwrap();
         assert_eq!(crate::net_v1::send(&connected, b"abcdefg").unwrap(), 7);
@@ -6241,6 +6257,7 @@ mod tests {
             accepted,
             ResourceKindV1::SocketStream,
             provenance,
+            None,
         );
         let (buffer, _) = resources.insert_buffer(16).unwrap();
         let mut backend = AllOpsBackend::default();

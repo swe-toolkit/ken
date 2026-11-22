@@ -1543,15 +1543,28 @@ no other class member, including `AFull`, is admitted as a `Net` class.
 The runner mints those declared classes onto the existing `Cap a`, not
 a separate `Cap_Net` value. `Loopback` permits
 IPv4 `127.0.0.0/8` and IPv6 `::1`; `Inet` covers all IPv4/IPv6
-addresses and implies `Loopback`; `Unix` covers absolute Unix paths.
-Both listen and connect use the address's class; `0.0.0.0` and `::`
-need `Inet`, not `Loopback`. A `Unix` declaration also requires
-`FS AFull`; `Loopback` and `Inet` do not. At `NetListen` and
-`NetConnect` acquisition, an address outside the held class returns
-`ResourceHostIO IOError.CapabilityDenied`, and a revoked grant returns
-`ResourceHostIO IOError.Revoked`, before any socket syscall. The
-listener or stream retains the originating grant's provenance. On a
-revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
+addresses and implies `Loopback`; `Unix` covers absolute Unix paths
+beneath the FS root of the presented `Cap a`. Both listen and connect
+use the address's class; `0.0.0.0` and `::` need `Inet`, not `Loopback`.
+A `Unix` declaration also requires `FS AFull`; `Loopback` and `Inet`
+do not. At `NetListen` and `NetConnect` acquisition, an address outside
+the held class returns `ResourceHostIO IOError.CapabilityDenied`, and
+a revoked grant returns `ResourceHostIO IOError.Revoked`, before any
+socket syscall. The listener or stream retains the originating grant's
+provenance.
+
+For Unix acquisition, a path outside the presented capability's FS root,
+a `..` component, or a symbolic link at any component returns
+`ResourceHostIO IOError.CapabilityDenied` before any socket syscall.
+With no explicit FS root, the execution-start cwd is the root; root `/`
+admits paths reached without symlinks. A spelling that reaches the root
+only through a symbolic link is outside it. An empty or final-dot socket
+name and a listener's final component longer than 82 bytes return
+`IOError.InvalidInput`; a missing parent returns `IOError.NotFound`,
+and a non-directory parent returns `IOError.NotDirectory`. An unreadable
+or deleted root returns `IOError.CapabilityDenied`.
+
+On a revoked originating grant, `NetAccept`, `NetReceive`, `NetSend`,
 `NetShutdown` and `NetLocalAddress` return the delivered FS/Net
 resource-token carrier `ResourceHostIO IOError.Revoked` before any
 guarded host leaf. They are not Process host operations (§62 §4.1).
@@ -1569,7 +1582,9 @@ escape check rejects a caller without `Net` in its row. Acquiring a
 listener or connected stream also takes `Cap a`, and acceptance is
 confined to an already-held listener. A listener bound to IPv4 or IPv6
 port zero reports its OS-assigned port through `socket_local_address`;
-peer-address readback is not part of this slice. Each bracket settles
+a Unix listener reports the validated address it was acquired with,
+not the host-internal pinned descriptor spelling. Peer-address readback
+is not part of this slice. Each bracket settles
 its acquired resource via the existing `ResourceRelease`, even when
 the body returns an error; the bracket's result retains the existing
 four-way body/release distinction. A Unix pathname created by bind is
