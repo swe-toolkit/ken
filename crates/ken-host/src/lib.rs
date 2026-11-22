@@ -588,6 +588,17 @@ impl PartialEq for RootedHandle {
 
 impl Eq for RootedHandle {}
 
+#[cfg(target_os = "linux")]
+impl RootedHandle {
+    /// Borrow the pinned directory descriptor for host-internal `*at`
+    /// calls and `/proc/self/fd` spellings. Crate-private: no Ken value,
+    /// observation or public API ever carries the descriptor.
+    pub(crate) fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        use std::os::fd::AsFd;
+        self.inner.0.as_fd()
+    }
+}
+
 /// A validated process-provided path used only to choose a capability root.
 #[derive(Clone, Debug)]
 pub struct RootPath(PathBuf);

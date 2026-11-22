@@ -2,7 +2,8 @@
 
 This checked stream-socket surface uses typed IPv4, IPv6 and absolute Unix
 addresses. The existing `Cap a` holds the declared Net class; `Net` is the
-operation row. Socket descriptors remain bracket-owned and opaque.
+operation row. A Unix address must lie beneath that capability's FS root.
+Socket descriptors remain bracket-owned and opaque.
 
 ## Definition
 
