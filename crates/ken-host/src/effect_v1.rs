@@ -1370,7 +1370,10 @@ pub enum ResourceOwnerV1 {
         fd: std::os::fd::OwnedFd,
         address: Option<crate::SocketAddressV1>,
     },
-    SocketStream(std::os::fd::OwnedFd),
+    SocketStream {
+        fd: std::os::fd::OwnedFd,
+        address: Option<crate::SocketAddressV1>,
+    },
 }
 
 #[derive(Debug)]
@@ -1539,7 +1542,7 @@ impl ResourceTableV1 {
     ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
         let owner = match kind {
             ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener { fd, address },
-            ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream(fd),
+            ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream { fd, address },
             _ => unreachable!("socket insertion needs a socket kind"),
         };
         self.insert_owner(owner, kind, crate::RightSet::NONE, Some(provenance))
@@ -2272,7 +2275,7 @@ impl ResourceTableV1 {
             | ResourceOwnerV1::PipeRead(_)
             | ResourceOwnerV1::PipeWrite(_)
             | ResourceOwnerV1::SocketListener { .. }
-            | ResourceOwnerV1::SocketStream(_) => None,
+            | ResourceOwnerV1::SocketStream { .. } => None,
             ResourceOwnerV1::Buffer(buffer) => Some(buffer.capacity() as u64),
             ResourceOwnerV1::Mapping(region) => Some(
                 mapping_accounted_capacity(region.length() as u64)
@@ -2308,7 +2311,7 @@ impl ResourceTableV1 {
             ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
             ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
             | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener { .. }
-            | ResourceOwnerV1::SocketStream(_) => Ok(()),
+            | ResourceOwnerV1::SocketStream { .. } => Ok(()),
             ResourceOwnerV1::Child(child) => backend.process_settle(child.process, false),
         };
         match closed {
@@ -2372,7 +2375,7 @@ impl ResourceTableV1 {
                     ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
                     ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
                     | ResourceOwnerV1::PipeWrite(_) | ResourceOwnerV1::SocketListener { .. }
-                    | ResourceOwnerV1::SocketStream(_) => Ok(()),
+                    | ResourceOwnerV1::SocketStream { .. } => Ok(()),
                     ResourceOwnerV1::Child(child) => backend.process_settle(child.process, terminal_error),
                 };
                 Some(match closed {
@@ -2516,7 +2519,7 @@ impl ResourceTableV1 {
         let fd = match pipe_owner {
             ResourceOwnerV1::PipeRead(fd) if kind == ResourceKindV1::PipeRead => fd,
             ResourceOwnerV1::PipeWrite(fd) if kind == ResourceKindV1::PipeWrite => fd,
-            ResourceOwnerV1::SocketStream(fd) if kind == ResourceKindV1::SocketStream => fd,
+            ResourceOwnerV1::SocketStream { fd, .. } if kind == ResourceKindV1::SocketStream => fd,
             _ => return Err(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource)),
         };
         let ResourceSlotStateV1::Live { owner: buffer_owner, kind: buffer_kind, identity: buffer_identity, .. } = &mut buffer_slot.state else {
@@ -3964,11 +3967,15 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     .map_err(SemanticErrorV1::Resource)?;
                 let provenance = provenance.ok_or(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
-                let ResourceOwnerV1::SocketListener { fd, .. } = owner else { unreachable!("validated socket kind") };
-                backend.net_accept(fd).map(|fd| (fd, provenance)).map_err(SemanticErrorV1::Io)
+                let ResourceOwnerV1::SocketListener { fd, address } = owner else { unreachable!("validated socket kind") };
+                backend.net_accept(fd)
+                    .map(|fd| (fd, provenance, address.clone()))
+                    .map_err(SemanticErrorV1::Io)
             })();
-            accepted.map(|(fd, provenance)| {
-                let (token, identity) = resources.insert_socket(fd, ResourceKindV1::SocketStream, provenance, None);
+            accepted.map(|(fd, provenance, address)| {
+                let (token, identity) = resources.insert_socket(
+                    fd, ResourceKindV1::SocketStream, provenance, address,
+                );
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::File, identity));
                 CanonicalReplyV1::ResourceAcquired {
@@ -3985,7 +3992,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 let (owner, identity, _) = resources.typed_owner(token, ResourceKindV1::SocketStream)
                     .map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
-                let ResourceOwnerV1::SocketStream(fd) = owner else { unreachable!("validated socket kind") };
+                let ResourceOwnerV1::SocketStream { fd, .. } = owner else { unreachable!("validated socket kind") };
                 backend.net_shutdown(fd, *how).map(|()| CanonicalReplyV1::Unit).map_err(SemanticErrorV1::Io)
             })()
         }
@@ -4000,9 +4007,10 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     .map_err(SemanticErrorV1::Resource)?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
                 let address = match owner {
-                    ResourceOwnerV1::SocketListener { address: Some(address), .. } => address.clone(),
+                    ResourceOwnerV1::SocketListener { address: Some(address), .. }
+                    | ResourceOwnerV1::SocketStream { address: Some(address), .. } => address.clone(),
                     ResourceOwnerV1::SocketListener { fd, address: None }
-                    | ResourceOwnerV1::SocketStream(fd) =>
+                    | ResourceOwnerV1::SocketStream { fd, address: None } =>
                         backend.net_local_address(fd).map_err(SemanticErrorV1::Io)?,
                     _ => unreachable!("validated socket kind"),
                 };
@@ -6223,6 +6231,264 @@ mod tests {
         assert!(HostOpV1::ALL.into_iter().all(|op| {
             op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
         }));
+    }
+
+    #[cfg(target_os = "linux")]
+    mod socket_local_address_tests {
+        use super::*;
+        use crate::SocketAddressV1;
+        use std::os::unix::fs::DirBuilderExt;
+        use std::os::unix::net::UnixStream;
+        use std::path::PathBuf;
+
+        struct TestDir(PathBuf);
+
+        impl TestDir {
+            fn new() -> Self {
+                let path = std::env::temp_dir().join(format!(
+                    "ken-net-local-{}-{:?}",
+                    std::process::id(),
+                    std::thread::current().id()
+                ));
+                std::fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&path)
+                    .unwrap();
+                Self(path)
+            }
+        }
+
+        impl Drop for TestDir {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+
+        struct Sockets {
+            backend: RealResourceBackend,
+            revocation: RevocationDomain,
+            capabilities: CapabilityTableV1,
+            grant: CapabilityTokenV1,
+            resources: ResourceTableV1,
+            jail: PathBuf,
+            _dir: TestDir,
+        }
+
+        impl Sockets {
+            fn new() -> Self {
+                let dir = TestDir::new();
+                let jail = std::fs::canonicalize(&dir.0).unwrap().join("jail");
+                std::fs::create_dir(&jail).unwrap();
+                let root = crate::open_root(&crate::RootPath::new(&jail).unwrap()).unwrap();
+                let identity = crate::metadata(&root).unwrap().identity;
+                let scope = crate::FsScope::root(
+                    crate::RightSet::ALL,
+                    crate::FsHandle::Posix(root.clone()),
+                    crate::FsIdentity::Posix {
+                        device: identity.device,
+                        inode: identity.inode,
+                    },
+                    crate::SymlinkPolicy::NoFollow,
+                );
+                let mut revocation = RevocationDomain::default();
+                let mut capabilities = CapabilityTableV1::default();
+                let grant = capabilities.insert(CapabilityGrantV1::mint_root(
+                    CapabilityTraceIdentity("net:local-address".into()),
+                    crate::Cap::mint_scoped(crate::AUTH_FULL, "FS", scope).with_declared_net_grant(&[
+                        crate::NetClassV1::Unix,
+                        crate::NetClassV1::Loopback,
+                    ]),
+                    &mut revocation,
+                ));
+                Self {
+                    backend: RealResourceBackend {
+                        root,
+                        metadata_calls: 0,
+                        metadata_error: None,
+                    },
+                    revocation,
+                    capabilities,
+                    grant,
+                    resources: ResourceTableV1::default(),
+                    jail,
+                    _dir: dir,
+                }
+            }
+
+            fn unix(&self, leaf: &str) -> SocketAddressV1 {
+                SocketAddressV1::Unix {
+                    path: self.jail.join(leaf).into_os_string().into_encoded_bytes(),
+                }
+            }
+
+            fn dispatch(
+                &mut self,
+                operation: HostOpV1,
+                request: CanonicalRequestV1,
+                target: Option<ResourceTokenV1>,
+            ) -> HostDispatchReplyV1 {
+                dispatch_host_op_v1(
+                    &mut self.backend,
+                    &self.capabilities,
+                    &self.revocation,
+                    &mut self.resources,
+                    operation,
+                    target.is_none().then_some(self.grant),
+                    target.map_or(ResourceInputsV1::None, ResourceInputsV1::Target),
+                    &request,
+                )
+                .expect("well-shaped socket request")
+            }
+
+            fn listen(&mut self, address: SocketAddressV1) -> ResourceTokenV1 {
+                acquired(
+                    self.dispatch(
+                        HostOpV1::NetListen,
+                        CanonicalRequestV1::NetListen { address },
+                        None,
+                    ),
+                    ResourceKindV1::SocketListener,
+                )
+            }
+
+            fn connect(&mut self, address: SocketAddressV1) -> ResourceTokenV1 {
+                acquired(
+                    self.dispatch(
+                        HostOpV1::NetConnect,
+                        CanonicalRequestV1::NetConnect { address },
+                        None,
+                    ),
+                    ResourceKindV1::SocketStream,
+                )
+            }
+
+            fn accept(&mut self, listener: ResourceTokenV1) -> ResourceTokenV1 {
+                acquired(
+                    self.dispatch(
+                        HostOpV1::NetAccept,
+                        CanonicalRequestV1::NetAccept,
+                        Some(listener),
+                    ),
+                    ResourceKindV1::SocketStream,
+                )
+            }
+
+            fn local_outcome(&mut self, token: ResourceTokenV1) -> CanonicalOutcomeV1 {
+                self.dispatch(
+                    HostOpV1::NetLocalAddress,
+                    CanonicalRequestV1::NetLocalAddress,
+                    Some(token),
+                )
+                .outcome
+            }
+
+            fn local_address(&mut self, token: ResourceTokenV1) -> SocketAddressV1 {
+                let outcome = self.local_outcome(token);
+                let CanonicalOutcomeV1::Success(CanonicalReplyV1::SocketAddress(address)) = outcome
+                else {
+                    panic!("expected a socket address reply");
+                };
+                address
+            }
+        }
+
+        fn acquired(reply: HostDispatchReplyV1, kind: ResourceKindV1) -> ResourceTokenV1 {
+            assert!(
+                matches!(reply.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired { resource_kind, .. })
+                    if resource_kind == kind),
+                "expected {kind:?} acquisition, got {:?}",
+                reply.outcome
+            );
+            reply.resource_token.expect("acquisition mints a token")
+        }
+
+        /// Promise class: durable invariant. MEASURED: with both listeners and
+        /// accepted streams live, each stream returns its own listener's
+        /// exact input path and the reply itself reconnects. CLAIMED: accepted
+        /// Unix stream readback is per listener and usable. THE GAP: this
+        /// exercises the shared host dispatcher, not Ken's surface projection.
+        #[test]
+        fn accepted_unix_local_address_matches_each_listener_and_reconnects() {
+            let mut sockets = Sockets::new();
+            let expected = [sockets.unix("svc.sock"), sockets.unix("other.sock")];
+            let listeners = expected.clone().map(|address| sockets.listen(address));
+            let _clients = expected.clone().map(|address| sockets.connect(address));
+            let streams = listeners.map(|listener| sockets.accept(listener));
+            let observed = streams.map(|stream| sockets.local_address(stream));
+            assert!(
+                observed == expected,
+                "each accepted stream must return its own listener's exact path"
+            );
+            for address in observed {
+                sockets.connect(address);
+            }
+        }
+
+        /// Promise class: durable invariant. MEASURED: the acquired client's
+        /// Linux endpoint is unnamed and its host reply carries no address.
+        /// CLAIMED: a connected Unix client does not publish a pathname.
+        /// THE GAP: the current address type cannot represent unnamed endpoints;
+        /// the reply is an I/O error, with no particular error identity pinned.
+        #[test]
+        fn connected_unix_local_address_is_unnamed() {
+            let mut sockets = Sockets::new();
+            let address = sockets.unix("svc.sock");
+            sockets.listen(address.clone());
+            let client = sockets.connect(address);
+            let (owner, ..) = sockets
+                .resources
+                .typed_owner(client, ResourceKindV1::SocketStream)
+                .unwrap();
+            let ResourceOwnerV1::SocketStream { fd, .. } = owner else {
+                unreachable!()
+            };
+            let client_socket = UnixStream::from(fd.try_clone().unwrap());
+            assert!(client_socket.local_addr().unwrap().is_unnamed());
+            assert!(
+                matches!(
+                    sockets.local_outcome(client),
+                    CanonicalOutcomeV1::Error(SemanticErrorV1::Io(_))
+                ),
+                "unnamed client must return no address in the current reply type"
+            );
+        }
+
+        /// Promise class: durable invariant. MEASURED: both IP families connect
+        /// to the listener's assigned port and the accepted stream returns the
+        /// same nonzero port and loopback octets. CLAIMED: accepted IP readback
+        /// still reflects the bound endpoint. THE GAP: only loopback is tested.
+        #[test]
+        fn accepted_ip_local_address_keeps_os_assigned_port() {
+            let mut sockets = Sockets::new();
+            let ipv4 = [127, 0, 0, 1];
+            let ipv6 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+            for requested in [
+                SocketAddressV1::Inet4 {
+                    octets: ipv4,
+                    port: 0,
+                },
+                SocketAddressV1::Inet6 {
+                    octets: ipv6,
+                    port: 0,
+                },
+            ] {
+                let listener = sockets.listen(requested.clone());
+                let bound = sockets.local_address(listener);
+                let mut without_port = bound.clone();
+                let port = match &mut without_port {
+                    SocketAddressV1::Inet4 { port, .. } | SocketAddressV1::Inet6 { port, .. } => {
+                        std::mem::take(port)
+                    }
+                    SocketAddressV1::Unix { .. } => panic!("expected an IP address"),
+                };
+                assert_ne!(port, 0);
+                assert_eq!(without_port, requested);
+                sockets.connect(bound.clone());
+                let stream = sockets.accept(listener);
+                assert_eq!(sockets.local_address(stream), bound);
+            }
+        }
     }
 
     /// Promise class: durable invariant. MEASURED: the real NetReceive

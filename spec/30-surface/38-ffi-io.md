@@ -1583,8 +1583,10 @@ listener or connected stream also takes `Cap a`, and acceptance is
 confined to an already-held listener. A listener bound to IPv4 or IPv6
 port zero reports its OS-assigned port through `socket_local_address`;
 a Unix listener reports the validated address it was acquired with,
-not the host-internal pinned descriptor spelling. Peer-address readback
-is not part of this slice. Each bracket settles
+not the host-internal pinned descriptor spelling. For a stream accepted
+from a Unix listener, `socket_local_address` returns that listener's
+validated address. Peer-address readback is not part of this slice. Each
+bracket settles
 its acquired resource via the existing `ResourceRelease`, even when
 the body returns an error; the bracket's result retains the existing
 four-way body/release distinction. A Unix pathname created by bind is
