@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER
 title: "Spec 67 §4 says area is zero when either axis is inverted, and a box containing a point has a derived positive area, but no law gives the converse, so a client holding a box of positive area cannot conclude it holds any point. Rule from a checked D0 at zero trust that a box whose area is at least one contains its low corner, and state it with a seed that separates a valid box from one inverted on a single axis"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
@@ -22,7 +22,7 @@ and `hi`, if `area (MkBox lo hi)` is at least `Suc Zero`, then `contains
 by its public type. With the existing derived use, positive area and
 having a member then coincide.
 
-## Settled inputs (main `d7d1e430e`; anchors re-checked at release)
+## Settled inputs (main `99ddd22e3`; anchors re-checked at release)
 
 - **The operation.** `area` (`NatBox.ken.md:2149`) is `mul (axis_span lx
   hx) (axis_span ly hy)`, with private `axis_span lo hi = sub (Suc hi) lo`
