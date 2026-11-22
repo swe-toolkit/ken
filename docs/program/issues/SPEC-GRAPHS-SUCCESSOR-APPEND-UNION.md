@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-SUCCESSOR-APPEND-UNION
 title: "Spec 62 builds a graph from successor lists (§14) and unions two graphs (§15), but no law relates the two, so a client merging two adjacency sources by appending their lists cannot use the union's reachability laws without re-proving list membership over the append. Rule from a checked D0 at zero trust that the adaptor over pointwise-appended successor lists has the edges of the union of the two adaptors, and state it with a seed that separates the union from either operand alone"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
