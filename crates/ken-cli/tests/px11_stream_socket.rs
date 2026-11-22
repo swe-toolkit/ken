@@ -121,6 +121,7 @@ fn px11_wrong_grant_refuses_unix_connect() {
 enum UnixRootCase {
     ListenInside,
     ListenOutside,
+    ListenLeafSymlink,
     ConnectInside,
     ConnectOutside,
     ParentEscape,
@@ -130,13 +131,14 @@ enum UnixRootCase {
 
 /// MEASURED: a checked program with FS AFull "./jail" and Net Unix uses the
 /// real interpreter/host dispatch to bind or connect at a named path. Outside
-/// peers are live, and outside bind leaves no inode. CLAIMED: Unix acquisition
-/// cannot extend the presented FS root via spelling, parent or leaf symlinks.
+/// peers are live, outside bind leaves no inode, and a listener leaf symlink
+/// preserves its link and outside peer. CLAIMED: Unix acquisition cannot extend
+/// the presented FS root via spelling, parent or leaf symlinks.
 /// THE GAP: this samples one canonical Linux temp root; descriptor pinning and
 /// the other roots/error classes have separate host-level tests and review.
 fn assert_unix_root_case(case: UnixRootCase) {
-    use std::os::unix::fs::symlink;
-    use std::os::unix::net::UnixListener;
+    use std::os::unix::fs::{symlink, FileTypeExt, MetadataExt};
+    use std::os::unix::net::{UnixListener, UnixStream};
 
     let dir = tempfile::Builder::new()
         .prefix("ken-net-scope-")
@@ -148,20 +150,42 @@ fn assert_unix_root_case(case: UnixRootCase) {
     std::fs::create_dir(&jail).unwrap();
     std::fs::create_dir(&outside).unwrap();
     let _inside_peer = UnixListener::bind(jail.join("svc.sock")).expect("live inside peer");
-    let _outside_peer = UnixListener::bind(outside.join("svc.sock")).expect("live outside peer");
+    let outside_peer_path = outside.join("svc.sock");
+    let _outside_peer = UnixListener::bind(&outside_peer_path).expect("live outside peer");
     symlink("../outside", jail.join("link")).unwrap();
-    symlink("../outside/svc.sock", jail.join("alias.sock")).unwrap();
+    let alias_path = jail.join("alias.sock");
+    symlink("../outside/svc.sock", &alias_path).unwrap();
+    let leaf_state = if matches!(case, UnixRootCase::ListenLeafSymlink) {
+        let link = std::fs::symlink_metadata(&alias_path).unwrap();
+        assert!(
+            link.file_type().is_symlink(),
+            "listener leaf must be a symlink"
+        );
+        let peer = std::fs::metadata(&outside_peer_path).unwrap();
+        assert!(
+            peer.file_type().is_socket(),
+            "outside peer must be a socket"
+        );
+        Some((
+            std::fs::read_link(&alias_path).unwrap(),
+            (link.dev(), link.ino()),
+            (peer.dev(), peer.ino()),
+        ))
+    } else {
+        None
+    };
     let inside_made = jail.join("made.sock");
     let outside_made = outside.join("made.sock");
     assert!(!outside_made.exists());
     let (operation, address, expected) = match case {
         UnixRootCase::ListenInside => ("listen", inside_made.clone(), 0),
         UnixRootCase::ListenOutside => ("listen", outside_made.clone(), 84),
+        UnixRootCase::ListenLeafSymlink => ("listen", alias_path.clone(), 84),
         UnixRootCase::ConnectInside => ("connect", jail.join("svc.sock"), 0),
         UnixRootCase::ConnectOutside => ("connect", outside.join("svc.sock"), 84),
         UnixRootCase::ParentEscape => ("connect", jail.join("../outside/svc.sock"), 84),
         UnixRootCase::ParentSymlink => ("connect", jail.join("link/svc.sock"), 84),
-        UnixRootCase::LeafSymlink => ("connect", jail.join("alias.sock"), 84),
+        UnixRootCase::LeafSymlink => ("connect", alias_path.clone(), 84),
     };
     let output = run(
         "rt_net_unix_root_scope.ken",
@@ -183,6 +207,17 @@ fn assert_unix_root_case(case: UnixRootCase) {
         !outside_made.exists(),
         "outside bind must not create an inode"
     );
+    if let Some((target, link_identity, peer_identity)) = leaf_state {
+        let link = std::fs::symlink_metadata(&alias_path).expect("listener symlink survives");
+        assert!(link.file_type().is_symlink());
+        assert_eq!(std::fs::read_link(&alias_path).unwrap(), target);
+        assert_eq!((link.dev(), link.ino()), link_identity);
+        let peer = std::fs::metadata(&outside_peer_path).expect("outside peer survives");
+        assert!(peer.file_type().is_socket());
+        assert_eq!((peer.dev(), peer.ino()), peer_identity);
+        let _connection = UnixStream::connect(&outside_peer_path)
+            .expect("outside peer remains live after refused listen");
+    }
 }
 
 /// Promise class: durable invariant; bind beneath the FS root succeeds.
@@ -195,6 +230,16 @@ fn unix_listen_inside_declared_fs_root_creates_socket() {
 #[test]
 fn unix_listen_outside_declared_fs_root_refuses_without_inode() {
     assert_unix_root_case(UnixRootCase::ListenOutside);
+}
+
+/// Promise class: durable invariant. MEASURED: NetListen returns the exact
+/// ResourceHostIO CapabilityDenied branch; the symlink target and inode, live
+/// outside peer inode and connection remain unchanged. CLAIMED: a listener
+/// leaf symlink cannot escape the FS root, and refusal precedes socket().
+/// THE GAP: the CLI does not count syscalls; guard ordering needs source review.
+#[test]
+fn unix_listen_leaf_symlink_refuses_live_outside_peer_without_path_change() {
+    assert_unix_root_case(UnixRootCase::ListenLeafSymlink);
 }
 
 /// Promise class: durable invariant; connect to a live in-root peer succeeds.
