@@ -50,6 +50,16 @@ FS root, and a pin holds that reach. AC-0 rules which.
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
+## Amendment: AC-0 ruling and AC-2 (2026-11-22)
+
+Architect AC-0 `evt_1p4j6qrbsavgs` ruled (a): Unix paths are confined
+beneath the root by root-handle resolution, which is symlink-safe. The
+same post rules the refusal identities, the default-root behaviour, the
+consumer dispositions and the AC-1 rows, including three guard rows for
+`..`, a parent symlink and a leaf symlink. `admits` never reads the root
+and stays the class check. Steward ruling `evt_31yc1867psx5k` replaces
+AC-2 with the amended AC-2 below.
+
 ## Scope
 
 The Net acquisition check and the Unix `bind` and `connect` path in
@@ -74,9 +84,10 @@ classes, the abstract namespace, or the FS act semantics.
   Under (a), the two outside rows refuse with the ruled identity, and no
   socket file exists outside the root afterwards. Under (b), all four
   succeed, and spec 38 states the unbounded reach.
-- **AC-2 (QA mutation).** Under (a), make `admits` ignore the root again.
-  Both outside rows redden, and the inside rows stay green. Restore it
-  byte-identically.
+- **AC-2 (QA mutation, amended).** Route Unix listen and connect through
+  the raw absolute-path `bind` and `connect` again, with everything else
+  unchanged. Both outside rows and the three guard rows redden, and both
+  inside rows stay green. Restore it byte-identically.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
