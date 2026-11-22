@@ -67,6 +67,8 @@ import Data.Numeric.Nat.Order (sub)
 
 import Core.Logic.Transport (sym, trans, cong)
 
+import Core.Logic.Or (Or, Inl, Inr)
+
 import Data.Numeric.Rational
   (Rational,
     MkRational,
@@ -444,6 +446,23 @@ pub theorem interval_width_zero_equiv
                 rational_zero
                 (interval_width_bounds_sub i x y hx hy)
                 width_leq_zero))
+
+pub fn interval_split_covers
+      (lo : Rational) (hi : Rational) (m : Rational) (x : Rational)
+    : IsTrue (interval_contains (MkInterval lo hi) x)
+      → Or
+        (IsTrue (interval_contains (MkInterval lo m) x))
+        (IsTrue (interval_contains (MkInterval m hi) x)) =
+  λmember.
+    interval_split_cases
+      lo
+      hi
+      m
+      x
+      (rational_leq x m)
+      Refl
+      ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) member)
+      ((proof right for bool_and) (rational_leq lo x) (rational_leq x hi) member)
 
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
@@ -1773,6 +1792,37 @@ theorem rational_distrib_r
       (rational_mul z x)
       ((proof comm for rational_mul) x y)
       ((proof comm for rational_mul) x z))
+
+fn interval_split_cases
+      (lo : Rational) (hi : Rational) (m : Rational) (x : Rational) (b : Bool)
+    : Equal Bool (rational_leq x m) b
+      → IsTrue (rational_leq lo x)
+      → IsTrue (rational_leq x hi)
+      → Or
+        (IsTrue (interval_contains (MkInterval lo m) x))
+        (IsTrue (interval_contains (MkInterval m hi) x)) =
+  match b {
+    True ↦
+      λbelow.
+        λlower.
+          λupper.
+            Inl
+              (IsTrue (interval_contains (MkInterval lo m) x))
+              (IsTrue (interval_contains (MkInterval m hi) x))
+              ((proof intro for bool_and) (rational_leq lo x) (rational_leq x m) lower below);
+    False ↦
+      λabove.
+        λlower.
+          λupper.
+            Inr
+              (IsTrue (interval_contains (MkInterval lo m) x))
+              (IsTrue (interval_contains (MkInterval m hi) x))
+              ((proof intro for bool_and)
+                (rational_leq m x)
+                (rational_leq x hi)
+                ((proof total for rational_leq) x m above)
+                upper)
+  }
 ```
 
 The inclusion test compares rational values, not constructor spellings:
@@ -1939,6 +1989,20 @@ no new Rational or Nat API is required. Composing the public law with
 value-equivalent, even if their Rational spellings differ. Neither theorem
 claims structural equality of those spellings.
 
+### Splitting an enclosure (§21)
+
+`interval_split_covers lo hi m x` takes evidence that `x` belongs to
+`MkInterval lo hi` and returns evidence that it belongs to `MkInterval lo m`
+(`Inl`) or `MkInterval m hi` (`Inr`). The result is a Type-sorted `Or`, so a
+client can match on it to use the evidence for the returned half. The split
+point need not lie between the endpoints: one half may be inverted and the
+other still contains `x`.
+
+The private `interval_split_cases` pairs the comparison `x ≤ m` with its
+Boolean result. If it is true, the original lower bound and `x ≤ m` give
+lower-half membership. If it is false, Rational order totality gives `m ≤ x`,
+which combines with the original upper bound to give upper-half membership.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -1979,10 +2043,12 @@ interval subtraction are not.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
-   `interval_hull`, `interval_intersect`, `interval_inside` and sixty
-   checked interval laws, including `interval_width_mul`,
-   `interval_width_inside`, `interval_width_bounds_sub` and
-   `interval_width_zero_equiv`, form the public contract.
+   `interval_hull`, `interval_intersect`, `interval_inside` and
+   `interval_split_covers` form the public contract with sixty checked public
+   theorems, including `interval_width_mul`, `interval_width_inside`,
+   `interval_width_bounds_sub` and `interval_width_zero_equiv`.
+   Section 21 adds one checked public function, for nine public functions in
+   total. No operation or law type from §§1–20 changes.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
@@ -2024,9 +2090,12 @@ interval subtraction are not.
    `rational_sub_zero_leq` turn both truncated differences into order
    comparisons, and public Rational antisymmetry concludes value
    equivalence. These helpers are not part of the public API.
-4. **Trusted-base delta.** Zero: all sixty laws have checked proof bodies,
-   and the package declares no `Axiom` or new primitive. Imported rational,
-   natural-number and logical providers retain their inherited trust.
+   [Splitting an enclosure](#splitting-an-enclosure-21) reuses Rational order
+   totality and Boolean conjunction proofs through the private split helper.
+4. **Trusted-base delta.** Zero: all sixty theorems and the split cover
+   function have checked bodies, and the package declares no `Axiom` or new
+   primitive. Imported rational, natural-number and logical providers retain
+   their inherited trust.
 5. **Validation.** The
    [arithmetic seed](../../../../conformance/stdlib/numerical/seed-rational-interval.md)
    [hull/intersection seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersection.md)
@@ -2083,6 +2152,8 @@ interval subtraction are not.
    premise. The interval-idempotence seed and
    `cat_numeric_interval_hull_intersect_idempotent` package test check both
    open laws and stored values at three intervals, and isolate the false
-   equal-value-but-different-spelling claim.
+   equal-value-but-different-spelling claim. The split-cover package test
+   checks an open client, both exclusive halves, exterior and endpoint splits,
+   rejection of a false lower-half claim, and unchanged trusted identities.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
