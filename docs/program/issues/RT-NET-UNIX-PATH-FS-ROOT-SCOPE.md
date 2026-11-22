@@ -58,7 +58,9 @@ same post rules the refusal identities, the default-root behaviour, the
 consumer dispositions and the AC-1 rows, including three guard rows for
 `..`, a parent symlink and a leaf symlink. `admits` never reads the root
 and stays the class check. Steward ruling `evt_31yc1867psx5k` replaces
-AC-2 with the amended AC-2 below.
+AC-2 with the amended AC-2 below. Runtime QA `evt_5cn3mhwe95433` found no
+row for a listener whose final component is a symlink. Steward ruling
+`evt_4f920kttaaamj` adds that row to AC-1 and to AC-2's reddening set.
 
 ## Scope
 
@@ -82,12 +84,15 @@ classes, the abstract namespace, or the FS act semantics.
 - **AC-1.** One test varies only the path against a declared root,
   across four rows: listen and connect, each inside and outside the root.
   Under (a), the two outside rows refuse with the ruled identity, and no
-  socket file exists outside the root afterwards. Under (b), all four
+  socket file exists outside the root afterwards. A listen on `R/jail/alias.sock`, a symlink to a live outside socket,
+  refuses with `IOError.CapabilityDenied` before any socket syscall and
+  leaves the path state unchanged. Under (b), all four
   succeed, and spec 38 states the unbounded reach.
 - **AC-2 (QA mutation, amended).** Route Unix listen and connect through
   the raw absolute-path `bind` and `connect` again, with everything else
-  unchanged. Both outside rows and the three guard rows redden, and both
-  inside rows stay green. Restore it byte-identically.
+  unchanged. Both outside rows and four guard rows redden: `..`, parent
+  symlink on connect, leaf symlink on connect, and leaf symlink on listen.
+  Both inside rows stay green. Restore it byte-identically.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
