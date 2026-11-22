@@ -36,8 +36,9 @@ intersection and hull, ahead of the three metric laws. The two corner-membership
 follow the three metric laws, and `contains_point_box` and
 `contains_point_box_equal` follow them. The corner-wise `inside` operation
 and its seven laws come next, then the eight
-inclusion-order laws, followed by `area`, its three laws and `area_point_box`.
-Per-axis proof helpers and distance helpers stay private.
+inclusion-order laws, followed by `area`, its three laws, `area_point_box`
+and `area_positive_contains_lo_corner`. Per-axis proof helpers and distance
+helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -2253,6 +2254,28 @@ pub theorem area_point_box (p : Point) : Equal Nat (area (MkBox p p)) (Suc Zero)
         (cong Nat Nat (axis_span y y) (Suc Zero) (λw. mul (Suc Zero) w) (axis_span_point y))
   }
 
+pub theorem area_positive_contains_lo_corner
+      (lo : Point) (hi : Point)
+    : IsTrue (leq_nat (Suc Zero) (area (MkBox lo hi))) → IsTrue (contains (MkBox lo hi) lo) =
+  match lo {
+    MkPoint lx ly ↦
+      match hi {
+        MkPoint hx hy ↦
+          λh.
+            (proof intro for bool_and)
+              (axis_contains lx hx lx)
+              (axis_contains ly hy ly)
+              (axis_corner_from_span
+                lx
+                hx
+                (mul_positive_left (axis_span lx hx) (axis_span ly hy) h))
+              (axis_corner_from_span
+                ly
+                hy
+                (mul_positive_right (axis_span lx hx) (axis_span ly hy) h))
+      }
+  }
+
 fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
   bool_and (leq_nat l2 l1) (leq_nat h1 h2)
 
@@ -2489,6 +2512,49 @@ theorem axis_span_point (n : Nat) : Equal Nat (axis_span n n) (Suc Zero) =
     Suc rest ↦ axis_span_point rest
   }
 
+theorem axis_corner_from_span
+      (l : Nat) (h : Nat)
+    : IsTrue (leq_nat (Suc Zero) (axis_span l h)) → IsTrue (axis_contains l h l) =
+  λp.
+    (proof intro for bool_and)
+      (leq_nat l l)
+      (leq_nat l h)
+      ((proof refl for leq_nat) l)
+      (axis_span_positive_orders l h p)
+
+theorem axis_span_positive_orders
+      (l : Nat)
+    : (h : Nat) → IsTrue (leq_nat (Suc Zero) (axis_span l h)) → IsTrue (leq_nat l h) =
+  match l {
+    Zero ↦ λh. λp. Proved;
+    Suc l2 ↦
+      λh.
+        match h {
+          Zero ↦
+            match l2 {
+              Zero ↦ λp. absurd p;
+              Suc l3 ↦ λp. absurd p
+            };
+          Suc h2 ↦ λp. axis_span_positive_orders l2 h2 p
+        }
+  }
+
+theorem mul_positive_left
+      (a : Nat) (b : Nat)
+    : IsTrue (leq_nat (Suc Zero) (mul a b)) → IsTrue (leq_nat (Suc Zero) a) =
+  match a {
+    Zero ↦ λp. J (λx _. IsTrue (leq_nat (Suc Zero) x)) p ((proof zero_l for mul) b);
+    Suc a2 ↦ λp. Proved
+  }
+
+theorem mul_positive_right
+      (a : Nat) (b : Nat)
+    : IsTrue (leq_nat (Suc Zero) (mul a b)) → IsTrue (leq_nat (Suc Zero) b) =
+  match b {
+    Zero ↦ λp. absurd p;
+    Suc b2 ↦ λp. Proved
+  }
+
 fn axis_span (lo : Nat) (hi : Nat) : Nat = sub (Suc hi) lo
 ```
 
@@ -2612,8 +2678,12 @@ A client with `contains c p` can derive `inside (MkBox p p) c` by taking `p`
 as the witness for `inside_complete`: every member of the point box equals
 `p`, so `cong` transports membership in `c` to that member. `area_inside`
 and `area_point_box` then give a positive lower bound on `area c`.
-These derived uses are checked by a generic package client rather than
-exported as two further laws.
+Conversely, `area_positive_contains_lo_corner` gives a member from positive
+area: the low corner. Thus positive area and having a member coincide. The
+high corner follows without another export by applying `contains_hi_corner`
+to the low-corner witness. The point-box inclusion and area lower-bound
+uses are checked by a generic package client rather than exported as two
+further laws.
 
 `inside_trans` composes lower and upper comparisons along each axis, including
 for inverted boxes. `inside_antisym` applies checked Nat antisymmetry to both
@@ -2645,7 +2715,11 @@ needs no added premise: `inside` forces the inner box
 to be inverted on that axis too. `area_inverted_x` and `area_inverted_y`
 use the checked saturation law separately for either axis. `area_point_box`
 rewrites each factor with the private `axis_span_point`; the closed product
-`mul (Suc Zero) (Suc Zero)` then reduces to one. The private
+`mul (Suc Zero) (Suc Zero)` then reduces to one. For
+`area_positive_contains_lo_corner`, positive area gives a positive span on
+each axis through the private product lemmas. Induction on the lower and
+upper endpoints shows a positive span orders them; checked `leq_nat`
+reflexivity supplies each corner's remaining comparison. The private
 intersection-area bounds apply `area_inside` to the existing
 `intersect_inside_left` and `intersect_inside_right` laws.
 
@@ -2696,8 +2770,8 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–17](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and forty-two public checked law types,
+1. **Contract.** [Exact geometry, §§1–17 and §20](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and forty-three public checked law types,
    including the two structural distribution, two corner-membership,
    inside-antisymmetry and three point-box laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
@@ -2715,7 +2789,8 @@ this interface.
    `inside_antisym`, `intersect_greatest`, `hull_least`,
    `intersect_eq_of_inside`, `hull_eq_of_inside`, `intersect_monotone`,
    `hull_monotone`, `area`, `area_inside`,
-   `area_inverted_x`, `area_inverted_y`, and `area_point_box`.
+   `area_inverted_x`, `area_inverted_y`, `area_point_box`, and
+   `area_positive_contains_lo_corner`.
    `axis_point_equal`, `axis_within`, `axis_span`, `box_with_lo`,
    `box_with_hi`, `box_equal`, generic multiplication bounds, per-axis
    lemmas and proof transport helpers remain private. Generic subtraction
