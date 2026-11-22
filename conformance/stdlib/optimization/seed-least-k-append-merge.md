@@ -154,6 +154,15 @@ theorem reselected_parts_select_db
         (Cons Candidate D (Cons Candidate B (Nil Candidate))) =
   Refl
 
+theorem raw_take_parts_selects_ba
+    : Equal (List Candidate)
+        (take Candidate two
+          (list_append Candidate
+            (least_k Candidate seed_cost two left)
+            (least_k Candidate seed_cost two right)))
+        (Cons Candidate B (Cons Candidate A (Nil Candidate))) =
+  Refl
+
 theorem append_merge_law
     : Equal (List Candidate)
         (least_k Candidate seed_cost two whole)
@@ -209,24 +218,25 @@ theorem tie_append_merge_law
   `[A] ++ [C]`, and `k = 1`
 - expect: the whole-input and re-selected-parts results are both `[D, B]`;
   the tied singleton split selects `[A]` on both law sides
-- measured: the fixture pins both part results, both `[D, B]` sides, four
-  cost values, both `[A]` tie sides, and applications of the public law
+- measured: the fixture pins both part results, both `[D, B]` sides, the
+  raw-take `[B, A]` result, four cost values, both `[A]` tie sides, and law
+  applications
 - claimed: re-selection after appending the part prefixes preserves the
   whole-input result and its stable tie order
 - gap: these finite values do not establish the law for arbitrary carriers,
   costs, bounds, or lists
-- controls: the separate part selections expose the left/right order and
-  the tied `A`/`C` selections before the combined result
+- controls: the part selections, raw-take `[B, A]` result, and tied `A`/`C`
+  selections are asserted independently of the combined result
 - why: costs are ordered `D < B = C < A`; the stable sort retains `B` before
   `C` at the `k = 2` cut. At constant cost, the original `A` precedes `C`
 
 ## Refuse omission of the final re-selection
 
 Use a fresh copy of the complete accepted closed client above, including its
-part, whole-input, re-selected-parts, and tie controls. Append only the false
-claim below. Its right side takes `k` directly from the raw append of the two
-part results, which is `[B, A]`. The public law instead re-applies `least_k`
-to that append, yielding `[D, B]`.
+part, whole-input, re-selected-parts, raw-take, and tie controls. Append only
+the false claim below. Its right side takes `k` directly from the raw append
+of the two part results, which is `[B, A]`. The public law instead re-applies
+`least_k` to that append, yielding `[D, B]`.
 
 ```ken
 theorem no_reselection_claim
@@ -255,8 +265,8 @@ theorem no_reselection_claim
 - gap: this one input does not characterize every invalid replacement for
   the final re-selection
 - controls: `append_merge_law`, `whole_selects_db`,
-  `reselected_parts_select_db`, and the raw-append value are accepted before
-  the false theorem
+  `reselected_parts_select_db`, and `raw_take_parts_selects_ba` are accepted
+  before the false theorem
 - why: the law application has the correct whole-input equality but its
   right endpoint differs from the claim's raw `take` endpoint
 
