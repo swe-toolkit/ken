@@ -1,7 +1,7 @@
 ---
 id: RT-NET-UNIX-PATH-FS-ROOT-SCOPE
 title: "A program declaring FS AFull on a root and Net Unix can listen on or connect to a Unix socket path anywhere on the host, because NetScopeV1::admits checks only the Unix class bit and never the Cap's FS root. The same program's file acts are refused outside that root. Rule from a D0 whether a Unix path is confined beneath the declared root or stated as unbounded, as Process is, and make the host, spec 38 and a pin agree"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1

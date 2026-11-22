@@ -1,12 +1,12 @@
 ---
 id: PX11-NATIVE-STREAM-SOCKET-PARITY
 title: "PX11's first slice runs stream sockets only on the interpreter: the seven Net operations are RepresentedUnavailable, executor_admits carries a named exception for exactly them, and a native build of any Net-declared program refuses with host_effect_lowering_unavailable, so under the operator's bar the slice delivers no PX11 value yet. Lower the seven operations natively with interpreter parity, promote them to NativeTested and close the interpreter-admission set again"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE]
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS]
 blocks: [PX11]
 github: null
 origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
