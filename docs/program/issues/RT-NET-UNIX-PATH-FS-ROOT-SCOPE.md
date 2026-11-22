@@ -84,9 +84,10 @@ classes, the abstract namespace, or the FS act semantics.
 - **AC-1.** One test varies only the path against a declared root,
   across four rows: listen and connect, each inside and outside the root.
   Under (a), the two outside rows refuse with the ruled identity, and no
-  socket file exists outside the root afterwards. A listen on `R/jail/alias.sock`, a symlink to a live outside socket,
-  refuses with `IOError.CapabilityDenied` before any socket syscall and
-  leaves the path state unchanged. Under (b), all four
+  socket file exists outside the root afterwards. A listen on
+  `R/jail/alias.sock`, a symlink to a live outside socket, refuses with
+  `IOError.CapabilityDenied` before any socket syscall and leaves the path
+  state unchanged. Under (b), all four
   succeed, and spec 38 states the unbounded reach.
 - **AC-2 (QA mutation, amended).** Route Unix listen and connect through
   the raw absolute-path `bind` and `connect` again, with everything else
