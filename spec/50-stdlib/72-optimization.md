@@ -16,7 +16,8 @@
 > SPEC-OPTIMIZATION-LEAST-K §4;
 > SPEC-OPTIMIZATION-LEAST-K-COST-ORDER-INVARIANCE §4.4;
 > SPEC-OPTIMIZATION-LEAST-K-PREFIX §4.5;
-> SPEC-OPTIMIZATION-LEAST-K-SATURATED §4.6).** Section 1 specifies
+> SPEC-OPTIMIZATION-LEAST-K-SATURATED §4.6;
+> SPEC-OPTIMIZATION-LEAST-K-APPEND-MERGE §4.7).** Section 1 specifies
 > the non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
 > four laws and seed are also present on main. Section 1.5's checked
@@ -1807,3 +1808,92 @@ closed bound checks by `Proved`, while the closed structural list
 equalities use `Refl`. These finite observations distinguish
 sorted saturation from input identity but do not prove the generic
 laws or replace the separate CV seed and trust gates.
+
+### 4.7 Stable selection after merging the selected parts
+
+> **Section 4.7 status: DRAFT v0
+> (SPEC-OPTIMIZATION-LEAST-K-APPEND-MERGE).** Architect's AC-0
+> `evt_4x3a0wnmhs12m` checked the generic Derived and Argmin proofs
+> on detached scratch at `d7d1e430e`: provider-first package loading
+> found equal exact `trusted_base()` identity sets before and after,
+> no added `Axiom`, and Transparent owners for both public laws. A
+> proof-breaking mutation in a Derived helper refused during load
+> and was restored. This is D0 scratch evidence, not an execution
+> of this Spec child, the separate catalog/test or CV seed children,
+> assembled AC-T, official conformance, CI, publication, landing or
+> measured landed trust. The §1a chain remains at zero; AC-0 preceded
+> this text and is not a hard stop.
+
+`Algorithm.Optimization.Argmin` must export one public Transparent
+checked theorem immediately after `least_k_saturated` and before
+`argmax`, with this exact name, binder order and type:
+
+```ken
+pub theorem least_k_append_merge
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (ys : List a)
+    : Equal
+        (List a)
+        (least_k a cost k (list_append a xs ys))
+        (least_k a cost k (list_append a (least_k a cost k xs) (least_k a cost k ys)))
+```
+
+The result is structural equality of the two **selected lists**,
+including their occurrence order under the stable cost sort, not
+merely equality of lengths, costs or value memberships. There is
+**no caller-supplied premise** on `cost`, `k`, `xs`, `ys` or candidate
+equality. Both sides use the same `k`, and the right side calls
+`least_k` **again** on the concatenated selected parts. Keeping up
+to `k` from each part is sufficient to recover the union's selection;
+the concatenated part results need not themselves be that selection.
+The law neither says that appending the two part results is already sorted
+nor that `take k` of that append is the combined selection. The
+stable sort preserves earlier occurrences on equal costs, so a tie
+across the parts still selects from `xs` before `ys` when the cut
+falls inside that cost class. These are selection semantics, not a
+complexity bound, and no candidate-level `DecEq a` is required.
+
+`Data.Collections.Derived` must publish the generic checked attached
+law `sort::take_append`, placed after `sort::comparator_cong` and
+before private `derived_class_order`. Its exact public type uses a
+total, transitive comparator, as in `sort::stable_class`:
+
+```ken
+pub proof take_append for sort
+      (a : Type) (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x y z : a) → Equal Bool (le x y) True
+        → Equal Bool (le y z) True → Equal Bool (le x z) True)
+      (k : Nat) (xs : List a) (ys : List a)
+    : Equal (List a)
+        (take a k (sort a le (list_append a xs ys)))
+        (take a k (sort a le (list_append a
+          (take a k (sort a le xs)) (take a k (sort a le ys)))))
+```
+
+The generic stable-sort fact belongs beside `sort` and `take` in
+Derived, not in an Argmin-local helper. Its checked proof absorbs
+sorting either part of an append, cuts both sorted parts at `k`,
+and re-sorts the surviving append before the final `take`. In
+particular, the left and right cuts do not assume that the two
+parts have disjoint costs or no ties. Derived's supporting helpers
+remain private; the generic proof reuses the public `take::prefix`
+and existing list/sort laws rather than introducing a second prefix
+mechanism. `least_k_append_merge` instantiates this public law at
+`cost_le a cost`: the public `leq_nat` totality and transitivity
+proofs discharge the comparator premises. Argmin adds no helper,
+new import, `Axiom`, kernel rule or surface form, and no §§1–4.6
+operation or law type changes.
+
+For a finite discriminator, take costs `A ↦ 2`, `B ↦ 1`, `C ↦ 1`
+and `D ↦ 0`, with `xs = [A,B]`, `ys = [C,D]` and `k = 2`.
+Selecting the parts yields `[B,A]` and `[D,C]`; their raw append
+begins `[B,A]`, but re-selecting it yields `[D,B]`, the same as
+selecting `[A,B,C,D]` directly. The tie between `B` and `C`
+retains `B` from the earlier part. Dropping the final re-selection
+and returning `take 2` of the appended part results would give
+`[B,A]`, not `[D,B]`. Separately, at constant cost with `k = 1`,
+`xs = [A]` and `ys = [C]`, the result is `[A]`, not `[C]`:
+the cross-part tie is resolved by original occurrence order. These
+closed values distinguish the promised selection and tie boundaries;
+they do not replace the generic checked proof or the separately
+owned CV seed and package trust gate.

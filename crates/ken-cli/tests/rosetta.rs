@@ -273,6 +273,7 @@ fn collections_prelude() -> String {
                 "pub proof right for bool_and",
                 "pub fn bool_or",
                 "pub fn leq_nat",
+                "pub proof refl for leq_nat",
             ]
             .into_iter()
             .map(|start| {
