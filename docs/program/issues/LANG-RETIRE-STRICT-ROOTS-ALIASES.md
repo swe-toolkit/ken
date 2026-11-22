@@ -1,7 +1,7 @@
 ---
 id: LANG-RETIRE-STRICT-ROOTS-ALIASES
 title: "The elaborator has one resolution mode, but ElabEnv and modules still export elaborate_module_from_roots_strict and elaborate_module_from_roots_strict_v1, aliases that forward to the ordinary roots entries. Their names advertise a second mode that no longer exists, and 37 elaborator files plus other crates and three conformance seeds call through them. Delete both aliases and move every caller to the ordinary entry"
-status: active
+status: merged
 owner: language
 size: M
 tier: T2
