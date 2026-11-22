@@ -347,6 +347,34 @@ its stated fresh fixture. For each root `R`, choose a canonical spelling so
 all addresses stay within 2–107 bytes; the 82-byte case states its tighter
 bound.
 
+### surface/ffi-io/socket-unix-root-alias-through-symlinked-ancestor
+
+- promise class: durable invariant.
+- spec: §1.13 Unix acquisition and FS authority.
+- given: create canonical CWD `D` with `jail/`, set the host root to
+  `FS AFull "./jail"`, and define `R=canonicalize(D/jail)`. Create
+  `D/alias -> D`; construct `R/svc.sock`, `D/alias/jail/svc.sock`,
+  `R/made.sock` and `D/alias/jail/made.sock` with
+  `socket_unix_path`; all four constructors succeed.
+  Choose `D` so all addresses meet the 2–107-byte bounds. Keep a host
+  listener live at `R/svc.sock` and record socket-syscall attempts. With
+  the same root and `Net Unix` grant, request `NetListen` at
+  `D/alias/jail/made.sock`, then at `R/made.sock`; request `NetConnect`
+  at `R/svc.sock`, then at `D/alias/jail/svc.sock`.
+- expect: alias listen returns exactly
+  `ResourceHostIO IOError.CapabilityDenied` before any socket syscall and
+  leaves `R/made.sock` absent; direct listen succeeds and creates it.
+  Direct connect succeeds. Alias connect returns exactly
+  `ResourceHostIO IOError.CapabilityDenied` before any socket syscall; the
+  live listener receives only the direct connection.
+- controls: each direct/alias pair uses the same operation, root, grant and
+  target; only the spelling changes. The direct listen and connect
+  requests succeed; the live listener distinguishes alias refusal from
+  `NotFound` or connection refusal.
+- why: the alias spelling is outside `R` but reaches the same in-root
+  paths through a symlinked ancestor. This tests the §1.13 alias refusal,
+  distinct from links below `R` that point outside.
+
 ### surface/ffi-io/socket-unix-empty-or-final-dot-name
 
 - promise class: durable invariant.
