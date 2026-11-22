@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS
 title: "Spec 68 refines an enclosure only by inclusion and width, and no law says that splitting an interval at a point loses no member, so a client bisecting an enclosure to tighten an error bound must re-derive rational order totality at every split. Rule from a checked D0 at zero trust that every member of MkInterval lo hi is a member of MkInterval lo m or of MkInterval m hi, for any m, and state it with a seed that separates the cover from either half alone"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
