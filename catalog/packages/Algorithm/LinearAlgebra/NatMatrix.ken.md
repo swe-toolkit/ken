@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and fifty-eight algebraic laws have checked proofs.
+all arithmetic is exact, and sixty algebraic laws have checked proofs.
 
 ## Contents
 
@@ -26,17 +26,19 @@ The canonical operations follow their contract: componentwise addition,
 scaling, the zero vector and dot product, followed by matrix-vector
 multiplication, transpose, matrix product and diagonal identity. Row-wise
 matrix addition and its seven public laws follow those operations and laws,
-alongside three vector sum laws, four vector-scaling laws, four zero-vector
-unit laws and three zero-annihilation laws, followed by the zero matrix,
+alongside three vector sum laws, four vector-scaling laws and a
+vector scale-cancellation law, four zero-vector unit laws and three
+zero-annihilation laws, followed by the zero matrix,
 its two unit laws for matrix addition and its action on every vector.
 Three further laws establish that the zero matrix absorbs products on
 both sides and that its transpose is zero. A zero self-dot conversely
 identifies the vector as zero, using Nat Arithmetic's zero-sum inversion
 laws and a private squared-head step. `matrix_scale` maps vector scaling over
-rows; its eight checked laws connect matrix addition, factor arithmetic,
-transpose and multiplication. `trace` sums the diagonal of a square matrix
-by recursion on its dimension, adding the corner entry to the trace of the
-trailing minor. Its four checked laws make it additive over `matrix_add`,
+rows; its eight scaling laws connect matrix addition, factor arithmetic,
+transpose and multiplication, and a ninth cancels successor scaling. `trace`
+sums the diagonal of a square matrix by recursion on its dimension, adding
+the corner entry to the trace of the trailing minor. Its four checked laws
+make it additive over `matrix_add`,
 homogeneous under `matrix_scale`, invariant under `transpose` and equal to
 the dimension on `identity`. A fifth law exchanges factors of a product
 under the trace, including rectangular factors. The named private stages
@@ -983,6 +985,14 @@ pub theorem vector_add_cancel_right
             (vec_tail Nat k zs))
   }
 
+pub theorem vector_scale_cancel
+      (n : Nat) (k : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_scale n (Suc k) xs) (vector_scale n (Suc k) ys)
+      → Equal (Vec Nat n) xs ys =
+  map_injective Nat Nat (mul (Suc k)) (mul_cancel_left k) n
+
 pub theorem vector_scale_zero
       (n : Nat) (u : Vec Nat n)
     : Equal (Vec Nat n) (vector_scale n Zero u) (vector_zero n) =
@@ -1166,6 +1176,14 @@ pub theorem matrix_add_cancel_right
             (vec_tail (Vec Nat n) k b)
             (vec_tail (Vec Nat n) k c))
   }
+
+pub theorem matrix_scale_cancel
+      (m : Nat) (n : Nat) (k : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_scale m n (Suc k) a) (matrix_scale m n (Suc k) b)
+      → Equal (Vec (Vec Nat n) m) a b =
+  map_injective (Vec Nat n) (Vec Nat n) (vector_scale n (Suc k)) (vector_scale_cancel n k) m
 
 pub theorem matrix_vector_zero_matrix
       (m : Nat) (n : Nat) (v : Vec Nat n)
@@ -4581,6 +4599,94 @@ theorem matrix_add_cons_sums
         (matrix_add k n (vec_tail (Vec Nat n) k b) (vec_tail (Vec Nat n) k c)))
       sum_eq
       (matrix_add_view k n b c))
+
+theorem map_injective
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (injective : (x : a) → (y : a) → Equal b (f x) (f y) → Equal a x y)
+      (n : Nat)
+    : (xs : Vec a n)
+      → (ys : Vec a n)
+      → Equal (Vec b n) (map a b n f xs) (map a b n f ys)
+      → Equal (Vec a n) xs ys =
+  match n {
+    Zero ↦ λxs ys image_eq. vec_zero_length_eq a xs ys;
+    Suc j ↦
+      λxs ys image_eq.
+        let
+          left_cons = VCons b j (f (vec_head a j xs)) (map a b j f (vec_tail a j xs));
+          right_cons = VCons b j (f (vec_head a j ys)) (map a b j f (vec_tail a j ys));
+          cons_eq : Equal (Vec b (Suc j)) left_cons right_cons =
+            trans
+              (Vec b (Suc j))
+              left_cons
+              (map a b (Suc j) f xs)
+              right_cons
+              (sym (Vec b (Suc j)) (map a b (Suc j) f xs) left_cons (map_view a b j f xs))
+              (trans
+                (Vec b (Suc j))
+                (map a b (Suc j) f xs)
+                (map a b (Suc j) f ys)
+                right_cons
+                image_eq
+                (map_view a b j f ys))
+        in
+          vec_cons_eq_eta
+            a
+            j
+            xs
+            ys
+            (injective
+              (vec_head a j xs)
+              (vec_head a j ys)
+              (cong (Vec b (Suc j)) b left_cons right_cons (vec_head b j) cons_eq))
+            (map_injective
+              a
+              b
+              f
+              injective
+              j
+              (vec_tail a j xs)
+              (vec_tail a j ys)
+              (cong (Vec b (Suc j)) (Vec b j) left_cons right_cons (vec_tail b j) cons_eq))
+  }
+
+theorem map_view
+      (a : Type) (b : Type) (j : Nat) (f : a → b) (xs : Vec a (Suc j))
+    : Equal
+        (Vec b (Suc j))
+        (map a b (Suc j) f xs)
+        (VCons b j (f (vec_head a j xs)) (map a b j f (vec_tail a j xs))) =
+  cong
+    (Vec a (Suc j))
+    (Vec b (Suc j))
+    xs
+    (VCons a j (vec_head a j xs) (vec_tail a j xs))
+    (map a b (Suc j) f)
+    (vec_eta a j xs)
+
+theorem mul_cancel_left
+      (k : Nat) (x : Nat) (y : Nat)
+    : Equal Nat (mul (Suc k) x) (mul (Suc k) y) → Equal Nat x y =
+  λproduct_eq.
+    (proof cancel_r for mul)
+      x
+      y
+      k
+      (trans
+        Nat
+        (mul x (Suc k))
+        (mul (Suc k) x)
+        (mul y (Suc k))
+        ((proof comm for mul) x (Suc k))
+        (trans
+          Nat
+          (mul (Suc k) x)
+          (mul (Suc k) y)
+          (mul y (Suc k))
+          product_eq
+          ((proof comm for mul) (Suc k) y)))
 ```
 
 ## 3. Using it
@@ -4659,6 +4765,14 @@ head and tail equalities with the private vector eta bridge. Right
 cancellation for matrix addition applies the vector law to each head row
 and recurses on the remaining rows. Both proofs cover zero dimensions;
 left cancellation follows from the existing commutativity laws.
+
+Scaling by a successor is injective, entry by entry. The private
+`map_injective` lifts an injective entry function through vector `map` by
+recursion on the dimension. The private `mul_cancel_left` commutes both
+products and applies the public `mul::cancel_r`. `vector_scale_cancel` uses
+these steps; `matrix_scale_cancel` uses the vector law as each row's
+injectivity. Cancellation by `Zero` would be false: both `[1, 2]` and
+`[3, 4]` scale to `[0, 0]` at that factor.
 
 The four scaling laws lift checked Nat arithmetic through each `VCons` head
 and recurse on its tail. Scaling a vector sum uses right distribution;
@@ -4782,8 +4896,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–20 owns
-seventy public names across twelve operations and fifty-eight laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–21 owns
+seventy-two public names across twelve operations and sixty laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -4824,8 +4938,11 @@ for the corner entry, the minor and their transport steps also stay private.
 `vector_add_cancel_right` follows `vector_add_zero_right`, and
 `matrix_add_cancel_right` follows `matrix_add_zero_right`; their private
 projection, cons-view and eta proofs use the public Nat `add_cancel_r` and
-cancel each matrix row by the checked vector law. All fifty-eight laws have
-checked bodies.
+cancel each matrix row by the checked vector law. `vector_scale_cancel`
+follows its §20 vector cancellation sibling, and `matrix_scale_cancel`
+follows its §20 matrix cancellation sibling. Their `map_injective`,
+`map_view` and `mul_cancel_left` helpers remain private. All sixty laws
+have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -4867,6 +4984,12 @@ conformance-run; `cat_linear_algebra_trace_product_comm` applies its generic
 law, checks rectangular and square trace and product values, and isolates
 the false square product-equality claim. The matrix package test also checks
 generic and closed right-cancellation clients, both zero-dimensional cases,
-the exact trusted-identity set and an isolated false sum premise. These tests
-use root-loaded exports and are not official conformance-runner runs or claims
-of CI, publication or landing.
+the exact trusted-identity set and an isolated false sum premise. The
+[scale-cancellation seed](../../../../conformance/stdlib/linear-algebra/seed-scale-cancel.md)
+states generic successor-factor applications and contrasts inhabited
+factor-zero premises with false conclusions. The matrix package test checks
+both generic scale-cancellation laws, factor-two values, empty vectors,
+private-helper imports and the exact trusted-identity set; it refuses the
+same-form factor-zero vector and matrix claims on fresh accepted prefixes.
+These tests use root-loaded exports and are not official conformance-runner
+runs or claims of CI, publication or landing.
