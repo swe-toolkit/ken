@@ -310,6 +310,10 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                 "import Data.Collections.Derived (filter, eq_from_ord)\n\
                  import Core.Classes.LawfulClasses (bool_or)\n"
             }
+            "sort::take_append" => {
+                "import Data.Collections.Derived (list_append, take)\n\
+                 import Core.Classes.LawfulClasses (bool_or)\n"
+            }
             "insert::sorted" | "sort::sorted" | "take::sorted" => {
                 "import Data.Collections.Derived (is_sorted as catalog_is_sorted)\n\
                  import Core.Classes.LawfulClasses (bool_or)\n"
@@ -461,6 +465,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "sort::member".to_owned(),
             "sort::stable_class".to_owned(),
             "sort::comparator_cong".to_owned(),
+            "sort::take_append".to_owned(),
             "take".to_owned(),
             "take::length".to_owned(),
             "take::member".to_owned(),

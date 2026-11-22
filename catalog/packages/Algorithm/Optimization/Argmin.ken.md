@@ -544,6 +544,21 @@ pub theorem least_k_saturated
           ((proof length for sort) a (cost_le a cost) xs))
         covered)
 
+pub theorem least_k_append_merge
+      (a : Type) (cost : a → Nat) (k : Nat) (xs : List a) (ys : List a)
+    : Equal
+        (List a)
+        (least_k a cost k (list_append a xs ys))
+        (least_k a cost k (list_append a (least_k a cost k xs) (least_k a cost k ys))) =
+  (proof take_append for sort)
+    a
+    (cost_le a cost)
+    (λx. λy. (proof total for leq_nat) (cost x) (cost y))
+    (λx. λy. λz. λxy. λyz. (proof trans for leq_nat) (cost x) (cost y) (cost z) xy yz)
+    k
+    xs
+    ys
+
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
 
@@ -1942,7 +1957,9 @@ ones. The zero and singleton laws agree with `argmin` on a nonempty input.
 `least_k_prefix` is `sym` of the public `take::prefix` on the one sorted list,
 with `leq_nat_add_left_bound` supplying k ≤ k + m. `least_k_saturated`
 applies `take::saturated` to the sorted list, moving the input-length bound
-through `length for sort` with `cong` and `trans`. Private helpers carry the
+through `length for sort` with `cong` and `trans`. `least_k_append_merge`
+is `sort::take_append` instantiated at `cost_le`, using the checked total
+and transitive natural-cost comparison. Private helpers carry the
 head-order and Boolean comparisons; none decides candidate equality or adds an
 assumption.
 
@@ -2009,11 +2026,12 @@ which members survive without promising a complexity bound.
 
 ## Trust & derivation
 
-**Public API:** `cost_le`, `least_k` and its eleven declarations for ten
+**Public API:** `cost_le`, `least_k` and its twelve declarations for eleven
 law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
 `least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
-`least_k_cost_order_invariant`, `least_k_prefix`, `least_k_saturated`);
+`least_k_cost_order_invariant`, `least_k_prefix`, `least_k_saturated`,
+`least_k_append_merge`);
 `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:
@@ -2069,8 +2087,14 @@ The [§4.6 saturation seed][saturation-seed] distinguishes full sorted input
 from input order, at equal and greater bounds, and refuses a short bound. The
 `cat_optimization_least_k_saturated` package test applies both open laws,
 checks exact trusted-base identities and the sorted closed result, and rejects
-input-order and short-bound claims on separate accepted prefixes.
+input-order and short-bound claims on separate accepted prefixes. The
+[§4.7 append-merge seed][append-merge-seed] distinguishes selection after
+appending from taking the raw appended part results and checks stable ties.
+The `cat_optimization_least_k_append_merge` package test checks the generic
+sort law and its cost instance, exact trusted-base identities, the two
+independent selection results, the left-tie result and the false take claim.
 
+[append-merge-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-append-merge.md
 [prefix-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-prefix.md
 [saturation-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-saturated.md
 

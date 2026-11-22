@@ -1834,7 +1834,11 @@ for any comparator, and `sort` preserves counts and is sorted when the
 comparator is total. Their new
 membership and length laws hold without comparator hypotheses; stable-class
 laws preserve each equal-cost class's input order when the comparator is
-also transitive. `list_sorted_head_bounded` makes the transitivity premise
+also transitive. `sort::take_append` states that selecting a prefix after
+sorting an append equals sorting and selecting a prefix after each part has
+first been sorted and truncated at the same bound; it needs totality and
+transitivity, not a premise about the bound or the input lists.
+`list_sorted_head_bounded` makes the transitivity premise
 explicit when extending an adjacent order fact to a later list member.
 
 ```ken
@@ -2159,6 +2163,1279 @@ pub proof comparator_cong for sort
           (sort a le2 t)
           (insert a le2 h)
           (sort::comparator_cong a le1 le2 same_le t))
+  }
+
+pub proof take_append for sort
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (k : Nat)
+      (xs : List a)
+      (ys : List a)
+    : Equal
+        (List a)
+        (take a k (sort a le (list_append a xs ys)))
+        (take
+          a
+          k
+          (sort a le (list_append a (take a k (sort a le xs)) (take a k (sort a le ys))))) =
+  trans
+    (List a)
+    (take a k (sort a le (list_append a xs ys)))
+    (take a k (sort a le (list_append a (take a k (sort a le xs)) ys)))
+    (take a k (sort a le (list_append a (take a k (sort a le xs)) (take a k (sort a le ys)))))
+    (trans
+      (List a)
+      (take a k (sort a le (list_append a xs ys)))
+      (take a k (sort a le (list_append a (take a k (sort a le xs)) (sort a le ys))))
+      (take a k (sort a le (list_append a (take a k (sort a le xs)) ys)))
+      (trans
+        (List a)
+        (take a k (sort a le (list_append a xs ys)))
+        (take a k (sort a le (list_append a (sort a le xs) (sort a le ys))))
+        (take a k (sort a le (list_append a (take a k (sort a le xs)) (sort a le ys))))
+        (cong
+          (List a)
+          (List a)
+          (sort a le (list_append a xs ys))
+          (sort a le (list_append a (sort a le xs) (sort a le ys)))
+          (take a k)
+          (trans
+            (List a)
+            (sort a le (list_append a xs ys))
+            (sort a le (list_append a (sort a le xs) ys))
+            (sort a le (list_append a (sort a le xs) (sort a le ys)))
+            (derived_sort_append_sorted_left a le total transitive xs ys)
+            (derived_sort_append_sort_right a le total (sort a le xs) ys)))
+        (derived_take_sort_cut_left
+          a
+          le
+          total
+          transitive
+          k
+          (sort a le xs)
+          (sort a le ys)
+          ((proof sorted for sort) a le total xs)
+          ((proof sorted for sort) a le total ys)))
+      (sym
+        (List a)
+        (take a k (sort a le (list_append a (take a k (sort a le xs)) ys)))
+        (take a k (sort a le (list_append a (take a k (sort a le xs)) (sort a le ys))))
+        (cong
+          (List a)
+          (List a)
+          (sort a le (list_append a (take a k (sort a le xs)) ys))
+          (sort a le (list_append a (take a k (sort a le xs)) (sort a le ys)))
+          (take a k)
+          (derived_sort_append_sort_right a le total (take a k (sort a le xs)) ys))))
+    (derived_take_sort_cut_right a le total k (take a k (sort a le xs)) ys)
+
+theorem derived_meet
+      (t : Type) (p : t) (m : t) (q : t) (left : Equal t p m) (right : Equal t q m)
+    : Equal t p q =
+  trans t p m q left (sym t q m right)
+
+theorem derived_insert_cons_true
+      (a : Type) (le : a → a → Bool) (x : a) (h : a) (t : List a)
+    : Equal Bool (le x h) True
+      → Equal (List a) (insert a le x (Cons a h t)) (Cons a x (Cons a h t)) =
+  λbefore.
+    J
+      (λdecision _.
+        Equal
+          (List a)
+          (match decision {
+            True ↦ Cons a x (Cons a h t);
+            False ↦ Cons a h (insert a le x t)
+          })
+          (Cons a x (Cons a h t)))
+      Refl
+      (sym Bool (le x h) True before)
+
+theorem derived_insert_cons_false
+      (a : Type) (le : a → a → Bool) (x : a) (h : a) (t : List a)
+    : Equal Bool (le x h) False
+      → Equal (List a) (insert a le x (Cons a h t)) (Cons a h (insert a le x t)) =
+  λafter.
+    J
+      (λdecision _.
+        Equal
+          (List a)
+          (match decision {
+            True ↦ Cons a x (Cons a h t);
+            False ↦ Cons a h (insert a le x t)
+          })
+          (Cons a h (insert a le x t)))
+      Refl
+      (sym Bool (le x h) False after)
+
+theorem derived_insert_head_ordered
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : derived_sort_head_ordered a le x xs → Equal (List a) (insert a le x xs) (Cons a x xs) =
+  match xs {
+    Nil ↦ λbefore. Refl;
+    Cons h t ↦ λbefore. derived_insert_cons_true a le x h t before
+  }
+
+theorem derived_le_false_after
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (p : a)
+      (q : a)
+      (r : a)
+      (decision : Bool)
+    : Equal Bool (le q r) decision
+      → Equal Bool (le p q) True
+      → Equal Bool (le p r) False
+      → Equal Bool (le q r) False =
+  match decision {
+    True ↦
+      λcomparison.
+        λp_before_q.
+          λp_after_r.
+            absurd
+              (trans
+                Bool
+                True
+                (le p r)
+                False
+                (sym Bool (le p r) True (transitive p q r p_before_q comparison))
+                p_after_r);
+    False ↦ λcomparison. λp_before_q. λp_after_r. comparison
+  }
+
+theorem derived_insert_commute_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (h : a)
+      (x : a)
+      (w : a)
+      (rest : List a)
+      (after : Equal Bool (le x h) False)
+      (ih : Equal
+        (List a)
+        (insert a le h (insert a le x rest))
+        (insert a le x (insert a le h rest)))
+      (decision : Bool)
+    : Equal Bool (le h w) decision
+      → Equal
+        (List a)
+        (insert a le h (insert a le x (Cons a w rest)))
+        (insert a le x (insert a le h (Cons a w rest))) =
+  match decision {
+    True ↦
+      λh_before_w.
+        let
+          h_before_x = derived_sort_right_of_left_false a le total x h after;
+          ordered =
+            derived_sort_head_after_insert a le h x (Cons a w rest) h_before_x h_before_w
+        in
+          derived_meet
+            (List a)
+            (insert a le h (insert a le x (Cons a w rest)))
+            (Cons a h (insert a le x (Cons a w rest)))
+            (insert a le x (insert a le h (Cons a w rest)))
+            (derived_insert_head_ordered a le h (insert a le x (Cons a w rest)) ordered)
+            (trans
+              (List a)
+              (insert a le x (insert a le h (Cons a w rest)))
+              (insert a le x (Cons a h (Cons a w rest)))
+              (Cons a h (insert a le x (Cons a w rest)))
+              (cong
+                (List a)
+                (List a)
+                (insert a le h (Cons a w rest))
+                (Cons a h (Cons a w rest))
+                (insert a le x)
+                (derived_insert_cons_true a le h w rest h_before_w))
+              (derived_insert_cons_false a le x h (Cons a w rest) after));
+    False ↦
+      λh_after_w.
+        let
+          h_before_x = derived_sort_right_of_left_false a le total x h after;
+          x_after_w =
+            derived_le_false_after a le transitive h x w (le x w) Refl h_before_x h_after_w
+        in
+          derived_meet
+            (List a)
+            (insert a le h (insert a le x (Cons a w rest)))
+            (Cons a w (insert a le x (insert a le h rest)))
+            (insert a le x (insert a le h (Cons a w rest)))
+            (trans
+              (List a)
+              (insert a le h (insert a le x (Cons a w rest)))
+              (Cons a w (insert a le h (insert a le x rest)))
+              (Cons a w (insert a le x (insert a le h rest)))
+              (trans
+                (List a)
+                (insert a le h (insert a le x (Cons a w rest)))
+                (insert a le h (Cons a w (insert a le x rest)))
+                (Cons a w (insert a le h (insert a le x rest)))
+                (cong
+                  (List a)
+                  (List a)
+                  (insert a le x (Cons a w rest))
+                  (Cons a w (insert a le x rest))
+                  (insert a le h)
+                  (derived_insert_cons_false a le x w rest x_after_w))
+                (derived_insert_cons_false a le h w (insert a le x rest) h_after_w))
+              (cong
+                (List a)
+                (List a)
+                (insert a le h (insert a le x rest))
+                (insert a le x (insert a le h rest))
+                (Cons a w)
+                ih))
+            (trans
+              (List a)
+              (insert a le x (insert a le h (Cons a w rest)))
+              (insert a le x (Cons a w (insert a le h rest)))
+              (Cons a w (insert a le x (insert a le h rest)))
+              (cong
+                (List a)
+                (List a)
+                (insert a le h (Cons a w rest))
+                (Cons a w (insert a le h rest))
+                (insert a le x)
+                (derived_insert_cons_false a le h w rest h_after_w))
+              (derived_insert_cons_false a le x w (insert a le h rest) x_after_w))
+  }
+
+theorem derived_insert_commute
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (h : a)
+      (x : a)
+      (ws : List a)
+    : Equal Bool (le x h) False
+      → Equal (List a) (insert a le h (insert a le x ws)) (insert a le x (insert a le h ws)) =
+  match ws {
+    Nil ↦
+      λafter.
+        derived_meet
+          (List a)
+          (insert a le h (insert a le x (Nil a)))
+          (Cons a h (Cons a x (Nil a)))
+          (insert a le x (insert a le h (Nil a)))
+          (derived_insert_cons_true
+            a
+            le
+            h
+            x
+            (Nil a)
+            (derived_sort_right_of_left_false a le total x h after))
+          (derived_insert_cons_false a le x h (Nil a) after);
+    Cons w rest ↦
+      λafter.
+        derived_insert_commute_cons_case
+          a
+          le
+          total
+          transitive
+          h
+          x
+          w
+          rest
+          after
+          (derived_insert_commute a le total transitive h x rest after)
+          (le h w)
+          Refl
+  }
+
+theorem derived_sort_insert_append_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (zs : List a)
+      (ih : Equal
+        (List a)
+        (sort a le (list_append a (insert a le x t) zs))
+        (insert a le x (sort a le (list_append a t zs))))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → Equal
+        (List a)
+        (sort a le (list_append a (insert a le x (Cons a h t)) zs))
+        (insert a le x (sort a le (list_append a (Cons a h t) zs))) =
+  match decision {
+    True ↦
+      λbefore.
+        cong
+          (List a)
+          (List a)
+          (insert a le x (Cons a h t))
+          (Cons a x (Cons a h t))
+          (λinserted. sort a le (list_append a inserted zs))
+          (derived_insert_cons_true a le x h t before);
+    False ↦
+      λafter.
+        trans
+          (List a)
+          (sort a le (list_append a (insert a le x (Cons a h t)) zs))
+          (insert a le h (insert a le x (sort a le (list_append a t zs))))
+          (insert a le x (sort a le (list_append a (Cons a h t) zs)))
+          (trans
+            (List a)
+            (sort a le (list_append a (insert a le x (Cons a h t)) zs))
+            (sort a le (list_append a (Cons a h (insert a le x t)) zs))
+            (insert a le h (insert a le x (sort a le (list_append a t zs))))
+            (cong
+              (List a)
+              (List a)
+              (insert a le x (Cons a h t))
+              (Cons a h (insert a le x t))
+              (λinserted. sort a le (list_append a inserted zs))
+              (derived_insert_cons_false a le x h t after))
+            (cong
+              (List a)
+              (List a)
+              (sort a le (list_append a (insert a le x t) zs))
+              (insert a le x (sort a le (list_append a t zs)))
+              (insert a le h)
+              ih))
+          (derived_insert_commute
+            a
+            le
+            total
+            transitive
+            h
+            x
+            (sort a le (list_append a t zs))
+            after)
+  }
+
+theorem derived_sort_insert_append
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (x : a)
+      (xs : List a)
+      (zs : List a)
+    : Equal
+        (List a)
+        (sort a le (list_append a (insert a le x xs) zs))
+        (insert a le x (sort a le (list_append a xs zs))) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      derived_sort_insert_append_cons_case
+        a
+        le
+        total
+        transitive
+        x
+        h
+        t
+        zs
+        (derived_sort_insert_append a le total transitive x t zs)
+        (le x h)
+        Refl
+  }
+
+theorem derived_sort_append_sorted_left
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (xs : List a)
+      (zs : List a)
+    : Equal
+        (List a)
+        (sort a le (list_append a xs zs))
+        (sort a le (list_append a (sort a le xs) zs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      trans
+        (List a)
+        (sort a le (list_append a (Cons a h t) zs))
+        (insert a le h (sort a le (list_append a (sort a le t) zs)))
+        (sort a le (list_append a (sort a le (Cons a h t)) zs))
+        (cong
+          (List a)
+          (List a)
+          (sort a le (list_append a t zs))
+          (sort a le (list_append a (sort a le t) zs))
+          (insert a le h)
+          (derived_sort_append_sorted_left a le total transitive t zs))
+        (sym
+          (List a)
+          (sort a le (list_append a (insert a le h (sort a le t)) zs))
+          (insert a le h (sort a le (list_append a (sort a le t) zs)))
+          (derived_sort_insert_append a le total transitive h (sort a le t) zs))
+  }
+
+theorem derived_sort_sorted_fixed
+      (a : Type) (le : a → a → Bool) (xs : List a)
+    : is_sorted a le xs → Equal (List a) (sort a le xs) xs =
+  match xs {
+    Nil ↦ λsorted_xs. Proved;
+    Cons h t ↦
+      λsorted_xs.
+        trans
+          (List a)
+          (sort a le (Cons a h t))
+          (insert a le h t)
+          (Cons a h t)
+          (cong
+            (List a)
+            (List a)
+            (sort a le t)
+            t
+            (insert a le h)
+            (derived_sort_sorted_fixed a le t (derived_sort_sorted_tail a le h t sorted_xs)))
+          (derived_insert_head_ordered a le h t (derived_sort_sorted_head a le h t sorted_xs))
+  }
+
+theorem derived_sort_append_sort_right
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (xs : List a)
+      (ys : List a)
+    : Equal
+        (List a)
+        (sort a le (list_append a xs ys))
+        (sort a le (list_append a xs (sort a le ys))) =
+  match xs {
+    Nil ↦
+      sym
+        (List a)
+        (sort a le (sort a le ys))
+        (sort a le ys)
+        (derived_sort_sorted_fixed a le (sort a le ys) ((proof sorted for sort) a le total ys));
+    Cons h t ↦
+      cong
+        (List a)
+        (List a)
+        (sort a le (list_append a t ys))
+        (sort a le (list_append a t (sort a le ys)))
+        (insert a le h)
+        (derived_sort_append_sort_right a le total t ys)
+  }
+
+theorem derived_take_cons_take
+      (a : Type) (n : Nat) (h : a) (t : List a)
+    : Equal (List a) (take a n (Cons a h (take a n t))) (take a n (Cons a h t)) =
+  match n {
+    Zero ↦ Proved;
+    Suc m ↦
+      cong
+        (List a)
+        (List a)
+        (take a m (take a (Suc m) t))
+        (take a m t)
+        (λrest. Cons a h rest)
+        ((proof prefix for take)
+          a
+          m
+          (Suc m)
+          t
+          (leq_nat_weaken_right m m ((proof refl for leq_nat) m)))
+  }
+
+theorem derived_take_insert_cut_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (x : a)
+      (m : Nat)
+      (h : a)
+      (t : List a)
+      (ih : Equal (List a) (take a m (insert a le x t)) (take a m (insert a le x (take a m t))))
+      (decision : Bool)
+    : Equal Bool (le x h) decision
+      → Equal
+        (List a)
+        (take a (Suc m) (insert a le x (Cons a h t)))
+        (take a (Suc m) (insert a le x (take a (Suc m) (Cons a h t)))) =
+  match decision {
+    True ↦
+      λbefore.
+        derived_meet
+          (List a)
+          (take a (Suc m) (insert a le x (Cons a h t)))
+          (Cons a x (take a m (Cons a h t)))
+          (take a (Suc m) (insert a le x (take a (Suc m) (Cons a h t))))
+          (cong
+            (List a)
+            (List a)
+            (insert a le x (Cons a h t))
+            (Cons a x (Cons a h t))
+            (take a (Suc m))
+            (derived_insert_cons_true a le x h t before))
+          (trans
+            (List a)
+            (take a (Suc m) (insert a le x (Cons a h (take a m t))))
+            (Cons a x (take a m (Cons a h (take a m t))))
+            (Cons a x (take a m (Cons a h t)))
+            (cong
+              (List a)
+              (List a)
+              (insert a le x (Cons a h (take a m t)))
+              (Cons a x (Cons a h (take a m t)))
+              (take a (Suc m))
+              (derived_insert_cons_true a le x h (take a m t) before))
+            (cong
+              (List a)
+              (List a)
+              (take a m (Cons a h (take a m t)))
+              (take a m (Cons a h t))
+              (λrest. Cons a x rest)
+              (derived_take_cons_take a m h t)));
+    False ↦
+      λafter.
+        derived_meet
+          (List a)
+          (take a (Suc m) (insert a le x (Cons a h t)))
+          (Cons a h (take a m (insert a le x (take a m t))))
+          (take a (Suc m) (insert a le x (take a (Suc m) (Cons a h t))))
+          (trans
+            (List a)
+            (take a (Suc m) (insert a le x (Cons a h t)))
+            (Cons a h (take a m (insert a le x t)))
+            (Cons a h (take a m (insert a le x (take a m t))))
+            (cong
+              (List a)
+              (List a)
+              (insert a le x (Cons a h t))
+              (Cons a h (insert a le x t))
+              (take a (Suc m))
+              (derived_insert_cons_false a le x h t after))
+            (cong
+              (List a)
+              (List a)
+              (take a m (insert a le x t))
+              (take a m (insert a le x (take a m t)))
+              (λrest. Cons a h rest)
+              ih))
+          (cong
+            (List a)
+            (List a)
+            (insert a le x (Cons a h (take a m t)))
+            (Cons a h (insert a le x (take a m t)))
+            (take a (Suc m))
+            (derived_insert_cons_false a le x h (take a m t) after))
+  }
+
+theorem derived_take_insert_cut
+      (a : Type) (le : a → a → Bool) (x : a) (n : Nat) (xs : List a)
+    : Equal (List a) (take a n (insert a le x xs)) (take a n (insert a le x (take a n xs))) =
+  match n {
+    Zero ↦ Proved;
+    Suc m ↦
+      match xs {
+        Nil ↦ Refl;
+        Cons h t ↦
+          derived_take_insert_cut_cons_case
+            a
+            le
+            x
+            m
+            h
+            t
+            (derived_take_insert_cut a le x m t)
+            (le x h)
+            Refl
+      }
+  }
+
+theorem derived_take_sort_cut_right
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (k : Nat)
+      (xs : List a)
+      (ys : List a)
+    : Equal
+        (List a)
+        (take a k (sort a le (list_append a xs ys)))
+        (take a k (sort a le (list_append a xs (take a k (sort a le ys))))) =
+  match xs {
+    Nil ↦
+      sym
+        (List a)
+        (take a k (sort a le (take a k (sort a le ys))))
+        (take a k (sort a le ys))
+        (trans
+          (List a)
+          (take a k (sort a le (take a k (sort a le ys))))
+          (take a k (take a k (sort a le ys)))
+          (take a k (sort a le ys))
+          (cong
+            (List a)
+            (List a)
+            (sort a le (take a k (sort a le ys)))
+            (take a k (sort a le ys))
+            (take a k)
+            (derived_sort_sorted_fixed
+              a
+              le
+              (take a k (sort a le ys))
+              ((proof sorted for take)
+                a
+                le
+                k
+                (sort a le ys)
+                ((proof sorted for sort) a le total ys))))
+          ((proof prefix for take) a k k (sort a le ys) ((proof refl for leq_nat) k)));
+    Cons x t ↦
+      trans
+        (List a)
+        (take a k (insert a le x (sort a le (list_append a t ys))))
+        (take
+          a
+          k
+          (insert a le x (take a k (sort a le (list_append a t (take a k (sort a le ys)))))))
+        (take a k (insert a le x (sort a le (list_append a t (take a k (sort a le ys))))))
+        (trans
+          (List a)
+          (take a k (insert a le x (sort a le (list_append a t ys))))
+          (take a k (insert a le x (take a k (sort a le (list_append a t ys)))))
+          (take
+            a
+            k
+            (insert a le x (take a k (sort a le (list_append a t (take a k (sort a le ys)))))))
+          (derived_take_insert_cut a le x k (sort a le (list_append a t ys)))
+          (cong
+            (List a)
+            (List a)
+            (take a k (sort a le (list_append a t ys)))
+            (take a k (sort a le (list_append a t (take a k (sort a le ys)))))
+            (λcut. take a k (insert a le x cut))
+            (derived_take_sort_cut_right a le total k t ys)))
+        (sym
+          (List a)
+          (take a k (insert a le x (sort a le (list_append a t (take a k (sort a le ys))))))
+          (take
+            a
+            k
+            (insert a le x (take a k (sort a le (list_append a t (take a k (sort a le ys)))))))
+          (derived_take_insert_cut
+            a
+            le
+            x
+            k
+            (sort a le (list_append a t (take a k (sort a le ys))))))
+  }
+
+theorem derived_sorted_skip_second
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (p : a)
+      (q : a)
+      (rest : List a)
+    : is_sorted a le (Cons a p (Cons a q rest)) → is_sorted a le (Cons a p rest) =
+  match rest {
+    Nil ↦ λsorted_input. Proved;
+    Cons r more ↦
+      λsorted_input.
+        let
+          p_before_q = derived_sort_sorted_head a le p (Cons a q (Cons a r more)) sorted_input;
+          tail_sorted = derived_sort_sorted_tail a le p (Cons a q (Cons a r more)) sorted_input;
+          q_before_r = derived_sort_sorted_head a le q (Cons a r more) tail_sorted;
+          rest_sorted = derived_sort_sorted_tail a le q (Cons a r more) tail_sorted
+        in
+          derived_sort_sorted_cons
+            a
+            le
+            p
+            (Cons a r more)
+            rest_sorted
+            (transitive p q r p_before_q q_before_r)
+  }
+
+theorem derived_sort_append_head
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (p : a)
+      (l : List a)
+      (zs : List a)
+    : is_sorted a le (Cons a p l)
+      → is_sorted a le zs
+      → derived_sort_head_ordered a le p zs
+      → derived_sort_head_ordered a le p (sort a le (list_append a l zs)) =
+  match l {
+    Nil ↦
+      λsorted_l.
+        λsorted_zs.
+          λp_before_zs.
+            J
+              (λlist _. derived_sort_head_ordered a le p list)
+              p_before_zs
+              (sym (List a) (sort a le zs) zs (derived_sort_sorted_fixed a le zs sorted_zs));
+    Cons q rest ↦
+      λsorted_l.
+        λsorted_zs.
+          λp_before_zs.
+            derived_sort_head_after_insert
+              a
+              le
+              p
+              q
+              (sort a le (list_append a rest zs))
+              (derived_sort_sorted_head a le p (Cons a q rest) sorted_l)
+              (derived_sort_append_head
+                a
+                le
+                transitive
+                p
+                rest
+                zs
+                (derived_sorted_skip_second a le transitive p q rest sorted_l)
+                sorted_zs
+                p_before_zs)
+  }
+
+theorem derived_sort_append_right_first
+      (a : Type)
+      (le : a → a → Bool)
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (p : a)
+      (l : List a)
+      (z : a)
+      (zs : List a)
+    : is_sorted a le (Cons a p l)
+      → is_sorted a le (Cons a z zs)
+      → Equal Bool (le p z) False
+      → Equal
+        (List a)
+        (sort a le (list_append a (Cons a p l) (Cons a z zs)))
+        (Cons a z (sort a le (list_append a (Cons a p l) zs))) =
+  match l {
+    Nil ↦
+      λsorted_l.
+        λsorted_z.
+          λp_after_z.
+            derived_meet
+              (List a)
+              (insert a le p (sort a le (Cons a z zs)))
+              (Cons a z (insert a le p zs))
+              (Cons a z (insert a le p (sort a le zs)))
+              (trans
+                (List a)
+                (insert a le p (sort a le (Cons a z zs)))
+                (insert a le p (Cons a z zs))
+                (Cons a z (insert a le p zs))
+                (cong
+                  (List a)
+                  (List a)
+                  (sort a le (Cons a z zs))
+                  (Cons a z zs)
+                  (insert a le p)
+                  (derived_sort_sorted_fixed a le (Cons a z zs) sorted_z))
+                (derived_insert_cons_false a le p z zs p_after_z))
+              (cong
+                (List a)
+                (List a)
+                (sort a le zs)
+                zs
+                (λsorted_rest. Cons a z (insert a le p sorted_rest))
+                (derived_sort_sorted_fixed
+                  a
+                  le
+                  zs
+                  (derived_sort_sorted_tail a le z zs sorted_z)));
+    Cons q rest ↦
+      λsorted_l.
+        λsorted_z.
+          λp_after_z.
+            let q_after_z =
+              derived_le_false_after
+                a
+                le
+                transitive
+                p
+                q
+                z
+                (le q z)
+                Refl
+                (derived_sort_sorted_head a le p (Cons a q rest) sorted_l)
+                p_after_z
+            in
+              trans
+                (List a)
+                (insert a le p (sort a le (list_append a (Cons a q rest) (Cons a z zs))))
+                (insert a le p (Cons a z (sort a le (list_append a (Cons a q rest) zs))))
+                (Cons a z (insert a le p (sort a le (list_append a (Cons a q rest) zs))))
+                (cong
+                  (List a)
+                  (List a)
+                  (sort a le (list_append a (Cons a q rest) (Cons a z zs)))
+                  (Cons a z (sort a le (list_append a (Cons a q rest) zs)))
+                  (insert a le p)
+                  (derived_sort_append_right_first
+                    a
+                    le
+                    transitive
+                    q
+                    rest
+                    z
+                    zs
+                    (derived_sort_sorted_tail a le p (Cons a q rest) sorted_l)
+                    sorted_z
+                    q_after_z))
+                (derived_insert_cons_false
+                  a
+                  le
+                  p
+                  z
+                  (sort a le (list_append a (Cons a q rest) zs))
+                  p_after_z)
+  }
+
+theorem derived_take_sort_append_nil
+      (a : Type) (le : a → a → Bool) (k : Nat) (l : List a)
+    : is_sorted a le l
+      → Equal (List a) (take a k (sort a le (list_append a l (Nil a)))) (take a k l) =
+  λsorted_l.
+    trans
+      (List a)
+      (take a k (sort a le (list_append a l (Nil a))))
+      (take a k (sort a le l))
+      (take a k l)
+      (cong
+        (List a)
+        (List a)
+        (list_append a l (Nil a))
+        l
+        (λappended. take a k (sort a le appended))
+        ((proof right_unit for list_append) a l))
+      (cong
+        (List a)
+        (List a)
+        (sort a le l)
+        l
+        (take a k)
+        (derived_sort_sorted_fixed a le l sorted_l))
+
+theorem derived_take_sort_cut_left_cons_case
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (m : Nat)
+      (p : a)
+      (l : List a)
+      (z : a)
+      (zs : List a)
+      (ih : (l2 : List a)
+        → (zs2 : List a)
+        → is_sorted
+        a
+        le
+        l2
+        → is_sorted
+        a
+        le
+        zs2
+        → Equal
+        (List a)
+        (take a m (sort a le (list_append a l2 zs2)))
+        (take a m (sort a le (list_append a (take a m l2) zs2))))
+      (sorted_l : is_sorted a le (Cons a p l))
+      (sorted_z : is_sorted a le (Cons a z zs))
+      (decision : Bool)
+    : Equal Bool (le p z) decision
+      → Equal
+        (List a)
+        (take a (Suc m) (sort a le (list_append a (Cons a p l) (Cons a z zs))))
+        (take a (Suc m) (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs)))) =
+  match decision {
+    True ↦
+      λp_before_z.
+        let cut_sorted =
+          (proof sorted for take) a le (Suc m) (Cons a p l) sorted_l
+        in
+          trans
+            (List a)
+            (take a (Suc m) (sort a le (list_append a (Cons a p l) (Cons a z zs))))
+            (Cons a p (take a m (sort a le (list_append a l (Cons a z zs)))))
+            (take a (Suc m) (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs))))
+            (cong
+              (List a)
+              (List a)
+              (sort a le (list_append a (Cons a p l) (Cons a z zs)))
+              (Cons a p (sort a le (list_append a l (Cons a z zs))))
+              (take a (Suc m))
+              (derived_insert_head_ordered
+                a
+                le
+                p
+                (sort a le (list_append a l (Cons a z zs)))
+                (derived_sort_append_head
+                  a
+                  le
+                  transitive
+                  p
+                  l
+                  (Cons a z zs)
+                  sorted_l
+                  sorted_z
+                  p_before_z)))
+            (derived_meet
+              (List a)
+              (Cons a p (take a m (sort a le (list_append a l (Cons a z zs)))))
+              (Cons a p (take a m (sort a le (list_append a (take a m l) (Cons a z zs)))))
+              (take a (Suc m) (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs))))
+              (cong
+                (List a)
+                (List a)
+                (take a m (sort a le (list_append a l (Cons a z zs))))
+                (take a m (sort a le (list_append a (take a m l) (Cons a z zs))))
+                (λrest. Cons a p rest)
+                (ih l (Cons a z zs) (derived_sort_sorted_tail a le p l sorted_l) sorted_z))
+              (cong
+                (List a)
+                (List a)
+                (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs)))
+                (Cons a p (sort a le (list_append a (take a m l) (Cons a z zs))))
+                (take a (Suc m))
+                (derived_insert_head_ordered
+                  a
+                  le
+                  p
+                  (sort a le (list_append a (take a m l) (Cons a z zs)))
+                  (derived_sort_append_head
+                    a
+                    le
+                    transitive
+                    p
+                    (take a m l)
+                    (Cons a z zs)
+                    cut_sorted
+                    sorted_z
+                    p_before_z))));
+    False ↦
+      λp_after_z.
+        let
+          cut_sorted = (proof sorted for take) a le (Suc m) (Cons a p l) sorted_l;
+          zs_sorted = derived_sort_sorted_tail a le z zs sorted_z
+        in
+          trans
+            (List a)
+            (take a (Suc m) (sort a le (list_append a (Cons a p l) (Cons a z zs))))
+            (Cons a z (take a m (sort a le (list_append a (Cons a p l) zs))))
+            (take a (Suc m) (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs))))
+            (cong
+              (List a)
+              (List a)
+              (sort a le (list_append a (Cons a p l) (Cons a z zs)))
+              (Cons a z (sort a le (list_append a (Cons a p l) zs)))
+              (take a (Suc m))
+              (derived_sort_append_right_first
+                a
+                le
+                transitive
+                p
+                l
+                z
+                zs
+                sorted_l
+                sorted_z
+                p_after_z))
+            (derived_meet
+              (List a)
+              (Cons a z (take a m (sort a le (list_append a (Cons a p l) zs))))
+              (Cons a z (take a m (sort a le (list_append a (Cons a p (take a m l)) zs))))
+              (take a (Suc m) (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs))))
+              (cong
+                (List a)
+                (List a)
+                (take a m (sort a le (list_append a (Cons a p l) zs)))
+                (take a m (sort a le (list_append a (Cons a p (take a m l)) zs)))
+                (λrest. Cons a z rest)
+                (derived_meet
+                  (List a)
+                  (take a m (sort a le (list_append a (Cons a p l) zs)))
+                  (take a m (sort a le (list_append a (take a m (Cons a p l)) zs)))
+                  (take a m (sort a le (list_append a (Cons a p (take a m l)) zs)))
+                  (ih (Cons a p l) zs sorted_l zs_sorted)
+                  (trans
+                    (List a)
+                    (take a m (sort a le (list_append a (Cons a p (take a m l)) zs)))
+                    (take a m (sort a le (list_append a (take a m (Cons a p (take a m l))) zs)))
+                    (take a m (sort a le (list_append a (take a m (Cons a p l)) zs)))
+                    (ih (Cons a p (take a m l)) zs cut_sorted zs_sorted)
+                    (cong
+                      (List a)
+                      (List a)
+                      (take a m (Cons a p (take a m l)))
+                      (take a m (Cons a p l))
+                      (λprefix. take a m (sort a le (list_append a prefix zs)))
+                      (derived_take_cons_take a m p l)))))
+              (cong
+                (List a)
+                (List a)
+                (sort a le (list_append a (Cons a p (take a m l)) (Cons a z zs)))
+                (Cons a z (sort a le (list_append a (Cons a p (take a m l)) zs)))
+                (take a (Suc m))
+                (derived_sort_append_right_first
+                  a
+                  le
+                  transitive
+                  p
+                  (take a m l)
+                  z
+                  zs
+                  cut_sorted
+                  sorted_z
+                  p_after_z)))
+  }
+
+theorem derived_take_sort_cut_left
+      (a : Type)
+      (le : a → a → Bool)
+      (total : (x : a) → (y : a) → IsTrue (bool_or (le x y) (le y x)))
+      (transitive : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (k : Nat)
+      (l : List a)
+      (zs : List a)
+    : is_sorted a le l
+      → is_sorted a le zs
+      → Equal
+        (List a)
+        (take a k (sort a le (list_append a l zs)))
+        (take a k (sort a le (list_append a (take a k l) zs))) =
+  match k {
+    Zero ↦ λsorted_l. λsorted_zs. Proved;
+    Suc m ↦
+      match l {
+        Nil ↦ λsorted_l. λsorted_zs. Refl;
+        Cons p rest ↦
+          match zs {
+            Nil ↦
+              λsorted_l.
+                λsorted_zs.
+                  derived_meet
+                    (List a)
+                    (take a (Suc m) (sort a le (list_append a (Cons a p rest) (Nil a))))
+                    (take a (Suc m) (Cons a p rest))
+                    (take
+                      a
+                      (Suc m)
+                      (sort a le (list_append a (take a (Suc m) (Cons a p rest)) (Nil a))))
+                    (derived_take_sort_append_nil a le (Suc m) (Cons a p rest) sorted_l)
+                    (trans
+                      (List a)
+                      (take
+                        a
+                        (Suc m)
+                        (sort a le (list_append a (take a (Suc m) (Cons a p rest)) (Nil a))))
+                      (take a (Suc m) (take a (Suc m) (Cons a p rest)))
+                      (take a (Suc m) (Cons a p rest))
+                      (derived_take_sort_append_nil
+                        a
+                        le
+                        (Suc m)
+                        (take a (Suc m) (Cons a p rest))
+                        ((proof sorted for take) a le (Suc m) (Cons a p rest) sorted_l))
+                      ((proof prefix for take)
+                        a
+                        (Suc m)
+                        (Suc m)
+                        (Cons a p rest)
+                        ((proof refl for leq_nat) (Suc m))));
+            Cons z more ↦
+              λsorted_l.
+                λsorted_zs.
+                  derived_take_sort_cut_left_cons_case
+                    a
+                    le
+                    total
+                    transitive
+                    m
+                    p
+                    rest
+                    z
+                    more
+                    (derived_take_sort_cut_left a le total transitive m)
+                    sorted_l
+                    sorted_zs
+                    (le p z)
+                    Refl
+          }
+      }
   }
 
 theorem derived_class_order
@@ -4445,7 +5722,7 @@ reference implementation.
    `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
    `insert::stable_class`, `insert::comparator_cong`, `sort::sorted`,
    `sort::perm`, `sort::length`, `sort::member`, `sort::stable_class`,
-   and `sort::comparator_cong`. The public
+   `sort::comparator_cong`, and `sort::take_append`. The public
    `list_sorted_head_bounded` carries its transitivity premise. All other
    definitions in this package are package-local;
    `cat_derived_pub_export.rs` is the authoritative inventory, and
