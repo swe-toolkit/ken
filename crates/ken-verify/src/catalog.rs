@@ -167,18 +167,12 @@ impl NativeTestedEvidence {
         run: &CanonicalDifferentialRun,
         request_path: &[u8],
         filesystem_path: &[u8],
-        recursive: bool,
     ) -> Self {
         let operation = HostOpV1::FsCreateDirectory;
         Self {
             exact_artifact_executed: run.exact_artifact_executed,
             canonical_observation_equal: run
-                .compare_fs_create_directory(
-                    request_path,
-                    filesystem_path,
-                    recursive,
-                    None,
-                )
+                .compare_fs_create_directory(request_path, filesystem_path, None)
                 .is_ok(),
             operation_observed_in_both_lanes: [&run.interpreter, &run.native]
                 .into_iter()

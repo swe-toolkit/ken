@@ -191,9 +191,8 @@ fn put_request(
             put_u8(out, 9);
             put_bytes(out, path)?;
         }
-        CanonicalRequestV1::FsCreateDirectory { recursive, path } => {
+        CanonicalRequestV1::FsCreateDirectory { path } => {
             put_u8(out, 10);
-            put_u8(out, u8::from(*recursive));
             put_bytes(out, path)?;
         }
         CanonicalRequestV1::FsRemoveFile { path } => {
@@ -937,7 +936,6 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
             path: cursor.bytes()?,
         },
         10 => CanonicalRequestV1::FsCreateDirectory {
-            recursive: get_bool(cursor)?,
             path: cursor.bytes()?,
         },
         11 => CanonicalRequestV1::FsRemoveFile {
@@ -1708,6 +1706,31 @@ mod tests {
         let mut wall = Vec::new();
         put_request(&mut wall, &CanonicalRequestV1::ClockWallNow).expect("encodes");
         assert_ne!(wall, encodings[0]);
+    }
+
+    /// Promise class: normative compatibility vector (AC-0 retirement).
+    /// MEASURED: trace request tag 10 emits and consumes only the path bytes,
+    /// and both old Bool encodings refuse. CLAIMED: tag 10 has no flag.
+    /// THE GAP: this isolates the request codec, not raw ABI dispatch.
+    #[test]
+    fn fs_create_directory_tag_ten_has_only_a_path() {
+        let expected = [10, 3, 0, 0, 0, 0, 0, 0, 0, b'a', b'/', b'b'];
+        let request = CanonicalRequestV1::FsCreateDirectory {
+            path: b"a/b".to_vec(),
+        };
+        let mut encoded = Vec::new();
+        put_request(&mut encoded, &request).unwrap();
+        assert_eq!(encoded, expected);
+
+        let mut cursor = Cursor { bytes: &expected, position: 0 };
+        assert_eq!(get_request(&mut cursor).unwrap(), request);
+        assert_eq!(cursor.position, expected.len());
+        for old_bool in [0, 1] {
+            let mut old = expected.to_vec();
+            old.insert(1, old_bool);
+            let mut cursor = Cursor { bytes: &old, position: 0 };
+            assert!(get_request(&mut cursor).is_err());
+        }
     }
 
     /// Promise class: normative compatibility vector. Canonical ProcessSignal

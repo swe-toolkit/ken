@@ -3898,7 +3898,6 @@ pub enum FsTrace {
     },
     CreateDirectory {
         path: Vec<u8>,
-        recursive: bool,
     },
     RemoveFile {
         path: Vec<u8>,
@@ -4041,12 +4040,7 @@ pub trait HostHandler {
     ) -> io::Result<()>;
     fn fs_metadata_at(&mut self, handle: &Self::Handle) -> io::Result<HostFileMetadata>;
     fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>>;
-    fn fs_create_directory_at(
-        &mut self,
-        parent: &Self::Handle,
-        leaf: &[u8],
-        recursive: bool,
-    ) -> io::Result<()>;
+    fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()>;
     fn fs_remove_file_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()>;
     fn fs_remove_directory_at(
         &mut self,
@@ -4612,12 +4606,7 @@ impl HostHandler for PosixHost {
         }
     }
 
-    fn fs_create_directory_at(
-        &mut self,
-        parent: &Self::Handle,
-        leaf: &[u8],
-        _recursive: bool,
-    ) -> io::Result<()> {
+    fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
         #[cfg(target_os = "linux")]
         {
             Ok(ken_host::create_directory(
@@ -5378,19 +5367,13 @@ impl HostHandler for CaptureHost {
             .collect())
     }
 
-    fn fs_create_directory_at(
-        &mut self,
-        parent: &Self::Handle,
-        leaf: &[u8],
-        recursive: bool,
-    ) -> io::Result<()> {
+    fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
         let mut path = self.virtual_path(*parent);
         if !path.is_empty() {
             path.push(b'/');
         }
         path.extend_from_slice(leaf);
-        self.fs_trace
-            .push(FsTrace::CreateDirectory { path, recursive });
+        self.fs_trace.push(FsTrace::CreateDirectory { path });
         if self.fs_entries.contains_key(&(*parent, leaf.to_vec())) {
             return Err(io::Error::from(io::ErrorKind::AlreadyExists));
         }
@@ -6264,7 +6247,6 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
         &mut self,
         grant: &ken_host::CapabilityGrantV1,
         path: &[u8],
-        recursive: bool,
     ) -> Result<(), ken_host::FileErrorCauseV1> {
         let Resolution::Parent(parent, leaf) =
             self.resolve(grant, path, FsOpKind::CreateDirectory)?
@@ -6274,7 +6256,7 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
             ));
         };
         self.handler
-            .fs_create_directory_at(&parent, &leaf, recursive)
+            .fs_create_directory_at(&parent, &leaf)
             .map_err(host_error_v1)
     }
 
@@ -6640,17 +6622,9 @@ fn fs_dispatch<H: HostHandler>(
             fs.op_read_directory_id,
         )
     } else if op_id == fs.createdirectory_id {
-        let recursive = match args.get(2) {
-            Some(EvalVal::Ctor { id, .. }) if *id == ids.true_id => true,
-            Some(EvalVal::Ctor { id, .. }) if *id == ids.false_id => false,
-            _ => return Some(Err(())),
-        };
         (
             ken_host::HostOpV1::FsCreateDirectory,
-            ken_host::CanonicalRequestV1::FsCreateDirectory {
-                recursive,
-                path: bytes_at(3)?,
-            },
+            ken_host::CanonicalRequestV1::FsCreateDirectory { path: bytes_at(2)? },
             fs.op_create_directory_id,
         )
     } else if op_id == fs.removefile_id {
@@ -8115,7 +8089,7 @@ mod px0_target_classification_tests {
         assert_unsupported(host.fs_create_append_at(&handle, b"file", b"bytes"));
         assert_unsupported(host.fs_metadata_at(&handle));
         assert_unsupported(host.fs_read_directory_at(&handle));
-        assert_unsupported(host.fs_create_directory_at(&handle, b"dir", false));
+        assert_unsupported(host.fs_create_directory_at(&handle, b"dir"));
         assert_unsupported(host.fs_remove_file_at(&handle, b"file"));
         assert_unsupported(host.fs_remove_directory_at(&handle, b"dir", false));
         assert_unsupported(host.fs_rename_at(&handle, b"from", &handle, b"to"));

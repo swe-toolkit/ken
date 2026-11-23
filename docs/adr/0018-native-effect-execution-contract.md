@@ -168,7 +168,7 @@ call. The V1 semantic schemas are:
 | FS.AppendFile | capability, path, bytes | Result FileError Unit |
 | FS.Metadata | capability, path | Result FileError FileMetadata |
 | FS.ReadDirectory | capability, path | Result FileError List-DirEntry |
-| FS.CreateDirectory | capability, recursive, path | Result FileError Unit |
+| FS.CreateDirectory | capability, path | Result FileError Unit |
 | FS.RemoveFile | capability, path | Result FileError Unit |
 | FS.RemoveDirectory | capability, recursive, path | Result FileError Unit |
 | FS.Rename | capability, source path, destination path | Result FileError Unit |

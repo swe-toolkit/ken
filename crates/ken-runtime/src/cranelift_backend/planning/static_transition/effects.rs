@@ -541,12 +541,13 @@ fn host_effect_seat_contract(
         | (Op::FsAppendFile, 0)
         | (Op::FsMetadata, 0)
         | (Op::FsReadDirectory, 0)
+        | (Op::FsCreateDirectory, 0)
         | (Op::FsRemoveFile, 0)
         | (Op::FsRename, 0)
         | (Op::FsChangeMode, 0)
         | (Op::FsOpen, 0) => Some(bytes),
-        (Op::FsCreateDirectory, 0) | (Op::FsRemoveDirectory, 0) => Some(tag),
-        (Op::FsCreateDirectory, 1) | (Op::FsRemoveDirectory, 1) => Some(bytes),
+        (Op::FsRemoveDirectory, 0) => Some(tag),
+        (Op::FsRemoveDirectory, 1) => Some(bytes),
         (Op::FsWriteFile, 1) | (Op::FsOpen, 1) => Some(tag),
         (Op::FsChangeMode, 1) => Some(exact_int),
         (Op::FsHandleMetadata, 0)

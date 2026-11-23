@@ -508,7 +508,6 @@ impl CanonicalDifferentialRun {
         &self,
         request_path: &[u8],
         filesystem_path: &[u8],
-        recursive: bool,
         expected_error: Option<ken_host::IoErrorIdentityV1>,
     ) -> Result<(), FsDirectoryDifferentialError> {
         compare_fs_mutation_observations(
@@ -517,7 +516,6 @@ impl CanonicalDifferentialRun {
             &self.native,
             &self.native_actions,
             ken_host::CanonicalRequestV1::FsCreateDirectory {
-                recursive,
                 path: request_path.to_vec(),
             },
             filesystem_path,
@@ -1515,7 +1513,7 @@ fn validate_fs_mutation_observation(
         });
     };
     let request_path = match request {
-        ken_host::CanonicalRequestV1::FsCreateDirectory { path, .. }
+        ken_host::CanonicalRequestV1::FsCreateDirectory { path }
         | ken_host::CanonicalRequestV1::FsRemoveFile { path }
         | ken_host::CanonicalRequestV1::FsRemoveDirectory { path, .. } => path,
         _ => unreachable!("validated mutation request set"),
@@ -2148,7 +2146,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
           ProgramCaps.MkProgramCaps cap |->
             host_bind AFull (Result FileError Unit) ExitCode
               (host_fs AFull (Result FileError Unit)
-                (create_directory AFull cap False path))
+                (create_directory AFull cap path))
               (\observed. match observed {
                 Err error |-> match error {
                   MkFileError file_operation _path cause |-> match file_operation {
@@ -2979,27 +2977,16 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         )
     }
 
-    fn fs_create_directory_scenario(
-        identity: &str,
-        recursive: bool,
-        path: &[u8],
-        nodes: Vec<SeedNode>,
-    ) -> Scenario {
-        let source = if recursive {
-            FS_CREATE_DIRECTORY_SOURCE.replace("cap False", "cap True")
-        } else {
-            FS_CREATE_DIRECTORY_SOURCE.to_string()
-        };
+    fn fs_create_directory_scenario(identity: &str, path: &[u8], nodes: Vec<SeedNode>) -> Scenario {
         abi_a3_scenario(
             identity,
-            source,
+            FS_CREATE_DIRECTORY_SOURCE.to_string(),
             AUTH_FULL,
             RightSet::ALL,
             path.to_vec(),
             nodes,
             ExpectedFsEffect::CreateDirectory {
                 path: path.to_vec(),
-                recursive,
             },
         )
     }
@@ -3068,10 +3055,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ),
             HostOpV1::FsCreateDirectory => (
                 FS_CREATE_DIRECTORY_SOURCE.to_string(),
-                ExpectedFsEffect::CreateDirectory {
-                    path: Vec::new(),
-                    recursive: false,
-                },
+                ExpectedFsEffect::CreateDirectory { path: Vec::new() },
                 ken_host::FsCapabilityOperationV1::CreateDirectory,
             ),
             HostOpV1::FsRemoveFile => (
@@ -3155,11 +3139,8 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             ExpectedFsEffect::ReadDirectory { .. } => {
                 ExpectedFsEffect::ReadDirectory { path: path.clone() }
             }
-            ExpectedFsEffect::CreateDirectory { recursive, .. } => {
-                ExpectedFsEffect::CreateDirectory {
-                    path: path.clone(),
-                    recursive,
-                }
+            ExpectedFsEffect::CreateDirectory { .. } => {
+                ExpectedFsEffect::CreateDirectory { path: path.clone() }
             }
             ExpectedFsEffect::RemoveFile { .. } => {
                 ExpectedFsEffect::RemoveFile { path: path.clone() }
@@ -3725,33 +3706,22 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
 
     /// Promise class: durable state-transition and failure-classification
-    /// invariant. The recursive flag's inertness is explicitly part of the
-    /// promoted-as-is contract, not a parent-chain capability claim.
+    /// invariant (spec 38 §1.12, AC-0). MEASURED: both lanes report the
+    /// path-only operation and make exactly one directory or leave the root
+    /// unchanged, with the specified error. CLAIMED: exact single-leaf
+    /// semantics. THE GAP: covered for an existing directory and a missing
+    /// parent, not a claim about other path policies or platforms.
     #[test]
-    fn fs_create_directory_real_artifact_matches_the_landed_inert_flag_contract() {
-        let success = fs_create_directory_scenario(
-            "abi-a3-create-success",
-            false,
-            b"created",
-            abi_a3_base_nodes(),
-        );
+    fn fs_create_directory_real_artifact_matches_single_leaf_contract() {
+        let success =
+            fs_create_directory_scenario("abi-a3-create-success", b"created", abi_a3_base_nodes());
         let run = run_scenario(&success).expect("create success executes");
-        run.compare_fs_create_directory(
-            b"created",
-            b"data/created",
-            false,
-            None,
-        )
-        .expect("exact create transition");
+        run.compare_fs_create_directory(b"created", b"data/created", None)
+            .expect("exact create transition");
         assert_eq!(
             confirm_native_tested_transition(
                 HostOpV1::FsCreateDirectory,
-                NativeTestedEvidence::from_fs_create_directory_run(
-                    &run,
-                    b"created",
-                    b"data/created",
-                    false,
-                ),
+                NativeTestedEvidence::from_fs_create_directory_run(&run, b"created", b"data/created"),
             ),
             Ok(HostOpAvailabilityV1::NativeTested)
         );
@@ -3766,7 +3736,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 &wrong_native,
                 &wrong_actions,
                 CanonicalRequestV1::FsCreateDirectory {
-                    recursive: false,
                     path: b"created".to_vec(),
                 },
                 b"data/created",
@@ -3787,7 +3756,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         });
         let existing = run_scenario(&fs_create_directory_scenario(
             "abi-a3-create-existing",
-            false,
             b"existing",
             existing_nodes,
         ))
@@ -3796,32 +3764,23 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             .compare_fs_create_directory(
                 b"existing",
                 b"data/existing",
-                false,
                 Some(IoErrorIdentityV1::AlreadyExists),
             )
             .expect("create-existing classification/state");
 
-        for recursive in [false, true] {
-            let missing = run_scenario(&fs_create_directory_scenario(
-                if recursive {
-                    "abi-a3-create-missing-true"
-                } else {
-                    "abi-a3-create-missing-false"
-                },
-                recursive,
+        let missing = run_scenario(&fs_create_directory_scenario(
+            "abi-a3-create-missing-parent",
+            b"missing/child",
+            abi_a3_base_nodes(),
+        ))
+        .expect("missing-parent create executes");
+        missing
+            .compare_fs_create_directory(
                 b"missing/child",
-                abi_a3_base_nodes(),
-            ))
-            .expect("missing-parent create executes");
-            missing
-                .compare_fs_create_directory(
-                    b"missing/child",
-                    b"data/missing/child",
-                    recursive,
-                    Some(IoErrorIdentityV1::NotFound),
-                )
-                .expect("both recursive values preserve the landed NotFound/no-op behavior");
-        }
+                b"data/missing/child",
+                Some(IoErrorIdentityV1::NotFound),
+            )
+            .expect("missing parents return NotFound without creating anything");
     }
 
     /// Promise class: durable state-transition and exact failure-classification

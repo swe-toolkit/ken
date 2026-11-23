@@ -343,7 +343,7 @@ fn request_path_mut(request: &mut CanonicalRequestV1) -> Option<&mut Vec<u8>> {
         | CanonicalRequestV1::FsAppendFile { path, .. }
         | CanonicalRequestV1::FsMetadata { path }
         | CanonicalRequestV1::FsReadDirectory { path }
-        | CanonicalRequestV1::FsCreateDirectory { path, .. }
+        | CanonicalRequestV1::FsCreateDirectory { path }
         | CanonicalRequestV1::FsRemoveFile { path }
         | CanonicalRequestV1::FsRemoveDirectory { path, .. }
         | CanonicalRequestV1::FsChangeMode { path, .. } => Some(path),

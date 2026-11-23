@@ -5559,7 +5559,7 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsMetadata, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsReadDirectory, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsCreateDirectory, EffectSeatSlot::Argument(1)),
+            (ken_host::HostOpV1::FsCreateDirectory, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsRemoveFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsRemoveDirectory, EffectSeatSlot::Argument(1)),
             (ken_host::HostOpV1::FsRename, EffectSeatSlot::Argument(0)),
