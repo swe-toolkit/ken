@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH-OFFSET-SPLIT
 title: "Spec 72 splits every list selector over appended parts (§1.6, §1.8, §3.6, §3.8, §4.7), but find_below has no split over its range: §2.4 keeps a witness already found below a smaller bound, and nothing carries a hit found past it. So a client that searches [0, b) and then [b, b + c) cannot conclude the whole search's result from the two parts. Rule from a checked D0 at zero trust that, when find_below p b is None and q searches p shifted by b, a hit n of find_below q c gives find_below p (add b c) = Some (add b n), and state it with a seed that separates a refuted first part from a first part that already hits"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE
 title: "Spec 66 §21 says eval depends only on the variables that occur, but substitution has no counterpart: §20 fixes one absent variable against the identity, and poly_eq_substitute_pointwise needs agreement at every variable and concludes only canonical equality. So a client whose two substitutions differ at several unused variables cannot conclude the results are equal as stored. Rule from a checked D0 at zero trust that substitute s e equals substitute t e whenever s and t agree at every variable occurring in e, and state it with a seed that separates agreement on the occurring variables from a disagreement at one of them"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
@@ -21,6 +21,9 @@ For every `e`, `s` and `t : Nat → Expr`, if `s w` equals `t w` as
 `Equal Expr` for every `w` with `occurs w e` equal to `True`, then
 `substitute s e` equals `substitute t e` as `Equal Expr`. It holds at
 zero trust, with that premise only. Spec 66 states it by its public type.
+
+Merged at squash `9244c24c8c7b68195fb0ae85b179a8453a9fb1ba` (candidate
+`6f66703d7af86744a61e33a50bc7d9e55410c9db`, full CI run `45166335642`).
 
 ## Settled inputs (main `aadce7362`)
 
