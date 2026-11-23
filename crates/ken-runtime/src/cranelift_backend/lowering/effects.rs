@@ -3125,6 +3125,9 @@ impl<'a> Lowering<'a> {
         const SEAT_1: EffectSeatSlot = EffectSeatSlot::Argument(1);
         const SEAT_2: EffectSeatSlot = EffectSeatSlot::Argument(2);
         const SEAT_3: EffectSeatSlot = EffectSeatSlot::Argument(3);
+        // The request and its synthesized FileError use the same path seat.
+        let recursive_remove = operation == ken_host::HostOpV1::FsRemoveDirectory;
+        let fs_path_ordinal = u32::from(recursive_remove);
         let pointer_type = builder.func.dfg.value_type(
             self.function_local
                 .host_dispatch_context
@@ -3311,18 +3314,16 @@ impl<'a> Lowering<'a> {
                     }
                 };
                 builder.ins().stack_store(token, request, request_offset(0));
-                let recursive_operation = matches!(
-                    operation,
-                    ken_host::HostOpV1::FsCreateDirectory
-                        | ken_host::HostOpV1::FsRemoveDirectory
-                );
-                let path_slot = if recursive_operation { SEAT_1 } else { SEAT_0 };
-                let path = self.wire_bytes_seat(builder, &seats, path_slot)?;
+                let path = self.wire_bytes_seat(
+                    builder,
+                    &seats,
+                    EffectSeatSlot::Argument(fs_path_ordinal),
+                )?;
                 if let Some((invalid, resource_code)) = path.refusal {
                     let detail = io_error_other_detail(builder, resource_code);
                     record_narrow_failure(builder, invalid, error_reply_tag, detail);
                 }
-                if recursive_operation {
+                if recursive_remove {
                     let recursive = self.wire_constructor_tag_seat(
                         builder,
                         &seats,
@@ -4357,7 +4358,7 @@ impl<'a> Lowering<'a> {
                 // unauthorized eager demand at a smaller scale. The one thing
                 // that legitimately needs it is the `OptionSome` child below,
                 // which projects it through `site_operand_argument` at its
-                // declared `SiteOperand(0)`.
+                // declared path operand.
                 let (operation_role, operation_symbol) = match operation {
                     ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsOpen => (
                         SynthesizedFixedConstructorRole::FileOperationRead,
@@ -4409,19 +4410,10 @@ impl<'a> Lowering<'a> {
                     Vec::new(),
                     &seats,
                 )?;
-                let path_ordinal = if matches!(
-                    operation,
-                    ken_host::HostOpV1::FsCreateDirectory
-                        | ken_host::HostOpV1::FsRemoveDirectory
-                ) {
-                    1
-                } else {
-                    0
-                };
                 let path_argument = self.site_operand_argument(
                     builder,
                     static_origin,
-                    path_ordinal,
+                    fs_path_ordinal,
                     &seats,
                 )?;
                 let path = self.synthesized_constructor(
@@ -4429,7 +4421,7 @@ impl<'a> Lowering<'a> {
                     &error_root.field(1),
                     SynthesizedFixedConstructorRole::OptionSome,
                     self.process_symbols.option_some.clone(),
-                    // The seat's operand 0 — projected, not passed.
+                    // The path seat is projected, not passed.
                     vec![path_argument],
                     &seats,
                 )?;

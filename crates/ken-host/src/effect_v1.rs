@@ -529,11 +529,12 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::FsReadFile
         | HostOpV1::FsMetadata
         | HostOpV1::FsReadDirectory
+        | HostOpV1::FsCreateDirectory
         | HostOpV1::FsRemoveFile => {
             let path = slice("path")?;
             vec![checked_u32(field("capability")?)?, path[0], path[1]]
         }
-        HostOpV1::FsCreateDirectory | HostOpV1::FsRemoveDirectory => {
+        HostOpV1::FsRemoveDirectory => {
             let path = slice("path")?;
             vec![
                 checked_u32(field("capability")?)?,
@@ -2618,7 +2619,6 @@ pub trait HostEffectBackendV1 {
         &mut self,
         _grant: &CapabilityGrantV1,
         _path: &[u8],
-        _recursive: bool,
     ) -> Result<(), FileErrorCauseV1> {
         Err(FileErrorCauseV1::Io(IoErrorIdentityV1::Unsupported))
     }
@@ -3472,9 +3472,9 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             .map_err(|cause| file_error(operation, path, cause)),
         (
             HostOpV1::FsCreateDirectory,
-            CanonicalRequestV1::FsCreateDirectory { recursive, path },
+            CanonicalRequestV1::FsCreateDirectory { path },
         ) => backend
-            .fs_create_directory(grant.expect("validated FS capability"), path, *recursive)
+            .fs_create_directory(grant.expect("validated FS capability"), path)
             .map(|()| CanonicalReplyV1::Unit)
             .map_err(|cause| file_error(operation, path, cause)),
         (HostOpV1::FsRemoveFile, CanonicalRequestV1::FsRemoveFile { path }) => backend
@@ -4297,7 +4297,7 @@ fn request_path(request: &CanonicalRequestV1) -> Vec<u8> {
         | CanonicalRequestV1::FsAppendFile { path, .. }
         | CanonicalRequestV1::FsMetadata { path }
         | CanonicalRequestV1::FsReadDirectory { path }
-        | CanonicalRequestV1::FsCreateDirectory { path, .. }
+        | CanonicalRequestV1::FsCreateDirectory { path }
         | CanonicalRequestV1::FsRemoveFile { path }
         | CanonicalRequestV1::FsRemoveDirectory { path, .. } => path.clone(),
         CanonicalRequestV1::FsRename { source, .. } => source.clone(),
@@ -4424,7 +4424,6 @@ pub enum CanonicalRequestV1 {
         path: Vec<u8>,
     },
     FsCreateDirectory {
-        recursive: bool,
         path: Vec<u8>,
     },
     FsRemoveFile {
@@ -5272,7 +5271,6 @@ mod tests {
             &mut self,
             _: &CapabilityGrantV1,
             _: &[u8],
-            _: bool,
         ) -> Result<(), FileErrorCauseV1> {
             self.0.push(HostOpV1::FsCreateDirectory);
             Ok(())
@@ -5832,7 +5830,6 @@ mod tests {
             (
                 HostOpV1::FsCreateDirectory,
                 CanonicalRequestV1::FsCreateDirectory {
-                    recursive: false,
                     path: b"a".to_vec(),
                 },
             ),
@@ -6953,6 +6950,24 @@ mod tests {
             NATIVE_TESTED_TARGETS_V1.len(),
             "the manifest count remains derived from the promoted roster"
         );
+    }
+
+    /// Promise class: normative compatibility vector (ADR 0018, AC-0).
+    /// MEASURED: generated ABI descriptors and the lowering layout expose
+    /// exactly the two-field path record and three-word create vector.
+    /// CLAIMED: the native descriptor contains no create flag. THE GAP:
+    /// execution of those offsets is tested by the real native artifact.
+    #[test]
+    fn fs_create_directory_uses_two_field_path_record_and_three_native_words() {
+        let row = HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == 0x0306)
+            .expect("create ABI operation is present");
+        assert_eq!((row.3, row.4), ("FsPathRequestV1", 2));
+        let create = host_effect_wire_layout_v1(HostOpV1::FsCreateDirectory).unwrap();
+        let read = host_effect_wire_layout_v1(HostOpV1::FsReadDirectory).unwrap();
+        assert_eq!(create, read, "create and read share the complete path layout");
+        assert_eq!(create.request_offsets.len(), 3, "capability, pointer, length");
     }
 
     #[test]

@@ -2478,7 +2478,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![cap_a(), bytes_t.clone(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
-                named(vec![cap_a(), bool_t.clone(), bytes_t.clone()]),
+                named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bool_t, bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), bytes_t.clone()]),
@@ -2701,7 +2701,7 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            AppendFile cap path contents |-> Result FileError Unit; \
            Metadata cap path |-> Result FileError FileMetadata; \
            ReadDirectory cap path |-> Result FileError (List DirEntry); \
-           CreateDirectory cap recursive path |-> Result FileError Unit; \
+           CreateDirectory cap path |-> Result FileError Unit; \
            RemoveFile cap path |-> Result FileError Unit; \
            RemoveDirectory cap recursive path |-> Result FileError Unit; \
            Rename cap from to |-> Result FileError Unit; \
@@ -2797,8 +2797,8 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude read_directory failed: {}", e)))?;
     elab.elaborate_decl(
-        "proc create_directory (a : Auth) (cap : Cap a) (recursive : Bool) (path : Bytes) : FS a (Result FileError Unit) visits [FS] = \
-         Vis (FSOp a) (fs_resp a) (Result FileError Unit) (CreateDirectory a cap recursive path) \
+        "proc create_directory (a : Auth) (cap : Cap a) (path : Bytes) : FS a (Result FileError Unit) visits [FS] = \
+         Vis (FSOp a) (fs_resp a) (Result FileError Unit) (CreateDirectory a cap path) \
            (\\r. Ret (FSOp a) (fs_resp a) (Result FileError Unit) r)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude create_directory failed: {}", e)))?;

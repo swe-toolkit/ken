@@ -161,14 +161,7 @@ fn full_authority_drives_every_fs_arm_with_exact_state_and_trace() {
         &mut host,
         "create_directory",
         AUTH_FULL,
-        vec![
-            EvalVal::Ctor {
-                id: env.console.false_id,
-                args: Default::default(),
-                slot: 0,
-            },
-            bytes(b"root/sub"),
-        ],
+        vec![bytes(b"root/sub")],
     ));
     ok(&drive(
         &env,
@@ -253,7 +246,6 @@ fn full_authority_drives_every_fs_arm_with_exact_state_and_trace() {
         &[
             FsTrace::CreateDirectory {
                 path: b"root/sub".to_vec(),
-                recursive: false
             },
             FsTrace::WriteFile {
                 path: b"root/sub/a\xff".to_vec(),

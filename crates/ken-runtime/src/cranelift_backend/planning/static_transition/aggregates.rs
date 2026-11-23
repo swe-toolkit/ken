@@ -3750,8 +3750,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     };
     const SOME_RECURSIVE_SITE_PATH: SynthesizedAggregateNode = N::Fixed {
         role: R::OptionSome,
-        // CreateDirectory/RemoveDirectory carry recursive at operand 0 and path
-        // at operand 1.
+        // RemoveDirectory carries recursive at operand 0 and path at operand 1.
         children: &[N::SiteOperand(1)],
     };
     /// `FileError(FileOperation*, Option::Some(<site path>), IOError)`.
@@ -3787,7 +3786,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     ];
     const CREATE_DIRECTORY_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[
         N::nullary(R::FileOperationCreateDirectory),
-        SOME_RECURSIVE_SITE_PATH,
+        SOME_SITE_PATH,
         IO_ERRORS,
     ];
     const REMOVE_FILE_ERROR_CHILDREN: &[SynthesizedAggregateNode] = &[

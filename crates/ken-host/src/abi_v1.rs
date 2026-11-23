@@ -697,7 +697,6 @@ impl HostEffectBackendV1 for ProcessHost {
         &mut self,
         grant: &CapabilityGrantV1,
         path: &[u8],
-        _recursive: bool,
     ) -> Result<(), FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
         crate::create_directory(&parent, &leaf).map_err(host_error)
@@ -1816,7 +1815,9 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 },
             )
         }
-        HostOpV1::FsReadDirectory if request_size == std::mem::size_of::<FsPathRequestV1>() => {
+        HostOpV1::FsReadDirectory | HostOpV1::FsCreateDirectory
+            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
+        {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
                 return -1;
             }
@@ -1824,15 +1825,22 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
             let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
                 return -1;
             };
+            let path = path.to_vec();
+            let request = if op == HostOpV1::FsCreateDirectory {
+                CanonicalRequestV1::FsCreateDirectory { path }
+            } else {
+                CanonicalRequestV1::FsReadDirectory { path }
+            };
             (
                 Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
                 crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsReadDirectory {
-                    path: path.to_vec(),
-                },
+                request,
             )
         }
-        HostOpV1::FsCreateDirectory | HostOpV1::FsRemoveDirectory
+        // 0x0306 recognizes only the path record; a wrong size is a
+        // malformed request, including the retired recursive record.
+        HostOpV1::FsCreateDirectory => return -1,
+        HostOpV1::FsRemoveDirectory
             if request_size == std::mem::size_of::<FsRecursivePathRequestV1>() =>
         {
             if !request.cast::<FsRecursivePathRequestV1>().is_aligned() {
@@ -1847,21 +1855,13 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
                 1 => true,
                 _ => return -1,
             };
-            let request = if op == HostOpV1::FsCreateDirectory {
-                CanonicalRequestV1::FsCreateDirectory {
-                    recursive,
-                    path: path.to_vec(),
-                }
-            } else {
-                CanonicalRequestV1::FsRemoveDirectory {
-                    recursive,
-                    path: path.to_vec(),
-                }
-            };
             (
                 Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
                 crate::ResourceInputsV1::None,
-                request,
+                CanonicalRequestV1::FsRemoveDirectory {
+                    recursive,
+                    path: path.to_vec(),
+                },
             )
         }
         HostOpV1::FsRemoveFile if request_size == std::mem::size_of::<FsPathRequestV1>() => {
@@ -2960,8 +2960,11 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// Promise class: normative compatibility vector for the four ABI-A3 raw
-    /// ids and their already-manifested request records.
+    /// Promise class: normative compatibility vector (ADR 0018). MEASURED:
+    /// raw requests dispatch through the ABI to distinct typed trace events;
+    /// a valid old create record and a malformed remove flag refuse before
+    /// dispatch. CLAIMED: create no longer accepts the recursive wire record.
+    /// THE GAP: this measures the raw decoder, not native argument emission.
     #[cfg(target_os = "linux")]
     #[test]
     fn abi_a3_raw_dispatch_executes_all_four_directory_operations() {
@@ -3031,9 +3034,8 @@ mod tests {
         );
 
         let create_path = b"created";
-        let create = FsRecursivePathRequestV1 {
+        let create = FsPathRequestV1 {
             capability: initialized.capability,
-            recursive: 1,
             path: SliceV1 {
                 data: create_path.as_ptr(),
                 len: create_path.len(),
@@ -3044,9 +3046,9 @@ mod tests {
             unsafe {
                 ken_host_dispatch_v1(
                     initialized.context,
-                    u64::from(HostOpV1::FsCreateDirectory as u16),
+                    0x0306,
                     std::ptr::from_ref(&create).cast(),
-                    std::mem::size_of::<FsRecursivePathRequestV1>(),
+                    std::mem::size_of::<FsPathRequestV1>(),
                     std::ptr::from_mut(&mut create_reply).cast(),
                 )
             },
@@ -3093,7 +3095,7 @@ mod tests {
             unsafe {
                 ken_host_dispatch_v1(
                     initialized.context,
-                    u64::from(HostOpV1::FsRemoveDirectory as u16),
+                    0x0308,
                     std::ptr::from_ref(&remove_directory).cast(),
                     std::mem::size_of::<FsRecursivePathRequestV1>(),
                     std::ptr::from_mut(&mut remove_directory_reply).cast(),
@@ -3104,29 +3106,37 @@ mod tests {
         assert_eq!(remove_directory_reply.tag, REPLY_UNIT);
         assert!(!directory.join("empty-dir").exists());
 
-        let invalid_path = b"invalid-recursive";
-        let invalid_recursive = FsRecursivePathRequestV1 {
-            capability: initialized.capability,
-            recursive: 2,
-            path: SliceV1 {
-                data: invalid_path.as_ptr(),
-                len: invalid_path.len(),
-            },
-        };
-        let mut invalid_reply = reply();
-        assert_eq!(
-            unsafe {
-                ken_host_dispatch_v1(
-                    initialized.context,
-                    u64::from(HostOpV1::FsCreateDirectory as u16),
-                    std::ptr::from_ref(&invalid_recursive).cast(),
-                    std::mem::size_of::<FsRecursivePathRequestV1>(),
-                    std::ptr::from_mut(&mut invalid_reply).cast(),
-                )
-            },
-            -1
-        );
-        assert!(!directory.join("invalid-recursive").exists());
+        let old_create_path = b"legacy-create";
+        for (op, recursive) in [
+            // A well-formed old create request must fail on size, not an invalid Bool.
+            (0x0306, 1),
+            // Remove still refuses invalid Bool values at the recursive size.
+            (0x0308, 2),
+        ] {
+            let request = FsRecursivePathRequestV1 {
+                capability: initialized.capability,
+                recursive,
+                path: SliceV1 {
+                    data: old_create_path.as_ptr(),
+                    len: old_create_path.len(),
+                },
+            };
+            let mut invalid_reply = reply();
+            assert_eq!(
+                unsafe {
+                    ken_host_dispatch_v1(
+                        initialized.context,
+                        op,
+                        std::ptr::from_ref(&request).cast(),
+                        std::mem::size_of::<FsRecursivePathRequestV1>(),
+                        std::ptr::from_mut(&mut invalid_reply).cast(),
+                    )
+                },
+                -1,
+                "wire request for {op:#06x} with recursive={recursive} must refuse"
+            );
+        }
+        assert!(!directory.join("legacy-create").exists());
 
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
         assert_eq!(
@@ -3145,7 +3155,6 @@ mod tests {
         assert_eq!(
             context.effect_trace[1].request,
             CanonicalRequestV1::FsCreateDirectory {
-                recursive: true,
                 path: create_path.to_vec(),
             }
         );

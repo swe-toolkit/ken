@@ -43,6 +43,33 @@ fn capability_filesystem_authority_fragment_elaborates() {
     let _env = mk_env();
 }
 
+/// Promise class: normative compatibility vector (spec 38 §1.12, AC-0).
+/// MEASURED: the same imported call accepts with just a path but refuses
+/// the old four-argument application. CLAIMED: the public proc has no flag
+/// slot. THE GAP: checked-call arity does not observe lowering or wire layout.
+#[test]
+fn create_directory_surface_takes_path_not_recursion_flag() {
+    let signature = "import Capability.Filesystem.Authority (FS, create_directory)\n\
+        proc make_dir (a : Auth) (cap : Cap a) (path : Bytes)\n\
+          : FS a (Result FileError Unit) visits [FS] =\n";
+    let source = format!("{signature}create_directory a cap path\n");
+    mk_env()
+        .elaborate_file(&source)
+        .expect("path-only call elaborates");
+
+    let legacy_call = "create_directory a cap False path";
+    let legacy = format!("{signature}{legacy_call}\n");
+    let result = mk_env().elaborate_file(&legacy);
+    assert!(
+        matches!(
+            &result,
+            Err(ElabError::NotAFunction { span })
+                if legacy.get(span.start..span.end) == Some(legacy_call)
+        ),
+        "expected a non-function error at the legacy call, got {result:?}"
+    );
+}
+
 #[test]
 fn filesystem_program_requires_the_declared_capability_and_accepts_its_twin() {
     let source_without_capability = capability_program("program");

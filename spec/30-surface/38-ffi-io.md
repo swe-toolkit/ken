@@ -233,6 +233,11 @@ as `UnboundName`, and no `Cap` constructor or producer is present in the Ken
 environment. The wrappers are ordinary checked Ken definitions and add neither
 a kernel rule nor a trusted primitive.
 
+`create_directory` creates exactly one directory, the final component of
+`path`, beneath the capability's root. It does not create missing parents,
+which refuse with `NotFound`, and an existing entry at `path` refuses with
+`AlreadyExists`. A caller that needs a parent chain calls it once per prefix.
+
 Raw attenuation and revocation are trusted runner/host management actions over
 non-Ken-visible grant identities (`62 §4`), not source operations. Attenuation
 records child lineage; revocation closes the selected identity and its

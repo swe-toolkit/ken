@@ -53,7 +53,6 @@ pub enum ExpectedFsEffect {
     },
     CreateDirectory {
         path: Vec<u8>,
-        recursive: bool,
     },
     RemoveFile {
         path: Vec<u8>,
@@ -95,7 +94,7 @@ impl ExpectedFsEffect {
             | (Self::AppendFile { path, .. }, FsOpKind::Append)
             | (Self::Metadata { path }, FsOpKind::Metadata)
             | (Self::ReadDirectory { path }, FsOpKind::Enumerate)
-            | (Self::CreateDirectory { path, .. }, FsOpKind::CreateDirectory)
+            | (Self::CreateDirectory { path }, FsOpKind::CreateDirectory)
             | (Self::RemoveFile { path }, FsOpKind::RemoveFile)
             | (Self::RemoveDirectory { path, .. }, FsOpKind::RemoveDirectory)
             | (Self::ChangeMode { path, .. }, FsOpKind::ChangeMode) => {
@@ -445,26 +444,9 @@ impl HostHandler for ScriptedPosixHost {
         self.inner.fs_read_directory_at(handle)
     }
 
-    fn fs_create_directory_at(
-        &mut self,
-        parent: &Self::Handle,
-        leaf: &[u8],
-        recursive: bool,
-    ) -> io::Result<()> {
-        let expected = self.take_pending(HostOpV1::FsCreateDirectory);
-        if !matches!(
-            expected,
-            Some(ExpectedFsEffect::CreateDirectory {
-                recursive: expected,
-                ..
-            }) if expected == recursive
-        ) {
-            self.fail_assertion(format!(
-                "interpreter FS create-directory flag diverged: expected={expected:?}, \
-                 recursive={recursive}"
-            ));
-        }
-        self.inner.fs_create_directory_at(parent, leaf, recursive)
+    fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
+        self.take_pending(HostOpV1::FsCreateDirectory);
+        self.inner.fs_create_directory_at(parent, leaf)
     }
 
     fn fs_remove_file_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
