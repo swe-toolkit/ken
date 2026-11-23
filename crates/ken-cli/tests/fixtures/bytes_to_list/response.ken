@@ -1,0 +1,32 @@
+program capabilities FS AFull, RootExecution Allow
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+
+fn check_octets (octets : List UInt8) : Bool =
+  match octets {
+    Nil ↦ False;
+    Cons head rest ↦ match eq_int (uint8_to_int head) 97 {
+      False ↦ False;
+      True ↦ match rest {
+        Nil ↦ False;
+        Cons second tail ↦ match eq_int (uint8_to_int second) 255 {
+          False ↦ False;
+          True ↦ match tail { Nil ↦ True; Cons _ _ ↦ False }
+        }
+      }
+    }
+  }
+
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps { ProgramCaps.MkProgramCaps cap ↦
+    host_bind AFull (Result FileError Bytes) ExitCode
+      (host_fs AFull (Result FileError Bytes) (readFile AFull cap (bytes_encode "input.bin")))
+      (\read. match read {
+        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 77);
+        Ok bytes ↦ match check_octets (bytes_to_list bytes) {
+          True ↦ host_pure AFull ExitCode ExitCode.Success;
+          False ↦ host_pure AFull ExitCode (ExitCode.Failure 75)
+        }
+      })
+  }

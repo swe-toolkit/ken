@@ -2768,6 +2768,8 @@ fn ac_c7_try_compile_edge_with_operands<'src>(
         Some(module.declare_func_in_func(native.intern, &mut context.func));
     compiler.function_local.native_int_resolve =
         Some(module.declare_func_in_func(native.resolve, &mut context.func));
+    compiler.function_local.native_int_compare =
+        Some(module.declare_func_in_func(native.compare, &mut context.func));
 
     let mut function_context = FunctionBuilderContext::new();
     let refused = {
@@ -3332,6 +3334,102 @@ fn d1_compile_borrowed_word_producer() -> (cranelift_jit::JITModule, *const u8) 
                 .word)
         },
     )
+}
+
+fn run_hostile_list_head(symbols: &crate::NativeProcessSymbols, head_reader: RuntimeExpr) -> i64 {
+    use super::effects::BorrowedFixtureValue;
+
+    let source = d1_match_expr(vec![RuntimeMatchCase {
+        constructor: symbols.list_cons.clone(),
+        binders: 2,
+        body: head_reader,
+    }]);
+    let plan = plan_static_transition_graph_with_symbols(
+        &source,
+        &BTreeMap::new(),
+        symbols,
+        AbiRootIngress::Value,
+        true,
+    ).expect("the checked-shaped reader has a join plan");
+    let origin = plan.root_static_origin().unwrap();
+    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (_module, consumer) = ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1,
+        |compiler, builder, operands| {
+            compiler.process_symbols = symbols.clone();
+            let arena = compiler.carrier_arena()?;
+            let pointer_type = builder.func.dfg.value_type(arena);
+            compiler.function_local.native_int_arena = Some(builder.ins().load(
+                pointer_type,
+                MemFlags::trusted(),
+                arena,
+                crate::boundary_value::ARENA_NATIVE_INT,
+            ));
+            let pointer = compiler.emit_carrier_scalar(builder, CarriedBoundaryWord { word: operands[0] })?;
+            let env = env_with_operands([
+                LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }),
+            ], &[]);
+            let lowered = compiler.lower_expr(builder, SourceOccurrence { expr: &source, static_origin: origin }, &env)?;
+            match lowered {
+                LoweringOperand::Specialized(Lowered::Bool { value, .. }) => Ok(value),
+                // Close the unreachable continuation distinctly from the
+                // production reader's explicit -1 exit.
+                LoweringOperand::Specialized(Lowered::Trap(_)) => Ok(builder.ins().iconst(types::I64, 0)),
+                _ => panic!("unexpected hostile-list reader result"),
+            }
+        },
+    ).expect("the borrowed leaf must compile with an explicit abort");
+
+    let bytes = b"X";
+    let fields = [
+        BorrowedFixtureValue { kind: 1, tag: 0, data: bytes.as_ptr().cast(), len: bytes.len() },
+        BorrowedFixtureValue { kind: 2, tag: 2, data: std::ptr::null(), len: 0 },
+    ];
+    let cons = BorrowedFixtureValue { kind: 2, tag: 3, data: fields.as_ptr().cast(), len: fields.len() };
+    let (_producer_module, producer) = d1_compile_borrowed_word_producer();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let word = c2_run_edge_with_arg(producer, base, &cons as *const BorrowedFixtureValue as i64);
+    assert_eq!(BoundaryWord(word as u64).tag(), Some(BoundaryTag::InvocationBorrowed));
+    d1_run_carried_word(consumer, base, word)
+}
+
+/// Durable invariant. MEASURED: a borrowed Cons with a Bytes head produces
+/// -1, not a Bool. CLAIMED: the Int reader aborts instead of treating the
+/// unreachable placeholder as a value. GAP: drives has_nul's head predicate,
+/// not its recursion (the head must abort before recursion is possible).
+#[test]
+fn borrowed_list_bytes_head_cannot_be_read_as_uint8() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let primitive = |symbol: &str, args| RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: symbol.into(),
+            partiality: RuntimePartiality::Total,
+        },
+        args,
+    };
+    let reader = primitive("eq_int", vec![
+        primitive("uint8_to_int", vec![RuntimeExpr::Var(0)]),
+        RuntimeExpr::Value(RuntimeValue::Int(0.into())),
+    ]);
+    assert_eq!(run_hostile_list_head(&symbols, reader), -1);
+}
+
+/// Durable invariant. MEASURED: the same Cons fails the Option reader before
+/// returning a value. CLAIMED: an absent borrowed identity aborts at emission
+/// of the reader. GAP: the fixture probes Option, not every non-ingress type.
+#[test]
+fn borrowed_list_bytes_head_cannot_be_read_as_option() {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    let case = |constructor, binders, value| RuntimeMatchCase {
+        constructor,
+        binders,
+        body: RuntimeExpr::Value(RuntimeValue::Bool(value)),
+    };
+    let none = || case(symbols.option_none.clone(), 0, true);
+    let some = || case(symbols.option_some.clone(), 1, false);
+    for cases in [vec![none()], vec![none(), some()]] {
+        assert_eq!(run_hostile_list_head(&symbols, d1_match_expr(cases)), -1);
+    }
 }
 
 /// Durable invariant: a real tag-7 BorrowedOpaque node whose scalar happens to

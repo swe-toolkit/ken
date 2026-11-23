@@ -1,0 +1,46 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Process.Exit (host_pure)
+
+-- UTF-8 for "aß" is 0x61, 0xc3, 0x9f, in that order and with no suffix.
+fn is_a_sharp_s (octets : List UInt8) : Bool =
+  match octets {
+    Nil ↦ False;
+    Cons first rest ↦ match eq_int (uint8_to_int first) (97 : Int) {
+      False ↦ False;
+      True ↦ match rest {
+        Nil ↦ False;
+        Cons second rest ↦ match eq_int (uint8_to_int second) (195 : Int) {
+          False ↦ False;
+          True ↦ match rest {
+            Nil ↦ False;
+            Cons third rest ↦ match eq_int (uint8_to_int third) (159 : Int) {
+              False ↦ False;
+              True ↦ match rest {
+                Nil ↦ True;
+                Cons _ _ ↦ False
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+fn main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Cons _argv0 rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+            Cons _ _ ↦ match is_a_sharp_s (bytes_to_list (bytes_encode "aß")) {
+              False ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+              True ↦ host_pure AFull ExitCode ExitCode.Success
+            }
+          }
+      }
+  }

@@ -3404,6 +3404,7 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     /// closure whose body is selected statically.
     BoundaryClosureEnvironment,
     RecursivePositionResidual,
+    PrimitiveResult,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -3626,7 +3627,7 @@ impl SynthesizedAggregateNode {
     }
 
     /// A native `Int` scalar.
-    pub(in crate::cranelift_backend::planning::static_transition) const fn native_int() -> Self {
+    pub(in crate::cranelift_backend) const fn native_int() -> Self {
         Self::Scalar {
             tag: BoundaryTag::ImmediateInt,
             spill: Some(BoundaryClass::Int),
@@ -4020,6 +4021,29 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     };
     SynthesizedHostResultTree { error, ok }
 }
+/// Closed recipe for a synthesized result of a registry primitive.
+fn primitive_result_recipe(expr: &RuntimeExpr) -> Option<SynthesizedAggregateNode> {
+    use SynthesizedAggregateNode as N;
+    use SynthesizedFixedConstructorRole as R;
+    const BYTES_LIST: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::ListNil),
+            N::Fixed {
+                role: R::ListCons,
+                children: &[
+                    N::native_int(),
+                    N::RepeatedAggregateLink { class: BoundaryClass::Constructor },
+                ],
+            },
+        ]));
+    match expr {
+        RuntimeExpr::PrimitiveCall { primitive, .. } if primitive.symbol == "bytes_to_list" => {
+            Some(BYTES_LIST)
+        }
+        _ => None,
+    }
+}
+
 /// The two synthesized aggregate trees of one host operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend::planning::static_transition) struct SynthesizedHostResultTree {
@@ -4038,7 +4062,8 @@ impl SynthesizedHostResultTree {
             SynthesizedAggregateRoot::UnitBoundaryEnvironment
             | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
             | SynthesizedAggregateRoot::BoundaryClosureEnvironment
-            | SynthesizedAggregateRoot::RecursivePositionResidual => {
+            | SynthesizedAggregateRoot::RecursivePositionResidual
+            | SynthesizedAggregateRoot::PrimitiveResult => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -5927,20 +5952,27 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
     }
 
     // The synthesized half: ONE record per exact allocation-reachable use in
-    // the operation's tree, keyed by WHERE that use sits.
-    //
-    // The population is (every `Effect` source occurrence) x (its emission
-    // owners) x (the allocation-reachable uses its operation's tree flattens
-    // to). Two seats using one role get two records, and two uses of one role
-    // at one seat -- `ResourceKind` under `ResourceKindMismatch` fields 0 and
-    // 1, say -- get two records because their paths differ.
+    // a host or primitive result recipe, keyed by WHERE that use sits.
+    // Each seat contributes its allocation-reachable uses per emission owner.
     for occurrence in plan.source_occurrences.iter().flatten() {
-        let RuntimeExpr::Effect { operation, .. } = occurrence.expr else {
+        let uses = if let RuntimeExpr::Effect { operation, .. } = occurrence.expr {
+            flatten_allocation_reachable_uses(plan, *operation)
+        } else if let Some(node) = primitive_result_recipe(occurrence.expr) {
+            let mut uses = Vec::new();
+            collect_reachable_uses(
+                node,
+                &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::PrimitiveResult),
+                plan.semantic.synthesized_io_error_roles().len(),
+                plan,
+                &mut uses,
+            );
+            uses
+        } else {
             continue;
         };
         let seat = occurrence.static_origin;
         for owner in inline_synthesized_seat_emission_owners(plan, seat)? {
-            for semantic_use in flatten_allocation_reachable_uses(plan, *operation) {
+            for semantic_use in &uses {
                 let mut children = Vec::with_capacity(semantic_use.children.len());
                 for (position, child) in semantic_use.children.iter().enumerate() {
                     // ⛔ No pruning. A child the emission site supplies is
@@ -11121,7 +11153,8 @@ impl<'src> StaticTransitionPlan<'src> {
     {
         let operation = self.host_effect_operation(seat)?;
         let roles = self.semantic.synthesized_io_error_roles();
-        match self.synthesized_tree_walk(operation, path)? {
+        let root = host_effect_recipe_tree(operation).node(path.root);
+        match Self::synthesized_tree_walk(root, path)? {
             SynthesizedTreeResolution::Node(SynthesizedAggregateNode::Fixed {
                 role,
                 children,
@@ -11159,11 +11192,9 @@ impl<'src> StaticTransitionPlan<'src> {
     /// at the path, the other wants the alternative POPULATION at it. Sharing
     /// the walk is what keeps the step-kind law stated once.
     fn synthesized_tree_walk(
-        &self,
-        operation: ken_host::HostOpV1,
+        mut node: SynthesizedAggregateNode,
         path: &SynthesizedAggregatePath,
     ) -> Result<SynthesizedTreeResolution, CraneliftBackendError> {
-        let mut node = host_effect_recipe_tree(operation).node(path.root);
         for (depth, step) in path.steps.iter().enumerate() {
             // The `IOError` set's alternatives are minted by the planner, so
             // they are resolved from the inventory rather than from a static
@@ -12017,7 +12048,7 @@ impl<'src> StaticTransitionPlan<'src> {
     /// ⭐ `Ok(None)` means the path **lawfully resolved** to a node that is not
     /// a dynamic set — a constructor, a scalar, a site operand, or an absent
     /// arm. `Err` means the question could not be answered at all: the seat is
-    /// missing or is not an `Effect`, the walk left the tree, an `IOError`
+    /// not a recognized effect or primitive seat, the walk left the tree, an `IOError`
     /// position is outside the closed inventory, or the population is
     /// malformed.
     ///
@@ -12033,8 +12064,19 @@ impl<'src> StaticTransitionPlan<'src> {
         seat: StaticOriginId,
         path: &SynthesizedAggregatePath,
     ) -> Result<Option<Vec<SynthesizedConstructorRole>>, CraneliftBackendError> {
-        let operation = self.host_effect_operation(seat)?;
-        match self.synthesized_tree_walk(operation, path)? {
+        let occurrence = self.source_occurrences.get(seat.0 as usize)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| planner_error("synthesized aggregate seat is not an occurrence"))?;
+        let root = match occurrence.expr {
+            RuntimeExpr::Effect { operation, .. } => host_effect_recipe_tree(*operation).node(path.root),
+            expr if path.root == SynthesizedAggregateRoot::PrimitiveResult => {
+                primitive_result_recipe(expr).ok_or_else(|| {
+                    planner_error("synthesized aggregate seat has no primitive result recipe")
+                })?
+            }
+            _ => return Err(planner_error("synthesized aggregate seat is not a host effect")),
+        };
+        match Self::synthesized_tree_walk(root, path)? {
             SynthesizedTreeResolution::Node(node) => match node {
                 SynthesizedAggregateNode::Dynamic(SynthesizedDynamicSet::Alternatives(
                     alternatives,
