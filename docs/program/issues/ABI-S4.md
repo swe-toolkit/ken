@@ -1,7 +1,7 @@
 ---
 id: ABI-S4
 title: "A Ken program's file metadata is MkFileMetadata Int FileKind, so it cannot read a modification time, a link count or a mode, and nothing tells it which fields the kernel actually supplied. Rule from an AC-0 the statx-shaped field set and how an unsupplied field is represented, then carry it through both lanes so a missing field is never a plausible zero"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
