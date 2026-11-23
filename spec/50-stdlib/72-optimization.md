@@ -590,7 +590,8 @@ trust measurement; the generic laws require checked catalog bodies.
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6;
-> SPEC-OPTIMIZATION-BOUNDED-SEARCH-AGREE §2.7).** The
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-AGREE §2.7;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-OFFSET-SPLIT §2.8).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
 > catalog export and package-owned test are on main. The roots-loaded
@@ -615,6 +616,11 @@ trust measurement; the generic laws require checked catalog bodies.
 > false claim refused at its own theorem. This does not test the §2.7
 > Spec child, an assembled candidate or official conformance, CI,
 > publication, landing or measured landed trust.
+> Section 2.8 specifies the eighth and ninth public laws. Architect's
+> isolated AC-0 on `9286f8fec` checked both laws and their open clients
+> without added `Axiom` or postulate, preserving the exact scratch
+> trusted `GlobalId` set (114 → 114). This is not assembled AC-T,
+> official conformance, CI, publication, landing or measured landed trust.
 
 ### 2.1 Carrier and result
 
@@ -925,6 +931,54 @@ control differ only in the bound. Architect's isolated D0 reported
 sets with zero added `Axiom` or `postulate`; this is scratch design
 evidence, not a Spec-child test, official conformance execution,
 CI, publication, landing or measured landed trust.
+
+### 2.8 Split a search after a refuted prefix
+
+`Algorithm.Optimization.BoundedSearch` must export two public Transparent
+checked theorems directly after `find_below_ext` and before the private
+`find_next`, in the order below. `add` comes from
+`Data.Numeric.Nat.Arithmetic`.
+
+```ken
+pub theorem find_below_offset
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (width : Nat) (n : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m width) True → Equal Bool (q m) (p (add offset m)))
+      → Equal (Option Nat) (find_below p offset) (None Nat)
+      → Equal (Option Nat) (find_below q width) (Some Nat n)
+      → Equal (Option Nat) (find_below p (add offset width)) (Some Nat (add offset n))
+
+pub theorem find_below_offset_none
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (width : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m width) True → Equal Bool (q m) (p (add offset m)))
+      → Equal (Option Nat) (find_below p offset) (None Nat)
+      → Equal (Option Nat) (find_below q width) (None Nat)
+      → Equal (Option Nat) (find_below p (add offset width)) (None Nat)
+```
+
+The first premise relates `q m` to `p (add offset m)` only for indices
+strictly below `width`. Neither law requires agreement at or above
+`width`. The second premise rules out all hits below `offset`. Then the
+last premise determines the full search result: a hit at `n` in the
+shifted search gives a hit at `add offset n`; no hit in the shifted
+search gives `None`. At `width = Zero`, the agreement premise is
+vacuous and the full search is just the refuted prefix.
+
+The None companion is not a None-stability law (§2.4). It requires
+both parts to have no hit, not merely the first. If the first part
+already has a hit, §2.4's `find_below_stable` keeps that earlier hit;
+a later shifted hit cannot replace it. In the D0 controls with hits
+at 5 and 7, splitting at 3 with width 4 gives the shifted hit 2 and
+full hit 5. With the same offset and width 2, the full result is
+`None` because the bound 5 excludes its endpoint. Splitting instead
+at 6 with width 2 has shifted hit 1, but the first part already hits
+at 5. The claimed `None` premise for that first part refuses; the
+full search returns 5, not 7.
+
+The proofs share induction on `width`, retaining `None` or translating
+`Some` by adding the offset. That outcome translation stays private
+and appears in neither public type. The module exports `find_below`
+plus nine public laws, ten public names in all. No §1–§2.7 operation
+or law type changes.
 
 ## 3. Greatest-cost candidate
 
