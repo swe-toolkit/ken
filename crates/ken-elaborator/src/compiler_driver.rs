@@ -4275,32 +4275,11 @@ fn validate_bracket_release_host_operation(
     }
 }
 
-fn checked_host_spine_v1(
+fn checked_host_operation_pairs(
     prelude: &crate::prelude::PreludeEnv,
-    symbols: &BTreeMap<GlobalId, StableSymbol>,
-) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
-    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
-    // by the immutable canonical `GlobalId` captured at prelude registration and
-    // then mapped through this exact stable-symbol table.
-    //
-    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
-    // Package source has been elaborated by the time either producer runs, so a
-    // role spelling can denote a package declaration rather than the prelude's.
-    // Narrowing the parameter makes `env.globals` unnameable here: source-name
-    // authority cannot be reintroduced by an ordinary edit, only by widening
-    // this signature, which a reviewer sees and the compiler forces through
-    // every call site. An earlier revision took the whole `ElabEnv` and leaned
-    // on a test enumerating today's roles — that proved the roles *reviewed*
-    // were sound, not that no other role could be added.
+) -> impl Iterator<Item = (GlobalId, ken_host::HostOpV1)> {
     let roles = &prelude.runtime_roles;
-    let resolve_id = |id: GlobalId| {
-        symbols
-            .get(&id)
-            .cloned()
-            .ok_or(CompilerDriverError::MissingStableSymbol { id })
-    };
-    let mut operations = BTreeMap::new();
-    for (id, operation) in [
+    [
         (roles.op_console_read, ken_host::HostOpV1::ConsoleRead),
         (roles.op_console_write, ken_host::HostOpV1::ConsoleWrite),
         (roles.op_console_flush, ken_host::HostOpV1::ConsoleFlush),
@@ -4336,10 +4315,6 @@ fn checked_host_spine_v1(
         ),
         (roles.op_fs_rename, ken_host::HostOpV1::FsRename),
         (roles.op_fs_change_mode, ken_host::HostOpV1::FsChangeMode),
-    ] {
-        operations.insert(resolve_id(id)?, operation);
-    }
-    for (id, operation) in [
         (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (prelude.private_fs_open_directory_id, ken_host::HostOpV1::FsOpenDirectory),
         (prelude.private_fs_read_directory_batch_id, ken_host::HostOpV1::FsReadDirectoryBatch),
@@ -4400,7 +4375,36 @@ fn checked_host_spine_v1(
         (prelude.px11_op_ids[4], ken_host::HostOpV1::NetSend),
         (prelude.px11_op_ids[5], ken_host::HostOpV1::NetShutdown),
         (prelude.px11_op_ids[6], ken_host::HostOpV1::NetLocalAddress),
-    ] {
+    ]
+    .into_iter()
+}
+
+fn checked_host_spine_v1(
+    prelude: &crate::prelude::PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
+    // by the immutable canonical `GlobalId` captured at prelude registration and
+    // then mapped through this exact stable-symbol table.
+    //
+    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
+    // Package source has been elaborated by the time either producer runs, so a
+    // role spelling can denote a package declaration rather than the prelude's.
+    // Narrowing the parameter makes `env.globals` unnameable here: source-name
+    // authority cannot be reintroduced by an ordinary edit, only by widening
+    // this signature, which a reviewer sees and the compiler forces through
+    // every call site. An earlier revision took the whole `ElabEnv` and leaned
+    // on a test enumerating today's roles — that proved the roles *reviewed*
+    // were sound, not that no other role could be added.
+    let roles = &prelude.runtime_roles;
+    let resolve_id = |id: GlobalId| {
+        symbols
+            .get(&id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id })
+    };
+    let mut operations = BTreeMap::new();
+    for (id, operation) in checked_host_operation_pairs(prelude) {
         operations.insert(resolve_id(id)?, operation);
     }
     validate_bracket_release_host_operation(
@@ -4982,6 +4986,202 @@ fn declaration_symbol(package_name: &str, name: &str) -> StableSymbol {
 #[cfg(test)]
 mod native_pre_source_stable_symbols {
     use super::*;
+
+    /// Promise class: durable invariant. MEASURED: each checked host
+    /// constructor's first field type agrees with host admission, and every
+    /// capability-bearing op has a constructor. CLAIMED: the explicit operand
+    /// split matches the checked surface. THE GAP: execution is not observed.
+    #[test]
+    fn host_capability_operands_agree_with_checked_constructor_types() {
+        use ken_host::HostOpV1;
+
+        let env = ElabEnv::new().expect("checked prelude");
+        let cap_id = env.prelude_env.runtime_roles.capability;
+        let (symbols, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        let mut checked_ops = BTreeSet::new();
+        for (id, operation) in checked_host_operation_pairs(&env.prelude_env) {
+            let (family, index) = env.env.constructor(id).expect("checked host constructor");
+            let first = family.constructors[index].args.first();
+            let head = first.map(|ty| term_application_spine(ty).map_or(ty, |(head, _)| head));
+            let has_cap = matches!(head, Some(Term::Const { id, .. }) if *id == cap_id);
+            assert_eq!(
+                has_cap,
+                operation.takes_capability_operand(),
+                "{} ({operation:?}, checked name {:?})",
+                symbols[&id],
+                env.prelude_env.pre_source_display_names.get(&id),
+            );
+            checked_ops.insert(operation as u16);
+        }
+        // FsSeek, FsSetLength, FsSync, FsGetInheritance, FsSetInheritance and
+        // FsDuplicate have no checked constructor and cannot reach erasure.
+        for op in HostOpV1::ALL
+            .into_iter()
+            .filter(|op| op.takes_capability_operand())
+        {
+            assert!(
+                checked_ops.contains(&(op as u16)),
+                "no checked constructor for {op:?}"
+            );
+        }
+        eprintln!(
+            "host operations: {}; operations with checked constructors: {}",
+            HostOpV1::ALL.len(),
+            checked_ops.len()
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: every emitted Net effect
+    /// in the public-wrapper fixture retains the checked semantic arity and
+    /// has a capability exactly for listen/connect. CLAIMED: erasure splits
+    /// the right operands. THE GAP: this does not exercise object emission.
+    #[test]
+    fn public_net_operations_keep_their_erased_operand_shapes() {
+        use ken_host::HostOpV1 as Op;
+        use ken_runtime::{RuntimeDeclarationKind, RuntimeExpr};
+
+        fn visit<'a>(expr: &'a RuntimeExpr, f: &mut impl FnMut(&'a RuntimeExpr)) {
+            use RuntimeExpr::*;
+            f(expr);
+            match expr {
+                CheckedBracketFinalizer { body, .. }
+                | CheckedJoinSite { body, .. }
+                | CheckedSubcontinuationFrame { body, .. }
+                | CheckedRecursiveInvocation { body, .. }
+                | CheckedComputationalIHSlots { body, .. }
+                | CheckedComputationalIHInvocation { body, .. }
+                | Project { record: body, .. }
+                | Closure { body, .. } => visit(body, f),
+                Let { value, body } => {
+                    visit(value, f);
+                    visit(body, f);
+                }
+                If {
+                    scrutinee,
+                    then_expr,
+                    else_expr,
+                } => {
+                    visit(scrutinee, f);
+                    visit(then_expr, f);
+                    visit(else_expr, f);
+                }
+                Match {
+                    scrutinee, cases, ..
+                } => {
+                    visit(scrutinee, f);
+                    for case in cases {
+                        visit(&case.body, f);
+                    }
+                }
+                ComputationalMatch {
+                    scrutinee, cases, ..
+                } => {
+                    visit(scrutinee, f);
+                    for case in cases {
+                        visit(&case.body, f);
+                    }
+                }
+                Record { fields } => {
+                    for (_, field) in fields {
+                        visit(field, f);
+                    }
+                }
+                PrimitiveCall { args, .. } | Construct { args, .. } => {
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                Call { callee, args } => {
+                    visit(callee, f);
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                LexicalClosure { body, captures, .. } => {
+                    for capture in captures {
+                        visit(capture, f);
+                    }
+                    visit(body, f);
+                }
+                Effect {
+                    capability, args, ..
+                } => {
+                    if let Some(capability) = capability {
+                        visit(&capability.value, f);
+                    }
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                Value(_)
+                | Var(_)
+                | DeclarationRef { .. }
+                | ImportedDeclarationRef { .. }
+                | Trap(_) => {}
+            }
+        }
+
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        let source = include_str!("../tests/fixtures/px11_erased_operand_shape.ken");
+        let prepared = prepare_native_program_sources(
+            "native-program",
+            vec![CompilerSource::new("src/main.ken", source).with_roots(vec![root])],
+        )
+        .expect("erased public Net program");
+        let env = ElabEnv::new().expect("checked prelude for the arity oracle");
+        let expected = checked_host_operation_pairs(&env.prelude_env)
+            .filter_map(|(id, op)| {
+                let has_cap = match op {
+                    Op::NetListen | Op::NetConnect => true,
+                    Op::NetAccept
+                    | Op::NetReceive
+                    | Op::NetSend
+                    | Op::NetShutdown
+                    | Op::NetLocalAddress => false,
+                    _ => return None,
+                };
+                let (family, index) = env.env.constructor(id).expect("checked Net constructor");
+                Some((op as u16, (has_cap, family.constructors[index].args.len())))
+            })
+            .collect::<BTreeMap<_, _>>();
+        // The required set is independent of the production registration table.
+        let required = [
+            Op::NetListen,
+            Op::NetConnect,
+            Op::NetAccept,
+            Op::NetReceive,
+            Op::NetSend,
+            Op::NetShutdown,
+            Op::NetLocalAddress,
+        ]
+        .map(|op| op as u16);
+        let mut seen = BTreeSet::new();
+        for decl in &prepared.runtime_program().declarations {
+            if let RuntimeDeclarationKind::Transparent { body } = &decl.kind {
+                visit(body, &mut |expr| {
+                    if let RuntimeExpr::Effect {
+                        operation,
+                        capability,
+                        args,
+                        ..
+                    } = expr
+                    {
+                        if required.contains(&(*operation as u16)) {
+                            let (has_cap, field_count) = expected[&(*operation as u16)];
+                            assert_eq!(capability.is_some(), has_cap, "{operation:?}");
+                            assert_eq!(
+                                args.len(),
+                                field_count - usize::from(has_cap),
+                                "{operation:?}"
+                            );
+                            seen.insert(*operation as u16);
+                        }
+                    }
+                });
+            }
+        }
+        assert_eq!(seen, BTreeSet::from(required));
+    }
 
     /// Promise class: durable invariant. MEASURED: stable symbol suffixes of
     /// the five registered prelude IDs. CLAIMED: the Net seat planner can

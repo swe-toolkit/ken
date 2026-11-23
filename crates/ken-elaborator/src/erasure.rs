@@ -4695,7 +4695,7 @@ fn lower_checked_host_computation(
             }
             let runtime_args = &decoded.args[decoded.constructor.family_parameter_count..];
             let (capability, semantic_args) =
-                if static_host_operation_requires_capability(decoded.operation) {
+                if decoded.operation.takes_capability_operand() {
                     let (cap, rest) = runtime_args.split_first().ok_or_else(|| {
                         expression_lowering_error(
                             root,
@@ -4990,58 +4990,6 @@ fn decode_checked_host_operation<'a>(
     })
 }
 
-const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1) -> bool {
-    !operation.is_ambient()
-        && !matches!(
-            operation,
-            ken_host::HostOpV1::FsHandleMetadata
-                | ken_host::HostOpV1::FsReadDirectoryBatch
-                | ken_host::HostOpV1::BufferAllocate
-                | ken_host::HostOpV1::FsReadAt
-                | ken_host::HostOpV1::FsWriteAt
-                | ken_host::HostOpV1::BufferFreeze
-                | ken_host::HostOpV1::MappingAllocate
-                | ken_host::HostOpV1::MappingReadView
-                | ken_host::HostOpV1::MappingWriteView
-                | ken_host::HostOpV1::MappingAcquireFile
-                | ken_host::HostOpV1::ResourceStreamRead
-                | ken_host::HostOpV1::ResourceStreamWrite
-                | ken_host::HostOpV1::ProcessPlanPush
-                | ken_host::HostOpV1::ProcessSpawn
-                | ken_host::HostOpV1::ProcessTakePipe
-                | ken_host::HostOpV1::ProcessWait
-                | ken_host::HostOpV1::ProcessSignal
-                | ken_host::HostOpV1::ResourceRelease
-        )
-}
-
-const fn runtime_selected_host_operation_requires_capability(
-    operation: ken_host::HostOpV1,
-) -> bool {
-    !operation.is_ambient()
-        && !matches!(
-            operation,
-            ken_host::HostOpV1::FsHandleMetadata
-                | ken_host::HostOpV1::FsReadDirectoryBatch
-                | ken_host::HostOpV1::BufferAllocate
-                | ken_host::HostOpV1::FsReadAt
-                | ken_host::HostOpV1::FsWriteAt
-                | ken_host::HostOpV1::BufferFreeze
-                | ken_host::HostOpV1::MappingAllocate
-                | ken_host::HostOpV1::MappingReadView
-                | ken_host::HostOpV1::MappingWriteView
-                | ken_host::HostOpV1::MappingAcquireFile
-                | ken_host::HostOpV1::ResourceStreamRead
-                | ken_host::HostOpV1::ResourceStreamWrite
-                | ken_host::HostOpV1::ProcessPlanPush
-                | ken_host::HostOpV1::ProcessSpawn
-                | ken_host::HostOpV1::ProcessTakePipe
-                | ken_host::HostOpV1::ProcessWait
-                | ken_host::HostOpV1::ProcessSignal
-                | ken_host::HostOpV1::ResourceRelease
-        )
-}
-
 fn lower_runtime_selected_host_operation(
     operation: RuntimeExpr,
     continuation_body: RuntimeExpr,
@@ -5101,7 +5049,7 @@ fn lower_runtime_selected_host_operation(
                 .map(|index| RuntimeExpr::Var(index as u32))
                 .collect::<Vec<_>>();
             let (capability, args) =
-                if runtime_selected_host_operation_requires_capability(host_operation) {
+                if host_operation.takes_capability_operand() {
                     let mut args = runtime_args.into_iter();
                     let cap = args.next().ok_or_else(|| {
                         expression_lowering_error(
@@ -9998,48 +9946,6 @@ mod px7l_tests {
         );
     }
 
-    #[test]
-    fn static_and_runtime_selected_capability_policies_are_exhaustively_identical() {
-        for operation in ken_host::HostOpV1::ALL {
-            let expected = !operation.is_ambient()
-                && !matches!(
-                    operation,
-                    ken_host::HostOpV1::FsHandleMetadata
-                        | ken_host::HostOpV1::FsReadDirectoryBatch
-                        | ken_host::HostOpV1::BufferAllocate
-                        | ken_host::HostOpV1::FsReadAt
-                        | ken_host::HostOpV1::FsWriteAt
-                        | ken_host::HostOpV1::BufferFreeze
-                        | ken_host::HostOpV1::MappingAllocate
-                        | ken_host::HostOpV1::MappingReadView
-                        | ken_host::HostOpV1::MappingWriteView
-                        | ken_host::HostOpV1::MappingAcquireFile
-                        | ken_host::HostOpV1::ResourceStreamRead
-                        | ken_host::HostOpV1::ResourceStreamWrite
-                        | ken_host::HostOpV1::ProcessPlanPush
-                        | ken_host::HostOpV1::ProcessSpawn
-                        | ken_host::HostOpV1::ProcessTakePipe
-                        | ken_host::HostOpV1::ProcessWait
-                        | ken_host::HostOpV1::ProcessSignal
-                        | ken_host::HostOpV1::ResourceRelease
-                );
-            assert_eq!(
-                static_host_operation_requires_capability(operation),
-                expected,
-                "static capability policy drifted for {operation:?}"
-            );
-            assert_eq!(
-                runtime_selected_host_operation_requires_capability(operation),
-                expected,
-                "runtime-selected capability policy drifted for {operation:?}"
-            );
-            assert_eq!(
-                static_host_operation_requires_capability(operation),
-                runtime_selected_host_operation_requires_capability(operation),
-                "static and runtime-selected paths disagree for {operation:?}"
-            );
-        }
-    }
 }
 
 #[cfg(test)]

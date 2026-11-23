@@ -520,11 +520,9 @@ fn host_effect_seat_contract(
     use EffectSeatAvail as Avail;
     use EffectSeatNeed as Need;
     use EffectSeatOperation as Semantic;
-    // ⭐ The CAPABILITY half, kept ahead of the argument table because its
-    // population is the exact complement: the eleven FS-path operations require
-    // one, and every other admitted operation refuses one outright. A `None`
-    // here is therefore not an arity gap but a capability the operation does
-    // not admit, and the caller refuses it with the seat's own coordinates.
+    // The capability-bearing set agrees with HostOpV1::takes_capability_operand,
+    // as checked by the consumer inventory test. A `None` here means that the
+    // operation does not admit a capability seat.
     let ordinal = match slot {
         EffectSeatSlot::Capability => {
             return match operation {
@@ -921,6 +919,22 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_host_effe
     }
     records.sort();
     Ok(records)
+}
+
+/// Promise class: durable invariant. MEASURED: every native consumer's
+/// Capability seat agrees with host admission. CLAIMED: the seat inventory
+/// tracks the host's explicit operand shape. THE GAP: no seat is emitted here.
+#[test]
+fn native_capability_seats_agree_with_host_operands() {
+    let consumers = CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
+    for &op in &consumers {
+        assert_eq!(
+            host_effect_seat_contract(op, EffectSeatSlot::Capability).is_some(),
+            op.takes_capability_operand(),
+            "{op:?}",
+        );
+    }
+    eprintln!("Cranelift host-effect consumers: {}", consumers.len());
 }
 
 #[cfg(test)]

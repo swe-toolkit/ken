@@ -3040,6 +3040,13 @@ enum ResourceAdmissionRequirementV1 {
 }
 
 impl HostOpV1 {
+    /// Whether the checked constructor carries an explicit `Cap a` at field 0.
+    /// In V1 this holds exactly when the host demands a capability. The
+    /// elaborator's cross-plane test checks this against the constructor types.
+    pub const fn takes_capability_operand(self) -> bool {
+        !matches!(self.capability_requirement(), CapabilityRequirementV1::None)
+    }
+
     /// Exhaustive classification at the ABI-R3 inventory boundary. A new host
     /// operation cannot silently skip capability admission: it must acquire a
     /// classification here before this crate compiles.
