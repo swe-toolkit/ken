@@ -5034,9 +5034,24 @@ mod native_pre_source_stable_symbols {
     /// Promise class: durable invariant. MEASURED: every emitted Net effect
     /// in the public-wrapper fixture retains the checked semantic arity and
     /// has a capability exactly for listen/connect. CLAIMED: erasure splits
-    /// the right operands. THE GAP: this does not exercise object emission.
+    /// the right operands. THE GAP: this does not exercise object emission;
+    /// the default test-thread stack overflowed during native preparation,
+    /// before any operand assertion (no finer frame was sampled).
     #[test]
     fn public_net_operations_keep_their_erased_operand_shapes() {
+        // Baseline provisioning: the default test stack overflowed; use the
+        // same 256 MiB as the CLI elaboration worker, not an ambient override.
+        const BUILD_STACK_BYTES: usize = 256 * 1024 * 1024;
+        std::thread::Builder::new()
+            .name("px11-erased-operand-shapes".to_owned())
+            .stack_size(BUILD_STACK_BYTES)
+            .spawn(assert_public_net_operation_shapes)
+            .expect("spawn stated-stack Net erasure fixture")
+            .join()
+            .expect("Net erasure fixture thread");
+    }
+
+    fn assert_public_net_operation_shapes() {
         use ken_host::HostOpV1 as Op;
         use ken_runtime::{RuntimeDeclarationKind, RuntimeExpr};
 
