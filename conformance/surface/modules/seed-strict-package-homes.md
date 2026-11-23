@@ -516,7 +516,8 @@ the eight `Data.Numeric.FixedWidth` names.
 
 - promise class: **normative compatibility vector** — the five
   ReadResult/metadata/State carrier families and `resp_state` retain their exact
-  identities and complete public paths
+  identities and complete public paths, including ABI-S4's `FileMetadata`
+  shape and Option-typed fields
 - spec: `30-taxonomy §4`; `33 §3.3`; `36 §4.2`; `38 §1.12`
 - given: in a fresh environment, snapshot the pre-source `GlobalId` of
   `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`, `StateOp`,
@@ -539,7 +540,18 @@ the eight `Data.Numeric.FixedWidth` names.
     }
 
   const metadata_control : FileMetadata =
-    FileMetadata.MkFileMetadata 0 FileKind.KFile
+    FileMetadata.MkFileMetadata
+      7
+      FileKind.KFile
+      (Some Int 493)
+      (None Int)
+      8
+      1
+      (Some Int 42)
+      (Some Instant (Instant.MkInstant 101))
+      (None Instant)
+      (Some Instant (Instant.MkInstant 303))
+      (Some Instant (Instant.MkInstant 404))
 
   const entry_control : DirEntry =
     DirEntry.MkDirEntry b"file" FileKind.KDirectory
@@ -557,12 +569,26 @@ the eight `Data.Numeric.FixedWidth` names.
     response
   ```
 
+  The control uses the existing pre-source `Option` and `Instant` identities
+  and their constructors without imports; ABI-S4 adds no new identity for
+  either family.
+
   The complete public constructor sets are `ReadResult.Chunk` and
   `ReadResult.Eof`; `FileKind.KFile`, `KDirectory`, `KSymlink`, and `KOther`;
   `FileMetadata.MkFileMetadata`; `DirEntry.MkDirEntry`; and `StateOp.Get` and
-  `StateOp.Put`. For each listed `T.C`, make a separate positive client using
-  the qualified constructor and a paired client that changes only `T.C` to
-  bare `C`, with no local binding or import for `C`.
+  `StateOp.Put`. For `FileMetadata.MkFileMetadata`, the ordered argument
+  types are `Int`, `FileKind`, `Option Int`, `Option Int`, `Int`, `Int`,
+  `Option Int`, then four `Option Instant` fields: modified, changed,
+  accessed, and born. Size and kind are required; mode, link count, inode,
+  and times are optional. `None` means the optional statx field was not
+  reported; `Some` carries its value. Device major and minor are plain `Int`
+  with no availability bits. Times use existing `Instant` values in signed
+  nanoseconds since the Unix epoch.
+  The control value exercises all eleven constructor arguments. Both `Some`
+  and `None` occur for `Option Int` and `Option Instant`. For each listed
+  `T.C`, make a separate positive client using the qualified constructor and a
+  paired client that changes only `T.C` to bare `C`, with no local binding or
+  import for `C`.
 
   Make a separate source declaration replacement client for each of
   `ReadResult`, `FileKind`, `FileMetadata`, and `DirEntry`, using
@@ -583,20 +609,29 @@ the eight `Data.Numeric.FixedWidth` names.
   negative client uses `State Bool` as a type; its positive control uses
   `StateOp Bool` as the checked operation carrier.
 - measured: each unimported reference's resolved `GlobalId`, each constructor
-  parent, the `resp_state` result types at `Get` and `Put`, and each paired
-  client's elaboration verdict.
+  parent, and type-checking of the full eleven-argument metadata application
+  against the canonical constructor. Also measure the `resp_state` result types
+  at `Get` and `Put`, and each paired client's elaboration verdict.
 - claimed: each new floor identity is available without import at its exact
   pre-source identity. Each inductive family is complete and scoped: public
-  cases resolve as `T.C`, not bare `C`. `resp_state` is an operation with
-  type `(s : Type) → StateOp s → Type`, reducing to `s` for `Get` and `Unit`
-  for `Put`; it has no constructor family. The source uses `StateOp` as the
-  carrier, not `State` as a second type.
+  cases resolve as `T.C`, not bare `C`. The `FileMetadata` control uses the
+  §38 constructor arity and field types; `Some` and `None` represent present and
+  absent optional values at the source boundary. This fixture checks the
+  static representation only; it does not assert host statx-mask mapping.
+  `resp_state` is an operation with type `(s : Type) → StateOp s → Type`,
+  reducing to `s` for `Get` and `Unit` for `Put`; it has no constructor
+  family. The source uses
+  `StateOp` as the carrier, not `State` as a second type.
 - the gap: a successful constructor spelling could resolve to a same-shaped
   source declaration, and a no-import acceptance alone would not prove the
   response family has the specified dependent cases. The snapshot, complete
   matches, type-level responses, and same-name replacement pairs expose those
-  alternatives.
+  alternatives. This static metadata control does not test whether either host
+  maps each statx availability bit to the corresponding `Some` or `None`, nor
+  does it establish the metadata values returned by either lane.
 - expect: all no-import clients accept and resolve the snapshotted IDs.
+  The metadata control accepts as an eleven-argument application, with
+  `Some` and `None` values for both `Option Int` and `Option Instant` fields.
   `ReadResult.Chunk`/`Eof`, the four `FileKind` cases, both single-constructor
   families, and `StateOp.Get`/`Put` are complete; every listed bare `C` pair
   refuses with `UnboundName` naming `C`. The `Get` response has type `Bool`
