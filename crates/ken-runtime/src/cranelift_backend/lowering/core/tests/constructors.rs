@@ -712,15 +712,14 @@ extern "C" fn final_kind_discriminator_host_probe(
     if host_context.is_null() || reply.is_null() {
         return -1;
     }
-    // SAFETY: `run_final_kind_discriminator_fixture` supplies this exact
-    // call-scoped `u64` as the direct host context.
+    // SAFETY: the JIT fixtures supply this exact call-scoped `u64` as
+    // the direct host context. Bit 0 selects the reply, and bits 1/2 attest
+    // that dispatch reached this context and completed the requested reply.
     let observation = host_context.cast::<u64>().cast_mut();
-    // Mark the exact call-scoped selector as observed. The caller checks this
-    // after execution so a lost host-context edge cannot masquerade as a
-    // discriminator result.
-    unsafe {
+    let selected = unsafe {
         *observation |= 2;
-    }
+        *observation & 1
+    };
     let Ok(operation) = ken_host::HostOpV1::try_from(operation as u16) else {
         return -1;
     };
@@ -740,11 +739,16 @@ extern "C" fn final_kind_discriminator_host_probe(
             .cast::<u64>();
         match operation {
             ken_host::HostOpV1::ConsoleWrite => {
-                *reply_tag = layout.reply_unit_tag;
+                if selected == 1 {
+                    *reply_tag = layout.reply_unit_tag;
+                } else {
+                    *reply_tag = layout.reply_error_tag;
+                    *reply_detail = 6; // ABI v1 IOError InvalidInput.
+                }
             }
             ken_host::HostOpV1::ConsoleIsTerminal => {
                 *reply_tag = layout.reply_bool_tag;
-                *reply_detail = 1;
+                *reply_detail = selected;
             }
             _ => return -1,
         }
@@ -753,7 +757,7 @@ extern "C" fn final_kind_discriminator_host_probe(
     0
 }
 
-fn run_final_kind_discriminator_fixture(fixture: &RuntimeExpr, symbol: &str) -> i64 {
+fn run_mixed_exit_fixture(fixture: &RuntimeExpr, symbol: &str, selector: u64) -> i64 {
     let isa = native_isa().expect("native ISA");
     let mut jit =
         cranelift_jit::JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
@@ -775,9 +779,9 @@ fn run_final_kind_discriminator_fixture(fixture: &RuntimeExpr, symbol: &str) -> 
         Some(test_only_distinguished_root_join_plan()),
         None,
     )
-    .expect("the CarrierWord final-kind fixture emits");
+    .expect("the mixed ExitCode join emits in the JIT");
     let process_input = 0_u8;
-    let mut host_observation = 0_u64;
+    let mut host_observation = selector;
     let ingress = crate::boundary_activation::GeneratedRootIngressV1 {
         process_input: (&process_input as *const u8).cast(),
         host_dispatch_context: (&mut host_observation as *mut u64).cast(),
@@ -787,32 +791,76 @@ fn run_final_kind_discriminator_fixture(fixture: &RuntimeExpr, symbol: &str) -> 
         .run_with_profile(Some(
             (&ingress as *const crate::boundary_activation::GeneratedRootIngressV1).cast(),
         ), crate::boundary_resource_profile::starter_smoke_profile())
-        .expect("the CarrierWord final-kind fixture runs")
+        .expect("the mixed ExitCode join runs")
         .1
         .expect("the process root returns a status");
     assert_eq!(
-        host_observation, 6,
-        "the direct host context must complete the intended runtime scalar arm"
+        host_observation,
+        selector | 6,
+        "the direct host context must complete the requested reply"
     );
     status
 }
 
-fn assert_runtime_final_kind_discriminator_rejects_scalar(fixture: &RuntimeExpr, symbol: &str) {
+fn assert_int_exit_arm_refused_at_composed_join(fixture: &RuntimeExpr, symbol: &str) {
     // Promise class: durable invariant. CarrierWord may change storage, but the
     // process root must still reject an Int-tagged word as an exit status.
-    //
-    // MEASURED: the same source fixture emits, then a runtime host reply selects
-    // its scalar alternative; the process root returns the wrong-tag guard -1.
-    // CLAIMED: the heterogeneous CarrierWord join defers final-kind validation
-    // to the emitted process-root discriminator without accepting Int as status.
-    // THE GAP: this pin observes the wrong-tag arm only. The companion object
-    // emission above establishes that the heterogeneous source population is
-    // accepted; this assertion does not re-prove every well-tagged exit route.
-    let scalar_status = run_final_kind_discriminator_fixture(fixture, &format!("{symbol}_scalar"));
-    assert_eq!(
-        scalar_status, -1,
-        "the emitted process-root discriminator must reject the wrong Int tag"
-    );
+    // MEASURED: object emission refuses the mixed Int/ExitCode join with the
+    // scalar-kind disagreement, before a native process object is produced.
+    // CLAIMED: the composed scalar join cannot admit an Int as an exit status.
+    // THE GAP: these mixed-kind fixtures do not reach the runtime discriminator;
+    // persistent_non_exit_constructor_at_process_root_traps covers that guard.
+    let err = emit_process_entrypoint_object_with_cranelift(fixture, symbol)
+        .expect_err("a composed scalar join must reject mixed Int and ExitCode arms");
+    assert!(matches!(
+        &err,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "ComputationalMatch",
+            cause: LoweringCause::Fragment,
+            reason,
+        }) if reason == "dynamic native arms disagree on scalar result kind"
+    ), "{err:?}");
+}
+
+fn assert_mixed_exit_join(mut fixture: RuntimeExpr, symbol: &str) {
+    let RuntimeExpr::ComputationalMatch { cases, .. } = &mut fixture else {
+        panic!("expected the outer ComputationalMatch");
+    };
+    let [carried, specialized] = cases.as_mut_slice() else {
+        panic!("expected two outer arms");
+    };
+    assert!(matches!(carried.body, RuntimeExpr::Var(0)));
+    assert!(matches!(&specialized.body,
+        RuntimeExpr::Construct { constructor, args }
+            if constructor == crate::EXIT_SUCCESS_CONSTRUCTOR && args.is_empty()
+    ));
+    // Same producer and consumer as the mixed-kind fixture. Replace only
+    // the final Int with a non-root callable returning ExitFailure(7).
+    carried.body = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: Vec::new(),
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: crate::EXIT_FAILURE_CONSTRUCTOR.to_string(),
+                args: vec![RuntimeExpr::Value(RuntimeValue::Int(7.into()))],
+            }),
+        }),
+        args: Vec::new(),
+    };
+    // Promise class: durable invariant. MEASURED: object emission and both
+    // runtime-selected ExitCode arms (Success and callable Failure 7).
+    // CLAIMED: a producer can join specialized and carried representations
+    // of ExitCode. THE GAP: the exit pin does not itself measure lanes; the
+    // M2 lowering trace measured both operands at each producer join.
+    emit_process_entrypoint_object_with_cranelift(&fixture, symbol)
+        .expect("the mixed-representation ExitCode join emits an object");
+    for (selector, expected) in [(0, 0), (1, 7)] {
+        assert_eq!(
+            run_mixed_exit_fixture(&fixture, symbol, selector),
+            expected,
+            "selected ExitCode for {symbol}, selector {selector}"
+        );
+    }
 }
 
 fn persistent_non_exit_constructor_root_status(fields: Vec<RuntimeExpr>, shape: &str) -> i64 {
@@ -903,13 +951,17 @@ fn dynamic_host_result_producer_wrong_arity_rejects_specifically() {
     ));
 }
 #[test]
-fn dynamic_host_result_producer_carrier_final_kind_is_runtime_guarded() {
-    let fixture = host_result_computational_fixture(1, true, true);
-    emit_process_entrypoint_object_with_cranelift(&fixture, "ken_px7m_kind_mismatch")
-        .expect("the CarrierWord result join emits its runtime final-kind discriminator");
-    assert_runtime_final_kind_discriminator_rejects_scalar(
-        &fixture,
-        "ken_px7m_kind_mismatch_runtime",
+fn dynamic_host_result_producer_mixed_final_kind_refuses_at_composed_join() {
+    assert_int_exit_arm_refused_at_composed_join(
+        &host_result_computational_fixture(1, true, true),
+        "ken_px7m_kind_mismatch",
+    );
+}
+#[test]
+fn dynamic_host_result_producer_joins_specialized_and_carried_exit() {
+    assert_mixed_exit_join(
+        host_result_computational_fixture(1, true, true),
+        "ken_px7m_mixed_exit",
     );
 }
 #[test]
@@ -958,13 +1010,17 @@ fn nested_computational_malformed_recursive_position_rejects_specifically() {
     ));
 }
 #[test]
-fn nested_computational_carrier_final_kind_is_runtime_guarded() {
-    let fixture = nested_computational_fixture(1, Vec::new(), true, true);
-    emit_process_entrypoint_object_with_cranelift(&fixture, "ken_px7n_final_kind_mismatch")
-        .expect("the CarrierWord result join emits its runtime final-kind discriminator");
-    assert_runtime_final_kind_discriminator_rejects_scalar(
-        &fixture,
-        "ken_px7n_final_kind_mismatch_runtime",
+fn nested_computational_mixed_final_kind_refuses_at_composed_join() {
+    assert_int_exit_arm_refused_at_composed_join(
+        &nested_computational_fixture(1, Vec::new(), true, true),
+        "ken_px7n_final_kind_mismatch",
+    );
+}
+#[test]
+fn nested_computational_producer_joins_specialized_and_carried_exit() {
+    assert_mixed_exit_join(
+        nested_computational_fixture(1, Vec::new(), true, true),
+        "ken_px7n_mixed_exit",
     );
 }
 #[test]
