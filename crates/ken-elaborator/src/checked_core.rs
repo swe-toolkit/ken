@@ -1484,6 +1484,25 @@ fn validate_dependency_hash_lane_coherence(
     Ok(())
 }
 
+/// A checked-core package that `validate_checked_core_package` accepted.
+/// The field is private, so code outside this module cannot construct
+/// one without validating.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ValidatedCheckedCorePackage<'a>(&'a CheckedCorePackage);
+
+impl<'a> ValidatedCheckedCorePackage<'a> {
+    pub(crate) fn package(self) -> &'a CheckedCorePackage {
+        self.0
+    }
+}
+
+pub(crate) fn validated_checked_core_package(
+    package: &CheckedCorePackage,
+) -> Result<ValidatedCheckedCorePackage<'_>, CheckedCorePackageError> {
+    validate_checked_core_package(package)?;
+    Ok(ValidatedCheckedCorePackage(package))
+}
+
 pub fn consume_checked_core_package_for_target<'a>(
     package: &CheckedCorePackage,
     target_closure: impl IntoIterator<Item = &'a StableSymbol>,
@@ -1528,7 +1547,17 @@ pub fn checked_core_declaration_body_view(
     selection: &CheckedCoreBodyViewSelection,
     symbol: &StableSymbol,
 ) -> Result<CheckedCoreDeclarationBodyView, CheckedCoreBodyViewError> {
-    let semantic = validate_body_view_selection(package, selection)?;
+    let validated = validated_checked_core_package(package)
+        .map_err(CheckedCoreBodyViewError::InvalidPackage)?;
+    validated_declaration_body_view(validated, selection, symbol)
+}
+
+pub(crate) fn validated_declaration_body_view(
+    validated: ValidatedCheckedCorePackage<'_>,
+    selection: &CheckedCoreBodyViewSelection,
+    symbol: &StableSymbol,
+) -> Result<CheckedCoreDeclarationBodyView, CheckedCoreBodyViewError> {
+    let semantic = check_selection_against_package(validated.package(), selection)?;
     if !selection.reachable_declarations.contains(symbol) {
         return Err(
             CheckedCoreBodyViewError::RequestedBodyOutsideSelectedClosure {
@@ -1751,6 +1780,13 @@ fn validate_body_view_selection<'a>(
     selection: &CheckedCoreBodyViewSelection,
 ) -> Result<&'a CheckedCoreSemanticInputs, CheckedCoreBodyViewError> {
     validate_checked_core_package(package).map_err(CheckedCoreBodyViewError::InvalidPackage)?;
+    check_selection_against_package(package, selection)
+}
+
+fn check_selection_against_package<'a>(
+    package: &'a CheckedCorePackage,
+    selection: &CheckedCoreBodyViewSelection,
+) -> Result<&'a CheckedCoreSemanticInputs, CheckedCoreBodyViewError> {
     if selection.package_identity != package.header.package_identity {
         return Err(CheckedCoreBodyViewError::MismatchedPackageIdentity {
             expected: package.header.package_identity.clone(),

@@ -1,0 +1,49 @@
+program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
+fn process_discriminator (input : ProcessInput) : UInt8 =
+  match input {
+    MkProcessInput arguments environment cwd |->
+      match arguments {
+        Nil |-> 1 ;
+        Cons _argv0 rest |-> match rest {
+          Nil |-> 2 ;
+          Cons argument _more |-> match environment {
+            Nil |-> 3 ;
+            Cons binding bindings |-> match bindings {
+              Cons _ _ |-> 8 ;
+              Nil |-> match binding {
+              MkProd key value |-> match bytes_at argument 0 {
+                None |-> 4 ;
+                Some argument_byte |-> match bytes_at key 0 {
+                  None |-> 5 ;
+                  Some key_byte |-> match bytes_at value 0 {
+                    None |-> 6 ;
+                    Some value_byte |-> match bytes_at cwd 0 {
+                      None |-> 7 ;
+                      Some cwd_byte |->
+                        match eq_int (uint8_to_int argument_byte) 255 {
+                          False |-> argument_byte ;
+                          True |-> match eq_int (uint8_to_int key_byte) 75 {
+                            False |-> key_byte ;
+                            True |-> match eq_int (uint8_to_int value_byte) 254 {
+                              False |-> value_byte ;
+                              True |-> match eq_int (uint8_to_int cwd_byte) 47 {
+                                False |-> cwd_byte ;
+                                True |-> value_byte
+                              }
+                            }
+                          }
+                        }
+                    }
+                  }
+                }
+              }
+              }
+            }
+          }
+        }
+      }
+  }
+fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  host_pure APartial ExitCode (ExitCode.Failure (process_discriminator input))

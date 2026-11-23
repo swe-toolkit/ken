@@ -15,19 +15,22 @@ use ken_kernel::{Context, Decl, GlobalEnv, GlobalId, Term};
 use crate::checked_core::{
     canonical_decl_bytes, canonical_symbol_bytes, canonical_term_bytes,
     checked_core_declaration_body_view, emit_checked_core_package, semantic_fingerprint,
-    validate_checked_core_package, AssumptionTrustKind, AssumptionTrustMetadata,
+    validate_checked_core_package, validated_checked_core_package, validated_declaration_body_view,
+    AssumptionTrustKind, AssumptionTrustMetadata,
     CanonicalEncodingError, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
     CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
     CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
     ConstructorMetadata, DataMetadata, LowerabilityStatus, ObligationMetadata, ObligationStatus,
     PartialityMetadata, PrimitiveMetadata, PrimitiveReductionMetadata, RecursionAdmission,
-    RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace,
+    RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace, ValidatedCheckedCorePackage,
 };
 use crate::extract::{v2_extract_with_suffixes, ObligationTriple, ProvKind};
 use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, ProgramAdmissionError};
 use crate::{ElabEnv, ElabError, ElabResult};
 
 mod bracket_regions;
+#[cfg(test)]
+mod closure_index_tests;
 #[cfg(test)]
 mod px10_plan_census_tests;
 use bracket_regions::collect_normalized_bracket_regions;
@@ -3130,6 +3133,11 @@ impl NativeProgramPreparationV1 {
         &self.package
     }
 
+    #[cfg(test)]
+    pub(crate) fn selected_targets_for_test(&self) -> &[SelectedTargetReport] {
+        &self.selected
+    }
+
     /// The planned Runtime program exactly as production carries it into object
     /// emission.
     pub fn runtime_program(&self) -> &ken_runtime::RuntimeProgram {
@@ -5570,29 +5578,30 @@ fn build_target_closures(
     package: &CheckedCorePackage,
     selected_targets: &[SelectedTargetReport],
 ) -> Result<Vec<TargetClosure>, CompilerDriverError> {
-    validate_checked_core_package(package)?;
-    selected_targets
-        .iter()
-        .map(|target| build_target_closure(package, target))
-        .collect()
+    let validated = validated_checked_core_package(package)?;
+    let mut index = OnDemandDependencyIndex::new(validated);
+    let mut closures = Vec::with_capacity(selected_targets.len());
+    for target in selected_targets {
+        closures.push(build_target_closure(package, target, &mut index)?);
+    }
+    Ok(closures)
 }
 
 fn build_target_closure(
     package: &CheckedCorePackage,
     target: &SelectedTargetReport,
+    index: &mut impl DeclarationDependencySource,
 ) -> Result<TargetClosure, CompilerDriverError> {
     let semantic = &package.artifact.semantic;
     validate_closure_metadata(semantic)?;
-    let dependency_index = declaration_dependency_index(package);
-    let semantic_dependency_index = declaration_semantic_dependency_index(package);
     let mut reachable_declarations = BTreeSet::from([target.symbol.clone()]);
     let mut closure_symbols = BTreeSet::from([target.symbol.clone()]);
     let mut external_symbols = BTreeSet::new();
     let mut queue = vec![target.symbol.clone()];
 
     while let Some(symbol) = queue.pop() {
-        if let Some(dependencies) = dependency_index.get(&symbol) {
-            for dependency in dependencies {
+        if let Some(dependencies) = index.dependencies(&symbol) {
+            for dependency in &dependencies.runtime {
                 include_closure_symbol(
                     semantic,
                     dependency.clone(),
@@ -5602,14 +5611,8 @@ fn build_target_closure(
                     &mut queue,
                 );
             }
-        }
-
-        if let Some(dependencies) = semantic_dependency_index.get(&symbol) {
-            for dependency in dependencies {
-                if dependency_index
-                    .get(&symbol)
-                    .is_some_and(|runtime| runtime.contains(dependency))
-                {
+            for dependency in &dependencies.semantic {
+                if dependencies.runtime.contains(dependency) {
                     continue;
                 }
                 include_non_runtime_closure_symbol(
@@ -5655,92 +5658,158 @@ fn build_target_closure(
     })
 }
 
-fn declaration_dependency_index(
-    package: &CheckedCorePackage,
-) -> BTreeMap<StableSymbol, BTreeSet<StableSymbol>> {
-    let mut encoded_symbols = package
-        .artifact
-        .semantic
-        .symbols
-        .iter()
-        .map(|symbol| (symbol.clone(), canonical_symbol_bytes(symbol)))
-        .collect::<Vec<_>>();
-    encoded_symbols.sort_by(|(left, _), (right, _)| left.cmp(right));
-
-    let mut index = BTreeMap::new();
-    for (owner, bytes) in &package.artifact.semantic.declarations {
-        let selection = CheckedCoreBodyViewSelection {
-            package_identity: package.header.package_identity.clone(),
-            package_core_semantic_hash: package.core_semantic_hash,
-            package_artifact_hash: package.artifact_hash,
-            target_symbol: owner.clone(),
-            reachable_declarations: package
-                .artifact
-                .semantic
-                .declarations
-                .keys()
-                .cloned()
-                .collect(),
-            external_symbols: BTreeSet::new(),
-            dependency_semantic_hashes: package
-                .artifact
-                .semantic
-                .dependency_semantic_hashes
-                .clone(),
-        };
-        let dependencies = match checked_core_declaration_body_view(package, &selection, owner) {
-            Ok(view) => {
-                let mut dependencies = BTreeSet::new();
-                collect_runtime_declaration_dependencies(&view.body, &mut dependencies);
-                dependencies.remove(owner);
-                dependencies
-            }
-            Err(_) => {
-                // Unsupported bodies remain reportable by the established
-                // entrypoint lane. Preserve the conservative dependency scan
-                // for those declarations; supported bodies use the executable
-                // term view so type-only names never enter runtime reachability.
-                encoded_symbols
-                    .iter()
-                    .filter_map(|(candidate, needle)| {
-                        (candidate != owner && contains_subslice(bytes, needle))
-                            .then_some(candidate.clone())
-                    })
-                    .collect()
-            }
-        };
-        index.insert(owner.clone(), dependencies);
-    }
-    index
+struct DeclarationDependencies {
+    runtime: BTreeSet<StableSymbol>,
+    semantic: BTreeSet<StableSymbol>,
 }
 
-fn declaration_semantic_dependency_index(
-    package: &CheckedCorePackage,
-) -> BTreeMap<StableSymbol, BTreeSet<StableSymbol>> {
-    let encoded_symbols = package
-        .artifact
-        .semantic
-        .symbols
-        .iter()
-        .map(|symbol| (symbol.clone(), canonical_symbol_bytes(symbol)))
-        .collect::<Vec<_>>();
+trait DeclarationDependencySource {
+    /// None exactly when `symbol` is not a key of semantic.declarations.
+    fn dependencies(&mut self, symbol: &StableSymbol) -> Option<&DeclarationDependencies>;
+}
 
-    package
-        .artifact
-        .semantic
-        .declarations
-        .iter()
-        .map(|(owner, bytes)| {
-            let dependencies = encoded_symbols
-                .iter()
-                .filter_map(|(candidate, needle)| {
-                    (candidate != owner && contains_subslice(bytes, needle))
-                        .then_some(candidate.clone())
-                })
-                .collect();
-            (owner.clone(), dependencies)
-        })
-        .collect()
+/// The package's encoded symbols, indexed for the spelling-substring test.
+/// `occurring` finds exactly the symbols whose non-empty encoding occurs in
+/// the input bytes, including distinct symbols with identical encodings.
+struct SpellingIndex {
+    anchor: Vec<u8>,
+    by_length: BTreeMap<usize, BTreeMap<Vec<u8>, Vec<StableSymbol>>>,
+}
+
+impl SpellingIndex {
+    fn new(encoded_symbols: &[(StableSymbol, Vec<u8>)]) -> Self {
+        let mut anchor: Option<Vec<u8>> = None;
+        let mut by_length = BTreeMap::<usize, BTreeMap<Vec<u8>, Vec<StableSymbol>>>::new();
+        for (symbol, encoding) in encoded_symbols {
+            if encoding.is_empty() {
+                continue;
+            }
+            match &mut anchor {
+                None => anchor = Some(encoding.clone()),
+                Some(prefix) => {
+                    let common = prefix
+                        .iter()
+                        .zip(encoding)
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    prefix.truncate(common);
+                }
+            }
+            by_length
+                .entry(encoding.len())
+                .or_default()
+                .entry(encoding.clone())
+                .or_default()
+                .push(symbol.clone());
+        }
+        Self {
+            anchor: anchor.unwrap_or_default(),
+            by_length,
+        }
+    }
+
+    fn occurring(&self, bytes: &[u8]) -> BTreeSet<StableSymbol> {
+        let mut found = BTreeSet::new();
+        for start in 0..bytes.len() {
+            let tail = &bytes[start..];
+            if !tail.starts_with(&self.anchor) {
+                continue;
+            }
+            for (&length, needles) in &self.by_length {
+                let Some(window) = tail.get(..length) else {
+                    break; // The remaining lengths are larger.
+                };
+                if let Some(symbols) = needles.get(window) {
+                    found.extend(symbols.iter().cloned());
+                }
+            }
+        }
+        found
+    }
+}
+
+struct OnDemandDependencyIndex<'a> {
+    validated: ValidatedCheckedCorePackage<'a>,
+    /// Every declaration key, built once per package.
+    selection: CheckedCoreBodyViewSelection,
+    spelling: SpellingIndex,
+    memo: BTreeMap<StableSymbol, DeclarationDependencies>,
+}
+
+impl<'a> OnDemandDependencyIndex<'a> {
+    fn new(validated: ValidatedCheckedCorePackage<'a>) -> Self {
+        let package = validated.package();
+        let semantic = &package.artifact.semantic;
+        let encoded_symbols = semantic
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.clone(), canonical_symbol_bytes(symbol)))
+            .collect::<Vec<_>>();
+        Self {
+            validated,
+            selection: CheckedCoreBodyViewSelection {
+                package_identity: package.header.package_identity.clone(),
+                package_core_semantic_hash: package.core_semantic_hash,
+                package_artifact_hash: package.artifact_hash,
+                // Replaced before every body-view request.
+                target_symbol: package.header.package_identity.clone(),
+                reachable_declarations: semantic.declarations.keys().cloned().collect(),
+                external_symbols: BTreeSet::new(),
+                dependency_semantic_hashes: semantic.dependency_semantic_hashes.clone(),
+            },
+            spelling: SpellingIndex::new(&encoded_symbols),
+            memo: BTreeMap::new(),
+        }
+    }
+}
+
+impl DeclarationDependencySource for OnDemandDependencyIndex<'_> {
+    fn dependencies(&mut self, symbol: &StableSymbol) -> Option<&DeclarationDependencies> {
+        let bytes = self
+            .validated
+            .package()
+            .artifact
+            .semantic
+            .declarations
+            .get(symbol)?;
+        Some(self.memo.entry(symbol.clone()).or_insert_with(|| {
+            self.selection.target_symbol = symbol.clone();
+            let mut spelled = self.spelling.occurring(bytes);
+            spelled.remove(symbol);
+            DeclarationDependencies {
+                runtime: runtime_declaration_dependencies(
+                    self.validated,
+                    &self.selection,
+                    symbol,
+                    &spelled,
+                ),
+                semantic: spelled,
+            }
+        }))
+    }
+}
+
+fn runtime_declaration_dependencies(
+    validated: ValidatedCheckedCorePackage<'_>,
+    selection: &CheckedCoreBodyViewSelection,
+    owner: &StableSymbol,
+    spelled: &BTreeSet<StableSymbol>,
+) -> BTreeSet<StableSymbol> {
+    match validated_declaration_body_view(validated, selection, owner) {
+        Ok(view) => {
+            let mut dependencies = BTreeSet::new();
+            collect_runtime_declaration_dependencies(&view.body, &mut dependencies);
+            dependencies.remove(owner);
+            dependencies
+        }
+        Err(_) => {
+            // Unsupported bodies remain reportable by the established
+            // entrypoint lane. Preserve the conservative dependency scan
+            // for those declarations; supported bodies use the executable
+            // term view so type-only names never enter runtime reachability.
+            spelled.clone()
+        }
+    }
 }
 
 fn collect_runtime_declaration_dependencies(
@@ -6114,6 +6183,7 @@ fn build_target_closure_report(
     report
 }
 
+#[cfg(test)]
 fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty()
         && haystack.len() >= needle.len()
