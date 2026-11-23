@@ -6,7 +6,7 @@ owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [RT-NATIVE-BORROWED-LANE-CHECKED-TYPE]
 blocks: [LINUX-ABI-EXIT-SERVICE-SUPERVISOR]
 github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S. Node filed by the Steward 2026-07-25. Framed 2026-11-23 as the third L1b node on the Language ring (operator 2026-11-22: \"Approved. Use the language ring.\"), absorbing the Architect's FSCREATE AC-0 carry on directory access through /proc/self/fd (evt_5zrw3xt08fewp). L1 Linux ABI program, Steward order."
