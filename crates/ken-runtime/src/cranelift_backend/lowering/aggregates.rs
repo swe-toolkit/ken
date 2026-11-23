@@ -3552,7 +3552,7 @@ impl<'a> Lowering<'a> {
                     let value = match record.need {
                         EffectSeatNeed::BytesPointerLength => {
                             let (pointer, len, outcome) =
-                                self.observe_carried_bytes_span(builder, record, *word)?;
+                                self.observe_carried_bytes_span(builder, record.into(), *word)?;
                             let valid = builder.ins().icmp_imm(
                                 cranelift_codegen::ir::condcodes::IntCC::Equal,
                                 outcome,
@@ -3588,7 +3588,7 @@ impl<'a> Lowering<'a> {
                         | EffectSeatNeed::CapabilityTokenScalar
                         | EffectSeatNeed::ExactIntU64 => {
                             let (pointer, len, outcome) =
-                                self.observe_carried_bytes_span(builder, record, *word)?;
+                                self.observe_carried_bytes_span(builder, record.into(), *word)?;
                             let valid = builder.ins().icmp_imm(
                                 cranelift_codegen::ir::condcodes::IntCC::Equal,
                                 outcome,

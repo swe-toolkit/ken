@@ -4032,6 +4032,25 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             },
         ]));
 
+    const SOCKET_BYTES: SynthesizedAggregateNode = N::HostResponseReferent {
+        class: BoundaryClass::Bytes,
+    };
+    const SOCKET_ADDRESS: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::Fixed {
+                role: R::SocketAddressIPv4,
+                children: &[SOCKET_BYTES, N::native_int()],
+            },
+            N::Fixed {
+                role: R::SocketAddressIPv6,
+                children: &[SOCKET_BYTES, N::native_int()],
+            },
+            N::Fixed {
+                role: R::SocketAddressUnix,
+                children: &[SOCKET_BYTES],
+            },
+        ]));
+
     let (error, ok) = match operation {
         // Returns a `Bool` before any synthesized producer runs, so neither arm
         // exists. Not a gap: the early return is above the synthesis entirely.
@@ -4070,8 +4089,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         }
         Op::ProcessPlanPush | Op::ProcessSignal => (RESOURCE_SURFACE, UNIT),
         Op::ProcessWait => (RESOURCE_SURFACE, CHILD_EXIT),
-        Op::ResourceStreamRead => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
-        Op::ResourceStreamWrite => (RESOURCE_SURFACE, WROTE),
+        Op::ResourceStreamRead | Op::NetReceive => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
+        Op::ResourceStreamWrite | Op::NetSend => (RESOURCE_SURFACE, WROTE),
+        Op::NetListen | Op::NetConnect | Op::NetAccept => (RESOURCE_SURFACE, N::Absent),
+        Op::NetShutdown => (RESOURCE_SURFACE, UNIT),
+        Op::NetLocalAddress => (RESOURCE_SURFACE, SOCKET_ADDRESS),
         // Not an admitted consumer; `lower_process_host_effect` refuses it
         // before any synthesized producer runs.
         _ => (N::Absent, N::Absent),

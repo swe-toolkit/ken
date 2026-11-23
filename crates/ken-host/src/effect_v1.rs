@@ -251,26 +251,13 @@ impl HostOpV1 {
             | Self::NetReceive
             | Self::NetSend
             | Self::NetShutdown
-            | Self::NetLocalAddress => HostOpAvailabilityV1::RepresentedUnavailable,
+            | Self::NetLocalAddress => HostOpAvailabilityV1::NativeTested,
         }
     }
 
-    /// Only the seven PX11 Net operations may execute without native parity;
-    /// a declared Net grant is separately refused before native object emission.
+    /// The shared executor admits exactly the native-tested partition.
     pub const fn executor_admits(self) -> bool {
-        match self.availability() {
-            HostOpAvailabilityV1::NativeTested => true,
-            HostOpAvailabilityV1::RepresentedUnavailable => matches!(
-                self,
-                Self::NetListen
-                    | Self::NetAccept
-                    | Self::NetConnect
-                    | Self::NetReceive
-                    | Self::NetSend
-                    | Self::NetShutdown
-                    | Self::NetLocalAddress
-            ),
-        }
+        matches!(self.availability(), HostOpAvailabilityV1::NativeTested)
     }
 
     /// **`ABI-R3` `D2` -- exhaustive, no wildcard.**
@@ -341,7 +328,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 35] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 42] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -377,6 +364,13 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 35] = [
     HostOpV1::ProcessTakePipe,
     HostOpV1::ProcessWait,
     HostOpV1::ProcessSignal,
+    HostOpV1::NetListen,
+    HostOpV1::NetAccept,
+    HostOpV1::NetConnect,
+    HostOpV1::NetReceive,
+    HostOpV1::NetSend,
+    HostOpV1::NetShutdown,
+    HostOpV1::NetLocalAddress,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -445,6 +439,7 @@ pub struct HostEffectWireLayoutV1 {
     pub reply_read_progress_tag: u64,
     pub reply_write_progress_tag: u64,
     pub reply_child_exit_tag: u64,
+    pub reply_socket_address_tag: u64,
     pub resource_error_closed: u64,
     pub resource_error_malformed: u64,
     pub resource_error_right_not_held: u64,
@@ -717,6 +712,34 @@ pub fn host_effect_wire_layout_v1(
                 checked_u32(field("span_origin")?)?,
             ]
         }
+        HostOpV1::NetListen | HostOpV1::NetConnect => {
+            let base = field("address")?;
+            let address = |name| offset("SocketAddressRecordV1", name).map(|n| base + n);
+            let bytes = address("bytes")?;
+            vec![
+                checked_u32(field("capability")?)?,
+                checked_u32(address("family")?)?,
+                checked_u32(bytes + slice_data)?,
+                checked_u32(bytes + slice_len)?,
+                checked_u32(address("port")?)?,
+            ]
+        }
+        HostOpV1::NetAccept => vec![checked_u32(field("listener")?)?],
+        HostOpV1::NetReceive => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+        ],
+        HostOpV1::NetSend => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+            checked_u32(field("span_origin")?)?,
+        ],
+        HostOpV1::NetShutdown => vec![checked_u32(field("stream")?)?, checked_u32(field("how")?)?],
+        HostOpV1::NetLocalAddress => vec![checked_u32(field("target")?)?],
         // **`ABI-R3` `D4` -- the request/reply schema axis, made a build break.**
         //
         // This was a `_` wildcard. Unlike the three defaults `D2` closed it did
@@ -727,7 +750,7 @@ pub fn host_effect_wire_layout_v1(
         // turns a new operation from a runtime refusal into `error[E0004]`.
         //
         // These operations are exactly the `RepresentedUnavailable` set, and
-        // the 26 matched above are exactly the `NativeTested` set. That
+        // the operations matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
         HostOpV1::ClockMonotonicNow
@@ -738,14 +761,7 @@ pub fn host_effect_wire_layout_v1(
         | HostOpV1::FsGetInheritance
         | HostOpV1::FsSetInheritance
         | HostOpV1::FsDuplicate
-        | HostOpV1::EntropyRandomBytes
-        | HostOpV1::NetListen
-        | HostOpV1::NetAccept
-        | HostOpV1::NetConnect
-        | HostOpV1::NetReceive
-        | HostOpV1::NetSend
-        | HostOpV1::NetShutdown
-        | HostOpV1::NetLocalAddress => {
+        | HostOpV1::EntropyRandomBytes => {
             return Err(TerminalErrorV1::OperationUnavailable(operation));
         }
     };
@@ -797,6 +813,7 @@ pub fn host_effect_wire_layout_v1(
         reply_read_progress_tag: generated_binding("tag", "reply.read_progress")?,
         reply_write_progress_tag: generated_binding("tag", "reply.write_progress")?,
         reply_child_exit_tag: generated_binding("tag", "reply.child_exit")?,
+        reply_socket_address_tag: generated_binding("tag", "reply.socket_address")?,
         resource_error_closed: generated_binding("error", "resource.Closed")?,
         resource_error_malformed: generated_binding("error", "resource.MalformedResource")?,
         resource_error_right_not_held: generated_binding("error", "resource.RightNotHeld")?,
@@ -6359,23 +6376,23 @@ mod tests {
     /// no native-unavailable operation gains executor admission. THE GAP:
     /// the shared dispatcher must use executor_admits for each operation.
     #[test]
-    fn executor_admits_exactly_native_tested_plus_px11_interpreter_set() {
-        use std::collections::BTreeSet;
-        // Transition sentinel: the immediate native-parity successor retires
-        // this exact seven-operation exception, not the admission invariant.
-        let px11 = [
-            HostOpV1::NetListen, HostOpV1::NetAccept, HostOpV1::NetConnect,
-            HostOpV1::NetReceive, HostOpV1::NetSend, HostOpV1::NetShutdown,
+    fn executor_admits_exactly_native_tested() {
+        for op in HostOpV1::ALL {
+            assert_eq!(op.executor_admits(), op.availability() == HostOpAvailabilityV1::NativeTested,
+                "executor admission of {op:?}");
+        }
+        for op in [
+            HostOpV1::NetListen,
+            HostOpV1::NetAccept,
+            HostOpV1::NetConnect,
+            HostOpV1::NetReceive,
+            HostOpV1::NetSend,
+            HostOpV1::NetShutdown,
             HostOpV1::NetLocalAddress,
-        ].into_iter().collect::<BTreeSet<_>>();
-        let interpreter_only = HostOpV1::ALL.into_iter().filter(|op| {
-            op.executor_admits()
-                && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
-        }).collect::<BTreeSet<_>>();
-        assert_eq!(interpreter_only, px11, "exact PX11 interpreter-only set");
-        assert!(HostOpV1::ALL.into_iter().all(|op| {
-            op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
-        }));
+        ] {
+            assert!(NATIVE_TESTED_TARGETS_V1.contains(&op), "missing {op:?}");
+            assert!(op.executor_admits(), "unavailable {op:?}");
+        }
     }
 
     #[cfg(target_os = "linux")]

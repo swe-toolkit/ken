@@ -686,6 +686,11 @@ fn native_process_symbols_from_record(
             spine.px10_kind_pipe_write.clone(),
         ],
         px10_exit_symbols: [spine.px10_exit_exited.clone(), spine.px10_exit_signaled.clone()],
+        px11_address_symbols: [
+            spine.px11_address_ipv4.clone(),
+            spine.px11_address_ipv6.clone(),
+            spine.px11_address_unix.clone(),
+        ],
     }
 }
 

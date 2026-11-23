@@ -351,6 +351,7 @@ fn runtime_producible_constructors(
         resource_kind_mapping,
         px10_kind_symbols,
         px10_exit_symbols,
+        px11_address_symbols,
     } = symbols;
     // The checked ITree/Coproduct spine is constructed by the program; the
     // host never synthesizes Ret, Vis or InL as a response. Keep these three
@@ -432,6 +433,7 @@ fn runtime_producible_constructors(
     producible.extend(io_errors.iter().cloned());
     producible.extend(px10_kind_symbols.iter().cloned());
     producible.extend(px10_exit_symbols.iter().cloned());
+    producible.extend(px11_address_symbols.iter().cloned());
     producible
 }
 
@@ -1165,6 +1167,8 @@ impl EffectSeatLedger {
         Ok(())
     }
 
+
+
     /// **Close the whole compilation.**
     ///
     /// ⛔ Every opened group committed, and `image(claims) ⊆ P`.
@@ -1194,6 +1198,12 @@ impl EffectSeatLedger {
                 opened.len(),
                 committed.len()
             )));
+        }
+        for record in planned {
+            if !record.field_contracts_match() {
+                return Err(backend_module(LoweringCause::PlannerInvariant,
+                    format!("host effect seat ledger: field contracts disagree for {record:?}")));
+            }
         }
         let population = planned
             .iter()
@@ -1250,6 +1260,15 @@ const RESOURCE_ERROR_INVALID_OFFSET: i64 = 6;
 /// same answer an out-of-range narrowing already gives, and it is the correct
 /// one: the value is a real span whose extent is not admissible.
 pub(super) const RESOURCE_ERROR_INVALID_BOUNDS: i64 = 7;
+pub(in crate::cranelift_backend) enum ByteSpanAuthority {
+    Seat(PlannedEffectSeat),
+    Field(PlannedEffectSeatField),
+}
+
+impl From<PlannedEffectSeat> for ByteSpanAuthority {
+    fn from(seat: PlannedEffectSeat) -> Self { Self::Seat(seat) }
+}
+
 /// **`RT-CARRIER-BYTESPAN-OBSERVE` `D5` — one byte-span seat, read in whichever
 /// phase its operand actually arrived in.**
 ///
@@ -1363,7 +1382,7 @@ impl<'a> Lowering<'a> {
             LoweringOperand::Carried(word) => {
                 let word = *word;
                 let (pointer, len, outcome) =
-                    self.observe_carried_bytes_span(builder, record, word)?;
+                    self.observe_carried_bytes_span(builder, record.into(), word)?;
                 #[cfg(test)]
                 let outcome = match effect_seat_dispatch_mutation() {
                     EffectSeatDispatchMutation::ForceByteSpanOutcomeBounds => {
@@ -1632,7 +1651,7 @@ impl<'a> Lowering<'a> {
     pub(super) fn observe_carried_bytes_span(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
-        seat: PlannedEffectSeat,
+        authority: ByteSpanAuthority,
         target: CarriedBoundaryWord,
     ) -> Result<
         (
@@ -1647,7 +1666,8 @@ impl<'a> Lowering<'a> {
         // seat whose need is not a byte span would be reading a value the
         // planner never said was one, and that is a representation decision
         // taken by the caller rather than by the authority.
-        if seat.need != EffectSeatNeed::BytesPointerLength {
+        match authority {
+            ByteSpanAuthority::Seat(seat) if seat.need != EffectSeatNeed::BytesPointerLength => {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "Effect",
                 format!(
@@ -1656,6 +1676,11 @@ impl<'a> Lowering<'a> {
                     seat.slot, seat.operation, seat.need
                 ),
             ));
+        }
+            ByteSpanAuthority::Field(field) => {
+                Self::require_field_need(field, EffectSeatNeed::BytesPointerLength)?;
+            }
+            ByteSpanAuthority::Seat(_) => {}
         }
         let refs = self.carrier_refs()?;
         let boundary_arena = self.carrier_arena()?;
@@ -2535,6 +2560,118 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(done);
     }
 
+    fn require_field_need(
+        authority: PlannedEffectSeatField,
+        need: EffectSeatNeed,
+    ) -> Result<(), CraneliftBackendError> {
+        if authority.need() != need {
+            return Err(unsupported(LoweringCause::PlannerInvariant, "Effect",
+                format!("constructor field {authority:?} needs {need:?}")));
+        }
+        Ok(())
+    }
+
+    fn observe_socket_fields(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        path: EffectSeatConstructorPath,
+        seat: PlannedEffectSeat,
+        mut field: impl FnMut(&mut Self, &mut FunctionBuilder<'_>, u32)
+            -> Result<LoweringOperand, CraneliftBackendError>,
+    ) -> Result<Vec<cranelift_codegen::ir::Value>, CraneliftBackendError> {
+        use ken_host::HostOpV1 as Op;
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let EffectSeatConstructorPath::RootFields { field_count, wire_tag, .. } = path else {
+            return Err(unsupported(LoweringCause::PlannerInvariant, "Effect", "expected a projected socket constructor"));
+        };
+        let authorize = |position, need| {
+            let authority = path.field_authority(seat, position).ok_or_else(||
+                unsupported(LoweringCause::PlannerInvariant, "Effect",
+                    format!("missing constructor field {position} authority for {path:?}")))?;
+            Self::require_field_need(authority, need)?;
+            Ok::<_, CraneliftBackendError>(authority)
+        };
+        match (seat.operation, field_count) {
+            (Op::NetLocalAddress, 1) => {
+                authorize(0, EffectSeatNeed::ResourceScalar)?;
+                let operand = field(self, builder, 0)?;
+                Ok(vec![self.lower_resource_token_seat(builder, &operand, "NetLocalAddress", "target field")?])
+            }
+            (Op::NetListen | Op::NetConnect, 1 | 2) => {
+                let bytes = authorize(0, EffectSeatNeed::BytesPointerLength)?;
+                let (pointer, length, outcome) = match field(self, builder, 0)? {
+                    LoweringOperand::Specialized(bytes) => {
+                        let (pointer, length) = self.wire_bytes(builder, &bytes)?;
+                        (pointer, length, builder.ins().iconst(types::I64, 0))
+                    }
+                    LoweringOperand::Carried(word) => self.observe_carried_bytes_span(
+                        builder, ByteSpanAuthority::Field(bytes), word)?,
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired { site: "socket address byte field" }),
+                };
+                let (port, valid) = if field_count == 2 {
+                    authorize(1, EffectSeatNeed::ExactIntU64)?;
+                    let (port, valid) = match field(self, builder, 1)? {
+                        LoweringOperand::Specialized(value @ Lowered::Int { .. }) =>
+                            self.narrow_native_int_u64(builder, &value)?,
+                        LoweringOperand::Carried(word) => self.narrow_carried_int_u64(builder, word)?,
+                        LoweringOperand::Residual(_) => return Err(
+                            CraneliftBackendError::ResidualRepresentationRequired { site: "socket address port field" }),
+                        LoweringOperand::Specialized(_) => return Err(unsupported(
+                            LoweringCause::Fragment, "Effect", "socket address port field is not Int")),
+                    };
+                    let fits = builder.ins().icmp_imm(IntCC::UnsignedLessThanOrEqual, port, 0xffff);
+                    (port, builder.ins().band(valid, fits))
+                } else {
+                    (builder.ins().iconst(types::I64, 0), builder.ins().iconst(types::I8, 1))
+                };
+                let tag = builder.ins().iconst(types::I64, wire_tag);
+                Ok(vec![tag, pointer, length, port, outcome, valid])
+            }
+            _ => Err(unsupported(LoweringCause::PlannerInvariant, "Effect",
+                format!("unexpected socket constructor path {path:?} for {:?}", seat.operation))),
+        }
+    }
+
+    /// Resolve checked template identities without looking up lowering-side names.
+    fn wire_socket_constructor_seat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seats: &ClaimedEffectSeats<'_>,
+        slot: EffectSeatSlot,
+    ) -> Result<Vec<cranelift_codegen::ir::Value>, CraneliftBackendError> {
+        let (seat, operand) = seats.operand(slot)?;
+        let paths = self.static_transition_plan.host_effect_constructor_dispatch(seat.operation, seat.slot)?
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "Effect", "missing socket constructor dispatcher"))?;
+        match operand {
+            LoweringOperand::Carried(word) => self.emit_carried_constructor_dispatch(builder, *word, &paths, Some(seat)),
+            LoweringOperand::Specialized(Lowered::Constructor { synthesized_identity: Some(identity), args, .. }) => {
+                for path in paths {
+                    match path {
+                        EffectSeatConstructorPath::RootFields { identity: expected, field_count, .. }
+                            if *identity == expected && args.len() == field_count as usize => {
+                            return self.observe_socket_fields(builder, path, seat, |_, _, position| {
+                                let value = args[position as usize].specialized_at("socket constructor field")?;
+                                Ok(LoweringOperand::Specialized(value.clone()))
+                            });
+                        }
+                        EffectSeatConstructorPath::Root { identity: expected, field_count, wire_tag }
+                            if *identity == expected && args.len() == field_count as usize => {
+                            return Ok(vec![builder.ins().iconst(types::I64, wire_tag)]);
+                        }
+                        _ => {}
+                    }
+                }
+                Err(unsupported(LoweringCause::PlannerInvariant, "Effect", "socket constructor template has no exact planner path"))
+            }
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                LoweringCause::PlannerInvariant, "Effect", "socket operand has no checked constructor template")),
+            LoweringOperand::Residual(_) => Err(CraneliftBackendError::ResidualRepresentationRequired {
+                site: "a socket constructor seat",
+            }),
+        }
+    }
+
     /// Emit the one-sided finite dispatcher for a carried constructor seat.
     ///
     /// Every success edge is named by a planner-issued constructor identity,
@@ -2547,7 +2684,8 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         word: CarriedBoundaryWord,
         paths: &[EffectSeatConstructorPath],
-    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        field_seat: Option<PlannedEffectSeat>,
+    ) -> Result<Vec<cranelift_codegen::ir::Value>, CraneliftBackendError> {
         if paths.is_empty() {
             return Err(unsupported(LoweringCause::Fragment,
                 "Effect",
@@ -2575,11 +2713,19 @@ impl<'a> Lowering<'a> {
         let done = builder.create_block();
         builder.append_block_param(done, types::I64);
 
+        if field_seat.is_some_and(|seat| matches!(seat.operation,
+            ken_host::HostOpV1::NetListen | ken_host::HostOpV1::NetConnect)) {
+            let pointer_type = builder.func.dfg.value_type(self.carrier_arena()?);
+            for ty in [pointer_type, types::I64, types::I64, types::I64, types::I8] {
+                builder.append_block_param(done, ty);
+            }
+        }
         for path in paths {
             let selected = builder.create_block();
             let next = builder.create_block();
             let root_identity = match path {
-                EffectSeatConstructorPath::Root { identity, .. } => *identity,
+                EffectSeatConstructorPath::Root { identity, .. }
+                | EffectSeatConstructorPath::RootFields { identity, .. } => *identity,
                 EffectSeatConstructorPath::PositionalChild { root_identity, .. } => *root_identity,
             };
             let expected_root =
@@ -2601,6 +2747,18 @@ impl<'a> Lowering<'a> {
                     Self::require_i64(builder, root_field_count, i64::from(*field_count));
                     let wire_tag = builder.ins().iconst(types::I64, *wire_tag);
                     builder.ins().jump(done, &[wire_tag]);
+                }
+                EffectSeatConstructorPath::RootFields { field_count, .. } => {
+                    Self::require_i64(builder, root_field_count, i64::from(*field_count));
+                    let seat = field_seat.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "Effect", "constructor field route is missing its claimed seat"))?;
+                    let values = self.observe_socket_fields(builder, *path, seat, |this, builder, position| {
+                        let child = this.emit_carrier_field(builder, word, position as usize)?;
+                        this.refuse_private_recursive_residual(builder, child)?;
+                        Ok(LoweringOperand::Carried(child))
+                    })?;
+                    let values = values.into_iter().map(Into::into).collect::<Vec<_>>();
+                    builder.ins().jump(done, &values);
                 }
                 EffectSeatConstructorPath::PositionalChild {
                     root_field_count: expected_root_fields,
@@ -2662,7 +2820,7 @@ impl<'a> Lowering<'a> {
         let failure = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[failure]);
         builder.switch_to_block(done);
-        Ok(builder.block_params(done)[0])
+        Ok(builder.block_params(done).to_vec())
     }
 
     /// Read one constructor-tag seat in either phase. Specialized templates
@@ -2694,7 +2852,7 @@ impl<'a> Lowering<'a> {
                             ),
                         )
                     })?;
-                self.emit_carried_constructor_dispatch(builder, *word, &paths)
+                self.emit_carried_constructor_dispatch(builder, *word, &paths, None).map(|values| values[0])
             }
             LoweringOperand::Residual(_) => Err(
                 CraneliftBackendError::ResidualRepresentationRequired {
@@ -4126,6 +4284,48 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(span_origin, request, request_offset(4));
             }
+            ken_host::HostOpV1::NetListen | ken_host::HostOpV1::NetConnect => {
+                let (_, operand) = seats.operand(EffectSeatSlot::Capability)?;
+                let token = match operand {
+                    LoweringOperand::Specialized(Lowered::CapabilityToken { value }) => *value,
+                    LoweringOperand::Carried(word) => self.emit_carrier_scalar(builder, *word)?,
+                    LoweringOperand::Residual(_) => return Err(CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a socket capability seat",
+                    }),
+                    LoweringOperand::Specialized(_) => return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "Effect", "socket invocation capability is not an opaque token")),
+                };
+                let payload = self.wire_socket_constructor_seat(builder, &seats, SEAT_0)?;
+                let [family, pointer, length, port, outcome, valid] = payload.as_slice() else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "Effect", "socket address route did not return six values"));
+                };
+                use cranelift_codegen::ir::condcodes::IntCC;
+                let invalid = builder.ins().icmp_imm(IntCC::NotEqual, *outcome, 0);
+                let bounds = builder.ins().icmp_imm(IntCC::Equal, *outcome, 1);
+                let bounds_code = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
+                let malformed_code = builder.ins().iconst(types::I64, RESOURCE_ERROR_MALFORMED_RESOURCE);
+                let detail = builder.ins().select(bounds, bounds_code, malformed_code);
+                record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                let invalid = builder.ins().icmp_imm(IntCC::Equal, *valid, 0);
+                let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
+                record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                for (index, value) in [token, *family, *pointer, *length, *port].into_iter().enumerate() {
+                    builder.ins().stack_store(value, request, request_offset(index));
+                }
+            }
+            ken_host::HostOpV1::NetAccept | ken_host::HostOpV1::NetShutdown => {
+                let token = self.lower_resource_token_seat(builder, seats.operand(SEAT_0)?.1,
+                    "socket resource operation", "socket")?;
+                builder.ins().stack_store(token, request, request_offset(0));
+                if operation == ken_host::HostOpV1::NetShutdown {
+                    let how = self.wire_socket_constructor_seat(builder, &seats, SEAT_1)?;
+                    builder.ins().stack_store(how[0], request, request_offset(1));
+                }
+            }
+            ken_host::HostOpV1::NetLocalAddress => {
+                let token = self.wire_socket_constructor_seat(builder, &seats, SEAT_0)?;
+                builder.ins().stack_store(token[0], request, request_offset(0));
+            }
             ken_host::HostOpV1::ProcessPlanPush => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment, "Effect", "ProcessPlanPush carried a capability"));
@@ -4170,7 +4370,7 @@ impl<'a> Lowering<'a> {
                 }
             }
             ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt
-            | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::ResourceStreamWrite => {
+            | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
@@ -4202,7 +4402,7 @@ impl<'a> Lowering<'a> {
                 // narrow-failure lane below. No second carried `Int` decode is
                 // spelled.
                 let stream = matches!(operation,
-                    ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::ResourceStreamWrite);
+                    ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend);
                 let (file_offset, file_offset_valid) = if stream {
                     (builder.ins().iconst(types::I64, 0), builder.ins().iconst(types::I64, 1))
                 } else {
@@ -4243,7 +4443,7 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .iconst(types::I64, RESOURCE_ERROR_INVALID_BOUNDS);
                 record_narrow_failure(builder, bounds_invalid, resource_error_reply_tag, detail);
-                if matches!(operation, ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite) {
+                if matches!(operation, ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend) {
                     // PX8-SPAN-PROV: `FsWriteAt` carries the trailing
                     // `span_origin` acquisition token; `FsReadAt` mints the span
                     // and has no origin operand.
@@ -4460,6 +4660,9 @@ impl<'a> Lowering<'a> {
                     wire.reply_metadata_tag
                 }
                 ken_host::HostOpV1::BufferAllocate
+                | ken_host::HostOpV1::NetListen
+                | ken_host::HostOpV1::NetConnect
+                | ken_host::HostOpV1::NetAccept
                 | ken_host::HostOpV1::MappingAllocate
                 | ken_host::HostOpV1::MappingAcquireFile => {
                     wire.reply_resource_tag
@@ -4467,9 +4670,10 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::BufferFreeze | ken_host::HostOpV1::MappingReadView => {
                     wire.reply_bytes_tag
                 }
-                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead => wire.reply_read_progress_tag,
-                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite => wire.reply_write_progress_tag,
+                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive => wire.reply_read_progress_tag,
+                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend => wire.reply_write_progress_tag,
                 ken_host::HostOpV1::ProcessWait => wire.reply_child_exit_tag,
+                ken_host::HostOpV1::NetLocalAddress => wire.reply_socket_address_tag,
                 _ => wire.reply_unit_tag,
             } as i64;
             let accepted_tags = match operation {
@@ -4498,8 +4702,13 @@ impl<'a> Lowering<'a> {
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
                 | ken_host::HostOpV1::ProcessSignal
-                | ken_host::HostOpV1::ResourceStreamRead
-                | ken_host::HostOpV1::ResourceStreamWrite
+                | ken_host::HostOpV1::NetListen
+                | ken_host::HostOpV1::NetConnect
+                | ken_host::HostOpV1::NetAccept
+                | ken_host::HostOpV1::NetShutdown
+                | ken_host::HostOpV1::NetLocalAddress
+                | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive
+                | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend
                 | ken_host::HostOpV1::MappingAllocate
                 | ken_host::HostOpV1::MappingAcquireFile
                 | ken_host::HostOpV1::MappingReadView
@@ -4778,8 +4987,13 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::ProcessTakePipe
                     | ken_host::HostOpV1::ProcessWait
                     | ken_host::HostOpV1::ProcessSignal
-                    | ken_host::HostOpV1::ResourceStreamRead
-                    | ken_host::HostOpV1::ResourceStreamWrite
+                    | ken_host::HostOpV1::NetListen
+                    | ken_host::HostOpV1::NetConnect
+                    | ken_host::HostOpV1::NetAccept
+                    | ken_host::HostOpV1::NetShutdown
+                    | ken_host::HostOpV1::NetLocalAddress
+                    | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive
+                    | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend
                     | ken_host::HostOpV1::ProcessPlanOpen
             ) {
                 let generic = builder.ins().icmp_imm(
@@ -5262,6 +5476,9 @@ impl<'a> Lowering<'a> {
             } else if matches!(
                 operation,
                 ken_host::HostOpV1::BufferAllocate
+                    | ken_host::HostOpV1::NetListen
+                    | ken_host::HostOpV1::NetAccept
+                    | ken_host::HostOpV1::NetConnect
                     | ken_host::HostOpV1::MappingAllocate
                     | ken_host::HostOpV1::MappingAcquireFile
             ) {
@@ -5307,8 +5524,52 @@ impl<'a> Lowering<'a> {
                         )?,
                     ],
                 })
+            } else if operation == ken_host::HostOpV1::NetLocalAddress {
+                use cranelift_codegen::ir::condcodes::IntCC;
+                let family = builder.ins().band_imm(detail, 0xff);
+                let port = builder.ins().ushr_imm(detail, 8);
+                let inet4 = builder.ins().icmp_imm(IntCC::Equal, family, 0);
+                let inet6 = builder.ins().icmp_imm(IntCC::Equal, family, 1);
+                let unix = builder.ins().icmp_imm(IntCC::Equal, family, 2);
+                let len = builder.ins().stack_load(types::I64, reply,
+                    i32::try_from(wire.reply_bytes_len_offset).expect("reply bytes length offset"));
+                let len4 = builder.ins().icmp_imm(IntCC::Equal, len, 4);
+                let len6 = builder.ins().icmp_imm(IntCC::Equal, len, 16);
+                let unix_min = builder.ins().icmp_imm(IntCC::UnsignedGreaterThanOrEqual, len, 2);
+                let unix_max = builder.ins().icmp_imm(IntCC::UnsignedLessThanOrEqual, len, 107);
+                let unix_len = builder.ins().band(unix_min, unix_max);
+                let unix_port = builder.ins().icmp_imm(IntCC::Equal, port, 0);
+                let valid4 = builder.ins().band(inet4, len4);
+                let valid6 = builder.ins().band(inet6, len6);
+                let valid_unix = builder.ins().band(unix, unix_len);
+                let valid_unix = builder.ins().band(valid_unix, unix_port);
+                let valid = builder.ins().bor(valid4, valid6);
+                let valid = builder.ins().bor(valid, valid_unix);
+                let port_fits = builder.ins().icmp_imm(IntCC::UnsignedLessThanOrEqual, port, 0xffff);
+                let valid = builder.ins().band(valid, port_fits);
+                Self::require_when(builder, success, valid);
+                let zero = builder.ins().iconst(types::I64, 0);
+                let family = builder.ins().select(success, family, zero);
+                let port = builder.ins().select(success, port, zero);
+                let port = self.lower_dynamic_small_int(builder, port);
+                let bytes = masked_reply_response_bytes(builder, pointer_type, reply,
+                    wire.reply_bytes_data_offset, wire.reply_bytes_len_offset, success);
+                let roles = [SynthesizedFixedConstructorRole::SocketAddressIPv4,
+                    SynthesizedFixedConstructorRole::SocketAddressIPv6,
+                    SynthesizedFixedConstructorRole::SocketAddressUnix];
+                let mut alternatives = Vec::new();
+                for (index, role) in roles.into_iter().enumerate() {
+                    let mut fields = vec![SynthesizedArgument::HostResponseReferent {
+                        class: BoundaryClass::Bytes, value: bytes.clone(),
+                    }];
+                    if index != 2 { fields.push(SynthesizedArgument::Scalar(port.clone())); }
+                    alternatives.push(self.synthesized_dynamic_alternative(static_origin, &ok_root,
+                        index as u32, index as i64, role, self.process_symbols.px11_address_symbols[index].clone(),
+                        fields, &seats)?);
+                }
+                Lowered::DynamicConstructor(DynamicConstructorV1 { discriminator: family, alternatives })
             } else if matches!(operation,
-                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead) {
+                ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive) {
                 let reply_data = builder.ins().stack_load(
                     pointer_type,
                     reply,
@@ -5376,7 +5637,7 @@ impl<'a> Lowering<'a> {
                 // splitting them ships a diff that greens nothing.
                 let span_argument =
                     self.site_operand_argument(builder, static_origin,
-                        if operation == ken_host::HostOpV1::ResourceStreamRead { 1 } else { 2 }, &seats)?;
+                        if matches!(operation, ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive) { 1 } else { 2 }, &seats)?;
                 let span = self.synthesized_constructor(
                     static_origin,
                     &ok_root.alternative(1).field(0),
@@ -5443,7 +5704,7 @@ impl<'a> Lowering<'a> {
                     ],
                 })
             } else if matches!(operation,
-                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite) {
+                ken_host::HostOpV1::FsWriteAt | ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend) {
                 let (request_start, request_length) = positioned_bounds
                     .expect("positioned request bounds were narrowed before dispatch");
                 let effective_request = builder.ins().stack_load(

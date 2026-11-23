@@ -296,6 +296,9 @@ runtime_host_spine_v1! {
     option_none,
     directory_entries,
     directory_end,
+    px11_address_ipv4,
+    px11_address_ipv6,
+    px11_address_unix,
 }
 
 /// The decoded, validated checked-runtime role record.

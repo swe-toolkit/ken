@@ -175,6 +175,7 @@ pub(super) use static_transition::{
 pub(super) use static_transition::{
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    PlannedEffectSeatField,
     CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]

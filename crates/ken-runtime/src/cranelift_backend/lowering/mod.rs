@@ -458,6 +458,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    PlannedEffectSeatField,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
     RecursiveCarrierBoxedStore, RecursiveCarrierMemberSchema, RecursiveCarrierStore,

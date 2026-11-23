@@ -1703,16 +1703,11 @@ The seven new host operations are `NetListen`, `NetAccept`, `NetConnect`,
 host-family codes are `0x0701` through `0x0707` in that order.
 `ResourceKind.SocketListener` and `ResourceKind.SocketStream` are new
 opaque resource kinds; resource release uses the existing operation.
-These seven operations, **and no others**, form the named
-interpreter-admission exception while each remains
-`RepresentedUnavailable` for the native lane. A native build of a
-program **declaring Net**, even one whose branch does not take a socket
-operation at runtime, refuses before object emission with the typed
-`host_effect_lowering_unavailable` reason naming the unavailable Net
-operations. No artifact is emitted. The immediate PX11 native-parity
-successor closes this interpreter-only set; datagrams, typed option
-families, an injected resolver and DNS boundary, nonblocking/readiness
-and abstract Unix names remain subsequent work. No new kernel rule or
+All seven operations are `NativeTested` and execute on both the interpreter
+and native lanes. A declared Net grant no longer triggers a native-build
+refusal. Datagrams, typed option families, an injected resolver and DNS
+boundary, nonblocking/readiness and abstract Unix names remain subsequent
+work. No new kernel rule or
 trusted postulate is authorized. Any required trust growth is an
 operator stop.
 

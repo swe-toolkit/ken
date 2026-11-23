@@ -160,10 +160,13 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ChildExitExited,
     ChildExitSignaled,
     OptionNone,
+    SocketAddressIPv4,
+    SocketAddressIPv6,
+    SocketAddressUnix,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 62] = [
+    pub(super) const ALL: [Self; 65] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -226,6 +229,9 @@ impl SynthesizedFixedConstructorRole {
         Self::ChildExitExited,
         Self::ChildExitSignaled,
         Self::OptionNone,
+        Self::SocketAddressIPv4,
+        Self::SocketAddressIPv6,
+        Self::SocketAddressUnix,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -292,6 +298,9 @@ impl SynthesizedFixedConstructorRole {
             Self::ResourceKindPipeWrite => &symbols.px10_kind_symbols[3],
             Self::ChildExitExited => &symbols.px10_exit_symbols[0],
             Self::ChildExitSignaled => &symbols.px10_exit_symbols[1],
+            Self::SocketAddressIPv4 => &symbols.px11_address_symbols[0],
+            Self::SocketAddressIPv6 => &symbols.px11_address_symbols[1],
+            Self::SocketAddressUnix => &symbols.px11_address_symbols[2],
         }
     }
 }

@@ -10466,7 +10466,7 @@ fn d4_observe(
         let word = compiler.transfer_into_carrier(builder, root, &value)?;
         let (pointer, length, outcome) = compiler.observe_carried_bytes_span(
             builder,
-            d4_seat(EffectSeatNeed::BytesPointerLength),
+            d4_seat(EffectSeatNeed::BytesPointerLength).into(),
             word,
         )?;
         Ok(match field {
@@ -10594,7 +10594,7 @@ fn d4_a_seat_whose_need_is_not_a_byte_span_is_refused() {
         let word = compiler.transfer_into_carrier(builder, root, &Lowered::Bytes(vec![1, 2]))?;
         let (pointer, _len, _outcome) = compiler.observe_carried_bytes_span(
             builder,
-            d4_seat(EffectSeatNeed::CapabilityTokenScalar),
+            d4_seat(EffectSeatNeed::CapabilityTokenScalar).into(),
             word,
         )?;
         Ok(pointer)

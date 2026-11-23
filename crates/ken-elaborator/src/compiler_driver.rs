@@ -2670,24 +2670,6 @@ fn prepare_native_program_from_elaborated(
         .map_err(NativeProgramBuildError::Driver)?;
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
-    // Arm I: no native socket opcode exists. Reject a declared Net grant
-    // before planning or object emission, even when its first operation is
-    // hidden behind a checked helper rather than visible at the entrypoint.
-    if plan.net_scope != 0 {
-        let unavailable = ken_host::HostOpV1::ALL
-            .into_iter()
-            .filter(|operation| {
-                crate::export::host_operation_family_v1(*operation)
-                    == crate::export::HostOpFamilyV1::Net
-            })
-            .map(|operation| format!("{operation:?}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
-            "host_effect_lowering_unavailable",
-            format!("{unavailable} are RepresentedUnavailable for native execution (declared Net)"),
-        )));
-    }
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
     // Gate 4a: retained on the preparation so a control can compare the EMBEDDED
     // plan bytes against a full native build's, rather than recomputing them.
@@ -3319,6 +3301,7 @@ fn emit_native_program_preparation(
                 resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
                 px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
+                px11_address_symbols: host_spine.px11_address_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -4478,6 +4461,11 @@ fn checked_host_spine_v1(
             resolve_id(prelude.px10_exit_ids[0])?,
             resolve_id(prelude.px10_exit_ids[1])?,
         ],
+        px11_address_symbols: [
+            resolve_id(prelude.px11_address_ids[0])?,
+            resolve_id(prelude.px11_address_ids[1])?,
+            resolve_id(prelude.px11_address_ids[2])?,
+        ],
         process_take_pipe_write_constructor: resolve_id(prelude.px10_op_ids[3])?,
         // Order is the contract — the roster documents it at the capture site.
         io_errors: [
@@ -4747,6 +4735,9 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S2 appends in the same order as the runtime role decoder.
         &spine.directory_entries,
         &spine.directory_end,
+        &spine.px11_address_symbols[0],
+        &spine.px11_address_symbols[1],
+        &spine.px11_address_symbols[2],
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());

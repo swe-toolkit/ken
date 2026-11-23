@@ -1,10 +1,10 @@
 //! Spec 38 §1.13, PX11 stream sockets. Each case reaches the checked Ken
-//! surface, interpreter, host dispatcher and Linux socket leaf.
+//! surface, the interpreter and native lanes, and the shared Linux socket leaf.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-const PROFILE: &str = r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":64},"invocation":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64},"persistent":{"nodes":64,"words":256,"data_bytes":512,"native_int_limbs":64}}"#;
+const PROFILE: &str = r#"{"runtime":{"invocation_epochs":18446744073709551615},"call_events":{"event_generations":18446744073709551615,"live_pending_slots":256},"invocation":{"nodes":65536,"words":262144,"data_bytes":1048576,"native_int_limbs":65536},"persistent":{"nodes":65536,"words":262144,"data_bytes":1048576,"native_int_limbs":65536}}"#;
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -23,6 +23,56 @@ fn run(name: &str, cwd: &Path, arguments: &[&str]) -> Output {
         .expect("run checked Ken source")
 }
 
+fn build(name: &str, work: &Path) -> PathBuf {
+    let build_dir = tempfile::tempdir_in(work).expect("private native output directory");
+    let profile = work.join("px11-profile.json");
+    std::fs::write(&profile, PROFILE).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_ken"))
+        .arg("native-build")
+        .arg(fixture(name))
+        .arg(build_dir.path())
+        .arg(profile)
+        .output()
+        .expect("build native PX11 artifact");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{name}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let artifact = String::from_utf8(output.stdout).expect("artifact path is UTF-8");
+    let artifact = PathBuf::from(artifact.trim());
+    assert!(
+        artifact.starts_with(build_dir.path()) && artifact.is_file(),
+        "{artifact:?}"
+    );
+    let _ = build_dir.keep();
+    artifact
+}
+
+fn assert_parity(name: &str, interp: Output, native: Output) {
+    assert_eq!(
+        native.status.code(),
+        interp.status.code(),
+        "{name}: native={native:?}, interp={interp:?}"
+    );
+    assert_eq!(native.stdout, interp.stdout, "{name}: stdout");
+    assert_eq!(native.stderr, interp.stderr, "{name}: stderr");
+    assert_success(name, interp);
+}
+
+fn run_parity(name: &str, cwd: &Path, args: &[&str]) {
+    let work = tempfile::tempdir().unwrap();
+    let artifact = build(name, work.path());
+    let interp = run(name, cwd, args);
+    let native = Command::new(artifact)
+        .current_dir(cwd)
+        .args(args)
+        .output()
+        .unwrap();
+    assert_parity(name, interp, native);
+}
+
 fn assert_success(name: &str, output: Output) {
     assert_eq!(
         output.status.code(),
@@ -33,40 +83,44 @@ fn assert_success(name: &str, output: Output) {
     );
 }
 
-/// Promise class: durable invariant (the seven Net ops stay interpreter-live).
-/// MEASURED: real Ken listener, ephemeral-port readback, connect/accept,
-/// full-byte sends and reads in both directions, shutdown then EOF across
-/// IPv4, IPv6 and Unix. CLAIMED: the three address families' stream contracts
-/// are executable. THE GAP: the Linux host is required to support all three
-/// address families; this case does not establish native support (AC-4 refuses).
+/// Promise class: durable invariant.
+/// MEASURED: both lanes exchange the known payload and observe EOF, then leave
+/// a socket pathname only for Unix. CLAIMED: stream operations agree across
+/// families. THE GAP: this row measures no capacity; a change in a Net
+/// operation's arena cost is not detected here.
 #[test]
 fn px11_all_three_families_exchange_exact_bytes_and_observe_eof() {
+    let work = tempfile::tempdir().unwrap();
+    let artifact = build("px11_stream_exchange.ken", work.path());
     for family in ["4", "6", "unix"] {
-        let dir = tempfile::Builder::new()
+        // Use the same pathname with a fresh filesystem state on each lane.
+        let root = tempfile::Builder::new()
             .prefix("ken-px11-")
             .tempdir_in("/tmp")
-            .expect("isolated socket fixture directory");
-        std::fs::write(dir.path().join("px11-payload.bin"), b"PX11ok!")
-            .expect("known-answer payload");
-        let unix_path = std::fs::canonicalize(dir.path())
-            .expect("canonical default FS root")
-            .join("listener.sock");
-        let unix = unix_path.to_str().expect("UTF-8 temporary path");
-        assert_success(
-            family,
-            run("px11_stream_exchange.ken", dir.path(), &[family, unix]),
+            .unwrap();
+        let unix_path = root.path().join("listener.sock");
+        let unix = unix_path.to_str().unwrap();
+        std::fs::write(root.path().join("px11-payload.bin"), b"PX11ok!").unwrap();
+        let interp = run("px11_stream_exchange.ken", root.path(), &[family, unix]);
+        assert_eq!(
+            unix_path.exists(),
+            family == "unix",
+            "{family}: interpreter; {interp:?}"
         );
         if family == "unix" {
-            assert!(
-                unix_path.exists(),
-                "socket pathname survives bracket release"
-            );
-        } else {
-            assert!(
-                !unix_path.exists(),
-                "IP traffic does not create a Unix socket"
-            );
+            std::fs::remove_file(&unix_path).unwrap();
         }
+        let native = Command::new(&artifact)
+            .current_dir(root.path())
+            .args([family, unix])
+            .output()
+            .unwrap();
+        assert_eq!(
+            unix_path.exists(),
+            family == "unix",
+            "{family}: native; {native:?}"
+        );
+        assert_parity(family, interp, native);
     }
 }
 
@@ -87,10 +141,7 @@ fn px11_missing_unix_listener_has_typed_socket_error() {
         .join("missing.sock");
     assert!(!unix_path.exists(), "negative case requires no listener");
     let path = unix_path.to_str().unwrap();
-    assert_success(
-        "missing listener",
-        run("px11_missing_listener.ken", dir.path(), &[path]),
-    );
+    run_parity("px11_missing_listener.ken", dir.path(), &[path]);
 }
 
 /// Promise class: durable invariant. MEASURED: a Unix address under only a
@@ -107,13 +158,10 @@ fn px11_wrong_grant_refuses_unix_connect() {
     let path = std::fs::canonicalize(dir.path())
         .expect("canonical default FS root")
         .join("absent.sock");
-    assert_success(
-        "wrong grant",
-        run(
-            "px11_wrong_grant.ken",
-            dir.path(),
-            &[path.to_str().unwrap()],
-        ),
+    run_parity(
+        "px11_wrong_grant.ken",
+        dir.path(),
+        &[path.to_str().unwrap()],
     );
 }
 
@@ -138,8 +186,8 @@ enum UnixRootCase {
 /// the presented FS root or follow a symlink, even to an in-root target.
 /// THE GAP: this samples one canonical Linux temp root; descriptor pinning and
 /// the other roots/error classes have separate host-level tests and review.
-fn assert_unix_root_case(case: UnixRootCase) {
-    use std::os::unix::fs::{symlink, FileTypeExt, MetadataExt};
+fn run_unix_root_case(case: UnixRootCase, artifact: Option<&Path>) -> Output {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt, symlink};
     use std::os::unix::net::{UnixListener, UnixStream};
 
     let dir = tempfile::Builder::new()
@@ -199,11 +247,15 @@ fn assert_unix_root_case(case: UnixRootCase) {
         UnixRootCase::ParentSymlink => ("connect", jail.join("link/svc.sock"), 84),
         UnixRootCase::LeafSymlink => ("connect", alias_path.clone(), 84),
     };
-    let output = run(
-        "rt_net_unix_root_scope.ken",
-        &root,
-        &[operation, address.to_str().expect("UTF-8 temp pathname")],
-    );
+    let args = [operation, address.to_str().expect("UTF-8 temp pathname")];
+    let output = match artifact {
+        None => run("rt_net_unix_root_scope.ken", &root, &args),
+        Some(artifact) => Command::new(artifact)
+            .current_dir(&root)
+            .args(args)
+            .output()
+            .unwrap(),
+    };
     assert_eq!(
         output.status.code(),
         Some(expected),
@@ -232,6 +284,23 @@ fn assert_unix_root_case(case: UnixRootCase) {
         let _connection = UnixStream::connect(peer_path)
             .expect("symlink target peer remains live after refused acquisition");
     }
+    output
+}
+
+/// Use fresh listener/path state on each lane. THE GAP: this row measures no
+/// capacity; a change in a Net operation's arena cost is not detected here.
+fn assert_unix_root_case(case: UnixRootCase) {
+    let work = tempfile::tempdir().unwrap();
+    let artifact = build("rt_net_unix_root_scope.ken", work.path());
+    let interp = run_unix_root_case(case, None);
+    let native = run_unix_root_case(case, Some(&artifact));
+    assert_eq!(
+        native.status.code(),
+        interp.status.code(),
+        "{case:?}: exit status"
+    );
+    assert_eq!(native.stdout, interp.stdout, "{case:?}: stdout");
+    assert_eq!(native.stderr, interp.stderr, "{case:?}: stderr");
 }
 
 /// Promise class: durable invariant; bind beneath the FS root succeeds.
@@ -304,51 +373,4 @@ fn unix_connect_parent_symlink_refuses_live_outside_peer() {
 #[test]
 fn unix_connect_leaf_symlink_refuses_live_outside_peer() {
     assert_unix_root_case(UnixRootCase::LeafSymlink);
-}
-
-/// Promise class: transition sentinel, retired by the native-parity successor.
-/// MEASURED: native-build of the same checked Net program returns the exact
-/// pre-emission unavailable diagnostic and an empty output directory.
-/// CLAIMED: no Net-declared program falls through to native object emission.
-/// THE GAP: the gate applies to the declared Net plan; the test does not
-/// enumerate every possible Net syntax spelling.
-#[test]
-fn px11_declared_net_native_build_refuses_before_emission() {
-    let dir = tempfile::tempdir().unwrap();
-    let output_dir = dir.path().join("native");
-    std::fs::create_dir(&output_dir).unwrap();
-    let profile = dir.path().join("profile.json");
-    std::fs::write(&profile, PROFILE).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_ken"))
-        .arg("native-build")
-        .arg(fixture("px11_stream_exchange.ken"))
-        .arg(&output_dir)
-        .arg(profile)
-        .output()
-        .expect("attempt native build through checked source");
-    assert_eq!(output.status.code(), Some(1), "{output:?}");
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("host_effect_lowering_unavailable"),
-        "{stderr}"
-    );
-    let named: Vec<_> = ken_host::HostOpV1::ALL
-        .into_iter()
-        .filter(|operation| stderr.contains(&format!("{operation:?}")))
-        .collect();
-    assert_eq!(
-        named,
-        [
-            ken_host::HostOpV1::NetListen,
-            ken_host::HostOpV1::NetAccept,
-            ken_host::HostOpV1::NetConnect,
-            ken_host::HostOpV1::NetReceive,
-            ken_host::HostOpV1::NetSend,
-            ken_host::HostOpV1::NetShutdown,
-            ken_host::HostOpV1::NetLocalAddress,
-        ],
-        "the refusal names exactly the seven unavailable Net operations: {stderr}"
-    );
-    assert!(stderr.contains("RepresentedUnavailable"), "{stderr}");
-    assert_eq!(std::fs::read_dir(&output_dir).unwrap().count(), 0);
 }

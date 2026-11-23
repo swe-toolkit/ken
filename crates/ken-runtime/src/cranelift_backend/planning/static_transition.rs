@@ -297,6 +297,7 @@ use aggregates::{
 pub(in crate::cranelift_backend) use effects::{
     host_effect_seat_contract_of, EffectSeatAvail, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    PlannedEffectSeatField,
     CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
