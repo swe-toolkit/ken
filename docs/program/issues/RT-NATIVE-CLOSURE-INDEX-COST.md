@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-CLOSURE-INDEX-COST
 title: "build_target_closure builds two dependency indexes over every package declaration, not over what the target reaches: one validates the whole checked package again for each declaration, and the other scans each declaration's bytes for every symbol's spelling. So every native build pays a cost set by the size of the prelude and imports, and PX11-NATIVE Inc2's exchange fixture cannot reach execution inside its bound. Validate once, by a type only validation can construct, and compute dependencies only for the symbols the closure walk pops, with closure identity unchanged"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
