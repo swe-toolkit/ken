@@ -4344,11 +4344,14 @@ import Capability.Filesystem.Authority (file_metadata)
 import Capability.Process.Exit (host_bind, host_fs, host_pure)
 import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, resourceMetadata, withResource)
 
-fn file_witness (meta : FileMetadata) : Bool =
+fn file_witness (meta : FileMetadata) (by_path : Bool) : Bool =
   match meta {
     FileMetadata.MkFileMetadata size kind mode links major minor inode modified changed accessed born |->
       match kind {
-        FileKind.KFile |-> match born { None |-> True; Some timestamp |-> False };
+        FileKind.KFile |-> match by_path {
+          True |-> __path_check;
+          False |-> __handle_check
+        };
         FileKind.KDirectory |-> False;
         FileKind.KSymlink |-> False;
         FileKind.KOther |-> False
@@ -4361,7 +4364,7 @@ fn handle_result (outcome : Result ResourceError FileMetadata)
     Err error |-> host_pure AFull (ResourceBodyResult ResourceError Bool)
       (ResourceBodyErr ResourceError Bool error);
     Ok metadata |-> host_pure AFull (ResourceBodyResult ResourceError Bool)
-      (ResourceBodyOk ResourceError Bool (file_witness metadata))
+      (ResourceBodyOk ResourceError Bool (file_witness metadata False))
   }
 
 proc handle_body (resource : Resource ResourceKind.FsHandle)
@@ -4392,7 +4395,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         (host_fs AFull (Result FileError FileMetadata) (file_metadata AFull cap (bytes_encode "version")))
         (\outcome. match outcome {
           Err error |-> host_pure AFull ExitCode (ExitCode.Failure 36);
-          Ok metadata |-> match file_witness metadata {
+          Ok metadata |-> match file_witness metadata True {
             False |-> host_pure AFull ExitCode (ExitCode.Failure 37);
             True |-> host_bind AFull (Result FileError (ResourceBracketResult ResourceError Bool)) ExitCode
               (withResource AFull ResourceError Bool cap (bytes_encode "version")
@@ -4402,6 +4405,32 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         })
   }
 "#;
+
+    #[cfg(target_os = "linux")]
+    fn abi_s4_both_metadata_scenario(
+        identity: &str,
+        path_check: &str,
+        handle_check: &str,
+    ) -> Scenario {
+        let mut scenario = fs_metadata_success_scenario();
+        // Both records plus the resource bracket exceed the 64-node starter
+        // profile. This is the caller's policy for these two read-only tests.
+        scenario.boundary_resource_profile.persistent.nodes = 128;
+        scenario.boundary_resource_profile.persistent.words = 512;
+        scenario.entry.identity = identity.to_owned();
+        scenario.entry.source = ABI_S4_BOTH_METADATA_SOURCE
+            .replace("__path_check", path_check)
+            .replace("__handle_check", handle_check);
+        scenario.initial_filesystem.clear();
+        scenario.process_input.arguments.clear();
+        scenario.program_caps.fs_authority = ken_elaborator::capabilities::AUTH_FULL;
+        scenario.program_caps.relative_root.clear();
+        scenario.program_caps.rights = RightSet::METADATA;
+        scenario.expected_fs = vec![ExpectedFsEffect::Metadata {
+            path: b"version".to_vec(),
+        }];
+        scenario
+    }
 
     fn metadata_result(
         observation: &EffectObservation,
@@ -4451,21 +4480,9 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
             !mask.contains(F::BTIME),
             "ABI-S4 /proc/version premise: STATX_BTIME absent"
         );
-        let mut scenario = fs_metadata_success_scenario();
-        // The combined witness constructs two records and a resource bracket.
-        // The starter profile stops during the bracket return at node 65.
-        scenario.boundary_resource_profile.persistent.nodes = 128;
-        scenario.boundary_resource_profile.persistent.words = 512;
-        scenario.entry.identity = "abi-s4-procfs-absence".to_owned();
-        scenario.entry.source = ABI_S4_BOTH_METADATA_SOURCE.to_owned();
-        scenario.initial_filesystem.clear();
-        scenario.process_input.arguments.clear();
-        scenario.program_caps.fs_authority = ken_elaborator::capabilities::AUTH_FULL;
-        scenario.program_caps.relative_root.clear();
-        scenario.program_caps.rights = RightSet::METADATA;
-        scenario.expected_fs = vec![ExpectedFsEffect::Metadata {
-            path: b"version".to_vec(),
-        }];
+        let absent_birth = "match born { None |-> True; Some timestamp |-> False }";
+        let scenario =
+            abi_s4_both_metadata_scenario("abi-s4-procfs-absence", absent_birth, absent_birth);
         let mut run =
             execute_scenario_with_roots(&scenario, Some(SharedMetadataRoot::Existing(proc)))
                 .expect("ABI-S4 /proc/version exact artifacts execute");
@@ -4528,6 +4545,61 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
                 HostOpV1::FsMetadata
             ))
         );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: mode from the path reply and mtime from the handle reply
+    /// match raw statx inside each Ken client. CLAIMED: both operations reach
+    /// the native Some path, for each of its two payload kinds. THE GAP: the
+    /// mapping and layout pins cover the other fields, not this returned-value
+    /// row. The separate procfs row still tests genuine absence on both.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s4_returned_options_match_raw_statx_for_both_operations() {
+        use rustix::fs::{statx, AtFlags, StatxFlags as F};
+        use std::fs::{FileTimes, Permissions};
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{Duration, UNIX_EPOCH};
+
+        let fixture = TwinRealRoots::create(&[]).unwrap();
+        let path = fixture.interpreter().join("version");
+        let fd = std::fs::File::create(&path).unwrap();
+        fd.set_permissions(Permissions::from_mode(0o640)).unwrap();
+        fd.set_times(FileTimes::new().set_modified(UNIX_EPOCH + Duration::from_secs(15)))
+            .unwrap();
+        // Sample before either lane, then do not read or write file contents.
+        let st = statx(&fd, "", AtFlags::EMPTY_PATH, F::BASIC_STATS | F::BTIME).unwrap();
+        let mask = F::from_bits_retain(st.stx_mask);
+        assert!(
+            mask.contains(F::MODE | F::MTIME),
+            "regular fixture must supply mode and mtime: {mask:?}"
+        );
+        let mode = st.stx_mode & 0o7777;
+        let ns = i128::from(st.stx_mtime.tv_sec) * 1_000_000_000 + i128::from(st.stx_mtime.tv_nsec);
+        assert_eq!((mode, ns), (0o640, 15_000_000_000));
+        // Derive the oracle from raw status, not the production mapper or
+        // the pre-lowering effect trace. The Ken match consumes each payload.
+        let path_check =
+            format!("match mode {{ None |-> False; Some n |-> eq_int n ({mode} : Int) }}");
+        let handle_check = format!(
+            "match modified {{ None |-> False; Some instant |-> \
+             match instant {{ Instant.MkInstant n |-> eq_int n ({ns} : Int) }} }}",
+        );
+        let scenario =
+            abi_s4_both_metadata_scenario("abi-s4-returned-options", &path_check, &handle_check);
+        let run = execute_scenario_with_roots(
+            &scenario,
+            Some(SharedMetadataRoot::Existing(fixture.interpreter())),
+        )
+        .expect("ABI-S4 returned-option artifacts execute");
+        for (lane, observation) in [("interpreter", &run.interpreter), ("native", &run.native)] {
+            assert_eq!(
+                observation.exit_status, 0,
+                "{lane} returned options must match raw statx (32: handle, 37: path); mask={mask:?}; observation={observation:?}"
+            );
+        }
+        run.compare_exact().expect("returned-option canonical parity");
     }
 
     /// Promise class: durable invariant.
