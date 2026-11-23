@@ -35,6 +35,7 @@ pub struct BoundProcessEntrypoint {
     pub authority: u8,
     pub fs_root_spec: ken_host::FsRootSpec,
     pub process_declared: bool,
+    pub net_scope: u8,
     pub fs_root_binding: u64,
     pub plan_hash: u64,
     pub allow_root_execution: bool,
@@ -1214,6 +1215,7 @@ pub fn build_bound_process_starter_executable_artifact(
             crate::process_exit_status(crate::ProcessExitCode::Failure(0)).status,
             &entrypoint.fs_root_spec,
             entrypoint.process_declared,
+            entrypoint.net_scope,
             &profile,
         ),
     )
@@ -2362,7 +2364,16 @@ int main(void) {{
 pub(crate) fn process_starter_c_stub(
     profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
-    process_starter_c_stub_for_authority(1, 1, false, 1, &ken_host::FsRootSpec::default(), false, profile)
+    process_starter_c_stub_for_authority(
+        1,
+        1,
+        false,
+        1,
+        &ken_host::FsRootSpec::default(),
+        false,
+        0,
+        profile,
+    )
 }
 
 fn starter_status_report_c() -> String {
@@ -2422,6 +2433,7 @@ fn process_starter_c_stub_for_authority(
     root_denied_exit_status: i32,
     fs_root_spec: &ken_host::FsRootSpec,
     process_declared: bool,
+    net_scope: u8,
     profile: &crate::boundary_resource_profile::BoundaryResourceProfileV3,
 ) -> String {
     r#"#include <stdint.h>
@@ -2491,6 +2503,7 @@ extern long long ken_host_invocation_v1_init(
     uint64_t plan_hash,
     uint64_t allow_root_execution,
     uint64_t process_declared,
+    uint64_t net_scope,
     long long root_denied_exit_status,
     const unsigned char *target_abi_hash,
     const unsigned char *host_effect_abi_hash,
@@ -2622,6 +2635,7 @@ int main(int argc, char **argv, char **envp) {
         KEN_ENTRYPOINT_PLAN_HASH,
         __KEN_ALLOW_ROOT_EXECUTION__,
         __KEN_PROCESS_DECLARED__,
+        __KEN_NET_SCOPE__,
         __KEN_ROOT_DENIED_EXIT_STATUS__,
         KEN_TARGET_ABI_HASH,
         KEN_HOST_EFFECT_ABI_HASH,
@@ -2741,6 +2755,7 @@ int main(int argc, char **argv, char **envp) {
         &u8::from(allow_root_execution).to_string(),
     )
     .replace("__KEN_PROCESS_DECLARED__", &u8::from(process_declared).to_string())
+    .replace("__KEN_NET_SCOPE__", &net_scope.to_string())
     .replace("__KEN_STATUS_REPORT__", &starter_status_report_c())
     .replace(
         "__KEN_ROOT_DENIED_EXIT_STATUS__",
@@ -5617,6 +5632,7 @@ mod tests {
             fs_root_binding: fs_root_plan_binding_v1(plan_hash, &fs_root_spec),
             fs_root_spec,
             process_declared: false,
+            net_scope: 0,
             plan_hash,
             allow_root_execution: false,
             root_execution_binding: root_execution_plan_binding_v1(plan_hash, false),
@@ -5639,6 +5655,7 @@ mod tests {
             fs_root_binding: fs_root_plan_binding_v1(plan_hash, &original),
             fs_root_spec: original,
             process_declared: false,
+            net_scope: 0,
             plan_hash,
             allow_root_execution: false,
             root_execution_binding: root_execution_plan_binding_v1(plan_hash, false),

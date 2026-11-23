@@ -390,6 +390,58 @@ struct ProcessWaitRequestV1 { child: u64 }
 struct ProcessSignalRequestV1 { child: u64, signal: u64 }
 
 #[repr(C)]
+struct SocketAddressRecordV1 {
+    family: u64,
+    bytes: SliceV1,
+    port: u64,
+}
+
+#[repr(C)]
+struct NetListenRequestV1 {
+    capability: u64,
+    address: SocketAddressRecordV1,
+}
+
+#[repr(C)]
+struct NetAcceptRequestV1 {
+    listener: u64,
+}
+
+#[repr(C)]
+struct NetConnectRequestV1 {
+    capability: u64,
+    address: SocketAddressRecordV1,
+}
+
+#[repr(C)]
+struct NetReceiveRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+}
+
+#[repr(C)]
+struct NetSendRequestV1 {
+    stream: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+    span_origin: u64,
+}
+
+#[repr(C)]
+struct NetShutdownRequestV1 {
+    stream: u64,
+    how: u64,
+}
+
+#[repr(C)]
+struct NetLocalAddressRequestV1 {
+    target: u64,
+}
+
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
     schema_version: u64,
@@ -424,6 +476,7 @@ const REPLY_RESOURCE_ERROR: u64 = 6;
 const REPLY_READ_PROGRESS: u64 = 7;
 const REPLY_WRITE_PROGRESS: u64 = 8;
 const REPLY_CHILD_EXIT: u64 = 9;
+const REPLY_SOCKET_ADDRESS: u64 = 10;
 
 struct ProcessContext {
     _posture: ProcessPostureV1,
@@ -852,6 +905,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
     plan_hash: u64,
     allow_root_execution: u64,
     process_declared: u64,
+    net_scope: u64,
     root_denied_exit_status: i64,
     target_abi_hash: *const u8,
     host_effect_abi_hash: *const u8,
@@ -901,6 +955,8 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
         || allow_root_execution > 1
         || process_declared > 1
         || (process_declared != 0 && authority != crate::AUTH_FULL)
+        || net_scope > 7
+        || (net_scope & 4 != 0 && authority != crate::AUTH_FULL)
         || target_abi_hash.is_null()
         || host_effect_abi_hash.is_null()
     {
@@ -958,6 +1014,7 @@ pub unsafe extern "C" fn ken_host_invocation_v1_init(
         authority,
         plan_hash,
         process_declared != 0,
+        crate::NetScopeV1::from_bits_v1(net_scope).expect("net scope was checked above"),
         observation_path,
         posture,
         effective_uid.ok(),
@@ -996,6 +1053,7 @@ fn initialize_process_context(
     authority: crate::Authority,
     plan_hash: u64,
     process_declared: bool,
+    net_scope: crate::NetScopeV1,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -1006,6 +1064,7 @@ fn initialize_process_context(
         authority,
         plan_hash,
         process_declared,
+        net_scope,
         observation_path,
         posture,
         effective_uid,
@@ -1019,6 +1078,7 @@ fn initialize_process_context_with_lookup(
     authority: crate::Authority,
     plan_hash: u64,
     process_declared: bool,
+    net_scope: crate::NetScopeV1,
     observation_path: &[u8],
     posture: Result<ProcessPostureV1, PostureErrorV1>,
     effective_uid: Option<EffectiveUidSnapshotV1>,
@@ -1049,7 +1109,7 @@ fn initialize_process_context_with_lookup(
         _ => ProcessContextInitError::Ordinary,
     })?;
     let mut revocation = RevocationDomain::default();
-    let cap = Cap::mint_scoped(authority, "FS", scope);
+    let cap = Cap::mint_scoped(authority, "FS", scope).with_declared_net_scope(net_scope);
     let mut capabilities = CapabilityTableV1::default();
     let capability = capabilities.insert(CapabilityGrantV1::mint_root(
         crate::program_caps_fs_trace_identity_v1(),
@@ -1457,6 +1517,29 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 len: bytes.len(),
             };
         }
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::SocketAddress(address)) => {
+            let (family, port, bytes) = match address {
+                crate::SocketAddressV1::Inet4 { octets, port } => (0, port, octets.to_vec()),
+                crate::SocketAddressV1::Inet6 { octets, port } => (1, port, octets.to_vec()),
+                crate::SocketAddressV1::Unix { path } => (2, 0, path),
+            };
+            context.response_arena.push(bytes.into_boxed_slice());
+            let bytes = context
+                .response_arena
+                .last()
+                .expect("address response was appended");
+            reply.tag = REPLY_SOCKET_ADDRESS;
+            reply.detail = family | (u64::from(port) << 8);
+            reply.bytes = SliceV1 {
+                data: bytes.as_ptr(),
+                len: bytes.len(),
+            };
+        }
+        CanonicalOutcomeV1::Success(
+            CanonicalReplyV1::MonotonicInstant(_)
+            | CanonicalReplyV1::FilePosition(_)
+            | CanonicalReplyV1::FdInheritancePolicy(_),
+        ) => reply.tag = REPLY_ERROR,
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
             reply.tag = REPLY_RESOURCE_ERROR;
             match error {
@@ -1508,7 +1591,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 }
             };
         }
-        CanonicalOutcomeV1::Success(_) => reply.tag = REPLY_ERROR,
     }
 }
 
@@ -1644,6 +1726,740 @@ fn decode_resource_error_reply(
     }
 }
 
+// Structural wire decoding only. The shared dispatcher and socket leaf retain
+// the sole authorization and Unix path validation for both execution lanes.
+unsafe fn decode_native_socket_address_v1(
+    wire: &SocketAddressRecordV1,
+) -> Option<crate::SocketAddressV1> {
+    let bytes = unsafe { borrowed_slice(&wire.bytes) }?;
+    match wire.family {
+        0 if bytes.len() == 4 && wire.port <= 0xffff => Some(crate::SocketAddressV1::Inet4 {
+            octets: bytes.try_into().ok()?,
+            port: wire.port as u16,
+        }),
+        1 if bytes.len() == 16 && wire.port <= 0xffff => Some(crate::SocketAddressV1::Inet6 {
+            octets: bytes.try_into().ok()?,
+            port: wire.port as u16,
+        }),
+        2 if wire.port == 0 => Some(crate::SocketAddressV1::Unix {
+            path: bytes.to_vec(),
+        }),
+        _ => None,
+    }
+}
+
+// SAFETY: the generated caller owns every request record and its slices for the
+// synchronous dispatch. The operation gate runs before this decoder is called.
+unsafe fn decode_native_request_v1(
+    op: HostOpV1,
+    request: *const c_void,
+    request_size: usize,
+) -> Result<
+    (
+        Option<CapabilityTokenV1>,
+        crate::ResourceInputsV1,
+        CanonicalRequestV1,
+    ),
+    i64,
+> {
+    if request.is_null() {
+        return Err(-1);
+    }
+    let decoded = match op {
+        HostOpV1::ConsoleRead if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
+            if !request.cast::<ConsoleReadRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<ConsoleReadRequestV1>()) };
+            let Some(stream) = stream(wire.stream) else {
+                return Err(-1);
+            };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ConsoleRead {
+                    stream,
+                    limit: wire.limit,
+                },
+            )
+        }
+        HostOpV1::ConsoleWrite if request_size == std::mem::size_of::<ConsoleWriteRequestV1>() => {
+            if !request.cast::<ConsoleWriteRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<ConsoleWriteRequestV1>()) };
+            let (Some(stream), Some(bytes)) =
+                (stream(wire.stream), unsafe { borrowed_slice(&wire.bytes) })
+            else {
+                return Err(-1);
+            };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ConsoleWrite {
+                    stream,
+                    bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
+            if !request.cast::<UnitRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ClockWallNow,
+            )
+        }
+        HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal
+            if request_size == std::mem::size_of::<ConsoleStreamRequestV1>() =>
+        {
+            if !request.cast::<ConsoleStreamRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<ConsoleStreamRequestV1>()) };
+            let Some(stream) = stream(wire.stream) else {
+                return Err(-1);
+            };
+            let request = if op == HostOpV1::ConsoleFlush {
+                CanonicalRequestV1::ConsoleFlush { stream }
+            } else {
+                CanonicalRequestV1::ConsoleIsTerminal { stream }
+            };
+            (None, crate::ResourceInputsV1::None, request)
+        }
+        HostOpV1::FsReadFile if request_size == std::mem::size_of::<FsReadFileRequestV1>() => {
+            if !request.cast::<FsReadFileRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsReadFileRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsReadFile {
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsWriteFile if request_size == std::mem::size_of::<FsWriteFileRequestV1>() => {
+            if !request.cast::<FsWriteFileRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsWriteFileRequestV1>()) };
+            let (Some(path), Some(bytes)) = (unsafe { borrowed_slice(&wire.path) }, unsafe {
+                borrowed_slice(&wire.bytes)
+            }) else {
+                return Err(-1);
+            };
+            let policy = match wire.create_policy {
+                0 => CreatePolicyV1::CreateNew,
+                1 => CreatePolicyV1::CreateOrTruncate,
+                2 => CreatePolicyV1::CreateOrKeep,
+                _ => return Err(-1),
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsWriteFile {
+                    path: path.to_vec(),
+                    create_policy: policy,
+                    bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsAppendFile if request_size == std::mem::size_of::<FsAppendFileRequestV1>() => {
+            if !request.cast::<FsAppendFileRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsAppendFileRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsAppendFile {
+                    path: path.to_vec(),
+                    bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsMetadata if request_size == std::mem::size_of::<FsPathRequestV1>() => {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsMetadata {
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsReadDirectory | HostOpV1::FsCreateDirectory
+            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
+        {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            let path = path.to_vec();
+            let request = if op == HostOpV1::FsCreateDirectory {
+                CanonicalRequestV1::FsCreateDirectory { path }
+            } else {
+                CanonicalRequestV1::FsReadDirectory { path }
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                request,
+            )
+        }
+        HostOpV1::FsCreateDirectory => return Err(-1),
+        HostOpV1::FsRemoveDirectory
+            if request_size == std::mem::size_of::<FsRecursivePathRequestV1>() =>
+        {
+            if !request.cast::<FsRecursivePathRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsRecursivePathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            let recursive = match wire.recursive {
+                0 => false,
+                1 => true,
+                _ => return Err(-1),
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsRemoveDirectory {
+                    recursive,
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsRemoveFile if request_size == std::mem::size_of::<FsPathRequestV1>() => {
+            if !request.cast::<FsPathRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsRemoveFile {
+                    path: path.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsRename if request_size == std::mem::size_of::<FsRenameRequestV1>() => {
+            if !request.cast::<FsRenameRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsRenameRequestV1>()) };
+            let (Some(source), Some(destination)) =
+                (unsafe { borrowed_slice(&wire.source) }, unsafe {
+                    borrowed_slice(&wire.destination)
+                })
+            else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsRename {
+                    source: source.to_vec(),
+                    destination: destination.to_vec(),
+                },
+            )
+        }
+        HostOpV1::FsChangeMode if request_size == std::mem::size_of::<FsChangeModeRequestV1>() => {
+            if !request.cast::<FsChangeModeRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsChangeModeRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsChangeMode {
+                    path: path.to_vec(),
+                    mode: wire.mode,
+                },
+            )
+        }
+        HostOpV1::FsOpen if request_size == std::mem::size_of::<FsOpenRequestV1>() => {
+            if !request.cast::<FsOpenRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsOpenRequestV1>()) };
+            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
+                return Err(-1);
+            };
+            let mode = match wire.mode {
+                0 => crate::FsOpenModeV1::Read,
+                1 => crate::FsOpenModeV1::Metadata,
+                2 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateNew),
+                3 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateOrTruncate),
+                4 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateOrKeep),
+                _ => return Err(-1),
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::FsOpen {
+                    path: path.to_vec(),
+                    mode,
+                },
+            )
+        }
+        HostOpV1::FsHandleMetadata | HostOpV1::ResourceRelease
+            if request_size == std::mem::size_of::<ResourceRequestV1>() =>
+        {
+            if !request.cast::<ResourceRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<ResourceRequestV1>()) };
+            let request = if op == HostOpV1::FsHandleMetadata {
+                CanonicalRequestV1::FsHandleMetadata
+            } else {
+                CanonicalRequestV1::ResourceRelease
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                request,
+            )
+        }
+        HostOpV1::FsReadAt if request_size == std::mem::size_of::<FsPositionedRequestV1>() => {
+            if !request.cast::<FsPositionedRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsPositionedRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::FileBuffer {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.file),
+                    buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                },
+                CanonicalRequestV1::FsReadAt {
+                    file_offset: wire.file_offset,
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::FsWriteAt if request_size == std::mem::size_of::<FsWriteAtRequestV1>() => {
+            if !request.cast::<FsWriteAtRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<FsWriteAtRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::FileBufferSpan {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.file),
+                    target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::FsWriteAt {
+                    file_offset: wire.file_offset,
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::BufferAllocate
+            if request_size == std::mem::size_of::<BufferAllocateRequestV1>() =>
+        {
+            if !request.cast::<BufferAllocateRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<BufferAllocateRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::BufferAllocate {
+                    capacity: wire.capacity,
+                },
+            )
+        }
+        HostOpV1::BufferFreeze if request_size == std::mem::size_of::<BufferFreezeRequestV1>() => {
+            if !request.cast::<BufferFreezeRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<BufferFreezeRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::BufferSpanTarget {
+                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::BufferFreeze {
+                    start: wire.start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::MappingAllocate
+            if request_size == std::mem::size_of::<MappingAllocateRequestV1>() =>
+        {
+            if !request.cast::<MappingAllocateRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<MappingAllocateRequestV1>()) };
+            let protection = match wire.protection {
+                0 => crate::MappingProtectionV1::ReadOnly,
+                1 => crate::MappingProtectionV1::Writable,
+                _ => return Err(-1),
+            };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::MappingAllocate {
+                    length: wire.length,
+                    protection,
+                },
+            )
+        }
+        HostOpV1::MappingAcquireFile
+            if request_size == std::mem::size_of::<MappingAcquireFileRequestV1>() =>
+        {
+            if !request.cast::<MappingAcquireFileRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<MappingAcquireFileRequestV1>()) };
+            let protection = match wire.protection {
+                0 => crate::MappingProtectionV1::ReadOnly,
+                1 => crate::MappingProtectionV1::Writable,
+                _ => return Err(-1),
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                CanonicalRequestV1::MappingAcquireFile {
+                    length: wire.length,
+                    protection,
+                },
+            )
+        }
+        HostOpV1::MappingReadView
+            if request_size == std::mem::size_of::<MappingReadViewRequestV1>() =>
+        {
+            if !request.cast::<MappingReadViewRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<MappingReadViewRequestV1>()) };
+            (
+                None,
+                crate::ResourceInputsV1::MappingSpanTarget {
+                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::MappingReadView {
+                    start: wire.start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::MappingWriteView
+            if request_size == std::mem::size_of::<MappingWriteViewRequestV1>() =>
+        {
+            if !request.cast::<MappingWriteViewRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*(request.cast::<MappingWriteViewRequestV1>()) };
+            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
+                return Err(-1);
+            };
+            (
+                None,
+                crate::ResourceInputsV1::MappingSpanTarget {
+                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::MappingWriteView {
+                    start: wire.start,
+                    bytes: bytes.to_vec(),
+                },
+            )
+        }
+        HostOpV1::ProcessPlanOpen
+            if request_size == std::mem::size_of::<ProcessPlanOpenRequestV1>() =>
+        {
+            if !request.cast::<ProcessPlanOpenRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessPlanOpenRequestV1>() };
+            let Some(program) = (unsafe { borrowed_slice(&wire.program) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ProcessPlanOpen {
+                    program: program.to_vec(),
+                },
+            )
+        }
+        HostOpV1::ProcessPlanPush
+            if request_size == std::mem::size_of::<ProcessPlanPushRequestV1>() =>
+        {
+            if !request.cast::<ProcessPlanPushRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessPlanPushRequestV1>() };
+            let (Some(first), Some(second)) = (unsafe { borrowed_slice(&wire.first) }, unsafe {
+                borrowed_slice(&wire.second)
+            }) else {
+                return Err(-1);
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.plan,
+                )),
+                CanonicalRequestV1::ProcessPlanPush {
+                    field: wire.field,
+                    first: first.to_vec(),
+                    second: second.to_vec(),
+                    scalar: wire.scalar,
+                },
+            )
+        }
+        HostOpV1::ProcessSpawn if request_size == std::mem::size_of::<ProcessSpawnRequestV1>() => {
+            if !request.cast::<ProcessSpawnRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessSpawnRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.plan,
+                )),
+                CanonicalRequestV1::ProcessSpawn,
+            )
+        }
+        HostOpV1::ProcessTakePipe
+            if request_size == std::mem::size_of::<ProcessTakePipeRequestV1>() =>
+        {
+            if !request.cast::<ProcessTakePipeRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessTakePipeRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.child,
+                )),
+                CanonicalRequestV1::ProcessTakePipe { fd: wire.fd },
+            )
+        }
+        HostOpV1::ProcessWait if request_size == std::mem::size_of::<ProcessWaitRequestV1>() => {
+            if !request.cast::<ProcessWaitRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.child,
+                )),
+                CanonicalRequestV1::ProcessWait,
+            )
+        }
+        HostOpV1::ProcessSignal
+            if request_size == std::mem::size_of::<ProcessSignalRequestV1>() =>
+        {
+            if !request.cast::<ProcessSignalRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ProcessSignalRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.child,
+                )),
+                CanonicalRequestV1::ProcessSignal {
+                    signal: wire.signal,
+                },
+            )
+        }
+        HostOpV1::ResourceStreamRead
+            if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() =>
+        {
+            if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::FileBuffer {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                    buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                },
+                CanonicalRequestV1::ResourceStreamRead {
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::ResourceStreamWrite
+            if request_size == std::mem::size_of::<ResourceStreamWriteRequestV1>() =>
+        {
+            if !request.cast::<ResourceStreamWriteRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<ResourceStreamWriteRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::FileBufferSpan {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                    target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::ResourceStreamWrite {
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::NetListen if request_size == std::mem::size_of::<NetListenRequestV1>() => {
+            if !request.cast::<NetListenRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetListenRequestV1>() };
+            let Some(address) = (unsafe { decode_native_socket_address_v1(&wire.address) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::NetListen { address },
+            )
+        }
+        HostOpV1::NetAccept if request_size == std::mem::size_of::<NetAcceptRequestV1>() => {
+            if !request.cast::<NetAcceptRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetAcceptRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.listener,
+                )),
+                CanonicalRequestV1::NetAccept,
+            )
+        }
+        HostOpV1::NetConnect if request_size == std::mem::size_of::<NetConnectRequestV1>() => {
+            if !request.cast::<NetConnectRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetConnectRequestV1>() };
+            let Some(address) = (unsafe { decode_native_socket_address_v1(&wire.address) }) else {
+                return Err(-1);
+            };
+            (
+                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::NetConnect { address },
+            )
+        }
+        HostOpV1::NetReceive if request_size == std::mem::size_of::<NetReceiveRequestV1>() => {
+            if !request.cast::<NetReceiveRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetReceiveRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::FileBuffer {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                    buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                },
+                CanonicalRequestV1::NetReceive {
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::NetSend if request_size == std::mem::size_of::<NetSendRequestV1>() => {
+            if !request.cast::<NetSendRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetSendRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::FileBufferSpan {
+                    file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
+                    target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
+                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
+                },
+                CanonicalRequestV1::NetSend {
+                    buffer_start: wire.buffer_start,
+                    length: wire.length,
+                },
+            )
+        }
+        HostOpV1::NetShutdown if request_size == std::mem::size_of::<NetShutdownRequestV1>() => {
+            if !request.cast::<NetShutdownRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetShutdownRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.stream,
+                )),
+                CanonicalRequestV1::NetShutdown { how: wire.how },
+            )
+        }
+        HostOpV1::NetLocalAddress
+            if request_size == std::mem::size_of::<NetLocalAddressRequestV1>() =>
+        {
+            if !request.cast::<NetLocalAddressRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<NetLocalAddressRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.target,
+                )),
+                CanonicalRequestV1::NetLocalAddress,
+            )
+        }
+        _ => return Err(-3),
+    };
+    Ok(decoded)
+}
+
+#[cfg(test)]
+#[path = "abi_v1/px11_inc1_tests.rs"]
+mod px11_inc1_tests;
+
 /// The single private V1 dispatch symbol linked into produced executables.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ken_host_dispatch_v1(
@@ -1673,524 +2489,25 @@ pub unsafe extern "C" fn ken_host_dispatch_v1(
     if require_native_operation_v1(op).is_err() {
         return crate::operation_unavailable_status_v1(op);
     }
-    let (capability, resource, request) = match op {
-        HostOpV1::ConsoleRead if request_size == std::mem::size_of::<ConsoleReadRequestV1>() => {
-            if !request.cast::<ConsoleReadRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<ConsoleReadRequestV1>()) };
-            let Some(stream) = stream(wire.stream) else {
-                return -1;
-            };
-            (
-                None,
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ConsoleRead {
-                    stream,
-                    limit: wire.limit,
+    let (capability, resource, request) =
+        match unsafe { decode_native_request_v1(op, request, request_size) } {
+            Ok(decoded) => decoded,
+            Err(status) => return status,
+        };
+    // Preserve the existing invalid-mode reply before admission or trace.
+    if let CanonicalRequestV1::FsChangeMode { ref path, mode } = request {
+        if mode & !0o7777 != 0 {
+            let outcome = CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(
+                crate::FileErrorIdentityV1 {
+                    operation: op,
+                    relative_path: path.clone(),
+                    cause: FileErrorCauseV1::Io(IoErrorIdentityV1::InvalidInput),
                 },
-            )
+            ));
+            set_reply(unsafe { &mut *reply.cast::<HostReplyV1>() }, outcome, context);
+            return 0;
         }
-        HostOpV1::ConsoleWrite if request_size == std::mem::size_of::<ConsoleWriteRequestV1>() => {
-            if !request.cast::<ConsoleWriteRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<ConsoleWriteRequestV1>()) };
-            let (Some(stream), Some(bytes)) =
-                (stream(wire.stream), unsafe { borrowed_slice(&wire.bytes) })
-            else {
-                return -1;
-            };
-            (
-                None,
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ConsoleWrite {
-                    stream,
-                    bytes: bytes.to_vec(),
-                },
-            )
-        }
-        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
-            if !request.cast::<UnitRequestV1>().is_aligned() {
-                return -1;
-            }
-            (
-                None,
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ClockWallNow,
-            )
-        }
-        HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal
-            if request_size == std::mem::size_of::<ConsoleStreamRequestV1>() =>
-        {
-            if !request.cast::<ConsoleStreamRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<ConsoleStreamRequestV1>()) };
-            let Some(stream) = stream(wire.stream) else {
-                return -1;
-            };
-            let request = if op == HostOpV1::ConsoleFlush {
-                CanonicalRequestV1::ConsoleFlush { stream }
-            } else {
-                CanonicalRequestV1::ConsoleIsTerminal { stream }
-            };
-            (None, crate::ResourceInputsV1::None, request)
-        }
-        HostOpV1::FsReadFile if request_size == std::mem::size_of::<FsReadFileRequestV1>() => {
-            if !request.cast::<FsReadFileRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsReadFileRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsReadFile {
-                    path: path.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsWriteFile if request_size == std::mem::size_of::<FsWriteFileRequestV1>() => {
-            if !request.cast::<FsWriteFileRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsWriteFileRequestV1>()) };
-            let (Some(path), Some(bytes)) = (unsafe { borrowed_slice(&wire.path) }, unsafe {
-                borrowed_slice(&wire.bytes)
-            }) else {
-                return -1;
-            };
-            let policy = match wire.create_policy {
-                0 => CreatePolicyV1::CreateNew,
-                1 => CreatePolicyV1::CreateOrTruncate,
-                2 => CreatePolicyV1::CreateOrKeep,
-                _ => return -1,
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsWriteFile {
-                    path: path.to_vec(),
-                    create_policy: policy,
-                    bytes: bytes.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsAppendFile if request_size == std::mem::size_of::<FsAppendFileRequestV1>() => {
-            if !request.cast::<FsAppendFileRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsAppendFileRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
-                return -1;
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsAppendFile {
-                    path: path.to_vec(),
-                    bytes: bytes.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsMetadata if request_size == std::mem::size_of::<FsPathRequestV1>() => {
-            if !request.cast::<FsPathRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsMetadata {
-                    path: path.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsReadDirectory | HostOpV1::FsCreateDirectory
-            if request_size == std::mem::size_of::<FsPathRequestV1>() =>
-        {
-            if !request.cast::<FsPathRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            let path = path.to_vec();
-            let request = if op == HostOpV1::FsCreateDirectory {
-                CanonicalRequestV1::FsCreateDirectory { path }
-            } else {
-                CanonicalRequestV1::FsReadDirectory { path }
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                request,
-            )
-        }
-        // 0x0306 recognizes only the path record; a wrong size is a
-        // malformed request, including the retired recursive record.
-        HostOpV1::FsCreateDirectory => return -1,
-        HostOpV1::FsRemoveDirectory
-            if request_size == std::mem::size_of::<FsRecursivePathRequestV1>() =>
-        {
-            if !request.cast::<FsRecursivePathRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsRecursivePathRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            let recursive = match wire.recursive {
-                0 => false,
-                1 => true,
-                _ => return -1,
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsRemoveDirectory {
-                    recursive,
-                    path: path.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsRemoveFile if request_size == std::mem::size_of::<FsPathRequestV1>() => {
-            if !request.cast::<FsPathRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsPathRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsRemoveFile {
-                    path: path.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsRename if request_size == std::mem::size_of::<FsRenameRequestV1>() => {
-            if !request.cast::<FsRenameRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsRenameRequestV1>()) };
-            let (Some(source), Some(destination)) =
-                (unsafe { borrowed_slice(&wire.source) }, unsafe {
-                    borrowed_slice(&wire.destination)
-                })
-            else {
-                return -1;
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsRename {
-                    source: source.to_vec(),
-                    destination: destination.to_vec(),
-                },
-            )
-        }
-        HostOpV1::FsChangeMode if request_size == std::mem::size_of::<FsChangeModeRequestV1>() => {
-            if !request.cast::<FsChangeModeRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsChangeModeRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            if wire.mode & !0o7777 != 0 {
-                let outcome = CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(
-                    crate::FileErrorIdentityV1 {
-                        operation: HostOpV1::FsChangeMode,
-                        relative_path: path.to_vec(),
-                        cause: FileErrorCauseV1::Io(IoErrorIdentityV1::InvalidInput),
-                    },
-                ));
-                set_reply(
-                    unsafe { &mut *(reply.cast::<HostReplyV1>()) },
-                    outcome,
-                    context,
-                );
-                return 0;
-            }
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsChangeMode {
-                    path: path.to_vec(),
-                    mode: wire.mode,
-                },
-            )
-        }
-        HostOpV1::FsOpen if request_size == std::mem::size_of::<FsOpenRequestV1>() => {
-            if !request.cast::<FsOpenRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsOpenRequestV1>()) };
-            let Some(path) = (unsafe { borrowed_slice(&wire.path) }) else {
-                return -1;
-            };
-            let mode = match wire.mode {
-                0 => crate::FsOpenModeV1::Read,
-                1 => crate::FsOpenModeV1::Metadata,
-                2 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateNew),
-                3 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateOrTruncate),
-                4 => crate::FsOpenModeV1::WriteCreate(crate::CreatePolicyV1::CreateOrKeep),
-                _ => return -1,
-            };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::FsOpen {
-                    path: path.to_vec(),
-                    mode,
-                },
-            )
-        }
-        HostOpV1::FsHandleMetadata | HostOpV1::ResourceRelease
-            if request_size == std::mem::size_of::<ResourceRequestV1>() =>
-        {
-            if !request.cast::<ResourceRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<ResourceRequestV1>()) };
-            let request = if op == HostOpV1::FsHandleMetadata {
-                CanonicalRequestV1::FsHandleMetadata
-            } else {
-                CanonicalRequestV1::ResourceRelease
-            };
-            (
-                None,
-                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
-                    wire.resource,
-                )),
-                request,
-            )
-        }
-        HostOpV1::FsReadAt if request_size == std::mem::size_of::<FsPositionedRequestV1>() => {
-            if !request.cast::<FsPositionedRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsPositionedRequestV1>()) };
-            (
-                None,
-                crate::ResourceInputsV1::FileBuffer {
-                    file: crate::ResourceTokenV1::from_erased_identity(wire.file),
-                    buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
-                },
-                CanonicalRequestV1::FsReadAt {
-                    file_offset: wire.file_offset,
-                    buffer_start: wire.buffer_start,
-                    length: wire.length,
-                },
-            )
-        }
-        HostOpV1::FsWriteAt if request_size == std::mem::size_of::<FsWriteAtRequestV1>() => {
-            if !request.cast::<FsWriteAtRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<FsWriteAtRequestV1>()) };
-            (
-                None,
-                crate::ResourceInputsV1::FileBufferSpan {
-                    file: crate::ResourceTokenV1::from_erased_identity(wire.file),
-                    target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
-                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
-                },
-                CanonicalRequestV1::FsWriteAt {
-                    file_offset: wire.file_offset,
-                    buffer_start: wire.buffer_start,
-                    length: wire.length,
-                },
-            )
-        }
-        HostOpV1::BufferAllocate
-            if request_size == std::mem::size_of::<BufferAllocateRequestV1>() =>
-        {
-            if !request.cast::<BufferAllocateRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<BufferAllocateRequestV1>()) };
-            (
-                None,
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::BufferAllocate {
-                    capacity: wire.capacity,
-                },
-            )
-        }
-        HostOpV1::BufferFreeze if request_size == std::mem::size_of::<BufferFreezeRequestV1>() => {
-            if !request.cast::<BufferFreezeRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<BufferFreezeRequestV1>()) };
-            (
-                None,
-                crate::ResourceInputsV1::BufferSpanTarget {
-                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
-                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
-                },
-                CanonicalRequestV1::BufferFreeze {
-                    start: wire.start,
-                    length: wire.length,
-                },
-            )
-        }
-        HostOpV1::MappingAllocate
-            if request_size == std::mem::size_of::<MappingAllocateRequestV1>() =>
-        {
-            if !request.cast::<MappingAllocateRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<MappingAllocateRequestV1>()) };
-            let protection = match wire.protection {
-                0 => crate::MappingProtectionV1::ReadOnly,
-                1 => crate::MappingProtectionV1::Writable,
-                _ => return -1,
-            };
-            (
-                None,
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::MappingAllocate {
-                    length: wire.length,
-                    protection,
-                },
-            )
-        }
-        HostOpV1::MappingAcquireFile
-            if request_size == std::mem::size_of::<MappingAcquireFileRequestV1>() =>
-        {
-            if !request.cast::<MappingAcquireFileRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<MappingAcquireFileRequestV1>()) };
-            let protection = match wire.protection {
-                0 => crate::MappingProtectionV1::ReadOnly,
-                1 => crate::MappingProtectionV1::Writable,
-                _ => return -1,
-            };
-            (
-                None,
-                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
-                    wire.resource,
-                )),
-                CanonicalRequestV1::MappingAcquireFile {
-                    length: wire.length,
-                    protection,
-                },
-            )
-        }
-        HostOpV1::MappingReadView
-            if request_size == std::mem::size_of::<MappingReadViewRequestV1>() =>
-        {
-            if !request.cast::<MappingReadViewRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<MappingReadViewRequestV1>()) };
-            (
-                None,
-                crate::ResourceInputsV1::MappingSpanTarget {
-                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
-                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
-                },
-                CanonicalRequestV1::MappingReadView {
-                    start: wire.start,
-                    length: wire.length,
-                },
-            )
-        }
-        HostOpV1::MappingWriteView
-            if request_size == std::mem::size_of::<MappingWriteViewRequestV1>() =>
-        {
-            if !request.cast::<MappingWriteViewRequestV1>().is_aligned() {
-                return -1;
-            }
-            let wire = unsafe { &*(request.cast::<MappingWriteViewRequestV1>()) };
-            let Some(bytes) = (unsafe { borrowed_slice(&wire.bytes) }) else {
-                return -1;
-            };
-            (
-                None,
-                crate::ResourceInputsV1::MappingSpanTarget {
-                    target: crate::ResourceTokenV1::from_erased_identity(wire.resource),
-                    span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
-                },
-                CanonicalRequestV1::MappingWriteView {
-                    start: wire.start,
-                    bytes: bytes.to_vec(),
-                },
-            )
-        }
-        HostOpV1::ProcessPlanOpen if request_size == std::mem::size_of::<ProcessPlanOpenRequestV1>() => {
-            if !request.cast::<ProcessPlanOpenRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessPlanOpenRequestV1>() };
-            let Some(program) = (unsafe { borrowed_slice(&wire.program) }) else { return -1 };
-            (
-                Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
-                crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ProcessPlanOpen { program: program.to_vec() },
-            )
-        }
-        HostOpV1::ProcessPlanPush if request_size == std::mem::size_of::<ProcessPlanPushRequestV1>() => {
-            if !request.cast::<ProcessPlanPushRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessPlanPushRequestV1>() };
-            let (Some(first), Some(second)) = (unsafe { borrowed_slice(&wire.first) }, unsafe { borrowed_slice(&wire.second) }) else { return -1 };
-            (
-                None,
-                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)),
-                CanonicalRequestV1::ProcessPlanPush { field: wire.field, first: first.to_vec(), second: second.to_vec(), scalar: wire.scalar },
-            )
-        }
-        HostOpV1::ProcessSpawn if request_size == std::mem::size_of::<ProcessSpawnRequestV1>() => {
-            if !request.cast::<ProcessSpawnRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessSpawnRequestV1>() };
-            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.plan)), CanonicalRequestV1::ProcessSpawn)
-        }
-        HostOpV1::ProcessTakePipe if request_size == std::mem::size_of::<ProcessTakePipeRequestV1>() => {
-            if !request.cast::<ProcessTakePipeRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessTakePipeRequestV1>() };
-            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessTakePipe { fd: wire.fd })
-        }
-        HostOpV1::ProcessWait if request_size == std::mem::size_of::<ProcessWaitRequestV1>() => {
-            if !request.cast::<ProcessWaitRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessWaitRequestV1>() };
-            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessWait)
-        }
-        HostOpV1::ProcessSignal if request_size == std::mem::size_of::<ProcessSignalRequestV1>() => {
-            if !request.cast::<ProcessSignalRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ProcessSignalRequestV1>() };
-            (None, crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(wire.child)), CanonicalRequestV1::ProcessSignal { signal: wire.signal })
-        }
-        HostOpV1::ResourceStreamRead if request_size == std::mem::size_of::<ResourceStreamReadRequestV1>() => {
-            if !request.cast::<ResourceStreamReadRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ResourceStreamReadRequestV1>() };
-            (None, crate::ResourceInputsV1::FileBuffer {
-                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
-                buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
-            }, CanonicalRequestV1::ResourceStreamRead { buffer_start: wire.buffer_start, length: wire.length })
-        }
-        HostOpV1::ResourceStreamWrite if request_size == std::mem::size_of::<ResourceStreamWriteRequestV1>() => {
-            if !request.cast::<ResourceStreamWriteRequestV1>().is_aligned() { return -1; }
-            let wire = unsafe { &*request.cast::<ResourceStreamWriteRequestV1>() };
-            (None, crate::ResourceInputsV1::FileBufferSpan {
-                file: crate::ResourceTokenV1::from_erased_identity(wire.stream),
-                target_buffer: crate::ResourceTokenV1::from_erased_identity(wire.buffer),
-                span_origin: crate::ResourceTokenV1::from_erased_identity(wire.span_origin),
-            }, CanonicalRequestV1::ResourceStreamWrite { buffer_start: wire.buffer_start, length: wire.length })
-        }
-        _ => return -3,
-    };
+    }
     let result = dispatch_host_op_v1(
         &mut context.host,
         &context.capabilities,
@@ -2962,8 +3279,9 @@ mod tests {
 
     /// Promise class: normative compatibility vector (ADR 0018). MEASURED:
     /// raw requests dispatch through the ABI to distinct typed trace events;
-    /// a valid old create record and a malformed remove flag refuse before
-    /// dispatch. CLAIMED: create no longer accepts the recursive wire record.
+    /// both valid Bool values in the old create record and a malformed
+    /// remove flag refuse before dispatch. CLAIMED: create no longer accepts
+    /// the recursive wire record.
     /// THE GAP: this measures the raw decoder, not native argument emission.
     #[cfg(target_os = "linux")]
     #[test]
@@ -3108,7 +3426,8 @@ mod tests {
 
         let old_create_path = b"legacy-create";
         for (op, recursive) in [
-            // A well-formed old create request must fail on size, not an invalid Bool.
+            // Refusal is about record size, even for the old non-recursive case.
+            (0x0306, 0),
             (0x0306, 1),
             // Remove still refuses invalid Bool values at the recursive size.
             (0x0308, 2),
@@ -4195,6 +4514,7 @@ mod tests {
                 1,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -4229,6 +4549,7 @@ mod tests {
                 1,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 wrong.as_ptr(),
@@ -4260,6 +4581,7 @@ mod tests {
                 0,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -4284,6 +4606,7 @@ mod tests {
             AUTH_FULL,
             1,
             false,
+            crate::NetScopeV1::default(),
             &[],
             Err(PostureErrorV1::HostPostureUnavailable),
             Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -4369,6 +4692,7 @@ mod tests {
                 AUTH_FULL,
                 31,
                 false,
+                crate::NetScopeV1::default(),
                 &[],
                 establish_process_posture_v1(Ok(EffectiveUidSnapshotV1::scripted(1000)), false),
                 Some(EffectiveUidSnapshotV1::scripted(1000)),
@@ -4442,6 +4766,7 @@ mod tests {
             AUTH_FULL,
             41,
             false,
+            crate::NetScopeV1::default(),
             &[],
             establish_process_posture_v1(Ok(uid), false),
             Some(uid),
@@ -4495,6 +4820,7 @@ mod tests {
                 19,
                 0,
                 0,
+                0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
                 crate::HOST_EFFECT_ABI_V1_HASH.as_ptr(),
@@ -4531,6 +4857,7 @@ mod tests {
                 2,
                 19,
                 1,
+                0,
                 0,
                 1,
                 crate::TARGET_ABI_MANIFEST_HASH.as_ptr(),
