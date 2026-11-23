@@ -19,7 +19,8 @@
 > SPEC-TIME-WINDOW-MERGE-ALL §17;
 > SPEC-TIME-MERGE-ALL-APPEND §18;
 > SPEC-TIME-MERGE-LENGTH §19;
-> SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE §20).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE §20;
+> SPEC-TIME-MERGE-SINGLETONS-SORT §21).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -1744,3 +1745,62 @@ unsorted left input `[c@3, a@1]` with right `[b@2]` is also covered
 by the generic law; the finite controls do not prove it. The
 assembled package test owes unchanged exact trusted identities as
 AC-T before a Decision.
+
+## 21. Merging single-event traces is insertion sort
+
+> **Section 21 status: DRAFT v0 (SPEC-TIME-MERGE-SINGLETONS-SORT).**
+> Architect's isolated AC-0 on `aadce7362` checked all three public
+> declarations and their clients without `Axiom`, preserving the exact
+> scratch trusted `GlobalId` set (114 → 114). This is not assembled
+> AC-T, official conformance, CI, or measured landed trust.
+
+`Data.Time.EventTrace` must export one public Transparent function and
+two public Transparent checked theorems. `event_singleton` follows
+`trace_merge_all` among the operations. It constructs the one-element
+list containing `e`, namely `Cons (Event p) e (Nil (Event p))`.
+
+```ken
+pub fn event_singleton (p : Type) (e : Event p) : List (Event p)
+
+pub theorem trace_merge_single_insert
+      (p : Type) (x : Event p) (ys : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x (Nil (Event p))) ys)
+        (insert (Event p) (event_before p) x ys)
+
+pub theorem trace_merge_all_singletons_sort
+      (p : Type) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_merge_all p (map (Event p) (List (Event p)) (event_singleton p) tr))
+        (sort (Event p) (event_before p) tr)
+```
+
+Both equations are unconditional structural list equalities, not
+permutation claims. Merging an empty left trace returns the right input
+unchanged, so with an empty tail the singleton merge uses the same head
+comparison, placement and recursion as `insert` from
+`Data.Collections.Derived`, even if `ys` is unordered. In the second,
+`trace_merge_all` merges the singleton for the head into the merged tail.
+The first equation turns that step into insertion, giving the same empty
+case and recursive step as Derived's `sort`.
+
+The exported sort equation lets clients transport Derived's `sorted`,
+`perm` and `stable_class` proofs to the merge result. The totality
+and transitivity needed by `stable_class for sort` come from the
+corresponding `leq_nat` proofs on event times, so stability preserves
+the input order within each equal-time class without a separate
+EventTrace law. The insert equation likewise transports `sorted for
+insert` when the caller supplies `time_ordered p ys`; that is a premise
+of the sortedness consequence, not of the equation.
+
+For two events at the same timestamp, `event_before` is true in both
+directions even when their payloads differ. When merging two singletons,
+the first trace's event comes first. The separate seed must accept the
+corresponding insert equation and refuse the swapped insertion on a fresh
+prefix. Both orders have the same events; only the first satisfies the
+stated list equality.
+
+Section 21 adds one public function and two public theorems. It changes
+no §§1–20 operation or law type and needs no `Axiom` or change to Derived.
