@@ -1,13 +1,13 @@
 ---
 id: RT-NATIVE-BYTES-TO-LIST
 title: "bytes_to_list is outside the native primitive set, and uint8_to_int refuses a UInt8 that arrives as a List element, so every byte-literal pattern and the prelude's socket_unix_path build under the interpreter but refuse at native-build. Rule from an AC-0 how bytes_to_list lowers over every Bytes representation and where a list element's UInt8 is projected to Int, and land both with interpreter-against-native parity rows"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
 gate: architect
 depends_on: []
-blocks: [PX11-NATIVE-STREAM-SOCKET-PARITY]
+blocks: [PX11-NATIVE-STREAM-SOCKET-PARITY, RT-NATIVE-RESULT-JOIN-PHASE]
 github: null
 origin: "Architect ruling evt_773gmfx4vmmab (U1) on PX11-NATIVE Inc2's missing-listener stop (runtime-implementer evt_3h2ca7fh2v0vx), measured on main with no Net operation. Steward decision evt_29axys7grks27: a separate prerequisite, run on the Language ring (L1b; operator 2026-11-22: \"Approved. Use the language ring.\") ahead of ABI-S2. L1 Linux ABI program, Steward order."
 ---
@@ -19,8 +19,12 @@ origin: "Architect ruling evt_773gmfx4vmmab (U1) on PX11-NATIVE Inc2's missing-l
 A Ken program that turns `Bytes` into a `List UInt8` and reads its
 elements as `Int` builds natively and agrees with the interpreter. That
 covers `bytes_to_list` used directly, every byte-literal pattern, and the
-prelude's `socket_unix_path`. No prelude rewrite and no new primitive
-are involved: the backend lowers the prelude as written.
+`bytes_to_list` and `uint8_to_int` sites in the prelude's
+`socket_unix_path`. No prelude rewrite and no new primitive are involved:
+the backend lowers the prelude as written. The `socket_unix_path` parity
+rows belong to `RT-NATIVE-RESULT-JOIN-PHASE`, because a pre-existing
+result-join refusal blocks them (Architect `evt_73g3jcqvh0a2s`, Steward
+`evt_74tcgq02wyxyk`).
 
 ## Settled inputs (main `9716dd74f`; Architect probes under `/workspaces/ken/tmp/arch-subst-coinc-wt/zz-arch-u8probe/`)
 
@@ -75,15 +79,19 @@ no new primitive, no change to `bytes_at`'s static-index rule, and no
   - p6, `bytes_to_list` over a runtime argument;
   - p7, a byte-literal pattern that matches on one input and fails on
     another;
-  - `socket_unix_path` on an absolute, a relative, an over-length and a
-    NUL-bearing path, each giving its ruled result;
+  - p9 and p10, with the hostile borrowed row (revised D6
+    `evt_5vkevf71csva0`, Steward `evt_68h4z6bxpq3dv`);
+  - the D5 arena cost row;
   - one `bytes_to_list` row per `Bytes` representation AC-0 names. The
     representation cannot be seen from the source, so each row states
     which one it reaches.
 - **AC-2.** Mutations, restored byte-identically:
   - drop one representation's arm from G2: its row fails and the others
     pass;
-  - revert the G1 projection: p5 fails at native-build.
+  - revert the G1 projection: p5 fails at native-build;
+  - delete the hostile row's return: that row fails;
+  - the owner census: the record count equals the `bytes_to_list`
+    PrimitiveCall origins.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions

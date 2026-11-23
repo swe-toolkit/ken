@@ -1,7 +1,7 @@
 ---
 id: ABI-S4
 title: "A Ken program's file metadata is MkFileMetadata Int FileKind, so it cannot read a modification time, a link count or a mode, and nothing tells it which fields the kernel actually supplied. Rule from an AC-0 the statx-shaped field set and how an unsupplied field is represented, then carry it through both lanes so a missing field is never a plausible zero"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -20,6 +20,9 @@ origin: "docs/program/10-linux-abi-completion.md §4 Track S. Node filed by the 
 from one `statx` call. Each field the kernel did not fill is observably
 absent. It is never zero, and never copied from another field. Both lanes
 agree.
+
+Merged at squash `0975174273d1215e8858228718b964f85ce41384` (candidate
+`a7ef900ca7c566d3161ed4acb61635da5b661f83`).
 
 ## Settled inputs (main `8c6d5b37c`; anchors re-checked at release)
 
