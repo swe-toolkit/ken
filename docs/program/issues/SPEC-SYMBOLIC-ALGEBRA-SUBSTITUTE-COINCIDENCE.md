@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE
 title: "Spec 66 §21 says eval depends only on the variables that occur, but substitution has no counterpart: §20 fixes one absent variable against the identity, and poly_eq_substitute_pointwise needs agreement at every variable and concludes only canonical equality. So a client whose two substitutions differ at several unused variables cannot conclude the results are equal as stored. Rule from a checked D0 at zero trust that substitute s e equals substitute t e whenever s and t agree at every variable occurring in e, and state it with a seed that separates agreement on the occurring variables from a disagreement at one of them"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
