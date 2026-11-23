@@ -1,15 +1,15 @@
 ---
 id: RT-NATIVE-METADATA-WIDE-INT
 title: "On the native lane, a program that reads a FileMetadata time whose nanosecond value lies outside the boundary immediate Int domain, which includes every present-day timestamp, aborts with UnclassifiedRuntimeTrap -1, while the interpreter returns the exact Instant. ABI-S4's rows used only in-domain values or None. Rule from an AC-0 where the spill of a wide Int inside lower_file_metadata_option's nested Some payload fails, repair it, and pin every wide metadata field against the interpreter"
-status: ready
-owner: verify
+status: active
+owner: language
 size: M
 tier: T1
 gate: architect
 depends_on: []
 blocks: []
 github: null
-origin: "Adversary finding evt_1bv5w8aw8g0rq on ABI-S4 at 097517427, measured on both lanes: a correctness defect in the landed product, outside every merged row. Steward-filed per COORDINATION section 2. L1b on the Verify ring (idle), beside RT-NATIVE-BYTES-TO-LIST on the Language ring."
+origin: "Adversary finding evt_1bv5w8aw8g0rq on ABI-S4 at 097517427, measured on both lanes: a correctness defect in the landed product, outside every merged row. Steward-filed per COORDINATION section 2. L1b on the Language ring, after RT-NATIVE-BYTES-TO-LIST (the Verify ring is unseated, Steward evt_4m67y43b306fb)."
 ---
 
 # Native metadata carries wide Int values
@@ -51,6 +51,15 @@ That includes every present-day file time.
   fields, the three optional `Int` fields (inode, links, mode), and the
   top-level size, major and minor. An inode at or above `2^55`, as overlayfs
   xino numbers can be, likely traps the same way.
+
+The Architect's AC-0 (`evt_4dy6fnsexd6hc`) corrects three of these
+inputs without changing a row. The defect is in the consumer: the carried
+`Int` arm of the scalar projection (`core/primitive.rs` ~`:158`) accepts
+only an immediate word. The spill arm and the payload construction are
+sound. Size traps at top level, so the nested shape is not the trigger.
+`1.5e19` traps on the handle lane. AC-0 also rules the field fan-in (times,
+size, and inode by injection; not links, mode, major or minor) and the
+AC-1 rows. D1-E is `evt_3be5px88gdnzk`.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
@@ -96,3 +105,9 @@ configuration, because none consumes an out-of-domain value. So AC-1 and
 AC-2 key on values at the domain edge, with controls just inside it.
 2 fired. The fan-in is the Adversary's ten fields. Only the times were
 measured, so AC-0 rules on the rest.
+
+## Symptom inventory
+
+1. int_view's View output carries a limb pointer into the helper's own
+   stack frame for a native-arena Small. Keyed on the storage lifetime of
+   the native resolver's view slot, which is helper-local.
