@@ -411,6 +411,10 @@ claim with no conformance case is a claim no one can rely on
   named `§7` deferrals (`delete`, balance, the proof-relevant permutation law).
   **Red-until-built** — the build's acceptance target; companion supersession
   reconcile in `surface/collections/seed-collections.md`.
+- `stdlib/time-and-events/seed-trace-merge-singletons-sort.md` — AC-2's
+  equal-time, different-payload singleton tie: first-event-first values and
+  both public equations accept; the fresh-prefix swapped insertion equation
+  is refused at the kernel as `KernelRejected(TypeMismatch)`.
 - `security/ifc/seed-ifc.md` — Sec1 information-flow-by-typing (the
   implicit-flow discriminator, label joins, capability-gated declassify, the
   relational by-proof mode).
