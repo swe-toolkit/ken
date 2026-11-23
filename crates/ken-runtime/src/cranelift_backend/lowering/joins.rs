@@ -1312,6 +1312,19 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        fn abort_borrowed_match(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            default: &RuntimeTrap,
+        ) -> Result<LoweringOperand, CraneliftBackendError> {
+            let failure = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[failure]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+            let unreachable = builder.create_block();
+            builder.switch_to_block(unreachable);
+            Ok(LoweringOperand::Specialized(Lowered::Trap(default.clone())))
+        }
+
         /// `static_origin` is the origin of the **match occurrence** whose cases
         /// these are; case *i*'s body is `child(static_origin, 1 + i)`.
         pub(super) fn lower_borrowed_match(
@@ -1324,6 +1337,13 @@ impl<'a> Lowering<'a> {
             env: &[LoweringEnvironmentBinding],
             join_plan: &JoinPlanToken,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
+            // Process-family matches can emit a borrowed leaf even when the
+            // checked element has no borrowed constructor identity.
+            let Some(identities) = cases.iter().map(|case| {
+                borrowed_constructor_identity(&self.process_symbols, &case.constructor)
+            }).collect::<Option<Vec<_>>>() else {
+                return self.abort_borrowed_match(builder, default);
+            };
             let kind = builder
                 .ins()
                 .load(types::I64, MemFlags::trusted(), pointer, 0);
@@ -1339,14 +1359,7 @@ impl<'a> Lowering<'a> {
                 .ins()
                 .load(pointer_type, MemFlags::trusted(), pointer, 16);
             if let [case] = cases {
-                let (expected_tag, expected_arity) =
-                    borrowed_constructor_identity(&self.process_symbols, &case.constructor)
-                        .ok_or_else(|| {
-                            unsupported(LoweringCause::PlannerInvariant,
-                                "Match",
-                                format!("{} has no borrowed constructor identity", case.constructor),
-                            )
-                        })?;
+                let (expected_tag, expected_arity) = identities[0];
                 if case.binders != expected_arity {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
@@ -1389,15 +1402,9 @@ impl<'a> Lowering<'a> {
             }
             let mut test_block = builder.current_block().expect("borrowed match block");
             let mut merge_kind = None;
-            for (index, case) in cases.iter().enumerate() {
-                let (expected_tag, expected_arity) =
-                    borrowed_constructor_identity(&self.process_symbols, &case.constructor)
-                        .ok_or_else(|| {
-                            unsupported(LoweringCause::PlannerInvariant,
-                                "Match",
-                                format!("{} has no borrowed constructor identity", case.constructor),
-                            )
-                        })?;
+            for (index, (case, (expected_tag, expected_arity))) in
+                cases.iter().zip(identities).enumerate()
+            {
                 if case.binders != expected_arity {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",

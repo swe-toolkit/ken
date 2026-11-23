@@ -3,8 +3,19 @@
 //! This child owns primitive argument evaluation, partiality, carried
 //! projection, representation checks, symbol dispatch, and emission.
 
+use crate::cranelift_backend::lowering::aggregates::CarrierAllocationRequest;
+use crate::cranelift_backend::planning::{
+    PlannedAggregateShape, SynthesizedAggregateNode, SynthesizedAggregatePath,
+    SynthesizedAggregateRoot, SynthesizedConstructorRole, SynthesizedFixedConstructorRole as Role,
+};
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
+
+#[derive(Clone, Copy)]
+struct BytesListConstructors {
+    nil: (AggregateOccurrenceId, u64),
+    cons: (AggregateOccurrenceId, u64),
+}
 use unicode_normalization::UnicodeNormalization;
 
 #[cfg(test)]
@@ -87,6 +98,18 @@ impl<'a> Lowering<'a> {
             }
         }
 
+        if primitive.symbol == "bytes_to_list" {
+            let [operand] = lowered_args.as_slice() else {
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "PrimitiveCall",
+                    "bytes_to_list requires exactly one bytes operand",
+                ));
+            };
+            return self.lower_bytes_to_list(builder, static_origin, operand)
+                .map(LoweringOperand::Carried);
+        }
+
         // A primitive's static symbol determines whether its operands are
         // scalar Ints or Bools. A carried word in one of those positions is
         // projected through the emitted scalar helper; no runtime tag chooses
@@ -153,6 +176,23 @@ impl<'a> Lowering<'a> {
             lowered_args
                 .into_iter()
                 .map(|arg| match arg {
+                    LoweringOperand::Specialized(Lowered::BorrowedNativeValue { .. }) => {
+                        // Borrowed ingress supplies only Bytes and constructors. A
+                        // process-family match can emit a borrowed leaf even for a
+                        // list whose checked element type cannot come from ingress.
+                        // Fail closed in that leaf rather than rejecting the unit.
+                        let failure = builder.ins().iconst(types::I64, -1);
+                        builder.ins().return_(&[failure]);
+                        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+                        let unreachable = builder.create_block();
+                        builder.switch_to_block(unreachable);
+                        let zero = builder.ins().iconst(types::I64, 0);
+                        Ok(match kind {
+                            "Int" => self.lower_dynamic_small_int(builder, zero),
+                            "Bool" => Lowered::Bool { value: zero, known: None },
+                            _ => unreachable!("closed primitive scalar kind"),
+                        })
+                    }
                     LoweringOperand::Specialized(value) => Ok(value),
                     LoweringOperand::Carried(word) => {
                         let value = self.emit_carrier_scalar(builder, word)?;
@@ -515,22 +555,7 @@ impl<'a> Lowering<'a> {
 
         builder.switch_to_block(borrowed);
         let pointer = self.emit_carrier_scalar(builder, word)?;
-        let kind = builder
-            .ins()
-            .load(types::I64, MemFlags::trusted(), pointer, 0);
-        Self::require_i64(builder, kind, 1);
-        let data = builder
-            .ins()
-            .load(pointer_type, MemFlags::trusted(), pointer, 16);
-        let len = builder
-            .ins()
-            .load(types::I64, MemFlags::trusted(), pointer, 24);
-        // Preserve the borrowed arm's non-null guard before reading a byte.
-        let null = builder.ins().icmp_imm(IntCC::Equal, data, 0);
-        let nonempty = builder.ins().icmp_imm(IntCC::NotEqual, len, 0);
-        let broken = builder.ins().band(null, nonempty);
-        let broken = builder.ins().uextend(types::I64, broken);
-        Self::require_i64(builder, broken, 0);
+        let (data, len) = Self::borrowed_bytes_view(builder, pointer);
         builder.ins().jump(done, &[data.into(), len.into()]);
 
         builder.switch_to_block(persistent);
@@ -558,6 +583,214 @@ impl<'a> Lowering<'a> {
             len,
             valid,
         )))
+    }
+
+    fn borrowed_bytes_view(
+        builder: &mut FunctionBuilder<'_>,
+        pointer: cranelift_codegen::ir::Value,
+    ) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let pointer_type = builder.func.dfg.value_type(pointer);
+        let kind = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 0);
+        Self::require_i64(builder, kind, 1);
+        let data = builder
+            .ins()
+            .load(pointer_type, MemFlags::trusted(), pointer, 16);
+        let len = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 24);
+        // Preserve the borrowed arm's non-null guard before reading a byte.
+        let null = builder.ins().icmp_imm(IntCC::Equal, data, 0);
+        let nonempty = builder.ins().icmp_imm(IntCC::NotEqual, len, 0);
+        let broken = builder.ins().band(null, nonempty);
+        let broken = builder.ins().uextend(types::I64, broken);
+        Self::require_i64(builder, broken, 0);
+        (data, len)
+    }
+
+    fn bytes_list_constructors(
+        &self,
+        seat: StaticOriginId,
+    ) -> Result<BytesListConstructors, CraneliftBackendError> {
+        let owner = self.defining_emission_owner.ok_or_else(|| {
+            unsupported(LoweringCause::PlannerInvariant, "PrimitiveCall",
+                "bytes_to_list is not in a declared emission owner")
+        })?;
+        let root = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::PrimitiveResult);
+        let nil = SynthesizedConstructorRole::Fixed(Role::ListNil);
+        let cons = SynthesizedConstructorRole::Fixed(Role::ListCons);
+        let plan = &self.static_transition_plan;
+        let alternatives = plan.synthesized_dynamic_alternatives(seat, &root)?;
+        let nil_children = plan.synthesized_aggregate_children(owner, seat, &root.alternative(0), nil)?;
+        let cons_children = plan.synthesized_aggregate_children(owner, seat, &root.alternative(1), cons)?;
+        if alternatives != [nil, cons]
+            || !nil_children.is_empty()
+            || cons_children != [
+                SynthesizedAggregateNode::native_int(),
+                SynthesizedAggregateNode::RepeatedAggregateLink { class: BoundaryClass::Constructor },
+            ]
+        {
+            return Err(unsupported(LoweringCause::PlannerInvariant, "PrimitiveCall",
+                "bytes_to_list requires planned Nil and Cons(Int, constructor link)"));
+        }
+        Ok(BytesListConstructors {
+            nil: (
+                plan.synthesized_aggregate_occurrence(owner, seat, &root.alternative(0), nil)?,
+                self.synthesized_fixed_identity(Role::ListNil)?.tag_abi_word()?,
+            ),
+            cons: (
+                plan.synthesized_aggregate_occurrence(owner, seat, &root.alternative(1), cons)?,
+                self.synthesized_fixed_identity(Role::ListCons)?.tag_abi_word()?,
+            ),
+        })
+    }
+
+    fn emit_bytes_list_node(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        (occurrence, identity): (AggregateOccurrenceId, u64),
+        children: &[CarriedBoundaryWord],
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        let node = self.emit_carrier_alloc(
+            builder,
+            CarrierAllocationRequest::PlannedAggregate {
+                occurrence,
+                shape: PlannedAggregateShape::Constructor,
+            },
+            BoundaryClass::Constructor,
+            children.len(),
+        )?;
+        self.emit_carrier_store_tag_id(builder, node, identity)?;
+        for (position, child) in children.iter().enumerate() {
+            self.emit_carrier_store_field(builder, node, position, *child)?;
+        }
+        Ok(node)
+    }
+
+    fn prepend_bytes_list_byte(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        constructors: BytesListConstructors,
+        byte: cranelift_codegen::ir::Value,
+        tail: CarriedBoundaryWord,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        let byte = builder.ins().uextend(types::I64, byte);
+        let byte = self.lower_dynamic_small_int(builder, byte);
+        let head = self.emit_carrier_transfer(builder, seat, &byte)?;
+        self.emit_bytes_list_node(builder, constructors.cons, &[head, tail])
+    }
+
+    fn lower_bytes_to_list(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        operand: &LoweringOperand,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let constructors = self.bytes_list_constructors(seat)?;
+        match operand {
+            LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => {
+                self.build_bytes_list_loop(builder, seat, constructors, span.len(), |_, _| Ok(span.pointer()))
+            }
+            LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) => {
+                let (data, len) = Self::borrowed_bytes_view(builder, *pointer);
+                self.build_bytes_list_loop(builder, seat, constructors, len, |_, _| Ok(data))
+            }
+            LoweringOperand::Specialized(Lowered::Bytes(bytes)) => {
+                let mut tail = self.emit_bytes_list_node(builder, constructors.nil, &[])?;
+                for byte in bytes.iter().rev() {
+                    let byte = builder.ins().iconst(types::I8, i64::from(*byte));
+                    tail = self.prepend_bytes_list_byte(builder, seat, constructors, byte, tail)?;
+                }
+                Ok(tail)
+            }
+            LoweringOperand::Carried(word) => {
+                let class = self.emit_carrier_class(builder, *word)?;
+                let borrowed = builder.create_block();
+                let persistent = builder.create_block();
+                let done = builder.create_block();
+                builder.append_block_param(done, types::I64);
+                let is_borrowed = builder.ins().icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
+                builder.ins().brif(is_borrowed, borrowed, &[], persistent, &[]);
+
+                builder.switch_to_block(borrowed);
+                let pointer = self.emit_carrier_scalar(builder, *word)?;
+                let (data, len) = Self::borrowed_bytes_view(builder, pointer);
+                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |_, _| Ok(data))?;
+                builder.ins().jump(done, &[list.word.into()]);
+
+                builder.switch_to_block(persistent);
+                Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
+                let arena = self.carrier_arena()?;
+                let pointer_type = builder.func.dfg.value_type(arena);
+                let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+                let out = builder.ins().stack_addr(pointer_type, slot, 0);
+                self.emit_bytes_list_view(builder, *word, out)?;
+                let len = builder.ins().stack_load(types::I64, slot, 8);
+                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |lowering, builder| {
+                    // Only the length survives the previous view. Materializing a
+                    // Cons can invalidate the data pointer, so read it afresh.
+                    lowering.emit_bytes_list_view(builder, *word, out)?;
+                    Ok(builder.ins().stack_load(pointer_type, slot, 0))
+                })?;
+                builder.ins().jump(done, &[list.word.into()]);
+
+                builder.switch_to_block(done);
+                Ok(CarriedBoundaryWord { word: builder.block_params(done)[0] })
+            }
+            LoweringOperand::Residual(_) => Err(CraneliftBackendError::ResidualRepresentationRequired {
+                site: "bytes_to_list requires an ordinary bytes value",
+            }),
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                LoweringCause::Fragment, "PrimitiveCall",
+                "bytes_to_list only supports Bytes arguments in native lowering",
+            )),
+        }
+    }
+
+    fn emit_bytes_list_view(
+        &self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+        out: cranelift_codegen::ir::Value,
+    ) -> Result<(), CraneliftBackendError> {
+        let call = builder.ins().call(self.carrier_refs()?.bytes_view, &[self.carrier_arena()?, word.word, out]);
+        Self::require_i64(builder, builder.inst_results(call)[0], BOUNDARY_OK);
+        Ok(())
+    }
+
+    fn build_bytes_list_loop(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        constructors: BytesListConstructors,
+        len: cranelift_codegen::ir::Value,
+        data_for_byte: impl FnOnce(&mut Self, &mut FunctionBuilder<'_>) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError>,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        let nil = self.emit_bytes_list_node(builder, constructors.nil, &[])?;
+        let test = builder.create_block();
+        let body = builder.create_block();
+        let done = builder.create_block();
+        builder.append_block_param(test, types::I64);
+        builder.append_block_param(test, types::I64);
+        builder.append_block_param(done, types::I64);
+        builder.ins().jump(test, &[len.into(), nil.word.into()]);
+        builder.switch_to_block(test);
+        let remaining = builder.block_params(test)[0];
+        let tail = CarriedBoundaryWord { word: builder.block_params(test)[1] };
+        builder.ins().brif(remaining, body, &[], done, &[tail.word.into()]);
+        builder.switch_to_block(body);
+        let index = builder.ins().iadd_imm(remaining, -1);
+        let data = data_for_byte(self, builder)?;
+        let address = builder.ins().iadd(data, index);
+        let byte = builder.ins().load(types::I8, MemFlags::trusted(), address, 0);
+        let list = self.prepend_bytes_list_byte(builder, seat, constructors, byte, tail)?;
+        builder.ins().jump(test, &[index.into(), list.word.into()]);
+        builder.switch_to_block(done);
+        Ok(CarriedBoundaryWord { word: builder.block_params(done)[0] })
     }
 
     fn lower_bytes_length(
