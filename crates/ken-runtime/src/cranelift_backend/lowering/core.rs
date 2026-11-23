@@ -7175,7 +7175,10 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 );
             }
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            // The arms below apply the suffix: use the outer value lanes
+            // with this Match's predecessor topology.
+            let join_plan =
+                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
             let true_block = builder.create_block();
             let false_block = builder.create_block();
             let merge = join_plan
@@ -7240,7 +7243,8 @@ impl<'a> Lowering<'a> {
             ok_constructor,
         }) = selected
         {
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let join_plan =
+                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
             let ok_block = builder.create_block();
             let err_block = builder.create_block();
             let merge = join_plan
@@ -7311,7 +7315,8 @@ impl<'a> Lowering<'a> {
             // Same branch selection as the ordinary chain's
             // `lower_borrowed_option_match`, but each arm continues through the
             // pending eliminators instead of joining at this Match.
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let join_plan =
+                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
             let some_block = builder.create_block();
             let none_block = builder.create_block();
             let merge = join_plan

@@ -1,0 +1,36 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Process.Exit (host_pure)
+
+fn any_empty (args : List Bytes) : Bool =
+  match args {
+    Nil ↦ False;
+    Cons a rest ↦ match eq_int (bytes_length a) (0 : Int) {
+      True ↦ True;
+      False ↦ any_empty rest
+    }
+  }
+
+fn check (path : Bytes) : Result IOError Bytes =
+  match leq_int (2 : Int) (bytes_length path) {
+    False ↦ Err IOError Bytes IOError.InvalidInput;
+    True ↦ match leq_int (bytes_length path) (107 : Int) {
+      False ↦ Err IOError Bytes IOError.InvalidInput;
+      True ↦ Ok IOError Bytes path
+    }
+  }
+
+fn main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Cons path _ ↦
+          match check path {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+            Ok _ ↦ host_pure AFull ExitCode ExitCode.Success
+          }
+      }
+  }

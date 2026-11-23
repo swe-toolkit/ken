@@ -1828,16 +1828,16 @@ impl<'a> Lowering<'a> {
                 | DynamicConstructorContinuation::Producer { static_origin, .. } => static_origin,
             };
             let join_plan = match continuation {
-                DynamicConstructorContinuation::Producer { eliminators, .. }
-                    if !self
-                        .static_transition_plan
-                        .checked_ih_environment_transport_source_identities()
-                        .is_empty() =>
-                {
+                // Producer arms are lowered under `eliminators`, so each yields
+                // the outermost composed frame's value, not this Match's. Take
+                // that frame's value lanes with this Match's predecessor
+                // topology. With checked-IH transports present,
+                // `consumed_composed_join_plan_token` takes the
+                // process-composed interface exactly as the guarded arm did.
+                DynamicConstructorContinuation::Producer { eliminators, .. } => {
                     self.consumed_composed_join_plan_token(static_origin, eliminators)?
                 }
-                DynamicConstructorContinuation::Producer { .. }
-                | DynamicConstructorContinuation::Ordinary { .. } => {
+                DynamicConstructorContinuation::Ordinary { .. } => {
                     self.consumed_join_plan_token(static_origin)?
                 }
             };

@@ -1,0 +1,42 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Filesystem.Authority (readFile)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+
+fn check (path : Bytes) (read : Result FileError Bytes) : Result IOError Bytes =
+  match read {
+    Ok _ ↦ Err IOError Bytes IOError.InvalidInput;
+    Err failure ↦ match failure {
+      MkFileError _ _ cause ↦ match cause {
+        IOError.NotFound ↦ Ok IOError Bytes path;
+        IOError.PermissionDenied ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.CapabilityDenied ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.BrokenPipe ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.Interrupted ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.AlreadyExists ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.InvalidInput ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.IsDirectory ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.NotDirectory ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.NotEmpty ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.Unsupported ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.Revoked ↦ Err IOError Bytes IOError.InvalidInput;
+        IOError.Other _ ↦ Err IOError Bytes IOError.InvalidInput
+      }
+    }
+  }
+
+proc main (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _ _ ↦ match arguments {
+      Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+      Cons path _ ↦ match caps {
+        ProgramCaps.MkProgramCaps cap ↦ host_bind AFull (Result FileError Bytes) ExitCode
+          (host_fs AFull (Result FileError Bytes) (readFile AFull cap (bytes_encode "d2-missing.bin")))
+          (λread. match check path read {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+            Ok _ ↦ host_pure AFull ExitCode ExitCode.Success
+          })
+      }
+    }
+  }
