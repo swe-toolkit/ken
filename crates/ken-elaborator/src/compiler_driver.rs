@@ -4985,6 +4985,35 @@ fn declaration_symbol(package_name: &str, name: &str) -> StableSymbol {
 mod native_pre_source_stable_symbols {
     use super::*;
 
+    /// Promise class: durable invariant. MEASURED: stable symbol suffixes of
+    /// the five registered prelude IDs. CLAIMED: the Net seat planner can
+    /// select the checked constructors without exposing private names.
+    /// THE GAP: this does not run the lowering observer.
+    #[test]
+    fn px11_socket_seat_constructors_have_checked_symbol_suffixes() {
+        let env = ElabEnv::new().expect("checked prelude");
+        let (symbols, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        for (id, suffix) in env
+            .prelude_env
+            .px11_address_ids
+            .into_iter()
+            .chain(env.prelude_env.px11_target_ids)
+            .zip([
+                "::SocketAddress::PrivateSocketIPv4",
+                "::SocketAddress::PrivateSocketIPv6",
+                "::SocketAddress::PrivateSocketUnix",
+                "::SocketTarget::ListeningSocket",
+                "::SocketTarget::ConnectedSocket",
+            ])
+        {
+            let symbol = &symbols[&id];
+            assert!(
+                symbol.to_string().ends_with(suffix),
+                "{symbol} must end with {suffix}"
+            );
+        }
+    }
+
     /// Promise class: durable invariant. MEASURED: every compiler declaration
     /// and every checked constructor is a key in the pre-source snapshot.
     /// CLAIMED: compiler membership cannot be inferred from a source spelling
