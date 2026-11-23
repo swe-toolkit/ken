@@ -3862,12 +3862,7 @@ pub enum HostFileKind {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HostFileMetadata {
-    pub size: u64,
-    pub kind: HostFileKind,
-    pub mode: Option<u16>,
-}
+pub type HostFileMetadata = ken_host::FileMetadataV1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostDirEntry {
@@ -4564,17 +4559,7 @@ impl HostHandler for PosixHost {
     fn fs_metadata_at(&mut self, handle: &Self::Handle) -> io::Result<HostFileMetadata> {
         #[cfg(target_os = "linux")]
         {
-            let metadata = ken_host::metadata(handle)?;
-            Ok(HostFileMetadata {
-                size: metadata.size,
-                kind: match metadata.kind {
-                    ken_host::FileKind::File => HostFileKind::File,
-                    ken_host::FileKind::Directory => HostFileKind::Directory,
-                    ken_host::FileKind::Symlink => HostFileKind::Symlink,
-                    ken_host::FileKind::Other => HostFileKind::Other,
-                },
-                mode: metadata.mode,
-            })
+            ken_host::file_metadata_v1(handle).map_err(ken_host::HostError::into_io_error)
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -4716,6 +4701,7 @@ pub struct CaptureHost {
     clock_trace: Vec<ClockTrace>,
     fs_nodes: BTreeMap<VfsNodeId, VirtualFsNode>,
     fs_modes: BTreeMap<VfsNodeId, u16>,
+    fs_metadata_script: BTreeMap<VfsNodeId, HostFileMetadata>,
     fs_entries: BTreeMap<(VfsNodeId, Vec<u8>), VfsNodeId>,
     fs_parents: BTreeMap<VfsNodeId, (VfsNodeId, Vec<u8>)>,
     next_fs_node: VfsNodeId,
@@ -4749,6 +4735,7 @@ impl CaptureHost {
             clock_trace: Vec::new(),
             fs_nodes: [(0, VirtualFsNode::Directory)].into_iter().collect(),
             fs_modes: [(0, 0o755)].into_iter().collect(),
+            fs_metadata_script: BTreeMap::new(),
             fs_entries: BTreeMap::new(),
             fs_parents: BTreeMap::new(),
             next_fs_node: 1,
@@ -4835,6 +4822,22 @@ impl CaptureHost {
                 }
             })
             .collect()
+    }
+
+    /// Override the observation at an existing virtual node, without touching real-host policy.
+    pub fn script_fs_metadata(
+        &mut self,
+        path: &[u8],
+        metadata: HostFileMetadata,
+    ) -> io::Result<()> {
+        let id = self
+            .fs_nodes
+            .keys()
+            .copied()
+            .find(|id| self.virtual_path(*id) == path)
+            .ok_or(io::ErrorKind::NotFound)?;
+        self.fs_metadata_script.insert(id, metadata);
+        Ok(())
     }
 
     pub fn fs_mode(&self, path: &[u8]) -> Option<u16> {
@@ -5328,24 +5331,20 @@ impl HostHandler for CaptureHost {
         self.fs_trace.push(FsTrace::Metadata {
             path: self.virtual_path(*handle),
         });
-        match self.fs_nodes.get(handle) {
-            Some(VirtualFsNode::File(bytes)) => Ok(HostFileMetadata {
-                size: bytes.len() as u64,
-                kind: HostFileKind::File,
-                mode: self.fs_modes.get(handle).copied(),
-            }),
-            Some(VirtualFsNode::Directory) => Ok(HostFileMetadata {
-                size: 0,
-                kind: HostFileKind::Directory,
-                mode: self.fs_modes.get(handle).copied(),
-            }),
-            Some(VirtualFsNode::Symlink(target)) => Ok(HostFileMetadata {
-                size: target.len() as u64,
-                kind: HostFileKind::Symlink,
-                mode: None,
-            }),
-            None => Err(io::Error::from(io::ErrorKind::NotFound)),
+        let (size, kind) = match self.fs_nodes.get(handle) {
+            Some(VirtualFsNode::File(bytes)) => (bytes.len() as u64, ken_host::FsNodeKindV1::File),
+            Some(VirtualFsNode::Directory) => (0, ken_host::FsNodeKindV1::Directory),
+            Some(VirtualFsNode::Symlink(target)) => {
+                (target.len() as u64, ken_host::FsNodeKindV1::Symlink)
+            }
+            None => return Err(io::ErrorKind::NotFound.into()),
+        };
+        if let Some(observation) = self.fs_metadata_script.get(handle) {
+            return Ok(observation.clone());
         }
+        let mut metadata = HostFileMetadata::without_optional_fields(size, kind, 0, 0);
+        metadata.mode = self.fs_modes.get(handle).copied().map(u64::from);
+        Ok(metadata)
     }
 
     fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>> {
@@ -5613,6 +5612,8 @@ pub struct FSIds {
     pub create_or_keep_id: GlobalId,
     pub mk_file_error_id: GlobalId,
     pub some_id: GlobalId,
+    pub none_id: GlobalId,
+    pub metadata_instant_id: GlobalId,
     pub op_read_file_id: GlobalId,
     pub op_write_file_id: GlobalId,
     pub op_append_file_id: GlobalId,
@@ -5706,6 +5707,8 @@ impl FSIds {
             create_or_keep_id: roles.create_or_keep,
             mk_file_error_id: roles.file_error,
             some_id: roles.option_some,
+            none_id: roles.option_none,
+            metadata_instant_id: roles.mk_instant,
             op_read_file_id: roles.file_operation_read,
             op_write_file_id: roles.file_operation_write,
             op_append_file_id: roles.file_operation_append,
@@ -6212,10 +6215,6 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
         };
         self.handler
             .fs_metadata_at(&handle)
-            .map(|metadata| ken_host::FileMetadataV1 {
-                size: metadata.size,
-                kind: host_kind_v1(metadata.kind),
-            })
             .map_err(host_error_v1)
     }
 
@@ -7224,11 +7223,46 @@ fn reify_host_reply_v1(
                 ken_host::FsNodeKindV1::Other => fs.k_other_id,
             };
             let kind = make_ctor(kind, vec![], store);
-            make_ctor(
-                fs.mk_file_metadata_id,
-                vec![EvalVal::BigInt(BigInt::from(metadata.size)), kind],
-                store,
-            )
+            let (instant, index) = globals.constructor(fs.metadata_instant_id).ok_or(())?;
+            let Term::Pi(int, instant) = &instant.constructors.get(index).ok_or(())?.type_ else {
+                return Err(());
+            };
+            let int = checked_type_value(int, globals, store);
+            let instant = checked_type_value(instant, globals, store);
+            let optional = |element: &EvalVal, payload: Option<EvalVal>, store: &mut EvalStore| {
+                match payload {
+                    Some(payload) => make_ctor(fs.some_id, vec![element.clone(), payload], store),
+                    None => make_ctor(fs.none_id, vec![element.clone()], store),
+                }
+            };
+            let number = |value: u64| EvalVal::BigInt(BigInt::from(value));
+            let integer = |value: Option<u64>, store: &mut EvalStore| {
+                optional(&int, value.map(number), store)
+            };
+            let time = |value: Option<i128>, store: &mut EvalStore| {
+                let payload = value.map(|time| {
+                    make_ctor(
+                        fs.metadata_instant_id,
+                        vec![EvalVal::BigInt(BigInt::from(time))],
+                        store,
+                    )
+                });
+                optional(&instant, payload, store)
+            };
+            let fields = vec![
+                number(metadata.size),
+                kind,
+                integer(metadata.mode, store),
+                integer(metadata.links, store),
+                number(metadata.device_major),
+                number(metadata.device_minor),
+                integer(metadata.inode, store),
+                time(metadata.modified, store),
+                time(metadata.changed, store),
+                time(metadata.accessed, store),
+                time(metadata.born, store),
+            ];
+            make_ctor(fs.mk_file_metadata_id, fields, store)
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::DirectoryEntries(
             entries,
@@ -8434,6 +8468,8 @@ mod px5b_effect_observation_tests {
             create_or_keep_id: id(),
             mk_file_error_id: id(),
             some_id: id(),
+            none_id: id(),
+            metadata_instant_id: id(),
             op_read_file_id: id(),
             op_write_file_id: id(),
             op_append_file_id: id(),

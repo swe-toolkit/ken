@@ -403,7 +403,7 @@ pub const HOST_EFFECT_ABI_V1: HostEffectAbiV1 = HostEffectAbiV1 {
     resource_token_align: std::mem::align_of::<ResourceTokenV1>() as u16,
     response_arena_lifetime_version: 1,
     trace_schema_version: 1,
-    filesystem_observation_schema_version: 2,
+    filesystem_observation_schema_version: 3,
     resource_observation_schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
     buffer_limits: DEFAULT_BUFFER_LIMITS_V1,
     manifest_hash: HOST_EFFECT_ABI_V1_HASH,
@@ -458,6 +458,46 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_kind_pipe_write: u64,
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
+}
+
+/// Options in constructor field order; the first three carry Int, the last four Instant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileMetadataReplyLayoutV1 {
+    pub present: u32,
+    pub size: u32,
+    pub kind: u32,
+    pub device_major: u32,
+    pub device_minor: u32,
+    pub options: [(u64, u32); 7],
+}
+
+pub fn file_metadata_reply_layout_v1() -> Result<FileMetadataReplyLayoutV1, TerminalErrorV1> {
+    let base = generated_layout_fact("OFFSET_HostReplyV1_metadata")?;
+    let offset = |field: &str| {
+        checked_u32(base + generated_layout_fact(&format!("OFFSET_FileMetadataReplyV1_{field}"))?)
+    };
+    let option = |field: &str| {
+        Ok((
+            generated_binding("tag", &format!("metadata_present.{field}"))?,
+            offset(field)?,
+        ))
+    };
+    Ok(FileMetadataReplyLayoutV1 {
+        present: offset("present")?,
+        size: offset("size")?,
+        kind: offset("kind")?,
+        device_major: offset("device_major")?,
+        device_minor: offset("device_minor")?,
+        options: [
+            option("mode")?,
+            option("links")?,
+            option("inode")?,
+            option("modified")?,
+            option("changed")?,
+            option("accessed")?,
+            option("born")?,
+        ],
+    })
 }
 
 fn generated_layout_fact(name: &str) -> Result<u64, TerminalErrorV1> {
@@ -2668,15 +2708,6 @@ pub trait HostEffectBackendV1 {
         handle: &crate::ResourceHandleV1,
     ) -> Result<FileMetadataV1, IoErrorIdentityV1> {
         crate::resource_metadata_v1(handle)
-            .map(|metadata| FileMetadataV1 {
-                size: metadata.size,
-                kind: match metadata.kind {
-                    crate::FileKind::File => FsNodeKindV1::File,
-                    crate::FileKind::Directory => FsNodeKindV1::Directory,
-                    crate::FileKind::Symlink => FsNodeKindV1::Symlink,
-                    crate::FileKind::Other => FsNodeKindV1::Other,
-                },
-            })
             .map_err(|error| io_error_identity_v1(&error.into_io_error()))
     }
 
@@ -4691,6 +4722,40 @@ pub enum WriteProgressV1 {
 pub struct FileMetadataV1 {
     pub size: u64,
     pub kind: FsNodeKindV1,
+    pub mode: Option<u64>,
+    pub links: Option<u64>,
+    pub device_major: u64,
+    pub device_minor: u64,
+    pub inode: Option<u64>,
+    /// Signed nanoseconds since the Unix epoch, as for wall-clock Instant.
+    pub modified: Option<i128>,
+    pub changed: Option<i128>,
+    pub accessed: Option<i128>,
+    pub born: Option<i128>,
+}
+
+impl FileMetadataV1 {
+    /// Starting point for a synthetic metadata observation, not a host fallback.
+    pub fn without_optional_fields(
+        size: u64,
+        kind: FsNodeKindV1,
+        device_major: u64,
+        device_minor: u64,
+    ) -> Self {
+        Self {
+            size,
+            kind,
+            device_major,
+            device_minor,
+            mode: None,
+            links: None,
+            inode: None,
+            modified: None,
+            changed: None,
+            accessed: None,
+            born: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -5254,10 +5319,12 @@ mod tests {
             _: &[u8],
         ) -> Result<FileMetadataV1, FileErrorCauseV1> {
             self.0.push(HostOpV1::FsMetadata);
-            Ok(FileMetadataV1 {
-                size: 0,
-                kind: FsNodeKindV1::File,
-            })
+            Ok(FileMetadataV1::without_optional_fields(
+                0,
+                FsNodeKindV1::File,
+                0,
+                0,
+            ))
         }
         fn fs_read_directory(
             &mut self,
@@ -7083,7 +7150,7 @@ mod tests {
             "MappingReadView|0405|native|MappingReadViewRequestV1|4|HostReplyV1|1",
             "MappingWriteView|0406|native|MappingWriteViewRequestV1|4|HostReplyV1|1",
             "MappingAcquireFile|0407|native|MappingAcquireFileRequestV1|3|HostReplyV1|1",
-            "lifetime=filesystem_observation_schema|2",
+            "lifetime=filesystem_observation_schema|3",
             "lifetime=resource_observation_schema|1",
             "lifetime=resource_error_reply_schema|1",
             "limit=buffer.per_buffer_max_capacity|1048576",
@@ -7167,24 +7234,32 @@ mod tests {
     #[test]
     fn canonical_payloads_and_unknown_identities_preserve_discriminators() {
         assert_ne!(
-            CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                size: 1,
-                kind: FsNodeKindV1::File,
-            }),
-            CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                size: 2,
-                kind: FsNodeKindV1::File,
-            })
+            CanonicalReplyV1::FileMetadata(FileMetadataV1::without_optional_fields(
+                1,
+                FsNodeKindV1::File,
+                0,
+                0
+            )),
+            CanonicalReplyV1::FileMetadata(FileMetadataV1::without_optional_fields(
+                2,
+                FsNodeKindV1::File,
+                0,
+                0
+            ))
         );
         assert_ne!(
-            CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                size: 1,
-                kind: FsNodeKindV1::File,
-            }),
-            CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                size: 1,
-                kind: FsNodeKindV1::Directory,
-            })
+            CanonicalReplyV1::FileMetadata(FileMetadataV1::without_optional_fields(
+                1,
+                FsNodeKindV1::File,
+                0,
+                0
+            )),
+            CanonicalReplyV1::FileMetadata(FileMetadataV1::without_optional_fields(
+                1,
+                FsNodeKindV1::Directory,
+                0,
+                0
+            ))
         );
         assert_ne!(
             CanonicalReplyV1::DirectoryEntries(vec![DirEntryV1 {
@@ -8495,15 +8570,6 @@ mod tests {
                 return Err(error);
             }
             crate::resource_metadata_v1(handle)
-                .map(|metadata| FileMetadataV1 {
-                    size: metadata.size,
-                    kind: match metadata.kind {
-                        crate::FileKind::File => FsNodeKindV1::File,
-                        crate::FileKind::Directory => FsNodeKindV1::Directory,
-                        crate::FileKind::Symlink => FsNodeKindV1::Symlink,
-                        crate::FileKind::Other => FsNodeKindV1::Other,
-                    },
-                })
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         }
     }
@@ -8637,12 +8703,14 @@ mod tests {
             };
 
         let live = metadata_operation(&mut backend, &mut resources, grandchild_resource);
+        let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(live_metadata)) =
+            live.outcome
+        else {
+            panic!("expected live resource metadata: {:?}", live.outcome);
+        };
         assert_eq!(
-            live.outcome,
-            CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                size: 14,
-                kind: FsNodeKindV1::File,
-            }))
+            (live_metadata.size, live_metadata.kind),
+            (14, FsNodeKindV1::File)
         );
         assert_eq!(backend.metadata_calls, 1);
 
@@ -8865,8 +8933,11 @@ mod tests {
         for root in [&left, &right] {
             let _ = std::fs::remove_dir_all(root);
             std::fs::create_dir_all(root).unwrap();
-            std::fs::write(root.join("held.bin"), b"same-bytes").unwrap();
         }
+        // Share the metadata subject, not the scope or resource identity.
+        // Distinct file copies would legitimately disagree on inode and times.
+        std::fs::write(left.join("held.bin"), b"same-bytes").unwrap();
+        std::fs::hard_link(left.join("held.bin"), right.join("held.bin")).unwrap();
         let left_events = resource_lane(&left);
         let right_events = resource_lane(&right);
         assert_eq!(left_events, right_events);

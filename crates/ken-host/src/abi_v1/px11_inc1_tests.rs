@@ -401,6 +401,7 @@ fn px11_native_socket_address_reply_known_answers() {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: 0,
+            metadata: FileMetadataReplyV1::default(),
         };
         set_reply(
             &mut reply,

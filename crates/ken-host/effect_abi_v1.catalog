@@ -1,7 +1,7 @@
 schema|1
 lifetime|response_arena|1
 lifetime|trace_schema|1
-lifetime|filesystem_observation_schema|2
+lifetime|filesystem_observation_schema|3
 lifetime|resource_observation_schema|1
 lifetime|resource_error_reply_schema|1
 limit|buffer.per_buffer_max_capacity|1048576
@@ -13,6 +13,13 @@ tag|reply.bytes|2
 tag|reply.error|3
 tag|reply.resource|4
 tag|reply.metadata|5
+tag|metadata_present.mode|1
+tag|metadata_present.links|2
+tag|metadata_present.inode|4
+tag|metadata_present.modified|8
+tag|metadata_present.changed|16
+tag|metadata_present.accessed|32
+tag|metadata_present.born|64
 tag|reply.resource_error|6
 tag|reply.read_progress|7
 tag|reply.write_progress|8

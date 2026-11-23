@@ -53,6 +53,80 @@ use super::core::masked_reply_response_bytes;
 // own relative path, not inherited from `use super::*`.
 use effect_seat_group::EffectSeatGroupId;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MetadataPayload {
+    Mode,
+    Int,
+    Instant,
+}
+
+fn metadata_option_entries(
+    layout: &ken_host::FileMetadataReplyLayoutV1,
+) -> [(u32, u64, u32, MetadataPayload); 7] {
+    use MetadataPayload::{Instant, Int, Mode};
+    let fields = [
+        (2, Mode),
+        (3, Int),
+        (6, Int),
+        (7, Instant),
+        (8, Instant),
+        (9, Instant),
+        (10, Instant),
+    ];
+    std::array::from_fn(|i| {
+        let (field, payload) = fields[i];
+        let (bit, offset) = layout.options[i];
+        (field, bit, offset, payload)
+    })
+}
+
+/// MEASURED: each field has the expected generated reply offset, bit and
+/// payload kind. CLAIMED: no two option sites read the same host slot or bit.
+/// THE GAP: the procfs differential exercises the table in linked code.
+#[test]
+fn abi_s4_native_metadata_option_entries_match_the_generated_layout() {
+    use MetadataPayload::{Instant, Int, Mode};
+    let fact = |name| {
+        ken_host::HOST_EFFECT_ABI_V1_FACTS
+            .iter()
+            .find_map(|(key, value)| (*key == name).then_some(*value as u32))
+            .unwrap()
+    };
+    let base = fact("OFFSET_HostReplyV1_metadata");
+    assert_eq!(
+        metadata_option_entries(&ken_host::file_metadata_reply_layout_v1().unwrap()),
+        [
+            (2, 1, base + fact("OFFSET_FileMetadataReplyV1_mode"), Mode),
+            (3, 2, base + fact("OFFSET_FileMetadataReplyV1_links"), Int),
+            (6, 4, base + fact("OFFSET_FileMetadataReplyV1_inode"), Int),
+            (
+                7,
+                8,
+                base + fact("OFFSET_FileMetadataReplyV1_modified"),
+                Instant
+            ),
+            (
+                8,
+                16,
+                base + fact("OFFSET_FileMetadataReplyV1_changed"),
+                Instant
+            ),
+            (
+                9,
+                32,
+                base + fact("OFFSET_FileMetadataReplyV1_accessed"),
+                Instant
+            ),
+            (
+                10,
+                64,
+                base + fact("OFFSET_FileMetadataReplyV1_born"),
+                Instant
+            ),
+        ]
+    );
+}
+
 /// **`D7` — perturbations of one VISIT, as distinct from perturbations of the
 /// planned population.**
 ///
@@ -216,6 +290,7 @@ fn runtime_producible_constructors(
         result_err,
         result_ok,
         option_some,
+        option_none,
         file_error,
         file_operation_read,
         file_operation_write,
@@ -291,6 +366,7 @@ fn runtime_producible_constructors(
         result_err,
         result_ok,
         option_some,
+        option_none,
         file_error,
         file_operation_read,
         file_operation_write,
@@ -1895,6 +1971,170 @@ impl<'a> Lowering<'a> {
             ],
         );
         Ok(self.lowered_from_scalar_pair(ScalarMergeKind::Int, pair))
+    }
+
+    fn lower_file_metadata_reply(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        reply: cranelift_codegen::ir::StackSlot,
+        pointer_type: types::Type,
+        origin: StaticOriginId,
+        root: &SynthesizedAggregatePath,
+        seats: &ClaimedEffectSeats<'_>,
+    ) -> Result<Lowered, CraneliftBackendError> {
+        use SynthesizedFixedConstructorRole as R;
+        let layout = ken_host::file_metadata_reply_layout_v1().map_err(|error| {
+            unsupported(
+                LoweringCause::PlannerInvariant,
+                "Effect",
+                format!("generated FileMetadataReplyV1 layout rejected: {error:?}"),
+            )
+        })?;
+        let load = |builder: &mut FunctionBuilder<'_>, offset| {
+            builder.ins().stack_load(types::I64, reply, offset as i32)
+        };
+        let present = load(builder, layout.present);
+        let unknown = builder.ins().band_imm(present, !0x7f);
+        Self::require_i64(builder, unknown, 0);
+        let kind_tag = load(builder, layout.kind);
+        Self::require_one_of_i64(builder, kind_tag, &[0, 1, 2, 3]);
+        let kind_root = root.field(1);
+        let alternatives = [
+            (R::FileKindFile, &self.process_symbols.file_kind_file),
+            (
+                R::FileKindDirectory,
+                &self.process_symbols.file_kind_directory,
+            ),
+            (R::FileKindSymlink, &self.process_symbols.file_kind_symlink),
+            (R::FileKindOther, &self.process_symbols.file_kind_other),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (role, symbol))| {
+            self.synthesized_dynamic_alternative(
+                origin,
+                &kind_root,
+                index as u32,
+                index as i64,
+                role,
+                symbol.clone(),
+                Vec::new(),
+                seats,
+            )
+        })
+        .collect::<Result<_, _>>()?;
+        let kind = Lowered::DynamicConstructor(DynamicConstructorV1 {
+            discriminator: kind_tag,
+            alternatives,
+        });
+        let size = load(builder, layout.size);
+        let size = self.lower_unsigned_u64_int(builder, size)?;
+        let major = load(builder, layout.device_major);
+        let major = self.lower_unsigned_u64_int(builder, major)?;
+        let minor = load(builder, layout.device_minor);
+        let minor = self.lower_unsigned_u64_int(builder, minor)?;
+        let mut fields = vec![
+            SynthesizedArgument::Scalar(size),
+            SynthesizedArgument::Dynamic(kind),
+        ];
+        for (field, bit, offset, payload) in metadata_option_entries(&layout) {
+            if field == 6 {
+                fields.extend([
+                    SynthesizedArgument::Scalar(major.clone()),
+                    SynthesizedArgument::Scalar(minor.clone()),
+                ]);
+            }
+            fields.push(self.lower_file_metadata_option(
+                builder,
+                reply,
+                pointer_type,
+                origin,
+                &root.field(field),
+                seats,
+                present,
+                bit,
+                offset,
+                payload,
+            )?);
+        }
+        self.synthesized_constructor(
+            origin,
+            root,
+            R::FileMetadata,
+            self.process_symbols.file_metadata.clone(),
+            fields,
+            seats,
+        )
+    }
+
+    fn lower_file_metadata_option(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        reply: cranelift_codegen::ir::StackSlot,
+        pointer_type: types::Type,
+        origin: StaticOriginId,
+        root: &SynthesizedAggregatePath,
+        seats: &ClaimedEffectSeats<'_>,
+        present: cranelift_codegen::ir::Value,
+        bit: u64,
+        offset: u32,
+        payload_kind: MetadataPayload,
+    ) -> Result<SynthesizedArgument, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        use SynthesizedFixedConstructorRole as R;
+        let flag = builder.ins().band_imm(present, bit as i64);
+        let supplied = builder.ins().icmp_imm(IntCC::NotEqual, flag, 0);
+        let discriminator = builder.ins().uextend(types::I64, supplied);
+        let payload = if payload_kind == MetadataPayload::Instant {
+            let pointer = builder.ins().stack_addr(pointer_type, reply, offset as i32);
+            let len = builder.ins().iconst(types::I64, 16);
+            let int = self.lower_wall_clock_instant_int(builder, pointer, len)?;
+            let value = self.synthesized_constructor(
+                origin,
+                &root.alternative(1).field(0),
+                R::MkInstant,
+                self.process_symbols.mk_instant.clone(),
+                vec![SynthesizedArgument::Scalar(int)],
+                seats,
+            )?;
+            SynthesizedArgument::Nested(value)
+        } else {
+            let raw = builder.ins().stack_load(types::I64, reply, offset as i32);
+            if payload_kind == MetadataPayload::Mode {
+                let valid = builder
+                    .ins()
+                    .icmp_imm(IntCC::UnsignedLessThanOrEqual, raw, 0o7777);
+                Self::require_when(builder, supplied, valid);
+            }
+            SynthesizedArgument::Scalar(self.lower_unsigned_u64_int(builder, raw)?)
+        };
+        Ok(SynthesizedArgument::Dynamic(Lowered::DynamicConstructor(
+            DynamicConstructorV1 {
+                discriminator,
+                alternatives: vec![
+                    self.synthesized_dynamic_alternative(
+                        origin,
+                        root,
+                        0,
+                        0,
+                        R::OptionNone,
+                        self.process_symbols.option_none.clone(),
+                        Vec::new(),
+                        seats,
+                    )?,
+                    self.synthesized_dynamic_alternative(
+                        origin,
+                        root,
+                        1,
+                        1,
+                        R::OptionSome,
+                        self.process_symbols.option_some.clone(),
+                        vec![payload],
+                        seats,
+                    )?,
+                ],
+            },
+        )))
     }
 
     fn require_u8(builder: &mut FunctionBuilder<'_>, value: cranelift_codegen::ir::Value) {
@@ -4887,70 +5127,16 @@ impl<'a> Lowering<'a> {
                 ken_host::HostOpV1::FsOpen | ken_host::HostOpV1::ProcessPlanOpen
                 | ken_host::HostOpV1::ProcessSpawn | ken_host::HostOpV1::ProcessTakePipe) {
                 Lowered::ResourceToken { value: detail }
-            } else if operation == ken_host::HostOpV1::FsMetadata {
-                let kind_tag = builder.ins().stack_load(
-                    types::I64,
+            } else if matches!(
+                operation,
+                ken_host::HostOpV1::FsMetadata | ken_host::HostOpV1::FsHandleMetadata
+            ) {
+                self.lower_file_metadata_reply(
+                    builder,
                     reply,
-                    i32::try_from(wire.reply_bytes_len_offset)
-                        .expect("reply bytes len offset is u32"),
-                );
-                Self::require_one_of_i64(builder, kind_tag, &[0, 1, 2, 3]);
-                let kind_root = ok_root.field(1);
-                let kind = Lowered::DynamicConstructor(DynamicConstructorV1 {
-                    discriminator: kind_tag,
-                    alternatives: vec![
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &kind_root,
-                            0,
-                            0,
-                            SynthesizedFixedConstructorRole::FileKindFile,
-                            self.process_symbols.file_kind_file.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &kind_root,
-                            1,
-                            1,
-                            SynthesizedFixedConstructorRole::FileKindDirectory,
-                            self.process_symbols.file_kind_directory.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &kind_root,
-                            2,
-                            2,
-                            SynthesizedFixedConstructorRole::FileKindSymlink,
-                            self.process_symbols.file_kind_symlink.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
-                        self.synthesized_dynamic_alternative(
-                            static_origin,
-                            &kind_root,
-                            3,
-                            3,
-                            SynthesizedFixedConstructorRole::FileKindOther,
-                            self.process_symbols.file_kind_other.clone(),
-                            Vec::new(),
-                            &seats,
-                        )?,
-                    ],
-                });
-                let size = self.lower_unsigned_u64_int(builder, detail)?;
-                self.synthesized_constructor(
+                    pointer_type,
                     static_origin,
                     &ok_root,
-                    SynthesizedFixedConstructorRole::FileMetadata,
-                    self.process_symbols.file_metadata.clone(),
-                    vec![
-                        SynthesizedArgument::Scalar(size),
-                        SynthesizedArgument::Dynamic(kind),
-                    ],
                     &seats,
                 )?
             } else if matches!(
@@ -5174,8 +5360,6 @@ impl<'a> Lowering<'a> {
                     vec![SynthesizedArgument::Nested(transferred)],
                     &seats,
                 )?
-            } else if operation == ken_host::HostOpV1::FsHandleMetadata {
-                self.lower_unsigned_u64_int(builder, detail)?
             } else {
                 self.synthesized_constructor(
                     static_origin,

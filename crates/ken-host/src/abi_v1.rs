@@ -455,6 +455,31 @@ struct ResourceErrorReplyV1 {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct FileMetadataReplyV1 {
+    present: u64,
+    size: u64,
+    kind: u64,
+    mode: u64,
+    links: u64,
+    device_major: u64,
+    device_minor: u64,
+    inode: u64,
+    modified: [u8; 16],
+    changed: [u8; 16],
+    accessed: [u8; 16],
+    born: [u8; 16],
+}
+
+const METADATA_PRESENT_MODE: u64 = 1;
+const METADATA_PRESENT_LINKS: u64 = 2;
+const METADATA_PRESENT_INODE: u64 = 4;
+const METADATA_PRESENT_MODIFIED: u64 = 8;
+const METADATA_PRESENT_CHANGED: u64 = 16;
+const METADATA_PRESENT_ACCESSED: u64 = 32;
+const METADATA_PRESENT_BORN: u64 = 64;
+
+#[repr(C)]
 struct HostReplyV1 {
     tag: u64,
     detail: u64,
@@ -464,6 +489,7 @@ struct HostReplyV1 {
     /// (BUDGET-EFF, `dec_1m6xdwjp2ttyn`). Set only for `ReadSome`/`Wrote`;
     /// zero otherwise. Never smuggled through `bytes`/`resource_error`.
     effective_request: u64,
+    metadata: FileMetadataReplyV1,
 }
 
 const REPLY_UNIT: u64 = 0;
@@ -708,16 +734,7 @@ impl HostEffectBackendV1 for ProcessHost {
     ) -> Result<crate::FileMetadataV1, FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
         let handle = crate::open_at(&parent, &leaf, OpenRequest::Read).map_err(host_error)?;
-        let metadata = crate::metadata(&handle).map_err(host_error)?;
-        Ok(crate::FileMetadataV1 {
-            size: metadata.size,
-            kind: match metadata.kind {
-                crate::FileKind::File => crate::FsNodeKindV1::File,
-                crate::FileKind::Directory => crate::FsNodeKindV1::Directory,
-                crate::FileKind::Symlink => crate::FsNodeKindV1::Symlink,
-                crate::FileKind::Other => crate::FsNodeKindV1::Other,
-            },
-        })
+        crate::file_metadata_v1(&handle).map_err(host_error)
     }
 
     fn fs_read_directory(
@@ -1436,6 +1453,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         len: 0,
     };
     reply.resource_error = ResourceErrorReplyV1::default();
+    reply.metadata = FileMetadataReplyV1::default();
     match outcome {
         CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit) => reply.tag = REPLY_UNIT,
         CanonicalOutcomeV1::Success(CanonicalReplyV1::Bool(value)) => {
@@ -1496,13 +1514,34 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) => {
             reply.tag = REPLY_METADATA;
-            reply.detail = metadata.size;
-            reply.bytes.len = match metadata.kind {
-                crate::FsNodeKindV1::File => 0,
-                crate::FsNodeKindV1::Directory => 1,
-                crate::FsNodeKindV1::Symlink => 2,
-                crate::FsNodeKindV1::Other => 3,
+            let mut record = FileMetadataReplyV1 {
+                size: metadata.size,
+                kind: match metadata.kind {
+                    crate::FsNodeKindV1::File => 0,
+                    crate::FsNodeKindV1::Directory => 1,
+                    crate::FsNodeKindV1::Symlink => 2,
+                    crate::FsNodeKindV1::Other => 3,
+                },
+                device_major: metadata.device_major,
+                device_minor: metadata.device_minor,
+                ..FileMetadataReplyV1::default()
             };
+            macro_rules! supplied {
+                ($field:ident, $bit:ident $(, $encode:ident)?) => {
+                    if let Some(value) = metadata.$field {
+                        record.present |= $bit;
+                        record.$field = value$(.$encode())?;
+                    }
+                };
+            }
+            supplied!(mode, METADATA_PRESENT_MODE);
+            supplied!(links, METADATA_PRESENT_LINKS);
+            supplied!(inode, METADATA_PRESENT_INODE);
+            supplied!(modified, METADATA_PRESENT_MODIFIED, to_be_bytes);
+            supplied!(changed, METADATA_PRESENT_CHANGED, to_be_bytes);
+            supplied!(accessed, METADATA_PRESENT_ACCESSED, to_be_bytes);
+            supplied!(born, METADATA_PRESENT_BORN, to_be_bytes);
+            reply.metadata = record;
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) => {
             let encoded = encode_directory_entries_reply_v1(&entries);
@@ -2843,6 +2882,7 @@ mod tests {
         size_align!("MappingAcquireFileRequestV1", MappingAcquireFileRequestV1);
         size_align!("ResourceErrorReplyV1", ResourceErrorReplyV1);
         size_align!("HostReplyV1", HostReplyV1);
+        size_align!("FileMetadataReplyV1", FileMetadataReplyV1);
         macro_rules! offset {
             ($record:literal, $ty:ty, $field:ident) => {
                 assert_eq!(
@@ -2985,6 +3025,19 @@ mod tests {
         offset!("HostReplyV1", HostReplyV1, detail);
         offset!("HostReplyV1", HostReplyV1, bytes);
         offset!("HostReplyV1", HostReplyV1, resource_error);
+        offset!("HostReplyV1", HostReplyV1, metadata);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, present);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, size);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, kind);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, mode);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, links);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, device_major);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, device_minor);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, inode);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, modified);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, changed);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, accessed);
+        offset!("FileMetadataReplyV1", FileMetadataReplyV1, born);
         // **`ABI-R3` `D3`** -- this was a length assertion over the generated
         // catalog against the literal 25, not reproduced here because `AC-3`'s
         // control greps for that spelling. The loop below
@@ -3018,6 +3071,34 @@ mod tests {
         assert_eq!(effect_binding("tag", "reply.error"), REPLY_ERROR);
         assert_eq!(effect_binding("tag", "reply.resource"), REPLY_RESOURCE);
         assert_eq!(effect_binding("tag", "reply.metadata"), REPLY_METADATA);
+        assert_eq!(
+            effect_binding("tag", "metadata_present.mode"),
+            METADATA_PRESENT_MODE
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.links"),
+            METADATA_PRESENT_LINKS
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.inode"),
+            METADATA_PRESENT_INODE
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.modified"),
+            METADATA_PRESENT_MODIFIED
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.changed"),
+            METADATA_PRESENT_CHANGED
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.accessed"),
+            METADATA_PRESENT_ACCESSED
+        );
+        assert_eq!(
+            effect_binding("tag", "metadata_present.born"),
+            METADATA_PRESENT_BORN
+        );
         assert_eq!(
             effect_binding("tag", "reply.resource_error"),
             REPLY_RESOURCE_ERROR
@@ -3235,6 +3316,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         set_reply(
             &mut reply,
@@ -3305,6 +3387,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let path = b"listing";
         let request = FsPathRequestV1 {
@@ -3791,6 +3874,7 @@ mod tests {
                 actual_kind: u64::MAX,
             },
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
 
         let mut project = |error| {
@@ -4020,6 +4104,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4108,6 +4193,7 @@ mod tests {
                 },
                 resource_error: ResourceErrorReplyV1::default(),
                 effective_request: u64::MAX,
+                metadata: FileMetadataReplyV1::default(),
             };
             let status = unsafe {
                 ken_host_dispatch_v1(
@@ -4120,9 +4206,11 @@ mod tests {
             };
             assert_eq!(status, 0, "FsMetadata must not take the -3 fallback");
             assert_eq!(reply.tag, REPLY_METADATA);
-            assert_eq!(reply.detail, expected_size);
+            assert_eq!(reply.detail, 0);
+            assert_eq!(reply.bytes.len, 0);
+            assert_eq!(reply.metadata.size, expected_size);
             assert_eq!(
-                reply.bytes.len,
+                reply.metadata.kind,
                 match expected_kind {
                     crate::FsNodeKindV1::File => 0,
                     crate::FsNodeKindV1::Directory => 1,
@@ -4142,14 +4230,14 @@ mod tests {
                     path: path.to_vec(),
                 }
             );
+            let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) =
+                &event.outcome
+            else {
+                panic!("metadata observation: {:?}", event.outcome);
+            };
             assert_eq!(
-                event.outcome,
-                CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(
-                    crate::FileMetadataV1 {
-                        size: expected_size,
-                        kind: expected_kind,
-                    }
-                ))
+                (metadata.size, metadata.kind),
+                (expected_size, expected_kind)
             );
         }
 
@@ -4200,6 +4288,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4262,6 +4351,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4304,6 +4394,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let before = ProcessHost.clock_wall_now();
         let status = unsafe {
@@ -4388,6 +4479,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4465,6 +4557,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4488,6 +4581,184 @@ mod tests {
         assert_eq!(child.wait().unwrap(), crate::ChildExitV1::Signaled(9));
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// MEASURED: for each missing field, set_reply clears just its bit and
+    /// slot, including when the reply is reused. CLAIMED: the native plane
+    /// gets the same presence as the canonical reply. THE GAP: native
+    /// construction consumes these catalog bits in its own lowering row.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s4_reply_bits_and_zero_slots_follow_each_optional_field() {
+        let root = std::env::temp_dir();
+        let initialized = context(&root);
+        let ctx = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+        let mut reply = HostReplyV1 {
+            tag: 0,
+            detail: 0,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: 0,
+            },
+            effective_request: 0,
+            resource_error: ResourceErrorReplyV1::default(),
+            metadata: FileMetadataReplyV1::default(),
+        };
+        let full = crate::FileMetadataV1 {
+            size: 13,
+            kind: crate::FsNodeKindV1::Directory,
+            mode: Some(0o641),
+            links: Some(3),
+            device_major: 14,
+            device_minor: 15,
+            inode: Some(16),
+            modified: Some(-7),
+            changed: Some(8),
+            accessed: Some(9),
+            born: Some(10),
+        };
+        let known = FileMetadataReplyV1 {
+            present: 0x7f,
+            size: 13,
+            kind: 1,
+            mode: 0o641,
+            links: 3,
+            device_major: 14,
+            device_minor: 15,
+            inode: 16,
+            modified: (-7_i128).to_be_bytes(),
+            changed: 8_i128.to_be_bytes(),
+            accessed: 9_i128.to_be_bytes(),
+            born: 10_i128.to_be_bytes(),
+        };
+        let put = |reply: &mut HostReplyV1, metadata, ctx: &mut ProcessContext| {
+            set_reply(
+                reply,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)),
+                ctx,
+            );
+        };
+        macro_rules! missing {
+            ($field:ident, $bit:literal, $zero:expr) => {{
+                put(&mut reply, full.clone(), ctx);
+                assert_eq!(reply.metadata, known);
+                let mut input = full.clone();
+                input.$field = None;
+                put(&mut reply, input, ctx);
+                let mut expected = known;
+                expected.present &= !$bit;
+                expected.$field = $zero;
+                assert_eq!(reply.metadata, expected, stringify!($field));
+                assert_eq!(
+                    (reply.tag, reply.detail, reply.bytes.len),
+                    (REPLY_METADATA, 0, 0)
+                );
+            }};
+        }
+        missing!(mode, 1, 0);
+        missing!(links, 2, 0);
+        missing!(inode, 4, 0);
+        missing!(modified, 8, [0; 16]);
+        missing!(changed, 16, [0; 16]);
+        missing!(accessed, 32, [0; 16]);
+        missing!(born, 64, [0; 16]);
+        unsafe { ken_host_invocation_v1_finish(initialized.context, 0) };
+    }
+
+    /// MEASURED: two successful write/metadata pairs separated by a monotonic
+    /// deadline have strictly ordered mtime. CLAIMED: metadata reports the
+    /// modification time, not a constant. THE GAP: the host clock and test
+    /// filesystem must advance; a constant-time observation fails the same check.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s4_modified_time_advances_after_deadline() {
+        let root = std::env::temp_dir().join(format!("ken-abi-s4-mtime-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let initialized = context(&root);
+        let path = b"modified.bin";
+        let path_wire = || SliceV1 {
+            data: path.as_ptr(),
+            len: path.len(),
+        };
+        let write_and_observe = |payload: &[u8]| {
+            let mut reply = HostReplyV1 {
+                tag: 0,
+                detail: 0,
+                bytes: SliceV1 {
+                    data: std::ptr::null(),
+                    len: 0,
+                },
+                effective_request: 0,
+                resource_error: ResourceErrorReplyV1::default(),
+                metadata: FileMetadataReplyV1::default(),
+            };
+            let write = FsWriteFileRequestV1 {
+                capability: initialized.capability,
+                path: path_wire(),
+                create_policy: 1,
+                bytes: SliceV1 {
+                    data: payload.as_ptr(),
+                    len: payload.len(),
+                },
+            };
+            let meta = FsPathRequestV1 {
+                capability: initialized.capability,
+                path: path_wire(),
+            };
+            let dispatch = |op, request, size, reply: &mut HostReplyV1| unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context,
+                    op as u64,
+                    request,
+                    size,
+                    std::ptr::from_mut(reply).cast(),
+                )
+            };
+            assert_eq!(
+                dispatch(
+                    HostOpV1::FsWriteFile,
+                    std::ptr::from_ref(&write).cast(),
+                    std::mem::size_of_val(&write),
+                    &mut reply
+                ),
+                0
+            );
+            assert_eq!(reply.tag, REPLY_UNIT);
+            assert_eq!(
+                dispatch(
+                    HostOpV1::FsMetadata,
+                    std::ptr::from_ref(&meta).cast(),
+                    std::mem::size_of_val(&meta),
+                    &mut reply
+                ),
+                0
+            );
+            assert_eq!(reply.tag, REPLY_METADATA);
+            assert_eq!(reply.metadata.size, payload.len() as u64);
+            assert_ne!(
+                reply.metadata.present & METADATA_PRESENT_MODIFIED,
+                0,
+                "fixture supplies mtime"
+            );
+            i128::from_be_bytes(reply.metadata.modified)
+        };
+        let before = write_and_observe(b"before");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        while let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now()) {
+            std::thread::sleep(remaining);
+        }
+        let after = write_and_observe(b"later payload");
+        let advances = |(first, second): (i128, i128)| second > first;
+        assert!(
+            advances((before, after)),
+            "modified time did not advance: {before} -> {after}"
+        );
+        assert!(
+            !advances((before, before)),
+            "constant-time negative control must fail"
+        );
+        unsafe { ken_host_invocation_v1_finish(initialized.context, 0) };
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     fn context(directory: &std::path::Path) -> HostInitResultV1 {
@@ -4896,6 +5167,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -4958,6 +5230,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -5044,6 +5317,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let allocate = MappingAllocateRequestV1 {
             length: 8,
@@ -5152,6 +5426,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -5247,6 +5522,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let dispatch = |operation, request: *const c_void, size, reply: &mut HostReplyV1| unsafe {
             ken_host_dispatch_v1(
@@ -5515,6 +5791,7 @@ mod tests {
             },
             resource_error: ResourceErrorReplyV1::default(),
             effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
         };
         let status = unsafe {
             ken_host_dispatch_v1(
@@ -5541,7 +5818,8 @@ mod tests {
         };
         assert_eq!(dispatch_resource(HostOpV1::FsHandleMetadata, &mut reply), 0);
         assert_eq!(reply.tag, REPLY_METADATA);
-        assert_eq!(reply.detail, 13);
+        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.metadata.size, 13);
         assert_eq!(dispatch_resource(HostOpV1::ResourceRelease, &mut reply), 0);
         assert_eq!(reply.tag, REPLY_UNIT);
         assert_eq!(dispatch_resource(HostOpV1::FsHandleMetadata, &mut reply), 0);

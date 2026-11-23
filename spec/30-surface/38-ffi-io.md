@@ -1423,8 +1423,7 @@ the native response. The CLI's `check`, `run` and `native-build` route
 switches belong to Increment 3b, not this vocabulary slice.
 
 The existing exact checked FS result carriers `FileKind` (`KFile`,
-`KDirectory`, `KSymlink`, `KOther`), `FileMetadata`
-(`MkFileMetadata Int FileKind`) and `DirEntry`
+`KDirectory`, `KSymlink`, `KOther`), `FileMetadata` and `DirEntry`
 (`MkDirEntry Bytes FileKind`) also enter the scoped floor. Native
 metadata and directory replies select their checked constructors;
 source uses only `FileKind.KFile` and its three sibling qualified
@@ -1445,6 +1444,47 @@ Only these five I/O family names enter the counted floor from this
 paragraph; none of their constructor leaves joins bare protected B.
 `StateOp.Get` and `StateOp.Put` are likewise scoped (§36 §4.2).
 Native stable-symbol leaves and runtime IDs do not change.
+
+For ABI-S4, `FileMetadata` grows in place, retaining its scoped-floor
+family and the qualified `FileMetadata.MkFileMetadata` constructor.
+The complete constructor shape, in field order, is:
+
+```text
+MkFileMetadata Int FileKind (Option Int) (Option Int) Int Int (Option Int)
+  (Option Instant) (Option Instant) (Option Instant) (Option Instant)
+```
+
+Both `file_metadata` and `resourceMetadata` obtain all fields from one
+Linux `statx` result for an already-opened file or handle. The fields are,
+in order:
+
+1. Size in bytes (`Int`), required from `STATX_SIZE`.
+2. Kind (`FileKind`), required from `STATX_TYPE`.
+3. Mode (`Option Int`): `stx_mode & 0o7777` when `STATX_MODE` is set,
+   regardless of file kind.
+4. Hard-link count (`Option Int`), reported by `STATX_NLINK`.
+5. Device major number (`Int`).
+6. Device minor number (`Int`).
+7. Inode number (`Option Int`), reported by `STATX_INO`.
+8. Modification time (`Option Instant`), reported by `STATX_MTIME`.
+9. Status-change time (`Option Instant`), reported by `STATX_CTIME`.
+10. Access time (`Option Instant`), reported by `STATX_ATIME`.
+11. Birth time (`Option Instant`), reported by `STATX_BTIME`.
+
+The device numbers are not optional: `statx` supplies them without
+availability bits. For each optional field, `Some` carries the value
+exactly when its corresponding bit is set in the returned mask; otherwise
+it is `None`. No zero or value from another field substitutes for absence.
+The mask itself and all other `statx` fields are outside this carrier.
+
+Each reported time uses the existing `Instant` in the same unit and epoch
+as `wall_now`: signed nanoseconds since the Unix epoch, computed exactly
+as `tv_sec * 1_000_000_000 + tv_nsec`. If either required bit is missing,
+or a reported time has `tv_nsec` outside `[0, 1_000_000_000)`, the operation
+fails without returning a partial or fabricated record. `file_metadata`
+returns a `FileError` with `FileOperation.OpMetadata`, `Some path`, and
+`IOError.Unsupported`; `resourceMetadata` returns
+`ResourceHostIO IOError.Unsupported`.
 
 Eight further checked FS wrappers (`append_file`, `change_mode`,
 `create_directory`, `read_directory`, `remove_directory`,

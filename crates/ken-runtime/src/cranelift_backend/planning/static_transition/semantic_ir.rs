@@ -157,10 +157,11 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ResourceKindPipeWrite,
     ChildExitExited,
     ChildExitSignaled,
+    OptionNone,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 59] = [
+    pub(super) const ALL: [Self; 60] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -220,6 +221,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ResourceKindPipeWrite,
         Self::ChildExitExited,
         Self::ChildExitSignaled,
+        Self::OptionNone,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -229,6 +231,7 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationWrite => &symbols.file_operation_write,
             Self::FileOperationChangeMode => &symbols.file_operation_change_mode,
             Self::OptionSome => &symbols.option_some,
+            Self::OptionNone => &symbols.option_none,
             Self::ResourceHostIo => &symbols.resource_host_io,
             Self::ResourceClosed => &symbols.resource_closed,
             Self::ResourceMalformed => &symbols.resource_malformed,

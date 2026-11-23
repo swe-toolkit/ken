@@ -299,7 +299,7 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
     source.push_str(
         "const chunk : ReadResult = ReadResult.Chunk (bytes_encode \"x\")\n\
          const eof : ReadResult = ReadResult.Eof\n\
-         const metadata : FileMetadata = FileMetadata.MkFileMetadata 1 FileKind.KFile\n\
+         const metadata : FileMetadata = FileMetadata.MkFileMetadata 1 FileKind.KFile (Option.None Int) (Option.None Int) 0 0 (Option.None Int) (Option.None Instant) (Option.None Instant) (Option.None Instant) (Option.None Instant)\n\
          const entry : DirEntry = DirEntry.MkDirEntry (bytes_encode \"n\") FileKind.KFile\n\
          const get : StateOp Nat = StateOp.Get Nat\n\
          const put : StateOp Nat = StateOp.Put Nat Zero\n\
@@ -327,7 +327,7 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
         (
             "FileMetadata",
             "MkFileMetadata",
-            "MkFileMetadata 1 FileKind.KFile",
+            "MkFileMetadata 1 FileKind.KFile (Option.None Int) (Option.None Int) 0 0 (Option.None Int) (Option.None Instant) (Option.None Instant) (Option.None Instant) (Option.None Instant)",
         ),
         (
             "DirEntry",

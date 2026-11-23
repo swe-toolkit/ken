@@ -381,6 +381,13 @@ fn put_node_kind(out: &mut Vec<u8>, kind: FsNodeKindV1) {
     );
 }
 
+fn put_option<T>(out: &mut Vec<u8>, value: Option<T>, put: impl FnOnce(&mut Vec<u8>, T)) {
+    put_u8(out, u8::from(value.is_some()));
+    if let Some(value) = value {
+        put(out, value);
+    }
+}
+
 fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTraceWireError> {
     match reply {
         CanonicalReplyV1::Unit => put_u8(out, 0),
@@ -409,6 +416,22 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
             put_u8(out, 6);
             put_u64(out, metadata.size);
             put_node_kind(out, metadata.kind);
+            if metadata.mode.is_some_and(|mode| mode > 0o7777) {
+                return Err(EffectTraceWireError);
+            }
+            put_option(out, metadata.mode, put_u64);
+            put_option(out, metadata.links, put_u64);
+            put_u64(out, metadata.device_major);
+            put_u64(out, metadata.device_minor);
+            put_option(out, metadata.inode, put_u64);
+            for time in [
+                metadata.modified,
+                metadata.changed,
+                metadata.accessed,
+                metadata.born,
+            ] {
+                put_option(out, time, |out, value| out.extend(value.to_be_bytes()));
+            }
         }
         CanonicalReplyV1::DirectoryEntries(entries) => {
             put_u8(out, 7);
@@ -1096,6 +1119,26 @@ fn validate_transfer_request_bound(
     }
 }
 
+fn get_option<'a, T>(
+    cursor: &mut Cursor<'a>,
+    get: impl FnOnce(&mut Cursor<'a>) -> Result<T, EffectTraceWireError>,
+) -> Result<Option<T>, EffectTraceWireError> {
+    if get_bool(cursor)? {
+        Ok(Some(get(cursor)?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn get_metadata_time(cursor: &mut Cursor<'_>) -> Result<i128, EffectTraceWireError> {
+    Ok(i128::from_be_bytes(
+        cursor
+            .take(16)?
+            .try_into()
+            .map_err(|_| EffectTraceWireError)?,
+    ))
+}
+
 fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWireError> {
     Ok(match cursor.u8()? {
         0 => CanonicalReplyV1::Unit,
@@ -1113,10 +1156,27 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
             1 => crate::ChildExitV1::Signaled(cursor.u8()?),
             _ => return Err(EffectTraceWireError),
         }),
-        6 => CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-            size: cursor.u64()?,
-            kind: get_node_kind(cursor)?,
-        }),
+        6 => {
+            let size = cursor.u64()?;
+            let kind = get_node_kind(cursor)?;
+            let mode = get_option(cursor, Cursor::u64)?;
+            if mode.is_some_and(|mode| mode > 0o7777) {
+                return Err(EffectTraceWireError);
+            }
+            CanonicalReplyV1::FileMetadata(FileMetadataV1 {
+                size,
+                kind,
+                mode,
+                links: get_option(cursor, Cursor::u64)?,
+                device_major: cursor.u64()?,
+                device_minor: cursor.u64()?,
+                inode: get_option(cursor, Cursor::u64)?,
+                modified: get_option(cursor, get_metadata_time)?,
+                changed: get_option(cursor, get_metadata_time)?,
+                accessed: get_option(cursor, get_metadata_time)?,
+                born: get_option(cursor, get_metadata_time)?,
+            })
+        }
         7 => {
             let count = usize::try_from(cursor.u64()?).map_err(|_| EffectTraceWireError)?;
             if count > cursor.remaining() / 9 {
@@ -1458,6 +1518,70 @@ pub fn decode_linked_effect_trace(bytes: &[u8]) -> Result<LinkedEffectTrace, Eff
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// MEASURED: absent time consumes only its tag; Some(0) adds 16 payload
+    /// bytes and malformed tags do not decode. CLAIMED: wire absence has no
+    /// numeric representation. THE GAP: both execution lanes must honor it.
+    #[test]
+    fn abi_s4_metadata_wire_distinguishes_absence_and_zero() {
+        let mut row = FileMetadataV1::without_optional_fields(5, FsNodeKindV1::File, 71, 72);
+        row.mode = Some(0o755);
+        row.modified = Some(-1);
+        let reply = CanonicalReplyV1::FileMetadata(row.clone());
+        let mut absent = Vec::new();
+        put_reply(&mut absent, &reply).unwrap();
+        let mut cursor = Cursor {
+            bytes: &absent,
+            position: 0,
+        };
+        assert_eq!(get_reply(&mut cursor).unwrap(), reply);
+        assert_eq!(cursor.remaining(), 0);
+        assert_eq!(absent.last(), Some(&0));
+
+        row.born = Some(0);
+        let mut zero = Vec::new();
+        let reply = CanonicalReplyV1::FileMetadata(row);
+        put_reply(&mut zero, &reply).unwrap();
+        let mut cursor = Cursor {
+            bytes: &zero,
+            position: 0,
+        };
+        assert_eq!(get_reply(&mut cursor).unwrap(), reply);
+        assert_eq!(cursor.remaining(), 0);
+        assert_eq!(&zero[..absent.len() - 1], &absent[..absent.len() - 1]);
+        assert_eq!(
+            &zero[absent.len() - 1..],
+            &[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+
+        let mut malformed = absent.clone();
+        *malformed.last_mut().unwrap() = 2;
+        assert_eq!(
+            get_reply(&mut Cursor {
+                bytes: &malformed,
+                position: 0
+            }),
+            Err(EffectTraceWireError)
+        );
+        malformed = absent.clone();
+        malformed[9] = 0xff; // unknown FileKind
+        assert_eq!(
+            get_reply(&mut Cursor {
+                bytes: &malformed,
+                position: 0
+            }),
+            Err(EffectTraceWireError)
+        );
+        malformed = absent;
+        malformed[11..19].copy_from_slice(&0o10000_u64.to_le_bytes());
+        assert_eq!(
+            get_reply(&mut Cursor {
+                bytes: &malformed,
+                position: 0
+            }),
+            Err(EffectTraceWireError)
+        );
+    }
 
     /// Promise: normative compatibility vector for the reserved typed terminal
     /// tag and durable invariant for unknown/malformed refusal. The positive

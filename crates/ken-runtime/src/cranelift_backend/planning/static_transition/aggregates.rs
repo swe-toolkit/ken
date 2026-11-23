@@ -3594,8 +3594,8 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateNode {
     },
     /// This arm of the host result synthesizes no aggregate at all.
     ///
-    /// `FsReadFile`'s `ResponseBytes`, `FsOpen`'s `ResourceToken`,
-    /// `FsHandleMetadata`'s `Int`. Distinct from [`Self::SiteOperand`] on
+    /// `FsReadFile`'s `ResponseBytes` or `FsOpen`'s `ResourceToken`.
+    /// Distinct from [`Self::SiteOperand`] on
     /// purpose: that one is a child whose evidence the seat supplies, this one
     /// is a position where the tree governs nothing because no aggregate is
     /// built. Collapsing them would let "no allocation here" and "an allocation
@@ -3891,9 +3891,37 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             N::nullary(R::FileKindSymlink),
             N::nullary(R::FileKindOther),
         ]));
+    const OPTIONAL_INT: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::OptionNone),
+            N::Fixed {
+                role: R::OptionSome,
+                children: &[N::native_int()],
+            },
+        ]));
+    const OPTIONAL_INSTANT: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::nullary(R::OptionNone),
+            N::Fixed {
+                role: R::OptionSome,
+                children: &[INSTANT],
+            },
+        ]));
     const FILE_METADATA: SynthesizedAggregateNode = N::Fixed {
         role: R::FileMetadata,
-        children: &[N::native_int(), FILE_KIND],
+        children: &[
+            N::native_int(),
+            FILE_KIND,
+            OPTIONAL_INT,
+            OPTIONAL_INT,
+            N::native_int(),
+            N::native_int(),
+            OPTIONAL_INT,
+            OPTIONAL_INSTANT,
+            OPTIONAL_INSTANT,
+            OPTIONAL_INSTANT,
+            OPTIONAL_INSTANT,
+        ],
     };
     const DIRECTORY_ENTRY: SynthesizedAggregateNode = N::Fixed {
         role: R::DirEntry,
@@ -3975,7 +4003,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             (RESOURCE_SURFACE, N::Absent)
         }
         Op::MappingWriteView => (RESOURCE_SURFACE, UNIT),
-        Op::FsHandleMetadata => (RESOURCE_SURFACE, N::Absent),
+        Op::FsHandleMetadata => (RESOURCE_SURFACE, FILE_METADATA),
         Op::ResourceRelease => (RESOURCE_SURFACE, UNIT),
         Op::FsReadAt => (RESOURCE_SURFACE, READ_PROGRESS),
         Op::FsWriteAt => (RESOURCE_SURFACE, WROTE),
@@ -12764,6 +12792,26 @@ mod tests {
         };
         let unit = || vec![(path(OK, &[]), Fixed(R::Unit))];
 
+        let metadata = || {
+            let mut roles = Vec::from([
+                (path(OK, &[]), Fixed(R::FileMetadata)),
+                (path(OK, &[field(1), alt(0)]), Fixed(R::FileKindFile)),
+                (path(OK, &[field(1), alt(1)]), Fixed(R::FileKindDirectory)),
+                (path(OK, &[field(1), alt(2)]), Fixed(R::FileKindSymlink)),
+                (path(OK, &[field(1), alt(3)]), Fixed(R::FileKindOther)),
+            ]);
+            for slot in [2, 3, 6, 7, 8, 9, 10] {
+                roles.push((path(OK, &[field(slot), alt(0)]), Fixed(R::OptionNone)));
+                roles.push((path(OK, &[field(slot), alt(1)]), Fixed(R::OptionSome)));
+                if slot >= 7 {
+                    roles.push((
+                        path(OK, &[field(slot), alt(1), field(0)]),
+                        Fixed(R::MkInstant),
+                    ));
+                }
+            }
+            roles
+        };
         let expected: Vec<(Op, Vec<(SynthesizedAggregatePath, SynthesizedConstructorRole)>)> = vec![
             // Returns a `Bool` above the synthesis entirely.
             (Op::ConsoleIsTerminal, vec![]),
@@ -12811,19 +12859,7 @@ mod tests {
                 Op::FsMetadata,
                 file_error(R::FileOperationMetadata)
                     .into_iter()
-                    .chain([
-                        (path(OK, &[]), Fixed(R::FileMetadata)),
-                        (path(OK, &[field(1), alt(0)]), Fixed(R::FileKindFile)),
-                        (
-                            path(OK, &[field(1), alt(1)]),
-                            Fixed(R::FileKindDirectory),
-                        ),
-                        (
-                            path(OK, &[field(1), alt(2)]),
-                            Fixed(R::FileKindSymlink),
-                        ),
-                        (path(OK, &[field(1), alt(3)]), Fixed(R::FileKindOther)),
-                    ])
+                    .chain(metadata())
                     .collect(),
             ),
             (
@@ -12850,7 +12886,12 @@ mod tests {
             ),
             (
                 Op::FsHandleMetadata,
-                surface.iter().cloned().chain(surface_io.clone()).collect(),
+                surface
+                    .iter()
+                    .cloned()
+                    .chain(surface_io.clone())
+                    .chain(metadata())
+                    .collect(),
             ),
             (
                 Op::ResourceRelease,
