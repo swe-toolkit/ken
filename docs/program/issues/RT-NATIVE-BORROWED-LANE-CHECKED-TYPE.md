@@ -1,18 +1,27 @@
 ---
 id: RT-NATIVE-BORROWED-LANE-CHECKED-TYPE
 title: "Native lowering admits a match onto the borrowed process-input lane from its case set's constructor names alone, so a list of any element type gets a borrowed leaf, and a nested match on an element constructor outside the four-row borrowed table refuses at native-build although provenance makes that leaf unreachable. Key the admission on the scrutinee's checked type, carried as an explicit field on the runtime Match, with today's rule kept wherever the type is not rigidly visible"
-status: ready
+status: draft
 owner: language
 size: M
 tier: T1
 gate: architect
 depends_on: []
-blocks: [ABI-S2]
+blocks: []
 github: null
 origin: "Architect ruling evt_7dcsn0qdafqmb on ABI-S2's A-d stop (language-implementer evt_pkyezk8nayxm; hold evt_7qcp68q6b803v; research advisory evt_2by4w115x1k81). B-a evt_74gjjrbrv0jnh: the wall predates ABI-S2. Steward scope evt_wrp06ygjgj1: its own node on the Language ring, ahead of ABI-S2's consuming fixture. Closes the Architect carry 'borrowed-leaf admission' and the predicate of RT-NATIVE-BYTES-TO-LIST inventory entry 1 and ABI-S2 entry 4. L1b Linux ABI program, Steward order."
 ---
 
 # Borrowed-lane admission by checked type
+
+Withdrawn to draft as a carry (Steward `evt_611zz5ccb9z9w`). On main
+`67128ba0f` the landed RT-NATIVE-BYTES-TO-LIST backstop aborts in the dead
+borrowed leaf, so the B program builds and runs (Architect
+`evt_3jvnz3jc5g36p`), and ABI-S2's wall was elsewhere (I-probe
+`evt_3va3hpc27g78q`). What remains is structural. Re-release when a consumer
+of a borrowed-leaf binder that the backstop does not cover refuses, or when
+a third abort site is proposed. The design, `evt_7dcsn0qdafqmb` §§1-2 with
+the recorder AC of `evt_3jvnz3jc5g36p`, stands.
 
 ## Objective
 
