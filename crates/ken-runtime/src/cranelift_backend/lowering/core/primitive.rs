@@ -195,20 +195,14 @@ impl<'a> Lowering<'a> {
                     }
                     LoweringOperand::Specialized(value) => Ok(value),
                     LoweringOperand::Carried(word) => {
-                        let value = self.emit_carrier_scalar(builder, word)?;
-                        let tag = builder
-                            .ins()
-                            .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
                         Ok(match kind {
-                            "Int" => {
-                                Self::require_i64(
-                                    builder,
-                                    tag,
-                                    crate::boundary_value::BoundaryTag::ImmediateInt as i64,
-                                );
-                                self.lower_dynamic_small_int(builder, value)
-                            }
+                            "Int" => self.decode_carried_int_operand(builder, word)?,
                             "Bool" => {
+                                let value = self.emit_carrier_scalar(builder, word)?;
+                                let tag = builder.ins().band_imm(
+                                    word.word,
+                                    crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+                                );
                                 Self::require_i64(
                                     builder,
                                     tag,

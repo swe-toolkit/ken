@@ -6350,6 +6350,49 @@ fn c1_d3_ac_c4_the_recursor_capsule_is_refused_before_its_residual_is_read() {
 // the same two answers. Every row below therefore drives **one** compiled
 // function with the payload as a **parameter**.
 
+/// Durable regression cover for narrowing a carried Small through `int_view`.
+/// The pointer-lifetime test, not this value test, discriminates a dead view.
+#[test]
+fn narrow_carried_int_u64_reads_spilled_small_or_refuses_its_sign() {
+    use cranelift_codegen::ir::condcodes::IntCC;
+
+    let fixture = ac_c7_ctor("Alpha");
+    let (plan, origin) = planned_root_occurrence(&fixture);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = ac_c7_try_compile_edge_with_operands(
+        &seed_env,
+        plan,
+        1,
+        |compiler, builder, operands| {
+            let payload = operands[0];
+            let small = compiler.lower_dynamic_small_int(builder, payload);
+            let word = compiler.transfer_into_carrier(builder, origin, &small)?;
+            let tag = builder
+                .ins()
+                .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+            Lowering::require_i64(builder, tag, BoundaryTag::PersistentGround as i64);
+
+            let (value, valid) = compiler.narrow_carried_int_u64(builder, word)?;
+            let expected_valid = builder.ins().icmp_imm(IntCC::SignedGreaterThanOrEqual, payload, 0);
+            let zero = builder.ins().iconst(types::I64, 0);
+            let expected_value = builder.ins().select(expected_valid, payload, zero);
+            let value_matches = builder.ins().icmp(IntCC::Equal, value, expected_value);
+            let valid_matches = builder.ins().icmp(IntCC::Equal, valid, expected_valid);
+            let matches = builder.ins().band(value_matches, valid_matches);
+            Ok(builder.ins().uextend(types::I64, matches))
+        },
+    )
+    .expect("the Small producer and narrow reader emit");
+    let native = crate::native_int::NativeIntArenaV1::default();
+    for payload in [1_i64 << 55, i64::MAX, -(1_i64 << 55) - 1] {
+        let mut store = crate::boundary_value::BoundaryValueStore::new();
+        let (_arena, base) = b2f_d9_bind_wide_arena(&mut store, &native);
+        assert_eq!(c2_run_edge_with_arg(code, base, payload), 1, "Small {payload}");
+    }
+}
+
 /// `(arena, payload) -> boundary word` — the dispatch, compiled once.
 ///
 /// ⚠ The `Lowered::Int` is built over the function's own **block parameter**,

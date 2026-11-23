@@ -9078,7 +9078,7 @@ impl<'a> Lowering<'a> {
         let view_slot = builder.create_sized_stack_slot(
             cranelift_codegen::ir::StackSlotData::new(
                 cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-                24,
+                32,
                 3,
             ),
         );

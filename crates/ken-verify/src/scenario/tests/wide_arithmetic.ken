@@ -1,0 +1,29 @@
+program capabilities FS AFull
+
+import Capability.Process.Exit (host_pure)
+
+data WideLengths = NoLengths | LengthThen Int WideLengths
+
+fn widen_lengths (args : List Bytes) : WideLengths =
+  match args {
+    Nil |-> NoLengths;
+    Cons a rest |-> LengthThen (add_int (36028797018963968 : Int) (bytes_length a)) (widen_lengths rest)
+  }
+
+fn any_successor_is_wanted (xs : WideLengths) : Bool =
+  match xs {
+    NoLengths |-> False;
+    LengthThen n rest |-> match eq_int (add_int n (1 : Int)) (36028797018963972 : Int) {
+      True |-> True;
+      False |-> any_successor_is_wanted rest
+    }
+  }
+
+fn main (input : ProcessInput) (_caps : ProgramCaps AFull) : HostIO AFull ExitCode =
+  match input {
+    MkProcessInput arguments _ _ |->
+      match any_successor_is_wanted (widen_lengths arguments) {
+        True |-> host_pure AFull ExitCode ExitCode.Success;
+        False |-> host_pure AFull ExitCode (ExitCode.Failure 32)
+      }
+  }

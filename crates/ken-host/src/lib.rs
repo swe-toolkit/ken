@@ -42,7 +42,8 @@ mod resource_close_v1;
 mod revocation_v1;
 
 pub use abi_v1::{
-    EffectiveUidSnapshotV1, RootExecutionDeniedV1, admit_root_execution,
+    EffectiveUidSnapshotV1, FileMetadataReplyV1, RootExecutionDeniedV1, admit_root_execution,
+    file_metadata_reply_record_v1,
     ken_host_invocation_v1_finish_with_capacity,
     ken_host_invocation_v1_finish_with_integrity, ken_host_invocation_v1_record_region_end,
     observe_effective_uid_v1,

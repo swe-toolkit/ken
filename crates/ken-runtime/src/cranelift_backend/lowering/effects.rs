@@ -1750,7 +1750,7 @@ impl<'a> Lowering<'a> {
         }
     }
 
-    fn narrow_carried_int_u64(
+    pub(super) fn narrow_carried_int_u64(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         target: CarriedBoundaryWord,
@@ -1811,7 +1811,7 @@ impl<'a> Lowering<'a> {
         builder.switch_to_block(viewed);
         let view_slot = builder.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,
-            24,
+            32,
             3,
         ));
         let view = builder.ins().stack_addr(pointer_type, view_slot, 0);
@@ -1873,6 +1873,84 @@ impl<'a> Lowering<'a> {
             .iconst(types::I64, crate::NATIVE_INT_SMALL_TAG_V1 as i64);
         self.function_local.native_int_tags.insert(value, tag);
         Lowered::Int { value, known: None }
+    }
+
+    /// Recover the native Int pair from either boundary representation.
+    /// The carrier's view validates non-immediate words before exposing limbs.
+    pub(super) fn decode_carried_int_operand(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+    ) -> Result<Lowered, CraneliftBackendError> {
+        use crate::native_int_clif::{VIEW_LEN, VIEW_LIMBS, VIEW_SIGN};
+        use cranelift_codegen::ir::condcodes::IntCC;
+
+        let refs = self.carrier_refs()?;
+        let boundary_arena = self.carrier_arena()?;
+        let native_arena = self.function_local.native_int_arena.ok_or_else(|| {
+            unsupported(
+                LoweringCause::PlannerInvariant,
+                "PrimitiveCall",
+                "a carried Int operand has no invocation arena",
+            )
+        })?;
+        let intern = self.function_local.native_int_intern.ok_or_else(|| {
+            unsupported(
+                LoweringCause::PlannerInvariant,
+                "PrimitiveCall",
+                "a carried Int operand has no local intern helper",
+            )
+        })?;
+        let pointer_type = builder.func.dfg.value_type(boundary_arena);
+        let tag = builder
+            .ins()
+            .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+        let is_immediate = builder.ins().icmp_imm(
+            IntCC::Equal,
+            tag,
+            BoundaryTag::ImmediateInt as i64,
+        );
+        let immediate = builder.create_block();
+        let viewed = builder.create_block();
+        let decoded = builder.create_block();
+        builder.append_block_param(decoded, types::I64);
+        builder.append_block_param(decoded, types::I64);
+        builder.ins().brif(is_immediate, immediate, &[], viewed, &[]);
+
+        builder.switch_to_block(immediate);
+        let payload = self.emit_carrier_scalar(builder, word)?;
+        let small = Self::carrier_small_marker(builder);
+        builder.ins().jump(decoded, &[small.into(), payload.into()]);
+
+        builder.switch_to_block(viewed);
+        let view_slot =
+            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 32, 3));
+        let view = builder.ins().stack_addr(pointer_type, view_slot, 0);
+        let call = builder.ins().call(refs.int_view, &[boundary_arena, word.word, view]);
+        Self::require_i64(builder, builder.inst_results(call)[0], BOUNDARY_OK);
+        let sign = builder.ins().stack_load(types::I64, view_slot, VIEW_SIGN);
+        let len = builder.ins().stack_load(types::I64, view_slot, VIEW_LEN);
+        let limbs = builder.ins().stack_load(pointer_type, view_slot, VIEW_LIMBS);
+        let output =
+            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        let output_pointer = builder.ins().stack_addr(pointer_type, output, 0);
+        let call = builder.ins().call(intern, &[native_arena, sign, limbs, len, output_pointer]);
+        Self::require_i64(builder, builder.inst_results(call)[0], 0);
+        let pair_tag = builder.ins().stack_load(types::I64, output, 0);
+        let pair_payload = builder.ins().stack_load(types::I64, output, 8);
+        Self::require_one_of_i64(
+            builder,
+            pair_tag,
+            &[crate::NATIVE_INT_SMALL_TAG_V1 as i64, crate::NATIVE_INT_BIG_TAG_V1 as i64],
+        );
+        builder.ins().jump(decoded, &[pair_tag.into(), pair_payload.into()]);
+
+        builder.switch_to_block(decoded);
+        let pair = NativeScalarPairV1 {
+            tag: builder.block_params(decoded)[0],
+            payload: builder.block_params(decoded)[1],
+        };
+        Ok(self.lowered_from_scalar_pair(ScalarMergeKind::Int, pair))
     }
 
     /// Decode ProcessHost's exact signed-i128 big-endian Instant field through
