@@ -87,7 +87,17 @@ impl Fixture {
                return ken_test_process_main(0, empty, empty); }\n",
         )
         .unwrap();
-        let shim = self.build.join("empty-argv-starter.o");
+        let native = self.run_starter_with_args_wrapper("empty-argv", &wrapper, &[]);
+        assert_outcomes("no args", self.interpreted(&[]), native, 74);
+    }
+
+    fn run_starter_with_args_wrapper(
+        &self,
+        label: &str,
+        wrapper: &Path,
+        linker_options: &[&str],
+    ) -> Output {
+        let shim = self.build.join(format!("{label}-starter.o"));
         run_cc(
             Command::new("cc")
                 .args(["-Dmain=ken_test_process_main", "-c"])
@@ -97,10 +107,11 @@ impl Fixture {
         );
         let archive = std::env::var_os("KEN_RUNTIME_SUPPORT_STATICLIB")
             .expect("the test runner supplies the runtime support archive");
-        let executable = self.build.join("empty-argv");
+        let executable = self.build.join(label);
         run_cc(
             Command::new("cc")
                 .arg("-Wl,--gc-sections")
+                .args(linker_options)
                 .arg(self.build.join("ken-entrypoint.o"))
                 .arg(&shim)
                 .arg(&wrapper)
@@ -108,12 +119,11 @@ impl Fixture {
                 .args(["-ldl", "-lpthread", "-lm", "-o"])
                 .arg(&executable),
         );
-        let native = Command::new(executable)
+        Command::new(executable)
             .current_dir(self.root.path())
             .env_clear()
             .output()
-            .unwrap();
-        assert_outcomes("no args", self.interpreted(&[]), native, 74);
+            .unwrap()
     }
 }
 
@@ -184,4 +194,87 @@ fn dynamic_file_error_cause() {
     // property here is the non-NotFound arm, not its particular cause tag.
     fixture.assert_argv0("directory", "x", 75);
     fixture.assert_no_args();
+}
+
+// Spec 38 §1.13, 42 §5, 45 §4. Promise class: durable parity invariant.
+// MEASURED: both lanes see the same path bytes and produce the expected exit.
+// CLAIMED: the public socket address constructor performs its path validation
+// after native lowering, including the interior-NUL check on borrowed Bytes.
+// THE GAP: this observes validation, not the returned address or socket I/O.
+#[test]
+fn socket_unix_path_matches_interpreter() {
+    let source = include_str!("fixtures/rt_native_result_join_phase/socket_unix_path.ken");
+    let fixture = Fixture::new("socket-unix-path", source);
+    fixture.assert_argv0("absolute path", "/tmp/k.sock", 0);
+    fixture.assert_argv0("relative path", "k.sock", 75);
+    fixture.assert_argv0(
+        "108-byte absolute path",
+        &format!("/{}", "a".repeat(107)),
+        75,
+    );
+
+    // execve cannot pass interior NULs. Use the same byte slice directly in
+    // the interpreter and in the generated native starter's argv packer.
+    // The C wrapper supplies the length for this one buffer only. It keeps
+    // the native object's borrowed argv path and the Ken fixture unchanged.
+    let path = b"/tmp/a\0b";
+    let roots = [Path::new(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
+    let mut host = ken_interp::PosixHost::new_at(fixture.root.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &roots,
+        &[path.to_vec()],
+        &[],
+        fixture.root.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("interpreter accepts a length-delimited Bytes input");
+    assert_eq!(interpreted.exit_status, 75, "interior NUL");
+    assert!(interpreted.stdout.is_empty() && interpreted.stderr.is_empty());
+
+    let initializer = path
+        .iter()
+        .map(u8::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let wrapper = fixture.build.join("nul-argv.c");
+    std::fs::write(
+        &wrapper,
+        format!(
+            r#"#include <stddef.h>
+extern int ken_test_process_main(int, char **, char **);
+extern size_t __real_strlen(const char *);
+static char path[] = {{ {initializer}, 0 }};
+static unsigned path_reads;
+size_t __wrap_strlen(const char *value) {{
+    if (value != path) return __real_strlen(value);
+    ++path_reads;
+    return sizeof(path) - 1;
+}}
+int main(void) {{
+    char *args[] = {{ path, NULL }};
+    char *env[] = {{ NULL }};
+    int status = ken_test_process_main(1, args, env);
+    return path_reads == 1 ? status : 76;
+}}
+"#
+        ),
+    )
+    .unwrap();
+    let native =
+        fixture.run_starter_with_args_wrapper("nul-argv", &wrapper, &["-Wl,--wrap=strlen"]);
+    assert_eq!(
+        native.status.code(),
+        Some(interpreted.exit_status),
+        "interior NUL: {native:?}"
+    );
+    assert_eq!(
+        native.stdout, interpreted.stdout,
+        "interior NUL: stdout parity"
+    );
+    assert_eq!(
+        native.stderr, interpreted.stderr,
+        "interior NUL: stderr parity"
+    );
 }
