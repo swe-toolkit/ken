@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-ORIENT-TRANSLATE
 title: "Spec 67 §18 fixes orient by its natural cross sums and states swap, rotation and repeated-point laws, but no law says the turn is unchanged when all three points move by the same vector, so a client cannot carry an orientation result across a shift of its coordinate origin. Rule from a checked D0 at zero trust that translating all three points by one (dx, dy) leaves orient unchanged, and state it with a seed that separates a shared translation from moving one point alone"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
