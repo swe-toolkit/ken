@@ -370,14 +370,25 @@ impl Fixture {
                     panic!("expected FileMetadata: {actual:?}")
                 };
                 assert_eq!(*id, self.fs.mk_file_metadata_id);
-                let size = if args[0] == EvalVal::Int(100) {
-                    101
-                } else {
-                    100
+                let [size, kind, mode, links, major, minor, inode, modified, changed, accessed, born] =
+                    args.as_slice()
+                else {
+                    panic!("expected complete FileMetadata payload: {args:?}");
                 };
-                assert_eq!(args.len(), 11, "complete FileMetadata payload");
-                let mut different = args.to_vec();
-                different[0] = EvalVal::Int(size);
+                let size = if *size == EvalVal::Int(100) { 101 } else { 100 };
+                let different = vec![
+                    EvalVal::Int(size),
+                    kind.clone(),
+                    mode.clone(),
+                    links.clone(),
+                    major.clone(),
+                    minor.clone(),
+                    inode.clone(),
+                    modified.clone(),
+                    changed.clone(),
+                    accessed.clone(),
+                    born.clone(),
+                ];
                 self.construct("FileMetadata.MkFileMetadata", different)
             }
             "(List DirEntry)" => {

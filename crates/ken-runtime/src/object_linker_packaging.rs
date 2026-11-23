@@ -4836,6 +4836,10 @@ mod tests {
         let cwd = output_dir.join("root");
         fs::create_dir_all(&cwd).unwrap();
         fs::write(cwd.join("held.bin"), b"held-resource").unwrap();
+        let semantic_root = output_dir.join("semantic-root");
+        fs::create_dir_all(&semantic_root).unwrap();
+        // Distinct root grants must observe the same inode and timestamps.
+        fs::hard_link(cwd.join("held.bin"), semantic_root.join("held.bin")).unwrap();
         let trace_path = output_dir.join("resource.trace");
         let output = Command::new(&executable)
             .env_clear()
@@ -4912,9 +4916,6 @@ mod tests {
             }
         }
 
-        let semantic_root = output_dir.join("semantic-root");
-        fs::create_dir_all(&semantic_root).unwrap();
-        fs::write(semantic_root.join("held.bin"), b"held-resource").unwrap();
         let root = ken_host::open_root(&ken_host::RootPath::new(&semantic_root).unwrap()).unwrap();
         let root_metadata = ken_host::metadata(&root).unwrap();
         let cap = ken_host::Cap::mint_scoped(

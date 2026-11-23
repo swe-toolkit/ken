@@ -2648,20 +2648,28 @@ fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeEx
             crate::RuntimeMatchCase {
                 constructor: symbols.result_ok.clone(),
                 binders: 1,
-                body: px8n_failure(
-                    symbols,
-                    RuntimeExpr::If {
-                        scrutinee: Box::new(total_primitive(
-                            "eq_int",
-                            vec![
-                                RuntimeExpr::Var(0),
-                                big(crate::Sign::NonNegative, &[PX8I_BIG_U64]),
-                            ],
-                        )),
-                        then_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Int((14).into()))),
-                        else_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Int((99).into()))),
-                    },
-                ),
+                body: RuntimeExpr::Match {
+                    scrutinee: Box::new(RuntimeExpr::Var(0)),
+                    cases: vec![crate::RuntimeMatchCase {
+                        constructor: symbols.file_metadata.clone(),
+                        binders: 11,
+                        body: px8n_failure(
+                            symbols,
+                            RuntimeExpr::If {
+                                scrutinee: Box::new(total_primitive(
+                                    "eq_int",
+                                    vec![
+                                        RuntimeExpr::Var(0), // Size, the first bound field.
+                                        big(crate::Sign::NonNegative, &[PX8I_BIG_U64]),
+                                    ],
+                                )),
+                                then_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Int(14.into()))),
+                                else_expr: Box::new(RuntimeExpr::Value(RuntimeValue::Int(99.into()))),
+                            },
+                        ),
+                    }],
+                    default: trap(),
+                },
             },
         ],
         default: trap(),
@@ -3105,8 +3113,10 @@ extern "C" fn px8n_scripted_host_dispatch(
                 },
             );
         } else {
+            let metadata = ken_host::file_metadata_reply_layout_v1()
+                .expect("PX8-I scripted metadata has a generated reply layout");
             store(wire.reply_tag_offset, wire.reply_metadata_tag);
-            store(wire.reply_detail_offset, PX8I_BIG_U64);
+            store(metadata.size, PX8I_BIG_U64);
         }
     } else {
         // BUDGET-EFF: every scripted FsReadAt/FsWriteAt scenario here uses

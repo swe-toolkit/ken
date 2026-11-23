@@ -15,13 +15,17 @@ fn run_scenario(present: bool) {
     }
     let roots =
         [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
+    let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+    // The present path executes three full metadata operations and measured
+    // 85 persistent nodes at return. The starter's 64 stopped at request 65.
+    profile.persistent.nodes = 96;
     let compiled = ken_cli::build_native_program_with_roots(
         SOURCE,
         ken_cli::SourceFormat::Ken,
         &roots,
         "rt_native_then_chain_source_slot_transfer",
         root.path().join("native"),
-        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        profile,
     )
     .expect("the checked Strict program builds as a native artifact");
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -79,7 +83,8 @@ fn run_scenario(present: bool) {
     assert_eq!(
         operations(&native),
         expected,
-        "native reaches the same arms"
+        "native reaches the same arms; terminal error: {:?}",
+        native.terminal_error
     );
     println!(
         "THEN_CHAIN_SCENARIO present={present} interpreted={:?} native={:?}",
