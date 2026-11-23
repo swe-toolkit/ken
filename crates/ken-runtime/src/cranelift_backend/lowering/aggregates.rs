@@ -6601,8 +6601,8 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// over is refused, at the same outer shape, lane and arity.**
     ///
     /// MEASURED, on a bare rig over one planned parent whose position 0 the planner
-    /// planned with owners `[NoReferent]` -- a child it will materialize as a native
-    /// scalar pair, which has no boundary node for anything to own:
+    /// planned with owners `[NoReferent]` -- a native scalar pair whose stored
+    /// Bool cannot spill to a boundary node:
     ///
     /// | held child at position 0 | derived closed owner set | outcome |
     /// |---|---|---|
@@ -6626,9 +6626,9 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// has its own witness.** Before the containment, the planner's two fields about
     /// the position are made to agree: the invocation arena is a possible owner only
     /// if the position is activation-owned. Not an equivalence -- `owners` is the
-    /// lifetime's affinity intersected with the child's representation, so THIS
-    /// fixture's position 0 is legitimately `ActivationOwned` over `[NoReferent]`,
-    /// and stating the law as `==` refuses it. Mutating the planner to admit the
+    /// lifetime's affinity intersected with the child's representation. Stating
+    /// the law as `==` would refuse an activation-owned position with narrowed
+    /// owners. Mutating the planner to admit the
     /// arena under a persistent lifetime reds the first arm; dropping the
     /// containment reds this row.
     ///
@@ -6639,20 +6639,39 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// not merely recorded.
     #[test]
     fn a_child_owner_set_outside_the_planned_meet_is_refused_before_any_allocation() {
+        assert_spill_free_child_owners(
+            RuntimeExpr::Value(RuntimeValue::Bool(true)),
+            RuntimeExpr::Value(RuntimeValue::Bool(false)),
+        );
+    }
+
+    #[test]
+    fn canonical_bool_constructor_join_is_spill_free() {
+        let boolean = |value| RuntimeExpr::Construct {
+            constructor: if value {
+                "ctor:prelude::Bool::True"
+            } else {
+                "ctor:prelude::Bool::False"
+            }
+            .to_string(),
+            args: Vec::new(),
+        };
+        assert_spill_free_child_owners(boolean(true), boolean(false));
+    }
+
+    fn scalar_if(then_expr: RuntimeExpr, else_expr: RuntimeExpr) -> RuntimeExpr {
+        RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            then_expr: Box::new(then_expr),
+            else_expr: Box::new(else_expr),
+        }
+    }
+
+    fn assert_spill_free_child_owners(then_expr: RuntimeExpr, else_expr: RuntimeExpr) {
         let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
-        // ⭐ The `Call` child is what makes position 0's planned owner set the
-        // singleton `[NoReferent]`: its join result is a native scalar pair, so the
-        // planner records that nothing can own it. Measured on this exact fixture.
         let fixture = RuntimeExpr::Construct {
             constructor: "ctor:fixture::C1::Wrap".to_string(),
-            args: vec![RuntimeExpr::Call {
-                callee: Box::new(RuntimeExpr::LexicalClosure {
-                    captures: Vec::new(),
-                    params: Vec::new(),
-                    body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
-                }),
-                args: Vec::new(),
-            }],
+            args: vec![scalar_if(then_expr, else_expr)],
         };
         let (plan, construct_origin) = planned_root_occurrence(&fixture);
         let wrap_occurrence = plan
@@ -6721,6 +6740,124 @@ pub(in crate::cranelift_backend::lowering) mod tests {
             "NON-VACUITY: the SAME parent holding a child whose closed owner set IS \
              inside the planned one must get past the owner check: got {reached}"
         );
+    }
+
+    fn scalar_int(value: i64) -> RuntimeExpr {
+        RuntimeExpr::Value(RuntimeValue::Int(value.into()))
+    }
+
+    // MEASURED: this exact planned child admits persistent ownership and the
+    // held value passes containment to the bare rig's carrier boundary.
+    // CLAIMED: a stored scalar's possible spill is admitted by its source plan.
+    // THE GAP: the rig supplies the held value, rather than lowering the If;
+    // it tests the agreement of the planner and allocator at their seam.
+    fn assert_spillable_child_reaches_allocator(
+        child: RuntimeExpr,
+        hold: impl FnOnce(cranelift_codegen::ir::Value) -> Lowered,
+    ) {
+        let seed_env = NativeSeedEnvironment::empty(
+            crate::boundary_resource_profile::starter_smoke_profile(),
+        );
+        let fixture = RuntimeExpr::Construct {
+            constructor: "ctor:fixture::C1::Wrap".to_string(),
+            args: vec![child],
+        };
+        let (plan, origin) = planned_root_occurrence(&fixture);
+        let occurrence = plan
+            .source_aggregate_occurrence(origin, PlannedAggregateShape::Constructor)
+            .expect("source Construct has an ownership record");
+        let owners = plan.aggregate_record_view(occurrence).unwrap().children()[0]
+            .owners
+            .clone();
+        let (_module, mut context, mut compiler) =
+            d7_bare_preflight_rig(&seed_env, plan, "scalar_join_child");
+        let mut function_context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut context.func, &mut function_context);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        bind_bare_test_trap_lane(&mut compiler, &mut builder);
+        let word = builder.ins().iconst(types::I64, 1);
+        let template = Lowered::Constructor {
+            constructor: "ctor:fixture::C1::Wrap".to_string(),
+            synthesized_identity: None,
+            occurrence: Some(occurrence),
+            args: vec![ConstructorField::specialized(hold(word))],
+        };
+        let error = compiler
+            .transfer_into_carrier(&mut builder, origin, &template)
+            .expect_err("bare rig has no boundary carrier refs");
+        assert!(
+            matches!(
+                error,
+                CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "BoundaryCarrier",
+                    ..
+                })
+            ),
+            "held scalar should reach the carrier boundary: {error:?}"
+        );
+        assert_eq!(
+            owners,
+            [BoundaryReferentOwner::NoReferent, BoundaryReferentOwner::PersistentStore]
+        );
+    }
+
+    #[test]
+    fn int_join_child_admits_persistent_spill_at_allocation() {
+        assert_spillable_child_reaches_allocator(
+            scalar_if(scalar_int(1), scalar_int(2)),
+            |word| Lowered::Int { value: word, known: None },
+        );
+    }
+
+    #[test]
+    fn exit_status_join_child_admits_persistent_spill_at_allocation() {
+        let exit = |name: &str, args| RuntimeExpr::Construct {
+            constructor: name.to_string(),
+            args,
+        };
+        assert_spillable_child_reaches_allocator(
+            scalar_if(
+                exit(crate::EXIT_SUCCESS_CONSTRUCTOR, Vec::new()),
+                exit(crate::EXIT_FAILURE_CONSTRUCTOR, vec![scalar_int(1)]),
+            ),
+            |word| Lowered::ProcessExitStatus { value: word },
+        );
+    }
+
+    // MEASURED: two Call positions exclude the arena and select PersistentGround.
+    // CLAIMED: accounting for spills preserves the original narrowing's lane.
+    // THE GAP: this row observes the allocation plan, not object execution.
+    #[test]
+    fn two_int_call_children_keep_the_persistent_ground_lane() {
+        let call = |value| RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(),
+                params: Vec::new(),
+                body: Box::new(scalar_int(value)),
+            }),
+            args: Vec::new(),
+        };
+        let fixture = RuntimeExpr::Construct {
+            constructor: "ctor:fixture::C1::WrapPair".to_string(),
+            args: vec![call(1), call(2)],
+        };
+        let (plan, origin) = planned_root_occurrence(&fixture);
+        let occurrence = plan
+            .source_aggregate_occurrence(origin, PlannedAggregateShape::Constructor)
+            .expect("source Construct has an ownership record");
+        let record = plan.aggregate_record_view(occurrence).unwrap();
+        let [left, right] = record.children() else {
+            panic!("WrapPair has two child positions");
+        };
+        for child in [left, right] {
+            assert!(
+                !child.owners.contains(&BoundaryReferentOwner::InvocationArena),
+                "a stored Int call result cannot be arena-owned: {:?}",
+                child.owners,
+            );
+        }
+        assert_eq!(record.allocation(), PlannedAggregateAllocation::PersistentGround);
     }
 
     /// **`D7` — a record's ordered FIELD SCHEMA is load-bearing, and a sibling's is
