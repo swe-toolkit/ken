@@ -62,6 +62,12 @@ theorem open_offset_none
   find_below_offset_none p q offset width
 "#;
 
+// SOURCE: spec/50-stdlib/72-optimization.md §2.8.
+// PROMISE CLASS: durable invariant.
+// New providers or exports stay green if loading BoundedSearch still adds no
+// trust and the owned, transparent laws and their shared proof still serve
+// open clients. Added package trust, a broken public type, or loss of that
+// ownership, transparency, or shared proof reference fails this test.
 /// MEASURED: exact trust identities, ownership and transparency, and open
 /// clients of both complete public types. This measures trust added by the
 /// package, not trust already in its providers.
@@ -105,6 +111,10 @@ fn offset_laws_are_owned_transparent_and_add_no_trust() {
     }
 }
 
+// SOURCE: spec/50-stdlib/72-optimization.md §2.8.
+// PROMISE CLASS: durable invariant.
+// Adding unrelated exports or more private helpers stays green. Making any
+// of these four proof helpers selectively importable fails this test.
 #[test]
 fn offset_helpers_refuse_selective_imports() {
     let mut env = loaded_package();
@@ -278,17 +288,32 @@ fn assert_refused_at_theorem(env: &mut ElabEnv, source: &str, theorem: &str) {
     }
 }
 
+// SOURCE: spec/50-stdlib/72-optimization.md §2.8.
+// PROMISE CLASS: durable invariant.
+// Search optimizations and additional split laws stay green if both existing
+// law applications still check and match the direct results. Losing the
+// offset on a shifted hit or returning a hit for two empty parts fails.
 #[test]
 fn empty_first_part_allows_shifted_hit_or_no_hit() {
     accepted_offset_clients();
 }
 
+// SOURCE: spec/50-stdlib/72-optimization.md §2.8.
+// PROMISE CLASS: durable invariant.
+// Adding a separate law for a first-part hit stays green if the accepted
+// controls still check and the false None proof still fails at the premise.
+// Accepting that proof or deferring rejection to the application fails.
 #[test]
 fn earlier_hit_refuses_at_the_first_part_none_premise() {
     let mut env = earlier_hit_clients();
     assert_refused_at_theorem(&mut env, FALSE_PREMISE_AND_APPLICATION, "first_part_six");
 }
 
+// SOURCE: spec/50-stdlib/72-optimization.md §2.8.
+// PROMISE CLASS: durable invariant.
+// Changing search strategy stays green if the earlier witness still checks
+// as the result and the later one still refuses. Reporting the shifted hit
+// instead of the earlier hit fails this test.
 #[test]
 fn earlier_hit_cannot_be_replaced_by_the_shifted_hit() {
     let mut env = earlier_hit_clients();
