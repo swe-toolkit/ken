@@ -228,6 +228,10 @@ claim with no conformance case is a claim no one can rely on
   with the **`pure`-but-effectful** named residual, capability+effect
   composition (couples Sec2), and a G6 round-trip proof in an FFI-using verified
   component.
+- `surface/ffi-io/seed-directory-stream.md` — ABI-S2 directory batches:
+  empty and multi-batch results, sticky `DirectoryEnd`, exactly-once names for
+  an unmodified directory without an order promise, and `NotDirectory` under
+  `FileOperation.OpReadDirectory` when a regular file is opened as a directory.
 - `surface/classes/seed-classes.md` — Lc typeclasses/constraints (classes-as-
   subobjects, `33 §5` + `39 §6`, ADR 0008): a `class` → a Σ+η **record**, an
   `instance` → a **record value** with real law proofs, and `where C A` → an

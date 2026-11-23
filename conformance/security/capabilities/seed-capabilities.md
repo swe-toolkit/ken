@@ -402,16 +402,17 @@ against a naive path-string implementation is not an acceptable substitute.
 ### security/capabilities/i5-handle-only-seam-replaces-byte-path-bypass
 **RED-UNTIL-I-5**
 
-- spec: ADR-0017 §4a(i)–(iii); I-5 AC0
+- spec: ADR-0017 §4a(i)–(iii); I-5 AC0; ABI-S2 directory stream in
+  `spec/30-surface/38-ffi-io.md`
 - given: inspect the landed `HostHandler` trait and the route reachable from
   `fs_dispatch`
 - expect: the positive half finds an owned resolved-handle type,
   `fs_resolve`, and handle-only `fs_read_at`/`fs_write_at`/creation operations.
-  The negative half finds **none** of the old byte-path operate entries
-  `fs_read`/`fs_write`/`fs_append`/`fs_metadata`/`fs_read_directory`/
-  `fs_create_directory`/`fs_remove_file`/`fs_remove_directory`/`fs_rename`
-  taking unresolved `&[u8]`. `fs_dispatch` threads the minted handle verbatim;
-  no operate call also receives a path.
+  The negative half finds no operation after handle acquisition that acts on
+  an unresolved `&[u8]` path. Directory streams use `readDirectoryBatch` on
+  the `DirectoryHandle` produced by `withDirectory`, not a path-taking
+  operation. `fs_dispatch` threads the minted handle verbatim; no operate call
+  also receives the original path.
 - why: this is a two-sided structural discriminator: the replacement API must
   be present **and** the bypass API absent. Keeping both makes every runtime
   pair below avoidable by a wrong op-id or future call, so a green value test

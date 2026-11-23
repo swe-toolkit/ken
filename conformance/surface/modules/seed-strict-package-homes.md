@@ -666,7 +666,9 @@ the eight `Data.Numeric.FixedWidth` names.
   ```
 
   The paired client removes only the import and retains `export host_clock`.
-  Instantiate this pair independently for every row below.
+  Instantiate this pair independently for every row below. The former
+  `read_directory` row is retired by ABI-S2 and is covered by the separate
+  retirement case below.
 
   | H name | Owner |
   |---|---|
@@ -674,7 +676,6 @@ the eight `Data.Numeric.FixedWidth` names.
   | `change_mode` | `Capability.Filesystem.Authority` |
   | `create_directory` | `Capability.Filesystem.Authority` |
   | `file_metadata` | `Capability.Filesystem.Authority` |
-  | `read_directory` | `Capability.Filesystem.Authority` |
   | `remove_directory` | `Capability.Filesystem.Authority` |
   | `remove_file` | `Capability.Filesystem.Authority` |
   | `rename_file` | `Capability.Filesystem.Authority` |
@@ -698,9 +699,9 @@ the eight `Data.Numeric.FixedWidth` names.
 - measured: each positive client's import and re-export resolution, the
   resulting canonical `GlobalId`, and each paired omission's exact name error.
   The omitted-import `export name` is the source-name reference under test.
-- claimed: all twenty-four names have the specified public home and original
-  pre-source identity; an unrelated loaded module or flat-global entry cannot
-  satisfy a missing Strict import.
+- claimed: all listed retained names have the specified public home and
+  original pre-source identity; an unrelated loaded module or flat-global
+  entry cannot satisfy a missing Strict import.
 - the gap: an omitted-import rejection could arise from another missing
   dependency or an invalid source body. Separate clients differ only by the
   selected import, while the accepted re-export is the positive control.
@@ -713,6 +714,65 @@ the eight `Data.Numeric.FixedWidth` names.
 - why: each row is a separate route from an ordinary package home. A home
   cannot be inferred from a sibling name or from implementation-global
   registration.
+
+### surface/modules/abi-s2-directory-stream-homes-require-imports
+
+- promise class: **durable provider-edge invariant** — each ABI-S2 name
+  resolves from its specified package home only through an explicit import
+- spec: ABI-S2 directory-stream contract in `spec/30-surface/38-ffi-io.md`;
+  `30-taxonomy §4`; `33 §3.3`
+- given: load dependency-closed roots containing
+  `Capability.Filesystem.Authority` and `Capability.System.IO`. For each row
+  below, create a fresh Strict client that imports the listed name and uses
+  `export name`. Pair it with a client having the same body and roots but
+  omitting only that selective import.
+
+  | Name | Home |
+  |---|---|
+  | `DirectoryHandle` | `Capability.Filesystem.Authority` |
+  | `withDirectory` | `Capability.Filesystem.Authority` |
+  | `DirectoryProgress` | `Capability.System.IO` |
+  | `readDirectoryBatch` | `Capability.System.IO` |
+
+- measured: each imported reference's provider `GlobalId`, the positive
+  client's acceptance, and the exact name reported by each omission.
+- claimed: the new stream types and operations are source-visible only through
+  their stated homes; a sibling import or a flat global does not satisfy a
+  missing home edge.
+- the gap: an omitted-import rejection could be caused by another missing
+  dependency or an ill-formed client. Each positive and negative pair keeps
+  the roots and source body fixed, varying only the selected import.
+- expect: every import-restored client accepts and resolves the name from its
+  stated home. Each paired omission refuses with `UnboundName` naming only its
+  selected name.
+- controls: each imported client is the positive control for its single-name
+  omission; the dependency-closed roots keep both provider homes available.
+- why: the two package homes are part of the stream contract, not ambient
+  prelude names.
+
+### surface/modules/abi-s2-retired-read-directory-is-not-exported
+
+- promise class: **durable invariant** — the retired whole-list binding is not
+  available from its former package home
+- spec: ABI-S2 directory-stream contract in `spec/30-surface/38-ffi-io.md`;
+  `33 §3.3`
+- given: in dependency-closed Strict roots, create one client that imports
+  `read_directory` from `Capability.Filesystem.Authority` and exports that
+  name. The positive control imports and exports `withDirectory` from the
+  same home; the roots are unchanged.
+- measured: the source-resolution result for the old import and for its
+  import-restored new-API control.
+- claimed: the former whole-list API is retired from the source home; directory
+  reading uses the new `withDirectory` and `readDirectoryBatch` stream instead.
+- the gap: a refusal could otherwise come from an unavailable owner module.
+  The accepted `withDirectory` control establishes that the former home and
+  roots are reachable.
+- expect: the old `read_directory` import refuses because it is not exported;
+  the `withDirectory` control accepts. Do not pin diagnostic wording or span.
+- controls: the same-home `withDirectory` import is the positive control; the
+  stream behavior cases exercise both new operations at their promised types.
+- why: retaining a package route to the removed function would duplicate the
+  stream contract and violate same-change retirement.
 
 ### surface/modules/inc3a-coproduct-injections-have-imported-signatures
 
