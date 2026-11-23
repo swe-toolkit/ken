@@ -476,7 +476,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
     BracketSettlementId,
     BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
-    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
+    resource_kind_role, SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use super::planning::{

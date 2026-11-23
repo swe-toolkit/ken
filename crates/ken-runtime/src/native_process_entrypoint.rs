@@ -53,8 +53,6 @@ pub struct NativeProcessSymbols {
     pub resource_invalid_offset: RuntimeSymbol,
     pub resource_invalid_bounds: RuntimeSymbol,
     pub resource_no_progress: RuntimeSymbol,
-    pub resource_kind_fs_handle: RuntimeSymbol,
-    pub resource_kind_buffer: RuntimeSymbol,
     pub resource_trace_identity: RuntimeSymbol,
     pub nat_zero: RuntimeSymbol,
     pub nat_suc: RuntimeSymbol,
@@ -91,11 +89,9 @@ pub struct NativeProcessSymbols {
     pub file_operation_set_inheritance: RuntimeSymbol,
     pub file_operation_duplicate: RuntimeSymbol,
     pub resource_mapping_limit: RuntimeSymbol,
-    pub resource_kind_mapping: RuntimeSymbol,
-    pub px10_kind_symbols: [RuntimeSymbol; 4],
     pub px10_exit_symbols: [RuntimeSymbol; 2],
+    pub resource_kind_symbols: [RuntimeSymbol; ken_host::RESOURCE_KIND_COUNT_V1],
     pub px11_address_symbols: [RuntimeSymbol; 3],
-    pub px11_kind_symbols: [RuntimeSymbol; 2],
 }
 
 impl NativeProcessSymbols {
@@ -154,8 +150,6 @@ impl NativeProcessSymbols {
             resource_invalid_offset: "ctor:prelude::ResourceError::InvalidOffset".to_string(),
             resource_invalid_bounds: "ctor:prelude::ResourceError::InvalidBounds".to_string(),
             resource_no_progress: "ctor:prelude::ResourceError::NoProgress".to_string(),
-            resource_kind_fs_handle: "ctor:prelude::ResourceKind::FsHandle".to_string(),
-            resource_kind_buffer: "ctor:prelude::ResourceKind::Buffer".to_string(),
             resource_trace_identity:
                 "ctor:prelude::ResourceTraceIdentity::PrivateResourceTraceIdentity".to_string(),
             nat_zero: "ctor:prelude::Nat::Zero".to_string(),
@@ -202,13 +196,10 @@ impl NativeProcessSymbols {
                 .to_string(),
             file_operation_duplicate: "ctor:prelude::FileOperation::OpDuplicate".to_string(),
             resource_mapping_limit: "ctor:prelude::ResourceError::MappingLimit".to_string(),
-            resource_kind_mapping: "ctor:prelude::ResourceKind::Mapping".to_string(),
-            px10_kind_symbols: ["SpawnPlan", "ChildProcess", "PipeRead", "PipeWrite"]
-                .map(|name| format!("ctor:prelude::ResourceKind::{name}")),
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| format!("ctor:prelude::ChildExit::{name}")),
-            px11_kind_symbols: ["SocketListener", "SocketStream"]
-                .map(|name| format!("ctor:prelude::ResourceKind::{name}")),
+            resource_kind_symbols: ken_host::resource_kind_population_v1().unwrap()
+                .map(|(kind, _)| format!("ctor:prelude::ResourceKind::{kind:?}")),
             px11_address_symbols: ["PrivateSocketIPv4", "PrivateSocketIPv6", "PrivateSocketUnix"]
                 .map(|name| format!("ctor:prelude::SocketAddress::{name}")),
         }

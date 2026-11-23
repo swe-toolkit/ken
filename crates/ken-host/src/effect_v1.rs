@@ -450,15 +450,7 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_error_invalid_offset: u64,
     pub resource_error_invalid_bounds: u64,
     pub resource_error_no_progress: u64,
-    pub resource_kind_fs_handle: u64,
-    pub resource_kind_buffer: u64,
-    pub resource_kind_mapping: u64,
-    pub resource_kind_spawn_plan: u64,
-    pub resource_kind_child_process: u64,
-    pub resource_kind_pipe_read: u64,
-    pub resource_kind_pipe_write: u64,
-    pub resource_kind_socket_listener: u64,
-    pub resource_kind_socket_stream: u64,
+    pub resource_kinds: [(ResourceKindV1, u64); RESOURCE_KIND_COUNT_V1],
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
 }
@@ -510,13 +502,36 @@ fn generated_layout_fact(name: &str) -> Result<u64, TerminalErrorV1> {
         .ok_or(TerminalErrorV1::HostEffectAbiMismatch)
 }
 
+const fn binding_key_eq(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut position = 0;
+    while position < left.len() {
+        if left[position] != right[position] {
+            return false;
+        }
+        position += 1;
+    }
+    true
+}
+
+const fn find_generated_binding(kind: &str, name: &str) -> Option<u64> {
+    let mut position = 0;
+    while position < HOST_EFFECT_ABI_V1_BINDINGS.len() {
+        let (bound_kind, bound_name, value) = HOST_EFFECT_ABI_V1_BINDINGS[position];
+        if binding_key_eq(bound_kind, kind) && binding_key_eq(bound_name, name) {
+            return Some(value);
+        }
+        position += 1;
+    }
+    None
+}
+
 fn generated_binding(kind: &str, name: &str) -> Result<u64, TerminalErrorV1> {
-    HOST_EFFECT_ABI_V1_BINDINGS
-        .iter()
-        .find_map(|(bound_kind, bound_name, value)| {
-            (*bound_kind == kind && *bound_name == name).then_some(*value)
-        })
-        .ok_or(TerminalErrorV1::HostEffectAbiMismatch)
+    find_generated_binding(kind, name).ok_or(TerminalErrorV1::HostEffectAbiMismatch)
 }
 
 fn checked_u32(value: u64) -> Result<u32, TerminalErrorV1> {
@@ -826,15 +841,7 @@ pub fn host_effect_wire_layout_v1(
         resource_error_invalid_offset: generated_binding("error", "resource.InvalidOffset")?,
         resource_error_invalid_bounds: generated_binding("error", "resource.InvalidBounds")?,
         resource_error_no_progress: generated_binding("error", "resource.NoProgress")?,
-        resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
-        resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
-        resource_kind_mapping: generated_binding("tag", "resource_kind.Mapping")?,
-        resource_kind_spawn_plan: generated_binding("tag", "resource_kind.SpawnPlan")?,
-        resource_kind_child_process: generated_binding("tag", "resource_kind.ChildProcess")?,
-        resource_kind_pipe_read: generated_binding("tag", "resource_kind.PipeRead")?,
-        resource_kind_pipe_write: generated_binding("tag", "resource_kind.PipeWrite")?,
-        resource_kind_socket_listener: generated_binding("tag", "resource_kind.SocketListener")?,
-        resource_kind_socket_stream: generated_binding("tag", "resource_kind.SocketStream")?,
+        resource_kinds: resource_kind_population_v1().ok_or(TerminalErrorV1::HostEffectAbiMismatch)?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
         resource_error_mapping_limit: generated_binding("error", "resource.MappingLimit")?,
     })
@@ -1046,6 +1053,59 @@ pub enum ResourceKindV1 {
     PipeWrite,
     SocketListener,
     SocketStream,
+}
+
+impl ResourceKindV1 {
+    // The encoder is independently exhaustive. This inventory binds the host
+    // kinds to their generated catalog tags, in wire order.
+    const fn catalog_entry(self) -> (&'static str, Option<Self>) {
+        match self {
+            Self::FsHandle => ("resource_kind.FsHandle", Some(Self::Buffer)),
+            Self::Buffer => ("resource_kind.Buffer", Some(Self::Mapping)),
+            Self::Mapping => ("resource_kind.Mapping", Some(Self::SpawnPlan)),
+            Self::SpawnPlan => ("resource_kind.SpawnPlan", Some(Self::ChildProcess)),
+            Self::ChildProcess => ("resource_kind.ChildProcess", Some(Self::PipeRead)),
+            Self::PipeRead => ("resource_kind.PipeRead", Some(Self::PipeWrite)),
+            Self::PipeWrite => ("resource_kind.PipeWrite", Some(Self::SocketListener)),
+            Self::SocketListener => ("resource_kind.SocketListener", Some(Self::SocketStream)),
+            Self::SocketStream => ("resource_kind.SocketStream", None),
+        }
+    }
+}
+
+const fn resource_kind_count_v1() -> usize {
+    let mut count = 0;
+    let mut next = Some(ResourceKindV1::FsHandle);
+    while let Some(kind) = next {
+        count += 1;
+        next = kind.catalog_entry().1;
+    }
+    count
+}
+
+pub const RESOURCE_KIND_COUNT_V1: usize = resource_kind_count_v1();
+
+/// The closed native ResourceKind population, in catalog-tag order.
+pub const fn resource_kind_population_v1()
+    -> Option<[(ResourceKindV1, u64); RESOURCE_KIND_COUNT_V1]>
+{
+    let mut population = [(ResourceKindV1::FsHandle, 0); RESOURCE_KIND_COUNT_V1];
+    let mut next = Some(ResourceKindV1::FsHandle);
+    let mut position = 0;
+    while let Some(kind) = next {
+        let (binding, successor) = kind.catalog_entry();
+        let tag = match find_generated_binding("tag", binding) {
+            Some(tag) => tag,
+            None => return None,
+        };
+        if position != 0 && population[position - 1].1 >= tag {
+            return None;
+        }
+        population[position] = (kind, tag);
+        position += 1;
+        next = successor;
+    }
+    Some(population)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

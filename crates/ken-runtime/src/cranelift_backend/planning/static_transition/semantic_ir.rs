@@ -167,6 +167,31 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ResourceKindSocketStream,
 }
 
+pub(super) const RESOURCE_KIND_POPULATION:
+    [(ken_host::ResourceKindV1, u64); ken_host::RESOURCE_KIND_COUNT_V1] =
+    match ken_host::resource_kind_population_v1() {
+        Some(population) => population,
+        None => panic!("invalid host ResourceKind catalog"),
+    };
+
+pub(in crate::cranelift_backend) const fn resource_kind_role(
+    kind: ken_host::ResourceKindV1,
+) -> SynthesizedFixedConstructorRole {
+    use ken_host::ResourceKindV1 as Kind;
+    use SynthesizedFixedConstructorRole as Role;
+    match kind {
+        Kind::FsHandle => Role::ResourceKindFsHandle,
+        Kind::Buffer => Role::ResourceKindBuffer,
+        Kind::Mapping => Role::ResourceKindMapping,
+        Kind::SpawnPlan => Role::ResourceKindSpawnPlan,
+        Kind::ChildProcess => Role::ResourceKindChildProcess,
+        Kind::PipeRead => Role::ResourceKindPipeRead,
+        Kind::PipeWrite => Role::ResourceKindPipeWrite,
+        Kind::SocketListener => Role::ResourceKindSocketListener,
+        Kind::SocketStream => Role::ResourceKindSocketStream,
+    }
+}
+
 impl SynthesizedFixedConstructorRole {
     pub(super) const ALL: [Self; 67] = [
         Self::FileError,
@@ -240,6 +265,20 @@ impl SynthesizedFixedConstructorRole {
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
         match self {
+            Self::ResourceKindFsHandle
+            | Self::ResourceKindBuffer
+            | Self::ResourceKindMapping
+            | Self::ResourceKindSpawnPlan
+            | Self::ResourceKindChildProcess
+            | Self::ResourceKindPipeRead
+            | Self::ResourceKindPipeWrite
+            | Self::ResourceKindSocketListener
+            | Self::ResourceKindSocketStream => {
+                let position = RESOURCE_KIND_POPULATION.iter()
+                    .position(|&(kind, _)| resource_kind_role(kind) == self)
+                    .expect("mapped resource kind role");
+                &symbols.resource_kind_symbols[position]
+            }
             Self::FileError => &symbols.file_error,
             Self::FileOperationRead => &symbols.file_operation_read,
             Self::FileOperationWrite => &symbols.file_operation_write,
@@ -257,8 +296,6 @@ impl SynthesizedFixedConstructorRole {
             Self::ResourceInvalidOffset => &symbols.resource_invalid_offset,
             Self::ResourceInvalidBounds => &symbols.resource_invalid_bounds,
             Self::ResourceNoProgress => &symbols.resource_no_progress,
-            Self::ResourceKindFsHandle => &symbols.resource_kind_fs_handle,
-            Self::ResourceKindBuffer => &symbols.resource_kind_buffer,
             Self::ResourceTraceIdentity => &symbols.resource_trace_identity,
             Self::PrivateBufferSpan => &symbols.private_buffer_span,
             Self::PrivateTransferCount => &symbols.private_transfer_count,
@@ -295,18 +332,11 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationSetInheritance => &symbols.file_operation_set_inheritance,
             Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
             Self::ResourceMappingLimit => &symbols.resource_mapping_limit,
-            Self::ResourceKindMapping => &symbols.resource_kind_mapping,
-            Self::ResourceKindSpawnPlan => &symbols.px10_kind_symbols[0],
-            Self::ResourceKindChildProcess => &symbols.px10_kind_symbols[1],
-            Self::ResourceKindPipeRead => &symbols.px10_kind_symbols[2],
-            Self::ResourceKindPipeWrite => &symbols.px10_kind_symbols[3],
             Self::ChildExitExited => &symbols.px10_exit_symbols[0],
             Self::ChildExitSignaled => &symbols.px10_exit_symbols[1],
             Self::SocketAddressIPv4 => &symbols.px11_address_symbols[0],
             Self::SocketAddressIPv6 => &symbols.px11_address_symbols[1],
             Self::SocketAddressUnix => &symbols.px11_address_symbols[2],
-            Self::ResourceKindSocketListener => &symbols.px11_kind_symbols[0],
-            Self::ResourceKindSocketStream => &symbols.px11_kind_symbols[1],
         }
     }
 }

@@ -3298,11 +3298,9 @@ fn emit_native_program_preparation(
                     .to_string(),
                 file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
-                resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
-                px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
                 px11_address_symbols: host_spine.px11_address_symbols.clone().map(|symbol| symbol.to_string()),
-                px11_kind_symbols: host_spine.px11_kind_symbols.clone().map(|symbol| symbol.to_string()),
+                resource_kind_symbols: host_spine.resource_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3319,8 +3317,6 @@ fn emit_native_program_preparation(
                 resource_invalid_offset: host_spine.resource_invalid_offset.to_string(),
                 resource_invalid_bounds: host_spine.resource_invalid_bounds.to_string(),
                 resource_no_progress: host_spine.resource_no_progress.to_string(),
-                resource_kind_fs_handle: host_spine.resource_kind_fs_handle.to_string(),
-                resource_kind_buffer: host_spine.resource_kind_buffer.to_string(),
                 resource_trace_identity: host_spine.resource_trace_identity.to_string(),
                 nat_zero: host_spine.nat_zero.to_string(),
                 nat_suc: host_spine.nat_suc.to_string(),
@@ -4411,7 +4407,28 @@ fn checked_host_spine_v1(
         &resolve_id(prelude.private_bracket_release_id)?,
         &operations,
     )?;
+    let resource_kind_symbols = ken_host::resource_kind_population_v1()
+        .expect("checked host ABI resource-kind catalog")
+        .into_iter()
+        .map(|(kind, _)| {
+            use ken_host::ResourceKindV1::*;
+            resolve_id(match kind {
+                FsHandle => prelude.fs_handle_id,
+                Buffer => roles.resource_kind_buffer,
+                Mapping => roles.resource_kind_mapping,
+                SpawnPlan => prelude.px10_kind_ids[0],
+                ChildProcess => prelude.px10_kind_ids[1],
+                PipeRead => prelude.px10_kind_ids[2],
+                PipeWrite => prelude.px10_kind_ids[3],
+                SocketListener => prelude.px11_kind_ids[0],
+                SocketStream => prelude.px11_kind_ids[1],
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .expect("one checked symbol per host resource kind");
     Ok(crate::erasure::CheckedHostSpineV1 {
+        resource_kind_symbols,
         ret: resolve_id(roles.ret)?,
         vis: resolve_id(roles.vis)?,
         in_l: resolve_id(roles.in_l)?,
@@ -4451,20 +4468,9 @@ fn checked_host_spine_v1(
         file_operation_set_inheritance: resolve_id(roles.file_operation_set_inheritance)?,
         file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
-        resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
-        px10_kind_symbols: [
-            resolve_id(prelude.px10_kind_ids[0])?,
-            resolve_id(prelude.px10_kind_ids[1])?,
-            resolve_id(prelude.px10_kind_ids[2])?,
-            resolve_id(prelude.px10_kind_ids[3])?,
-        ],
         px10_exit_symbols: [
             resolve_id(prelude.px10_exit_ids[0])?,
             resolve_id(prelude.px10_exit_ids[1])?,
-        ],
-        px11_kind_symbols: [
-            resolve_id(prelude.px11_kind_ids[0])?,
-            resolve_id(prelude.px11_kind_ids[1])?,
         ],
         px11_address_symbols: [
             resolve_id(prelude.px11_address_ids[0])?,
@@ -4502,8 +4508,6 @@ fn checked_host_spine_v1(
         resource_invalid_offset: resolve_id(roles.resource_invalid_offset)?,
         resource_invalid_bounds: resolve_id(roles.resource_invalid_bounds)?,
         resource_no_progress: resolve_id(roles.resource_no_progress)?,
-        resource_kind_fs_handle: resolve_id(prelude.fs_handle_id)?,
-        resource_kind_buffer: resolve_id(roles.resource_kind_buffer)?,
         resource_trace_identity: resolve_id(prelude.private_resource_trace_identity_id)?,
         nat_zero: resolve_id(prelude.zero_id)?,
         nat_suc: resolve_id(prelude.suc_id)?,
@@ -4688,8 +4692,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.resource_invalid_offset,
         &spine.resource_invalid_bounds,
         &spine.resource_no_progress,
-        &spine.resource_kind_fs_handle,
-        &spine.resource_kind_buffer,
         &spine.resource_trace_identity,
         &spine.nat_zero,
         &spine.nat_suc,
@@ -4729,11 +4731,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S6 D4 appends without moving established positional identities.
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
-        &spine.resource_kind_mapping,
-        &spine.px10_kind_symbols[0],
-        &spine.px10_kind_symbols[1],
-        &spine.px10_kind_symbols[2],
-        &spine.px10_kind_symbols[3],
         &spine.px10_exit_symbols[0],
         &spine.px10_exit_symbols[1],
         &spine.option_none,
@@ -4743,9 +4740,12 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.px11_address_symbols[0],
         &spine.px11_address_symbols[1],
         &spine.px11_address_symbols[2],
-        &spine.px11_kind_symbols[0],
-        &spine.px11_kind_symbols[1],
     ] {
+        let field = symbol.to_string();
+        out.extend_from_slice(&(field.len() as u64).to_le_bytes());
+        out.extend_from_slice(field.as_bytes());
+    }
+    for symbol in &spine.resource_kind_symbols {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
         out.extend_from_slice(field.as_bytes());
@@ -9408,7 +9408,7 @@ mod d1b_role_c1_roster_identity {
             ),
             (
                 "resource_kind_buffer",
-                record.spine.resource_kind_buffer.clone(),
+                record.spine.resource_kind_symbols[1].clone(),
             ),
             ("read_some", record.spine.read_some.clone()),
             ("read_eof", record.spine.read_eof.clone()),
@@ -9488,7 +9488,7 @@ mod d1b_role_c1_roster_identity {
             ),
             (
                 "resource_kind_mapping",
-                record.spine.resource_kind_mapping.clone(),
+                record.spine.resource_kind_symbols[2].clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             (

@@ -3472,12 +3472,9 @@ pub(in crate::cranelift_backend::planning::static_transition) enum SynthesizedAg
     /// One alternative of a dynamic constructor, by its ordered position in the
     /// closed alternative list.
     ///
-    /// ⚠ The POSITION, not the ABI discriminator tag. `ResourceKind`'s two tags
-    /// are wire-schema facts (`wire.resource_kind_fs_handle`), so a path keyed
-    /// on them would depend on a value this planner does not own and could not
-    /// state without importing the host's wire layout. The position is the same
-    /// fact on both sides, and the emitter's own alternative list is checked
-    /// against it at construction.
+    /// The position, not the ABI discriminator tag. For `ResourceKind`, both
+    /// sides use the position in the host's ordered catalog population; the
+    /// emitter separately compares the generated wire tag at that position.
     Alternative(u32),
 }
 /// The exact position of one synthesized aggregate in its compiler-built tree.
@@ -3749,18 +3746,18 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     };
     /// The closed `ResourceKind` set, at wire tags this module does not spell —
     /// reached by POSITION, per [`SynthesizedAggregateStep`].
+    const RESOURCE_KIND_ALTERNATIVES: [SynthesizedAggregateNode; ken_host::RESOURCE_KIND_COUNT_V1] = {
+        use super::semantic_ir::{RESOURCE_KIND_POPULATION, resource_kind_role};
+        let mut alternatives = [N::Absent; ken_host::RESOURCE_KIND_COUNT_V1];
+        let mut position = 0;
+        while position < alternatives.len() {
+            alternatives[position] = N::nullary(resource_kind_role(RESOURCE_KIND_POPULATION[position].0));
+            position += 1;
+        }
+        alternatives
+    };
     const RESOURCE_KIND: SynthesizedAggregateNode =
-        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
-            N::nullary(R::ResourceKindFsHandle),
-            N::nullary(R::ResourceKindBuffer),
-            N::nullary(R::ResourceKindMapping),
-            N::nullary(R::ResourceKindSpawnPlan),
-            N::nullary(R::ResourceKindChildProcess),
-            N::nullary(R::ResourceKindPipeRead),
-            N::nullary(R::ResourceKindPipeWrite),
-            N::nullary(R::ResourceKindSocketListener),
-            N::nullary(R::ResourceKindSocketStream),
-        ]));
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&RESOURCE_KIND_ALTERNATIVES));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
     /// The twelve-alternative resource surface, in the emitter's own order.

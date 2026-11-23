@@ -310,8 +310,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_kind_fs_handle,
-        resource_kind_buffer,
         resource_trace_identity,
         nat_zero,
         nat_suc,
@@ -348,11 +346,9 @@ fn runtime_producible_constructors(
         file_operation_set_inheritance,
         file_operation_duplicate,
         resource_mapping_limit,
-        resource_kind_mapping,
-        px10_kind_symbols,
         px10_exit_symbols,
         px11_address_symbols,
-        px11_kind_symbols,
+        resource_kind_symbols,
     } = symbols;
     // The checked ITree/Coproduct spine is constructed by the program; the
     // host never synthesizes Ret, Vis or InL as a response. Keep these three
@@ -386,8 +382,6 @@ fn runtime_producible_constructors(
         resource_invalid_offset,
         resource_invalid_bounds,
         resource_no_progress,
-        resource_kind_fs_handle,
-        resource_kind_buffer,
         resource_trace_identity,
         nat_zero,
         nat_suc,
@@ -424,7 +418,6 @@ fn runtime_producible_constructors(
         file_operation_set_inheritance,
         file_operation_duplicate,
         resource_mapping_limit,
-        resource_kind_mapping,
     ]
     .into_iter()
     .cloned()
@@ -432,10 +425,9 @@ fn runtime_producible_constructors(
     // The `IOError` alternatives are a run rather than a single field, and the
     // whole run is host-produced.
     producible.extend(io_errors.iter().cloned());
-    producible.extend(px10_kind_symbols.iter().cloned());
     producible.extend(px10_exit_symbols.iter().cloned());
     producible.extend(px11_address_symbols.iter().cloned());
-    producible.extend(px11_kind_symbols.iter().cloned());
+    producible.extend(resource_kind_symbols.iter().cloned());
     producible
 }
 
@@ -2403,10 +2395,9 @@ impl<'a> Lowering<'a> {
         actual_actual_kind: cranelift_codegen::ir::Value,
         resource_error_tags_in_payload_shape_order: [u64; 11],
         expected_schema: u64,
-        expected_kind: u64,
-        buffer_kind: u64,
-        mapping_kind: u64,
+        resource_kinds: [(ken_host::ResourceKindV1, u64); ken_host::RESOURCE_KIND_COUNT_V1],
     ) {
+        let admitted_kind_tags = resource_kinds.map(|(_, tag)| tag as i64);
         let resource = builder.create_block();
         let done = builder.create_block();
         let is_resource = builder.ins().icmp_imm(
@@ -2486,11 +2477,7 @@ impl<'a> Lowering<'a> {
                     Self::require_one_of_i64(
                         builder,
                         kind,
-                        &[
-                            expected_kind as i64,
-                            buffer_kind as i64,
-                            mapping_kind as i64,
-                        ],
+                        &admitted_kind_tags,
                     );
                     Self::require_i64(builder, required, 0);
                     Self::require_i64(builder, held, 0);
@@ -2505,20 +2492,12 @@ impl<'a> Lowering<'a> {
                     Self::require_one_of_i64(
                         builder,
                         actual_expected_kind,
-                        &[
-                            expected_kind as i64,
-                            buffer_kind as i64,
-                            mapping_kind as i64,
-                        ],
+                        &admitted_kind_tags,
                     );
                     Self::require_one_of_i64(
                         builder,
                         actual_actual_kind,
-                        &[
-                            expected_kind as i64,
-                            buffer_kind as i64,
-                            mapping_kind as i64,
-                        ],
+                        &admitted_kind_tags,
                     );
                     let distinct = builder.ins().icmp(
                         cranelift_codegen::ir::condcodes::IntCC::NotEqual,
@@ -4797,9 +4776,7 @@ impl<'a> Lowering<'a> {
                     wire.resource_error_mapping_limit,
                 ],
                 wire.resource_error_reply_schema,
-                wire.resource_kind_fs_handle,
-                wire.resource_kind_buffer,
-                wire.resource_kind_mapping,
+                wire.resource_kinds,
             );
             let payload = builder.ins().sshr_imm(detail, 32);
             let payload_int = self.lower_dynamic_small_int(builder, payload);
@@ -5045,84 +5022,16 @@ impl<'a> Lowering<'a> {
                 // path could only ever describe one of them.
                 let resource_kind_value =
                     |this: &Self, discriminator, node: &SynthesizedAggregatePath| {
+                        let alternatives = wire.resource_kinds.iter().enumerate().map(
+                            |(position, &(kind, tag))| this.synthesized_dynamic_alternative(
+                                static_origin, node, position as u32, tag as i64,
+                                resource_kind_role(kind),
+                                this.process_symbols.resource_kind_symbols[position].clone(),
+                                Vec::new(), &seats,
+                            )
+                        ).collect::<Result<Vec<_>, _>>()?;
                         Ok::<_, CraneliftBackendError>(Lowered::DynamicConstructor(
-                            DynamicConstructorV1 {
-                                discriminator,
-                                alternatives: vec![
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin,
-                                        node,
-                                        0,
-                                        wire.resource_kind_fs_handle as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindFsHandle,
-                                        this.process_symbols.resource_kind_fs_handle.clone(),
-                                        Vec::new(),
-                                        &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin,
-                                        node,
-                                        1,
-                                        wire.resource_kind_buffer as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindBuffer,
-                                        this.process_symbols.resource_kind_buffer.clone(),
-                                        Vec::new(),
-                                        &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin,
-                                        node,
-                                        2,
-                                        wire.resource_kind_mapping as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindMapping,
-                                        this.process_symbols.resource_kind_mapping.clone(),
-                                        Vec::new(),
-                                        &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 3,
-                                        wire.resource_kind_spawn_plan as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindSpawnPlan,
-                                        this.process_symbols.px10_kind_symbols[0].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 4,
-                                        wire.resource_kind_child_process as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindChildProcess,
-                                        this.process_symbols.px10_kind_symbols[1].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 5,
-                                        wire.resource_kind_pipe_read as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindPipeRead,
-                                        this.process_symbols.px10_kind_symbols[2].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 6,
-                                        wire.resource_kind_pipe_write as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindPipeWrite,
-                                        this.process_symbols.px10_kind_symbols[3].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 7,
-                                        wire.resource_kind_socket_listener as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindSocketListener,
-                                        this.process_symbols.px11_kind_symbols[0].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                    this.synthesized_dynamic_alternative(
-                                        static_origin, node, 8,
-                                        wire.resource_kind_socket_stream as i64,
-                                        SynthesizedFixedConstructorRole::ResourceKindSocketStream,
-                                        this.process_symbols.px11_kind_symbols[1].clone(),
-                                        Vec::new(), &seats,
-                                    )?,
-                                ],
-                            },
+                            DynamicConstructorV1 { discriminator, alternatives },
                         ))
                     };
                 // `ResourceReleaseFailed` field 1, alternative 4 of the

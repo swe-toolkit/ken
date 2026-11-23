@@ -3773,6 +3773,10 @@ mod tests {
             (crate::ResourceKindV1::SocketListener, "resource_kind.SocketListener", 7),
             (crate::ResourceKindV1::SocketStream, "resource_kind.SocketStream", 8),
         ];
+        assert_eq!(
+            crate::resource_kind_population_v1().expect("native resource-kind catalog"),
+            kinds.map(|(kind, _, tag)| (kind, tag)),
+        );
         for (kind, binding, tag) in kinds {
             match kind {
                 crate::ResourceKindV1::FsHandle

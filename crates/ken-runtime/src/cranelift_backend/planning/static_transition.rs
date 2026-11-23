@@ -138,7 +138,7 @@ pub(in crate::cranelift_backend) use semantic_ir::{
 };
 pub(in crate::cranelift_backend) use semantic_ir::{
     BoolMatchCaseOrdinals, ConstructorIdentity, FieldIdentity, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole,
+    resource_kind_role, SynthesizedFixedConstructorRole,
 };
 // The immediate-bridge realization plane. The plan field's descriptor is the
 // only name needed here even now that the plane is wired: `construction.rs` is

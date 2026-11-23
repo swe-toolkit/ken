@@ -146,7 +146,7 @@ pub(super) use static_transition::{
     BoolMatchCaseOrdinals, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
     JoinPlanToken,
     JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,
-    SynthesizedFixedConstructorRole,
+    resource_kind_role, SynthesizedFixedConstructorRole,
 };
 // `RT-CONTSPEC-ACTIVATE` `D1` — the activation projection's facade route.
 // Namespace re-exports only: no wrapper, no derivation, no second authority.

@@ -1746,6 +1746,56 @@ fn abi_s6_mapping_kind_fixture(symbols: &crate::NativeProcessSymbols) -> Runtime
     }
 }
 
+const PX11_SCRIPTED_RELEASE_FAILED: u64 = 256;
+
+fn px11_release_kind_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "PX11 release kind projection".to_string(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(abi_s6_mapping_allocate()),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_err.clone(),
+            binders: 1,
+            body: RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(0)),
+                cases: vec![crate::RuntimeMatchCase {
+                    constructor: symbols.resource_release_failed.clone(),
+                    binders: 3,
+                    body: RuntimeExpr::Match {
+                        scrutinee: Box::new(RuntimeExpr::Var(0)),
+                        cases: symbols.resource_kind_symbols.iter().enumerate().map(|(position, constructor)| {
+                            crate::RuntimeMatchCase {
+                                constructor: constructor.clone(),
+                                binders: 0,
+                                body: px8n_failure(symbols, RuntimeExpr::Value(
+                                    RuntimeValue::Int((100 + position as i64).into()),
+                                )),
+                            }
+                        }).collect(),
+                        default: trap(),
+                    },
+                }],
+                default: trap(),
+            },
+        }],
+        default: trap(),
+    }
+}
+
+/// Durable invariant. MEASURED: the native guard, aggregate plan and reifier
+/// deliver each injected ReleaseFailed kind as its checked constructor.
+/// CLAIMED: the native closed kind set admits every host member.
+/// THE GAP: the host reply is scripted; this does not require a real failed close.
+#[test]
+fn px11_every_catalog_resource_kind_reifies_through_native_reply_validation() {
+    for (position, (kind, tag)) in ken_host::resource_kind_population_v1().unwrap().into_iter().enumerate() {
+        assert_eq!(run_abi_s6_d5a_reifier_fixture(PX11_SCRIPTED_RELEASE_FAILED + tag, px11_release_kind_fixture),
+            100 + position as i64, "kind {kind:?} with wire tag {tag}");
+    }
+}
+
 fn run_abi_s6_d5a_reifier_fixture(
     scenario: u64,
     expression: fn(&crate::NativeProcessSymbols) -> RuntimeExpr,
@@ -1816,6 +1866,7 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
     };
     store(wire.reply_tag_offset, wire.reply_resource_error_tag);
     let scenario = unsafe { *host_context.cast::<u64>() };
+    let kind_tag = |kind| wire.resource_kinds.iter().find(|(k, _)| *k == kind).unwrap().1;
     match scenario {
         ABI_S6_D5A_MAPPING_LIMIT => {
             store(wire.reply_detail_offset, wire.resource_error_mapping_limit);
@@ -1824,12 +1875,20 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
             store(wire.reply_detail_offset, wire.resource_error_kind_mismatch);
             store(
                 wire.reply_resource_error_expected_kind_offset,
-                wire.resource_kind_mapping,
+                kind_tag(ken_host::ResourceKindV1::Mapping),
             );
             store(
                 wire.reply_resource_error_actual_kind_offset,
-                wire.resource_kind_buffer,
+                kind_tag(ken_host::ResourceKindV1::Buffer),
             );
+        }
+        code if code >= PX11_SCRIPTED_RELEASE_FAILED => {
+            store(wire.reply_detail_offset, wire.resource_error_release_failed);
+            store(wire.reply_resource_error_schema_offset, wire.resource_error_reply_schema);
+            store(wire.reply_resource_error_kind_offset, code - PX11_SCRIPTED_RELEASE_FAILED);
+            store(wire.reply_resource_error_identity_offset, 42);
+            // Existing IOError wire known answer: NotFound.
+            store(wire.reply_resource_error_io_offset, 0);
         }
         _ => return -1,
     }
@@ -2286,12 +2345,11 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.resource_error_release_failed ^= 1;
         mutations.push(changed);
-        let mut changed = layout.clone();
-        changed.resource_kind_fs_handle ^= 1;
-        mutations.push(changed);
-        let mut changed = layout.clone();
-        changed.resource_kind_mapping ^= 1;
-        mutations.push(changed);
+        for index in 0..layout.resource_kinds.len() {
+            let mut changed = layout.clone();
+            changed.resource_kinds[index].1 ^= 1;
+            mutations.push(changed);
+        }
         let mut changed = layout.clone();
         changed.resource_error_reply_schema ^= 1;
         mutations.push(changed);
