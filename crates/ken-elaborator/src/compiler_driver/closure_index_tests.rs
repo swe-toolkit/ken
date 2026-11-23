@@ -171,10 +171,13 @@ fn declaration_semantic_dependency_index(
 /// and checked body decoder; base-versus-candidate fingerprints independently
 /// cover the walk on these fixtures. This test makes no timing claim.
 fn assert_indexes_agree(fixture: &'static str, source: &'static str) {
-    // Baseline provisioning: use the 256 MiB native-preparation stack, as in
-    // checked_core's elaborated host-program pin. The isolated p3 process peaked
-    // at 65,088 KiB resident (all mappings, not stack use); this is not a stack
-    // headroom assertion.
+    // Baseline provisioning uses the existing 256 MiB native-preparation
+    // budget. On Linux x86_64 (debug), the deepest touched page in each worker's
+    // own stack mapping was 1,548 KiB from the top for p3 and px4b, and
+    // 1,884 KiB for p2 (4 KiB pages, preparation through comparison and drop).
+    // The fixed budget leaves at least 260,260 KiB of measured headroom on
+    // these fixtures and keeps the native-preparation budget across toolchains;
+    // this comparison does not assert a stack-depth limit.
     const BUILD_STACK_BYTES: usize = 256 * 1024 * 1024;
     std::thread::Builder::new()
         .name(format!("closure-index-{fixture}"))
