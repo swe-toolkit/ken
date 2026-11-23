@@ -1,7 +1,7 @@
 ---
 id: ABI-FSCREATE-RECURSIVE-CONTRACT
 title: "create_directory takes a recursive Bool that the surface, the wire, the interpreter, native lowering and ken-verify all carry, but both host implementations drop it, so recursive=True silently creates one leaf and refuses a missing parent. Rule from an AC-0 whether the flag gains parent-chain meaning under the filesystem root confinement or leaves the operation, and land the ruled result on both lanes"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1

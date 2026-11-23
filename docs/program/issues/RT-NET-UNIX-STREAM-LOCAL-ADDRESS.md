@@ -1,7 +1,7 @@
 ---
 id: RT-NET-UNIX-STREAM-LOCAL-ADDRESS
 title: "Since RT-NET-UNIX-PATH-FS-ROOT-SCOPE binds Unix listeners through /proc/self/fd/<parent>/<leaf>, socket_local_address on a stream accepted from a Unix listener returns that host-internal spelling, which carries a descriptor number and refuses when fed back to connect. Spec 38 §1.13 forbids both. Report the listener's validated address on its accepted streams, and state the stream readback in spec 38"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T1
