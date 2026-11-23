@@ -6287,9 +6287,10 @@ fn narrow_carried_int_u64_reads_spilled_small_or_refuses_its_sign() {
         },
     )
     .expect("the Small producer and narrow reader emit");
+    let native = crate::native_int::NativeIntArenaV1::default();
     for payload in [1_i64 << 55, i64::MAX, -(1_i64 << 55) - 1] {
         let mut store = crate::boundary_value::BoundaryValueStore::new();
-        let (_arena, base) = ac_c7_bind_arena(&mut store);
+        let (_arena, base) = b2f_d9_bind_wide_arena(&mut store, &native);
         assert_eq!(c2_run_edge_with_arg(code, base, payload), 1, "Small {payload}");
     }
 }
