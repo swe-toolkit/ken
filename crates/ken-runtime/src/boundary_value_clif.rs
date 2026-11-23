@@ -202,7 +202,11 @@ pub(crate) struct BoundaryLocalFuncs {
     /// `(arena, word, index, out) -> status` — a spilled `Int`'s limb.
     pub int_limb: FuncId,
     /// `(arena, word, out_view) -> status` — a spilled `Int`'s canonical
-    /// `{sign, len, limbs}` view.
+    /// view. `out_view` must supply 32 writable bytes: sign, len, limbs,
+    /// and the native resolver's Small limb cell (offsets 0, 8, 16, 24).
+    /// Native Small limbs point into that caller-owned buffer. Native Big
+    /// limbs live with the native arena; region limbs follow the region's
+    /// address-stability contract.
     pub int_view: FuncId,
     /// `(arena, word, out_view) -> status` — a lawful byte span's
     /// `{pointer, length}` view (`RT-CARRIER-BYTESPAN-OBSERVE` `D3`).
@@ -2800,6 +2804,7 @@ enum IntPart {
     Sign,
     Len,
     Limb,
+    /// The caller provides the whole native view, including its Small limb.
     View,
 }
 
@@ -2929,12 +2934,20 @@ fn define_int_part<M: Module>(
         let native_payload = b
             .ins()
             .load(types::I64, MemFlags::trusted(), node, NODE_PAYLOAD);
-        let view_slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
-            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-            32,
-            3,
-        ));
-        let view = b.ins().stack_addr(ptr, view_slot, 0);
+        // A native Small view's limb pointer names its own VIEW_SMALL cell.
+        // For View this must be the caller's buffer, so the limb survives
+        // this helper's return. The scalar parts consume their views here.
+        let view = match part {
+            IntPart::View => out,
+            IntPart::Sign | IntPart::Len | IntPart::Limb => {
+                let view_slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+                    cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                    32,
+                    3,
+                ));
+                b.ins().stack_addr(ptr, view_slot, 0)
+            }
+        };
         let call = b
             .ins()
             .call(native, &[native_arena, marker, native_payload, view]);
@@ -2993,9 +3006,9 @@ fn define_int_part<M: Module>(
                 b.ins().store(MemFlags::trusted(), limb, out, 0);
             }
             IntPart::View => {
-                b.ins().store(MemFlags::trusted(), sign, out, 0);
-                b.ins().store(MemFlags::trusted(), len, out, 8);
-                b.ins().store(MemFlags::trusted(), limbs, out, 16);
+                b.ins().store(MemFlags::trusted(), sign, out, VIEW_SIGN);
+                b.ins().store(MemFlags::trusted(), len, out, VIEW_LEN);
+                b.ins().store(MemFlags::trusted(), limbs, out, VIEW_LIMBS);
             }
         }
         let z = b.ins().iconst(types::I64, BOUNDARY_OK);
@@ -5180,6 +5193,56 @@ pub(crate) mod tests {
         seen.sort_unstable();
         seen.dedup();
         assert_eq!(seen.len(), 4, "AC-4: every case must be distinguishable");
+    }
+
+    #[test]
+    fn int_view_keeps_native_small_limbs_in_the_callers_buffer() {
+        use crate::native_int_clif::{VIEW_LEN, VIEW_LIMBS, VIEW_SIGN, VIEW_SMALL};
+
+        let mut module = jit();
+        let native_fns = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
+            .expect("native Int helpers");
+        let helpers = emit_boundary_value_local_graph(
+            &mut module,
+            &native_fns,
+            &crate::boundary_emission_plan::BoundaryEmissionPlan::derive(),
+        )
+        .expect("carrier helpers");
+        module.finalize_definitions().expect("link carrier helpers");
+        // SAFETY: this function was declared as (arena, word, out) -> status
+        // and defined with the host ISA. The module outlives both calls.
+        let view: extern "C" fn(*const u64, u64, *mut u64) -> i64 =
+            unsafe { std::mem::transmute(module.get_finalized_function(helpers.int_view)) };
+        let (_producer, produce) = compile_producer(3, emit_spilled_int_producer);
+        let mut store = c1_d2_store();
+        let region_value = wide_int(0);
+        let (region_sign, region_limbs) = region_value.canonical_sign_and_limbs();
+        let region_word = materialize_ground(&mut store, &RuntimeGroundValue::Int(region_value))
+            .expect("materialize region-backed Int");
+        let native = crate::native_int::NativeIntArenaV1::default();
+        let mut f = bind_with(&mut store, BoundaryArenaBuilder::new(), (2, 0, 0), (0, 0, 0));
+        with_native_int(&mut f, &native);
+
+        let magnitude = (1_i64 << 60) + 7;
+        let small_word = BoundaryWord(run3(produce, f.base, BoundaryWord(-magnitude as u64), 0) as u64);
+        assert_eq!(small_word.tag(), Some(BoundaryTag::PersistentGround));
+        assert_ne!(small_word, region_word);
+        let mut out = [0_u64; 4];
+        let slot = |offset: i32| offset as usize / size_of::<u64>();
+        let small_address = out.as_ptr().wrapping_add(slot(VIEW_SMALL)) as u64;
+        assert_eq!(view(f.base, small_word.0, out.as_mut_ptr()), BOUNDARY_OK);
+        assert_eq!(out[slot(VIEW_LIMBS)], small_address, "Small limbs must point into the caller's view");
+        assert_eq!(out[slot(VIEW_SIGN)], 1);
+        assert_eq!(out[slot(VIEW_LEN)], 1);
+        // The pointer equality above proves that reading this cell is *limbs.
+        assert_eq!(out[slot(VIEW_SMALL)], magnitude as u64);
+
+        out.fill(u64::MAX);
+        assert_eq!(view(f.base, region_word.0, out.as_mut_ptr()), BOUNDARY_OK);
+        assert_ne!(out[slot(VIEW_LIMBS)], small_address, "region limbs must not point into a Small cell");
+        assert_eq!(out[slot(VIEW_SIGN)], region_sign as u64);
+        assert_eq!(out[slot(VIEW_LEN)], region_limbs.len() as u64);
+        assert_eq!(out[slot(VIEW_SMALL)], u64::MAX, "region view does not write the Small cell");
     }
 
     /// Drive the emitted span producer once and read the result back

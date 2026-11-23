@@ -4432,6 +4432,9 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         scenario
     }
 
+    #[cfg(target_os = "linux")]
+    mod wide_metadata;
+
     fn metadata_result(
         observation: &EffectObservation,
         op: HostOpV1,

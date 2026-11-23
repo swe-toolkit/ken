@@ -456,19 +456,19 @@ struct ResourceErrorReplyV1 {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct FileMetadataReplyV1 {
-    present: u64,
-    size: u64,
-    kind: u64,
-    mode: u64,
-    links: u64,
-    device_major: u64,
-    device_minor: u64,
-    inode: u64,
-    modified: [u8; 16],
-    changed: [u8; 16],
-    accessed: [u8; 16],
-    born: [u8; 16],
+pub struct FileMetadataReplyV1 {
+    pub present: u64,
+    pub size: u64,
+    pub kind: u64,
+    pub mode: u64,
+    pub links: u64,
+    pub device_major: u64,
+    pub device_minor: u64,
+    pub inode: u64,
+    pub modified: [u8; 16],
+    pub changed: [u8; 16],
+    pub accessed: [u8; 16],
+    pub born: [u8; 16],
 }
 
 const METADATA_PRESENT_MODE: u64 = 1;
@@ -1445,6 +1445,39 @@ fn decode_directory_entries_reply_v1(bytes: &[u8]) -> Option<Vec<crate::DirEntry
     (cursor == bytes.len()).then_some(entries)
 }
 
+/// Encode the metadata record of a `REPLY_METADATA` reply, as stored by
+/// `set_reply`, without changing any process state.
+pub fn file_metadata_reply_record_v1(metadata: &crate::FileMetadataV1) -> FileMetadataReplyV1 {
+    let mut record = FileMetadataReplyV1 {
+        size: metadata.size,
+        kind: match metadata.kind {
+            crate::FsNodeKindV1::File => 0,
+            crate::FsNodeKindV1::Directory => 1,
+            crate::FsNodeKindV1::Symlink => 2,
+            crate::FsNodeKindV1::Other => 3,
+        },
+        device_major: metadata.device_major,
+        device_minor: metadata.device_minor,
+        ..FileMetadataReplyV1::default()
+    };
+    macro_rules! supplied {
+        ($field:ident, $bit:ident $(, $encode:ident)?) => {
+            if let Some(value) = metadata.$field {
+                record.present |= $bit;
+                record.$field = value$(.$encode())?;
+            }
+        };
+    }
+    supplied!(mode, METADATA_PRESENT_MODE);
+    supplied!(links, METADATA_PRESENT_LINKS);
+    supplied!(inode, METADATA_PRESENT_INODE);
+    supplied!(modified, METADATA_PRESENT_MODIFIED, to_be_bytes);
+    supplied!(changed, METADATA_PRESENT_CHANGED, to_be_bytes);
+    supplied!(accessed, METADATA_PRESENT_ACCESSED, to_be_bytes);
+    supplied!(born, METADATA_PRESENT_BORN, to_be_bytes);
+    record
+}
+
 fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut ProcessContext) {
     reply.detail = 0;
     reply.effective_request = 0;
@@ -1514,34 +1547,7 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) => {
             reply.tag = REPLY_METADATA;
-            let mut record = FileMetadataReplyV1 {
-                size: metadata.size,
-                kind: match metadata.kind {
-                    crate::FsNodeKindV1::File => 0,
-                    crate::FsNodeKindV1::Directory => 1,
-                    crate::FsNodeKindV1::Symlink => 2,
-                    crate::FsNodeKindV1::Other => 3,
-                },
-                device_major: metadata.device_major,
-                device_minor: metadata.device_minor,
-                ..FileMetadataReplyV1::default()
-            };
-            macro_rules! supplied {
-                ($field:ident, $bit:ident $(, $encode:ident)?) => {
-                    if let Some(value) = metadata.$field {
-                        record.present |= $bit;
-                        record.$field = value$(.$encode())?;
-                    }
-                };
-            }
-            supplied!(mode, METADATA_PRESENT_MODE);
-            supplied!(links, METADATA_PRESENT_LINKS);
-            supplied!(inode, METADATA_PRESENT_INODE);
-            supplied!(modified, METADATA_PRESENT_MODIFIED, to_be_bytes);
-            supplied!(changed, METADATA_PRESENT_CHANGED, to_be_bytes);
-            supplied!(accessed, METADATA_PRESENT_ACCESSED, to_be_bytes);
-            supplied!(born, METADATA_PRESENT_BORN, to_be_bytes);
-            reply.metadata = record;
+            reply.metadata = file_metadata_reply_record_v1(&metadata);
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) => {
             let encoded = encode_directory_entries_reply_v1(&entries);

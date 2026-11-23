@@ -2625,6 +2625,168 @@ fn px9_resource_origin_revoked_projection_fixture(
     }
 }
 
+const WIDE_METADATA_EDGE: u64 = 1 << 55;
+
+#[derive(Clone, Copy, Debug)]
+enum WideMetadataField {
+    Inode,
+    Size,
+}
+
+fn wide_metadata_handle_expr(
+    symbols: &crate::NativeProcessSymbols,
+    field: WideMetadataField,
+    crossing: bool,
+) -> RuntimeExpr {
+    use crate::RuntimeMatchCase;
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "wide metadata handle fixture default".to_owned(),
+    };
+    let int = |n: i64| RuntimeExpr::Value(RuntimeValue::Int(n.into()));
+    let status = |n| px8n_failure(symbols, int(n));
+    let check = || RuntimeExpr::If {
+        scrutinee: Box::new(total_primitive(
+            "eq_int",
+            vec![RuntimeExpr::Var(0), int(WIDE_METADATA_EDGE as i64)],
+        )),
+        then_expr: Box::new(RuntimeExpr::Construct {
+            constructor: symbols.exit_success.clone(),
+            args: vec![],
+        }),
+        else_expr: Box::new(status(32)),
+    };
+    let read_field = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases: vec![RuntimeMatchCase {
+            constructor: symbols.file_metadata.clone(),
+            binders: 11,
+            body: match field {
+                WideMetadataField::Size => check(),
+                WideMetadataField::Inode => RuntimeExpr::Match {
+                    scrutinee: Box::new(RuntimeExpr::Var(6)),
+                    cases: vec![
+                        RuntimeMatchCase { constructor: symbols.option_some.clone(), binders: 1, body: check() },
+                        RuntimeMatchCase { constructor: symbols.option_none.clone(), binders: 0, body: status(98) },
+                    ],
+                    default: trap(),
+                },
+            },
+        }],
+        default: trap(),
+    };
+    let handle_result = RuntimeExpr::Effect {
+        bracket_acquire: None,
+        family: "FS".to_owned(),
+        operation: ken_host::HostOpV1::FsHandleMetadata,
+        capability: None,
+        args: vec![RuntimeExpr::Var(0)],
+    };
+    let consume = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases: vec![
+            RuntimeMatchCase { constructor: symbols.result_ok.clone(), binders: 1, body: read_field },
+            RuntimeMatchCase { constructor: symbols.result_err.clone(), binders: 1, body: status(97) },
+        ],
+        default: trap(),
+    };
+    let observe = if crossing {
+        RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: vec![],
+                params: vec!["metadata_result".to_owned()],
+                body: Box::new(consume),
+            }),
+            args: vec![handle_result],
+        }
+    } else {
+        RuntimeExpr::Let { value: Box::new(handle_result), body: Box::new(consume) }
+    };
+    let allocate = |body| RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
+            family: "FS".to_owned(),
+            operation: ken_host::HostOpV1::BufferAllocate,
+            capability: None,
+            args: vec![int(8)],
+        }),
+        cases: vec![RuntimeMatchCase {
+            constructor: symbols.result_ok.clone(),
+            binders: 1,
+            body,
+        }],
+        default: trap(),
+    };
+    allocate(observe)
+}
+
+fn check_jit_wide_metadata(field: WideMetadataField, value: u64, crossing: bool) {
+    let mut metadata = ken_host::FileMetadataV1::without_optional_fields(
+        if matches!(field, WideMetadataField::Size) { value } else { 19 },
+        ken_host::FsNodeKindV1::File,
+        2,
+        3,
+    );
+    if matches!(field, WideMetadataField::Inode) {
+        metadata.inode = Some(value);
+    }
+    let (status, fixture) = run_px8n_arm_fixture_with_metadata(
+        PX8I_METADATA_BIG,
+        Some(ken_host::file_metadata_reply_record_v1(&metadata)),
+        |symbols| wide_metadata_handle_expr(symbols, field, crossing),
+    );
+    assert_eq!(fixture.malformed_request, 0);
+    assert_eq!(fixture.call_index, 2);
+    let expected = if value == WIDE_METADATA_EDGE { 0 } else { 32 };
+    assert_eq!(status, expected, "{field:?}={value}, crossing={crossing}");
+}
+
+// Durable decode pins. These single-unit fixtures read the wire fields but do
+// not reach a carried Int consumer: a D1-site revert leaves them green.
+#[test]
+fn jit_handle_metadata_inode_wide() {
+    check_jit_wide_metadata(WideMetadataField::Inode, WIDE_METADATA_EDGE, false);
+}
+
+#[test]
+fn jit_handle_metadata_inode_immediate() {
+    check_jit_wide_metadata(WideMetadataField::Inode, WIDE_METADATA_EDGE - 1, false);
+}
+
+#[test]
+fn jit_handle_metadata_size_wide_decode() {
+    check_jit_wide_metadata(WideMetadataField::Size, WIDE_METADATA_EDGE, false);
+}
+
+#[test]
+fn jit_handle_metadata_size_immediate_decode() {
+    check_jit_wide_metadata(WideMetadataField::Size, WIDE_METADATA_EDGE - 1, false);
+}
+
+// Durable carrier-consumer pins. Size calibrates this lexical-closure seat
+// against linked handle parity: the wide witness must fall to terminal -1
+// with D1 reverted, while the immediate control remains 32. Inode varies only
+// the projected field; its input matches the interpreter's reifier fixture.
+#[test]
+fn jit_crossed_metadata_size_wide() {
+    check_jit_wide_metadata(WideMetadataField::Size, WIDE_METADATA_EDGE, true);
+}
+
+#[test]
+fn jit_crossed_metadata_size_immediate() {
+    check_jit_wide_metadata(WideMetadataField::Size, WIDE_METADATA_EDGE - 1, true);
+}
+
+#[test]
+fn jit_crossed_metadata_inode_wide() {
+    check_jit_wide_metadata(WideMetadataField::Inode, WIDE_METADATA_EDGE, true);
+}
+
+#[test]
+fn jit_crossed_metadata_inode_immediate() {
+    check_jit_wide_metadata(WideMetadataField::Inode, WIDE_METADATA_EDGE - 1, true);
+}
+
 fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
     let trap = || RuntimeTrap {
         code: RuntimeTrapCode::PatternMatchFailure,
@@ -2926,6 +3088,7 @@ struct Px8nHostReplyFixture {
     scenario: u64,
     call_index: u64,
     malformed_request: u64,
+    metadata: Option<ken_host::FileMetadataReplyV1>,
 }
 
 #[cfg(test)]
@@ -2937,6 +3100,14 @@ fn px8n_write_arm_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr 
 fn run_px8n_arm_fixture(
     scenario: u64,
     expression: fn(&crate::NativeProcessSymbols) -> RuntimeExpr,
+) -> (i64, Px8nHostReplyFixture) {
+    run_px8n_arm_fixture_with_metadata(scenario, None, expression)
+}
+
+fn run_px8n_arm_fixture_with_metadata(
+    scenario: u64,
+    metadata: Option<ken_host::FileMetadataReplyV1>,
+    expression: impl FnOnce(&crate::NativeProcessSymbols) -> RuntimeExpr,
 ) -> (i64, Px8nHostReplyFixture) {
     let isa = native_isa().unwrap();
     let mut builder = JITBuilder::with_isa(isa, default_libcall_names());
@@ -2969,6 +3140,7 @@ fn run_px8n_arm_fixture(
         scenario,
         call_index: 0,
         malformed_request: 0,
+        metadata,
     };
     let invocation = RootIngressFixture {
         process_input: &input,
@@ -3116,7 +3288,31 @@ extern "C" fn px8n_scripted_host_dispatch(
             let metadata = ken_host::file_metadata_reply_layout_v1()
                 .expect("PX8-I scripted metadata has a generated reply layout");
             store(wire.reply_tag_offset, wire.reply_metadata_tag);
-            store(metadata.size, PX8I_BIG_U64);
+            if let Some(record) = fixture.metadata {
+                store(metadata.present, record.present);
+                store(metadata.size, record.size);
+                store(metadata.kind, record.kind);
+                store(metadata.device_major, record.device_major);
+                store(metadata.device_minor, record.device_minor);
+                for ((_, offset), value) in metadata.options[..3].iter().zip([
+                    record.mode, record.links, record.inode,
+                ]) {
+                    store(*offset, value);
+                }
+                for ((_, offset), value) in metadata.options[3..].iter().zip([
+                    record.modified, record.changed, record.accessed, record.born,
+                ]) {
+                    // SAFETY: generated layout locates the 16-byte option slot
+                    // in the same caller-owned reply as the scalar fields.
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            value.as_ptr(), reply.cast::<u8>().add(*offset as usize), value.len(),
+                        );
+                    }
+                }
+            } else {
+                store(metadata.size, PX8I_BIG_U64);
+            }
         }
     } else {
         // BUDGET-EFF: every scripted FsReadAt/FsWriteAt scenario here uses

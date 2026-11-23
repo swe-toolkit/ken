@@ -9484,6 +9484,85 @@ mod px5b_effect_observation_tests {
         });
     }
 
+    /// Interpreter oracle for `jit_crossed_metadata_inode_wide` and
+    /// `jit_crossed_metadata_inode_immediate`: the production handle reifier
+    /// and `eq_int` check the same canonical inputs as the native JIT rows.
+    /// Promise class: durable invariant.
+    #[test]
+    fn scripted_handle_metadata_inode_reifies_and_compares_exactly() {
+        use ken_kernel::{declare_inductive, declare_primitive, CtorSpec, InductiveSpec};
+
+        const EDGE: u64 = 1 << 55;
+
+        // The metadata reifier obtains the checked Int and Instant types
+        // from the Instant constructor declaration. No filesystem is needed.
+        let mut globals = GlobalEnv::new();
+        let int = declare_primitive(
+            &mut globals,
+            vec![],
+            Term::Type(Level::zero()),
+            ken_kernel::env::PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        let instant = declare_inductive(&mut globals, |_| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![CtorSpec {
+                args: vec![Term::const_(int, vec![])],
+                target_indices: vec![],
+            }],
+        })
+        .unwrap();
+        let mut fs = fs_ids();
+        fs.metadata_instant_id = globals.inductive(instant).unwrap().constructors[0].id;
+        let ids = console_ids();
+        let mut store = EvalStore::new();
+        for (value, expected) in [(EDGE, true), (EDGE - 1, false)] {
+            let mut metadata = ken_host::FileMetadataV1::without_optional_fields(
+                19,
+                ken_host::FsNodeKindV1::File,
+                2,
+                3,
+            );
+            metadata.inode = Some(value);
+            let result = super::reify_host_reply_v1(
+                ken_host::CanonicalOutcomeV1::Success(
+                    ken_host::CanonicalReplyV1::FileMetadata(metadata),
+                ),
+                None,
+                None,
+                &ken_host::CanonicalRequestV1::FsHandleMetadata,
+                fs.private_fs_handle_metadata_id,
+                &fs,
+                &ids,
+                &globals,
+                None,
+                &mut store,
+            )
+            .expect("reify the scripted handle reply");
+            let payload = result_payload(&result, ids.ok_id);
+            let EvalVal::Ctor { id, args, .. } = payload else {
+                panic!("expected FileMetadata, got {payload:?}");
+            };
+            assert_eq!(*id, fs.mk_file_metadata_id);
+            let EvalVal::Ctor { id, args, .. } = &args[6] else {
+                panic!("expected Option Int inode");
+            };
+            assert_eq!(*id, fs.some_id);
+            let inode = &args[1];
+            assert_eq!(eval_to_bigint(inode), Some(BigInt::from(value)));
+            assert_eq!(
+                prim_reduce(
+                    "eq_int",
+                    &[inode.clone(), EvalVal::BigInt(BigInt::from(EDGE))],
+                ),
+                EvalVal::Bool(expected),
+            );
+        }
+    }
+
     fn assert_positioned_backend_failure<E: PositionedFailureIdentity>(
         label: &str,
         expected: impl FnOnce(&ConsoleIds) -> GlobalId,
