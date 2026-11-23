@@ -127,8 +127,10 @@ fn p6_borrowed_argument_is_converted_in_main() {
 fn response_span_is_read_in_its_reply_body() {
     parity("response", &[(&[b"program"], 0)]);
 }
+/// Durable invariant: both lanes must return success only for the three
+/// UTF-8 octets of `aß` in order, followed immediately by Nil.
 #[test]
-fn static_bytes_have_the_same_list_form() {
+fn static_bytes_preserve_exact_utf8_order_and_nil() {
     parity("static", &[(&[b"program", b"unused"], 0)]);
 }
 #[test]
