@@ -5665,12 +5665,71 @@ trait DeclarationDependencySource {
     fn dependencies(&mut self, symbol: &StableSymbol) -> Option<&DeclarationDependencies>;
 }
 
+/// The package's encoded symbols, indexed for the spelling-substring test.
+/// `occurring` finds exactly the symbols whose non-empty encoding occurs in
+/// the input bytes, including distinct symbols with identical encodings.
+struct SpellingIndex {
+    anchor: Vec<u8>,
+    by_length: BTreeMap<usize, BTreeMap<Vec<u8>, Vec<StableSymbol>>>,
+}
+
+impl SpellingIndex {
+    fn new(encoded_symbols: &[(StableSymbol, Vec<u8>)]) -> Self {
+        let mut anchor: Option<Vec<u8>> = None;
+        let mut by_length = BTreeMap::<usize, BTreeMap<Vec<u8>, Vec<StableSymbol>>>::new();
+        for (symbol, encoding) in encoded_symbols {
+            if encoding.is_empty() {
+                continue;
+            }
+            match &mut anchor {
+                None => anchor = Some(encoding.clone()),
+                Some(prefix) => {
+                    let common = prefix
+                        .iter()
+                        .zip(encoding)
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    prefix.truncate(common);
+                }
+            }
+            by_length
+                .entry(encoding.len())
+                .or_default()
+                .entry(encoding.clone())
+                .or_default()
+                .push(symbol.clone());
+        }
+        Self {
+            anchor: anchor.unwrap_or_default(),
+            by_length,
+        }
+    }
+
+    fn occurring(&self, bytes: &[u8]) -> BTreeSet<StableSymbol> {
+        let mut found = BTreeSet::new();
+        for start in 0..bytes.len() {
+            let tail = &bytes[start..];
+            if !tail.starts_with(&self.anchor) {
+                continue;
+            }
+            for (&length, needles) in &self.by_length {
+                let Some(window) = tail.get(..length) else {
+                    break; // The remaining lengths are larger.
+                };
+                if let Some(symbols) = needles.get(window) {
+                    found.extend(symbols.iter().cloned());
+                }
+            }
+        }
+        found
+    }
+}
+
 struct OnDemandDependencyIndex<'a> {
     validated: ValidatedCheckedCorePackage<'a>,
     /// Every declaration key, built once per package.
     selection: CheckedCoreBodyViewSelection,
-    /// The encoded symbol population shared by both dependency predicates.
-    encoded_symbols: Vec<(StableSymbol, Vec<u8>)>,
+    spelling: SpellingIndex,
     memo: BTreeMap<StableSymbol, DeclarationDependencies>,
 }
 
@@ -5678,6 +5737,11 @@ impl<'a> OnDemandDependencyIndex<'a> {
     fn new(validated: ValidatedCheckedCorePackage<'a>) -> Self {
         let package = validated.package();
         let semantic = &package.artifact.semantic;
+        let encoded_symbols = semantic
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.clone(), canonical_symbol_bytes(symbol)))
+            .collect::<Vec<_>>();
         Self {
             validated,
             selection: CheckedCoreBodyViewSelection {
@@ -5690,11 +5754,7 @@ impl<'a> OnDemandDependencyIndex<'a> {
                 external_symbols: BTreeSet::new(),
                 dependency_semantic_hashes: semantic.dependency_semantic_hashes.clone(),
             },
-            encoded_symbols: semantic
-                .symbols
-                .iter()
-                .map(|symbol| (symbol.clone(), canonical_symbol_bytes(symbol)))
-                .collect(),
+            spelling: SpellingIndex::new(&encoded_symbols),
             memo: BTreeMap::new(),
         }
     }
@@ -5711,15 +5771,16 @@ impl DeclarationDependencySource for OnDemandDependencyIndex<'_> {
             .get(symbol)?;
         Some(self.memo.entry(symbol.clone()).or_insert_with(|| {
             self.selection.target_symbol = symbol.clone();
+            let mut spelled = self.spelling.occurring(bytes);
+            spelled.remove(symbol);
             DeclarationDependencies {
                 runtime: runtime_declaration_dependencies(
                     self.validated,
                     &self.selection,
-                    &self.encoded_symbols,
                     symbol,
-                    bytes,
+                    &spelled,
                 ),
-                semantic: semantic_declaration_dependencies(&self.encoded_symbols, symbol, bytes),
+                semantic: spelled,
             }
         }))
     }
@@ -5728,9 +5789,8 @@ impl DeclarationDependencySource for OnDemandDependencyIndex<'_> {
 fn runtime_declaration_dependencies(
     validated: ValidatedCheckedCorePackage<'_>,
     selection: &CheckedCoreBodyViewSelection,
-    encoded_symbols: &[(StableSymbol, Vec<u8>)],
     owner: &StableSymbol,
-    bytes: &[u8],
+    spelled: &BTreeSet<StableSymbol>,
 ) -> BTreeSet<StableSymbol> {
     match validated_declaration_body_view(validated, selection, owner) {
         Ok(view) => {
@@ -5744,28 +5804,9 @@ fn runtime_declaration_dependencies(
             // entrypoint lane. Preserve the conservative dependency scan
             // for those declarations; supported bodies use the executable
             // term view so type-only names never enter runtime reachability.
-            encoded_symbols
-                .iter()
-                .filter_map(|(candidate, needle)| {
-                    (candidate != owner && contains_subslice(bytes, needle))
-                        .then_some(candidate.clone())
-                })
-                .collect()
+            spelled.clone()
         }
     }
-}
-
-fn semantic_declaration_dependencies(
-    encoded_symbols: &[(StableSymbol, Vec<u8>)],
-    owner: &StableSymbol,
-    bytes: &[u8],
-) -> BTreeSet<StableSymbol> {
-    encoded_symbols
-        .iter()
-        .filter_map(|(candidate, needle)| {
-            (candidate != owner && contains_subslice(bytes, needle)).then_some(candidate.clone())
-        })
-        .collect()
 }
 
 fn collect_runtime_declaration_dependencies(
@@ -6139,6 +6180,7 @@ fn build_target_closure_report(
     report
 }
 
+#[cfg(test)]
 fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty()
         && haystack.len() >= needle.len()

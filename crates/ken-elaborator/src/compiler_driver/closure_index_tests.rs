@@ -209,6 +209,89 @@ fn assert_indexes_agree(fixture: &'static str, source: &'static str) {
         .expect("closure comparison thread");
 }
 
+/// MEASURED: indexed and per-needle scans agree with explicit known answers.
+/// CLAIMED: the index preserves spelling matches at substring boundaries.
+/// THE GAP: the cases are finite; closure fixtures exercise actual encodings.
+#[test]
+fn spelling_index_matches_naive_scan() {
+    type Case<'a> = (&'a str, &'a [(&'a str, &'a str)], &'a str, &'a [&'a str]);
+    let cases: &[Case<'_>] = &[
+        (
+            "offset zero",
+            &[("a", "ab"), ("long", "abcde")],
+            "ab!",
+            &["a"],
+        ),
+        (
+            "proper prefix",
+            &[("a", "ab"), ("long", "abcd")],
+            "!abcd!",
+            &["a", "long"],
+        ),
+        ("last byte", &[("a", "ab")], "!ab", &["a"]),
+        (
+            "overlap",
+            &[("a", "aba"), ("b", "bab")],
+            "abab",
+            &["a", "b"],
+        ),
+        (
+            "proper suffix",
+            &[("short", "bc"), ("long", "abc")],
+            "!abc!",
+            &["short", "long"],
+        ),
+        ("whole input", &[("a", "ab")], "ab", &["a"]),
+        (
+            "duplicate encoding",
+            &[("a", "ab"), ("b", "ab"), ("owner", "ab")],
+            "!ab!",
+            &["a", "b"],
+        ),
+        (
+            "empty encoding",
+            &[("empty", ""), ("a", "ab")],
+            "!ab!",
+            &["a"],
+        ),
+        (
+            "empty anchor",
+            &[("a", "ab"), ("b", "cd")],
+            "!cdab!",
+            &["a", "b"],
+        ),
+        (
+            "shorter than anchor",
+            &[("a", "abc"), ("b", "abcd")],
+            "ab",
+            &[],
+        ),
+    ];
+    let symbol = |name| StableSymbol::declaration("spelling-index-test", &[], name);
+    let owner = symbol("owner");
+    for &(label, population, input, expected) in cases {
+        let encoded = population
+            .iter()
+            .map(|&(name, bytes)| (symbol(name), bytes.as_bytes().to_vec()))
+            .collect::<Vec<_>>();
+        let naive = encoded
+            .iter()
+            .filter(|(candidate, needle)| {
+                candidate != &owner && contains_subslice(input.as_bytes(), needle)
+            })
+            .map(|(candidate, _)| candidate.clone())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            naive,
+            expected.iter().map(|&name| symbol(name)).collect(),
+            "{label}: naive known answer"
+        );
+        let mut indexed = SpellingIndex::new(&encoded).occurring(input.as_bytes());
+        indexed.remove(&owner);
+        assert_eq!(indexed, naive, "{label}");
+    }
+}
+
 #[test]
 fn p3_closure_equals_eager_index() {
     assert_indexes_agree("p3", P3);
