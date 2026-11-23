@@ -79,6 +79,32 @@ release; a mismatch is a stop to the Architect. Steward rulings:
 - Probe arm S-NO (B3) and the D0's other named stops return to the
   Architect.
 
+## Amendment: Inc2 ResourceKind closure (2026-11-23)
+
+Inc1 merged (`f09912a10`). The Inc2 re-measure held (Architect
+`evt_47czmv4vck7av`). At Inc2's third symptom-inventory entry, the
+Architect measured seven native copies of the host-owned ResourceKind
+population, each frozen at a different wave (validator 3, planner and
+emitter 7, host 9; `evt_42ncdsdxj34kk`). Steward ruling
+`evt_6fpdh2m2ywcvm`: Inc2 carries the closure in place of A2.
+
+- **C1.** ken-host owns one ResourceKind population, built on an
+  exhaustive match over `ResourceKindV1`. It replaces the separate
+  `resource_kind_*` wire fields, which are removed, not kept alongside.
+- **C2.** Every native consumer reads C1: the validator's three kind
+  guards, the planner's alternatives, the emitter's list, and one
+  exhaustive kind-to-role-and-symbol map.
+- **C3.** A native totality row through the validator's admitted set,
+  and two mutations. Dropping a kind from the map fails to compile.
+  Dropping it from the validator only turns the row red.
+- **C4.** If an in-crate harness can inject a ReleaseFailed reply, a
+  known answer for kinds 4 (ChildProcess) and 8 (SocketStream).
+  Otherwise the GAP is stated.
+
+This closes a defect on main: the native validator refuses ReleaseFailed
+and ResourceKindMismatch replies for the four PX10 process kinds. The fix
+is claimed only when C3's row covers them.
+
 ## Scope
 
 Native lowering and the native host leaf for the seven `Net` operations,
