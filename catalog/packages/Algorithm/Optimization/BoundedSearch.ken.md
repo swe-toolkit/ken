@@ -23,7 +23,7 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its seven laws lead. The private outcome invariant
+The public operation and its nine laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
@@ -34,6 +34,8 @@ import Core.Logic.Transport (cong, sym, trans)
 import Core.Classes.LawfulClasses (leq_nat)
 
 import Data.Numeric.Nat.Order (lt_nat)
+
+import Data.Numeric.Nat.Arithmetic (add)
 
 pub fn find_below (p : Nat → Bool) (bound : Nat) : Option Nat =
   match bound {
@@ -168,6 +170,52 @@ pub theorem find_below_ext
             (agree below ((proof self_suc for lt_nat) below)))
   }
 
+pub theorem find_below_offset
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (width : Nat) (n : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m width) True → Equal Bool (q m) (p (add offset m)))
+      → Equal (Option Nat) (find_below p offset) (None Nat)
+      → Equal (Option Nat) (find_below q width) (Some Nat n)
+      → Equal (Option Nat) (find_below p (add offset width)) (Some Nat (add offset n)) =
+  λshift.
+    λmissing.
+      λfound.
+        trans
+          (Option Nat)
+          (find_below p (add offset width))
+          (offset_outcome offset (find_below q width))
+          (Some Nat (add offset n))
+          (offset_search p q offset width shift missing)
+          (cong
+            (Option Nat)
+            (Option Nat)
+            (find_below q width)
+            (Some Nat n)
+            (offset_outcome offset)
+            found)
+
+pub theorem find_below_offset_none
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (width : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m width) True → Equal Bool (q m) (p (add offset m)))
+      → Equal (Option Nat) (find_below p offset) (None Nat)
+      → Equal (Option Nat) (find_below q width) (None Nat)
+      → Equal (Option Nat) (find_below p (add offset width)) (None Nat) =
+  λshift.
+    λmissing.
+      λabsent.
+        trans
+          (Option Nat)
+          (find_below p (add offset width))
+          (offset_outcome offset (find_below q width))
+          (None Nat)
+          (offset_search p q offset width shift missing)
+          (cong
+            (Option Nat)
+            (Option Nat)
+            (find_below q width)
+            (None Nat)
+            (offset_outcome offset)
+            absent)
+
 fn find_next (p : Nat → Bool) (below : Nat) (prior : Option Nat) : Option Nat =
   match prior {
     None ↦ found_at below (p below);
@@ -188,6 +236,12 @@ fn found_spec (p : Nat → Bool) (bound : Nat) (outcome : Option Nat) : Prop =
     None ↦ none_below p bound;
     Some n ↦
       And (Equal Bool (lt_nat n bound) True) (And (Equal Bool (p n) True) (none_below p n))
+  }
+
+fn offset_outcome (offset : Nat) (outcome : Option Nat) : Option Nat =
+  match outcome {
+    None ↦ None Nat;
+    Some n ↦ Some Nat (add offset n)
   }
 
 theorem found_some_sound
@@ -404,6 +458,92 @@ theorem found_at_correct
               }
   }
 
+theorem offset_search
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (width : Nat)
+    : ((m : Nat) → Equal Bool (lt_nat m width) True → Equal Bool (q m) (p (add offset m)))
+      → Equal (Option Nat) (find_below p offset) (None Nat)
+      → Equal
+        (Option Nat)
+        (find_below p (add offset width))
+        (offset_outcome offset (find_below q width)) =
+  match width {
+    Zero ↦ λshift. λmissing. missing;
+    Suc below ↦
+      λshift.
+        λmissing.
+          trans
+            (Option Nat)
+            (find_next p (add offset below) (find_below p (add offset below)))
+            (find_next p (add offset below) (offset_outcome offset (find_below q below)))
+            (offset_outcome offset (find_next q below (find_below q below)))
+            (cong
+              (Option Nat)
+              (Option Nat)
+              (find_below p (add offset below))
+              (offset_outcome offset (find_below q below))
+              (find_next p (add offset below))
+              (offset_search
+                p
+                q
+                offset
+                below
+                (λm.
+                  λearlier.
+                    shift
+                      m
+                      ((proof trans for lt_nat)
+                        m
+                        below
+                        (Suc below)
+                        earlier
+                        ((proof self_suc for lt_nat) below)))
+                missing))
+            (offset_next
+              p
+              q
+              offset
+              below
+              (find_below q below)
+              (shift below ((proof self_suc for lt_nat) below)))
+  }
+
+theorem offset_next
+      (p : Nat → Bool) (q : Nat → Bool) (offset : Nat) (below : Nat) (prior : Option Nat)
+    : Equal Bool (q below) (p (add offset below))
+      → Equal
+        (Option Nat)
+        (find_next p (add offset below) (offset_outcome offset prior))
+        (offset_outcome offset (find_next q below prior)) =
+  match prior {
+    None ↦
+      λsame.
+        trans
+          (Option Nat)
+          (found_at (add offset below) (p (add offset below)))
+          (found_at (add offset below) (q below))
+          (offset_outcome offset (found_at below (q below)))
+          (cong
+            Bool
+            (Option Nat)
+            (p (add offset below))
+            (q below)
+            (found_at (add offset below))
+            (sym Bool (q below) (p (add offset below)) same))
+          (offset_found_at offset below (q below));
+    Some n ↦ λsame. Refl
+  }
+
+theorem offset_found_at
+      (offset : Nat) (candidate : Nat) (hit : Bool)
+    : Equal
+        (Option Nat)
+        (found_at (add offset candidate) hit)
+        (offset_outcome offset (found_at candidate hit)) =
+  match hit {
+    True ↦ Refl;
+    False ↦ Proved
+  }
+
 theorem lt_suc_not_lt_same
       (m : Nat)
     : (b : Nat)
@@ -497,6 +637,16 @@ agreement at the new candidate through the step. No agreement at or above the
 bound, equality of predicates as functions, or predicate-call-count guarantee
 is needed.
 
+When the first range has no hit, `find_below_offset` carries the least hit
+from a shifted search back to its original index. If the shifted search
+also returns `None`, `find_below_offset_none` proves that the full range
+has no hit. Both ask for agreement only below the shifted width. They use
+`offset_search`, which inducts on that width and translates the shifted
+outcome: `None` stays `None`, while a witness gets the offset added. At
+successor width, the proof narrows agreement for the induction hypothesis
+and uses `offset_next` to transport the decision at the new candidate.
+If the first range already has a hit, use `find_below_stable` instead.
+
 `refuted_outcome_none` matches the observed result through an explicit outcome
 equality. The `None` case returns that equality; the `Some n` case combines
 `find_below_sound`'s in-range hit with the premise refuting all in-range hits,
@@ -525,8 +675,10 @@ The public contract fixes the least result or its absence, not an iteration
 order or a number of predicate calls. A bound controls the domain without
 introducing an equality operation on predicates. The outcome invariant,
 `refuted_outcome_none`, `hit_outcome_some`, `lt_suc_not_lt_same`,
-`leq_suc_not_leq_same` and `find_next_ext` are private proof scaffolding, not
-additional public laws.
+`leq_suc_not_leq_same`, and `find_next_ext` are private proof scaffolding,
+not additional public laws. So are `offset_search`, `offset_next`,
+`offset_found_at`, and `offset_outcome`: the public types state `Some` and
+`None` directly.
 Unlike `argmin` over an existing nonempty list, this package searches a numeric
 range and can return `None`.
 
@@ -553,7 +705,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the seven named laws above;
+Its public interface consists of `find_below` and the nine named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
@@ -591,5 +743,11 @@ control and a bound-ten refusal where the predicates disagree. The
   ../../../../crates/ken-elaborator/tests/cat_optimization_bounded_search_agree.rs)
 checks the generic §2.7 public type, package ownership, private-helper
 visibility, unchanged trusted `GlobalId` identities, and both seed clients.
-The seeds have not been run by the official conformance runner. No time, space,
-or predicate-call-count guarantee is claimed.
+The [offset-split seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-offset-split.md)
+checks a shifted hit, two empty parts, and a split whose first part already
+hits. The offset-split package test checks both open laws, private-helper
+visibility, and unchanged trusted `GlobalId` identities. It also checks both
+closed outcomes and isolates the refusal at the false first-part premise.
+These package tests do not establish official conformance execution. No time,
+space, or predicate-call-count guarantee is claimed.
