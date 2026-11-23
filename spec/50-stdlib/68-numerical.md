@@ -19,8 +19,8 @@
 > SPEC-NUMERICAL-INTERVAL-WIDTH-MUL §17;
 > SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE §18;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT §19;
-> SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20).** The §1–2
-> operations,
+> SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
+> SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -1930,3 +1930,45 @@ inequivalent. These closed checks discriminate the premise, not the
 open theorem or an interval's stored-identity property. The assembled
 package test separately owes unchanged exact trusted identities as
 AC-T before a Decision.
+
+## 21. Splitting an enclosure keeps every member
+
+> **Section 21 status: DRAFT v0 (SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS).**
+> Architect's isolated AC-0 on `7e8e1cc38` checked the function and an
+> open client that eliminates its result. It added no `Axiom` and
+> preserved the exact scratch trusted `GlobalId` set (114 → 114).
+> These observations do not check the separate catalog or CV seed,
+> assembled AC-T, official conformance, CI, or landed trust.
+
+`Algorithm.Numeric.RationalInterval` must export this public Transparent
+function after `interval_width_zero_equiv` and before `interval_contains`:
+
+```ken
+pub fn interval_split_covers
+      (lo : Rational) (hi : Rational) (m : Rational) (x : Rational)
+    : IsTrue (interval_contains (MkInterval lo hi) x)
+      → Or
+        (IsTrue (interval_contains (MkInterval lo m) x))
+        (IsTrue (interval_contains (MkInterval m hi) x))
+```
+
+The sole premise is membership of `x` in `MkInterval lo hi`. There is
+no premise on the split point `m`: it can be an endpoint, an interior
+point, or lie strictly below `lo` or above `hi`. If the original
+interval has a member, an exterior split inverts one half and the other
+covers the original interval. The law does not assert that the halves
+contain only original members. An inverted original interval has no
+member to supply the premise (§13).
+
+The membership premise gives `lo ≤ x` and `x ≤ hi`. When `x ≤ m`, the
+bounds `lo ≤ x` and `x ≤ m` give lower-half membership. Otherwise,
+`proof total for rational_leq` yields `m ≤ x`, which gives upper-half
+membership with `x ≤ hi`. This argument requires no new trusted
+assumption. A client can match the `Core.Logic.Or` result: `Inl` carries
+lower-half membership and `Inr` carries upper-half membership. `Or` has
+sort `Type`, not `Omega`, so the checked declaration is a `pub fn`, not
+a `theorem` (`33 §8.4`) or a Boolean disjunction claim.
+
+Section 21 adds one public function, raising the count from eight to
+nine while leaving the sixty public theorems unchanged. No operation or
+law type from §§1–20 changes.
