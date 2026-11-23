@@ -1,0 +1,29 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Process.Exit (host_pure)
+
+fn lengths (args : List Bytes) : List Int =
+  match args {
+    Nil ↦ Nil Int;
+    Cons a rest ↦ Cons Int (bytes_length a) (lengths rest)
+  }
+
+fn any_zero (xs : List Int) : Bool =
+  match xs {
+    Nil ↦ False;
+    Cons x rest ↦ match eq_int x (0 : Int) {
+      True ↦ True;
+      False ↦ any_zero rest
+    }
+  }
+
+fn main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match any_zero (lengths arguments) {
+        True ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+        False ↦ host_pure AFull ExitCode ExitCode.Success
+      }
+  }
