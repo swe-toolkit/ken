@@ -163,10 +163,12 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     SocketAddressIPv4,
     SocketAddressIPv6,
     SocketAddressUnix,
+    ResourceKindSocketListener,
+    ResourceKindSocketStream,
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 65] = [
+    pub(super) const ALL: [Self; 67] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -232,6 +234,8 @@ impl SynthesizedFixedConstructorRole {
         Self::SocketAddressIPv4,
         Self::SocketAddressIPv6,
         Self::SocketAddressUnix,
+        Self::ResourceKindSocketListener,
+        Self::ResourceKindSocketStream,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -301,6 +305,8 @@ impl SynthesizedFixedConstructorRole {
             Self::SocketAddressIPv4 => &symbols.px11_address_symbols[0],
             Self::SocketAddressIPv6 => &symbols.px11_address_symbols[1],
             Self::SocketAddressUnix => &symbols.px11_address_symbols[2],
+            Self::ResourceKindSocketListener => &symbols.px11_kind_symbols[0],
+            Self::ResourceKindSocketStream => &symbols.px11_kind_symbols[1],
         }
     }
 }

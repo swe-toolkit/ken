@@ -1022,6 +1022,7 @@ pub(crate) struct CheckedHostSpineV1 {
     pub px10_kind_symbols: [StableSymbol; 4],
     pub px10_exit_symbols: [StableSymbol; 2],
     pub px11_address_symbols: [StableSymbol; 3],
+    pub px11_kind_symbols: [StableSymbol; 2],
     /// Checked constructor for the parent write end of child stdin. Both take
     /// constructors share ProcessTakePipe but have different source arities.
     pub process_take_pipe_write_constructor: StableSymbol,
@@ -9660,6 +9661,8 @@ mod px7l_tests {
                 .map(|name| StableSymbol::constructor(&family("ResourceKind"), name)),
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| StableSymbol::constructor(&family("ChildExit"), name)),
+            px11_kind_symbols: ["SocketListener", "SocketStream"]
+                .map(|name| StableSymbol::constructor(&family("ResourceKind"), name)),
             px11_address_symbols: ["PrivateSocketIPv4", "PrivateSocketIPv6", "PrivateSocketUnix"]
                 .map(|name| StableSymbol::constructor(&family("SocketAddress"), name)),
             process_take_pipe_write_constructor: StableSymbol::constructor(
@@ -10135,6 +10138,7 @@ mod d1b_role_b_decoder_alignment {
             resource_kind_mapping: sentinel("resource_kind_mapping"),
             px10_kind_symbols: [0, 1, 2, 3].map(|i| sentinel(&format!("px10_kind_{i}"))),
             px10_exit_symbols: [0, 1].map(|i| sentinel(&format!("px10_exit_{i}"))),
+            px11_kind_symbols: [0, 1].map(|i| sentinel(&format!("px11_kind_{i}"))),
             px11_address_symbols: [0, 1, 2].map(|i| sentinel(&format!("px11_address_{i}"))),
             process_take_pipe_write_constructor: sentinel("take_stdin"),
             io_errors: (0..13)

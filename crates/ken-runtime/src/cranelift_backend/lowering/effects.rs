@@ -352,6 +352,7 @@ fn runtime_producible_constructors(
         px10_kind_symbols,
         px10_exit_symbols,
         px11_address_symbols,
+        px11_kind_symbols,
     } = symbols;
     // The checked ITree/Coproduct spine is constructed by the program; the
     // host never synthesizes Ret, Vis or InL as a response. Keep these three
@@ -434,6 +435,7 @@ fn runtime_producible_constructors(
     producible.extend(px10_kind_symbols.iter().cloned());
     producible.extend(px10_exit_symbols.iter().cloned());
     producible.extend(px11_address_symbols.iter().cloned());
+    producible.extend(px11_kind_symbols.iter().cloned());
     producible
 }
 
@@ -5103,6 +5105,20 @@ impl<'a> Lowering<'a> {
                                         wire.resource_kind_pipe_write as i64,
                                         SynthesizedFixedConstructorRole::ResourceKindPipeWrite,
                                         this.process_symbols.px10_kind_symbols[3].clone(),
+                                        Vec::new(), &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 7,
+                                        wire.resource_kind_socket_listener as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindSocketListener,
+                                        this.process_symbols.px11_kind_symbols[0].clone(),
+                                        Vec::new(), &seats,
+                                    )?,
+                                    this.synthesized_dynamic_alternative(
+                                        static_origin, node, 8,
+                                        wire.resource_kind_socket_stream as i64,
+                                        SynthesizedFixedConstructorRole::ResourceKindSocketStream,
+                                        this.process_symbols.px11_kind_symbols[1].clone(),
                                         Vec::new(), &seats,
                                     )?,
                                 ],

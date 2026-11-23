@@ -3758,6 +3758,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             N::nullary(R::ResourceKindChildProcess),
             N::nullary(R::ResourceKindPipeRead),
             N::nullary(R::ResourceKindPipeWrite),
+            N::nullary(R::ResourceKindSocketListener),
+            N::nullary(R::ResourceKindSocketStream),
         ]));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
@@ -12896,6 +12898,8 @@ mod tests {
                     R::ResourceKindChildProcess,
                     R::ResourceKindPipeRead,
                     R::ResourceKindPipeWrite,
+                    R::ResourceKindSocketListener,
+                    R::ResourceKindSocketStream,
                 ]
                     .into_iter()
                     .enumerate()
@@ -13534,6 +13538,8 @@ mod tests {
                 Fixed(R::ResourceKindChildProcess),
                 Fixed(R::ResourceKindPipeRead),
                 Fixed(R::ResourceKindPipeWrite),
+                Fixed(R::ResourceKindSocketListener),
+                Fixed(R::ResourceKindSocketStream),
             ],
         );
 

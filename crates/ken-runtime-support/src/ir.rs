@@ -299,6 +299,8 @@ runtime_host_spine_v1! {
     px11_address_ipv4,
     px11_address_ipv6,
     px11_address_unix,
+    px11_kind_listener,
+    px11_kind_stream,
 }
 
 /// The decoded, validated checked-runtime role record.

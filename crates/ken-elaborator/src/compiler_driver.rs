@@ -3302,6 +3302,7 @@ fn emit_native_program_preparation(
                 px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
                 px11_address_symbols: host_spine.px11_address_symbols.clone().map(|symbol| symbol.to_string()),
+                px11_kind_symbols: host_spine.px11_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -4461,6 +4462,10 @@ fn checked_host_spine_v1(
             resolve_id(prelude.px10_exit_ids[0])?,
             resolve_id(prelude.px10_exit_ids[1])?,
         ],
+        px11_kind_symbols: [
+            resolve_id(prelude.px11_kind_ids[0])?,
+            resolve_id(prelude.px11_kind_ids[1])?,
+        ],
         px11_address_symbols: [
             resolve_id(prelude.px11_address_ids[0])?,
             resolve_id(prelude.px11_address_ids[1])?,
@@ -4738,6 +4743,8 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.px11_address_symbols[0],
         &spine.px11_address_symbols[1],
         &spine.px11_address_symbols[2],
+        &spine.px11_kind_symbols[0],
+        &spine.px11_kind_symbols[1],
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());

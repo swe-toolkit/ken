@@ -197,6 +197,7 @@ fn selected_host_fixture() -> SelectedHostFixture {
         px10_kind_symbols: std::array::from_fn(|_| unused.clone()),
         px10_exit_symbols: std::array::from_fn(|_| unused.clone()),
         px11_address_symbols: std::array::from_fn(|_| unused.clone()),
+        px11_kind_symbols: std::array::from_fn(|_| unused.clone()),
         process_take_pipe_write_constructor: unused.clone(),
         bracket_finalizer_constructor: None,
         operations,

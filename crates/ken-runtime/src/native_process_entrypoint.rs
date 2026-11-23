@@ -95,6 +95,7 @@ pub struct NativeProcessSymbols {
     pub px10_kind_symbols: [RuntimeSymbol; 4],
     pub px10_exit_symbols: [RuntimeSymbol; 2],
     pub px11_address_symbols: [RuntimeSymbol; 3],
+    pub px11_kind_symbols: [RuntimeSymbol; 2],
 }
 
 impl NativeProcessSymbols {
@@ -206,6 +207,8 @@ impl NativeProcessSymbols {
                 .map(|name| format!("ctor:prelude::ResourceKind::{name}")),
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| format!("ctor:prelude::ChildExit::{name}")),
+            px11_kind_symbols: ["SocketListener", "SocketStream"]
+                .map(|name| format!("ctor:prelude::ResourceKind::{name}")),
             px11_address_symbols: ["PrivateSocketIPv4", "PrivateSocketIPv6", "PrivateSocketUnix"]
                 .map(|name| format!("ctor:prelude::SocketAddress::{name}")),
         }

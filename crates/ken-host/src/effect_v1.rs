@@ -457,6 +457,8 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_kind_child_process: u64,
     pub resource_kind_pipe_read: u64,
     pub resource_kind_pipe_write: u64,
+    pub resource_kind_socket_listener: u64,
+    pub resource_kind_socket_stream: u64,
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
 }
@@ -831,6 +833,8 @@ pub fn host_effect_wire_layout_v1(
         resource_kind_child_process: generated_binding("tag", "resource_kind.ChildProcess")?,
         resource_kind_pipe_read: generated_binding("tag", "resource_kind.PipeRead")?,
         resource_kind_pipe_write: generated_binding("tag", "resource_kind.PipeWrite")?,
+        resource_kind_socket_listener: generated_binding("tag", "resource_kind.SocketListener")?,
+        resource_kind_socket_stream: generated_binding("tag", "resource_kind.SocketStream")?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
         resource_error_mapping_limit: generated_binding("error", "resource.MappingLimit")?,
     })
