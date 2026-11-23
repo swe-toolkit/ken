@@ -20,7 +20,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-EXPR-POWER-CONGRUENCE §18;
 > SPEC-SYMBOLIC-ALGEBRA-EVAL-ABSENT-VARIABLE §19;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20;
-> SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE §21).**
+> SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE §21;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE §22).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -1731,3 +1732,55 @@ refuse in its index-2 arm; the evaluations are independently 9
 and 3. These finite checks test the boundary, not the generic
 quantifier or its trust delta; the assembled package test owes
 unchanged exact trusted-base identities as AC-T before a Decision.
+
+## 22. Substitution agrees when replacements agree on occurring variables
+
+> **Section 22 status: DRAFT v0
+> (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE).** Architect's AC-0 on
+> `9716dd74f` checked the generic theorem, its open client and the
+> derivation of `substitute_absent` in scratch. It added no `Axiom` and
+> preserved the exact trusted `GlobalId` set (114 → 114). These scratch
+> results do not establish assembled AC-T, official conformance, CI,
+> publication, landing or measured landed trust.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export one public
+Transparent checked theorem directly after `eval_coincidence` and
+before `deriv_substitute`. Its exact public type is:
+
+```ken
+pub theorem substitute_coincidence
+      (e : Expr) (s : Nat → Expr) (t : Nat → Expr)
+    : ((w : Nat) → Equal Bool (occurs w e) True → Equal Expr (s w) (t w))
+      → Equal Expr (substitute s e) (substitute t e)
+```
+
+The sole premise requires structural equality of the replacement
+expressions at every variable that occurs syntactically in `e`. The
+substitutions may disagree at any number of other indices. The result
+is structural `Equal Expr`, not equal evaluation under some environment
+or equality of the substitution functions. No converse is asserted.
+The premise follows the colon so induction on the written `e` refines
+it; its occurrence test is spelled `Equal Bool (occurs w e) True`.
+
+Constants are unchanged under both substitutions; at `EVar v` the
+agreement premise supplies the result because `v` occurs. In sums and
+products, an occurrence in either operand is an occurrence in the whole
+expression, so agreement restricts to each operand. The two recursive
+equalities then combine by the existing constructor congruence proofs.
+No new helper, import or trusted assumption is required. The roster grows
+from forty to **forty-one** checked public theorems; the fifteen public
+operations and all §§1–21 operation and law types stay unchanged.
+
+Section 20's `substitute_absent` follows by taking `t = EVar`: when `v`
+is absent, every occurring `w` differs from `v`, so agreement off `v`
+supplies the premise. Section 4's `substitute_var` then closes
+`substitute EVar e = e`. The existing `substitute_absent` export and its
+own checked proof are retained.
+
+The separate seed uses substitutions that differ at indices 1 and 2
+but agree at index 0. For `EAdd (EVar 0) (EConst 2)`, agreement suffices.
+Changing only the variable to index 1 makes the same attempted agreement
+proof refuse: one substitution gives `EAdd (EConst 7) (EConst 2)` and the
+other leaves `EAdd (EVar 1) (EConst 2)`. These closed cases test the
+premise's boundary; they do not replace the generic proof or assembled
+AC-T.
