@@ -1,15 +1,25 @@
 # Natural-point orientation
 
 Three natural points determine an exact turn by comparing two cross sums.
-The six public laws include `orient_shared_x` and `orient_shared_y`: each
+The seven public laws include `orient_shared_x` and `orient_shared_y`: each
 returns `Eq` when all three points share the named coordinate. They do not
 state a general collinearity theorem for arbitrary distinct points.
+`orient_translate` preserves the turn when the same natural offset is added
+to all three points on each axis. It does not apply to moving just one point.
 
 ## Definition
 
 Both shared-axis proofs turn one cross sum into the other with the private
 `orient_reorder`, a swap of the inner sum, and commutativity of each product.
 The checked `compare::self_eq` law closes the resulting turn.
+
+The translation proof inducts on the horizontal offset and then on the
+vertical offset. Moving every point one unit horizontally adds the sum of
+the three y coordinates to each cross sum. Moving every point one unit
+vertically adds the sum of the three x coordinates to each cross sum.
+Private helpers use distributivity and rearrange the terms to expose the
+common summand; [`compare::add_cancel_r`](../../Data/Numeric/Nat/Order.ken.md)
+then cancels it from the comparison. No signed cross product is needed.
 
 ```ken
 import Algorithm.Geometry.NatBox (Point, MkPoint)
@@ -18,7 +28,7 @@ import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_result_flip)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Arithmetic (add, mul)
+import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
 
 import Data.Numeric.Nat.Order (compare)
 
@@ -427,6 +437,242 @@ pub theorem orient_shared_y
                 ((proof comm for mul) xa y)))))))
     ((proof self_eq for compare) (add (add (mul y xb) (mul y xc)) (mul y xa))))
 
+pub theorem orient_translate
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (dx : Nat) (dy : Nat)
+    : Equal OrdResult
+        (orient
+          (MkPoint (add xa dx) (add ya dy))
+          (MkPoint (add xb dx) (add yb dy))
+          (MkPoint (add xc dx) (add yc dy)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  match dx {
+    Zero ↦ orient_translate_y xa ya xb yb xc yc dy;
+    Suc k ↦
+      trans
+        OrdResult
+        (orient
+          (MkPoint (Suc (add xa k)) (add ya dy))
+          (MkPoint (Suc (add xb k)) (add yb dy))
+          (MkPoint (Suc (add xc k)) (add yc dy)))
+        (orient
+          (MkPoint (add xa k) (add ya dy))
+          (MkPoint (add xb k) (add yb dy))
+          (MkPoint (add xc k) (add yc dy)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+        (orient_step_x (add xa k) (add ya dy) (add xb k) (add yb dy) (add xc k) (add yc dy))
+        (orient_translate xa ya xb yb xc yc k dy)
+  }
+
+theorem orient_translate_y
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (dy : Nat)
+    : Equal OrdResult
+        (orient (MkPoint xa (add ya dy)) (MkPoint xb (add yb dy)) (MkPoint xc (add yc dy)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  match dy {
+    Zero ↦ Refl;
+    Suc k ↦
+      trans
+        OrdResult
+        (orient
+          (MkPoint xa (Suc (add ya k)))
+          (MkPoint xb (Suc (add yb k)))
+          (MkPoint xc (Suc (add yc k))))
+        (orient (MkPoint xa (add ya k)) (MkPoint xb (add yb k)) (MkPoint xc (add yc k)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+        (orient_step_y xa (add ya k) xb (add yb k) xc (add yc k))
+        (orient_translate_y xa ya xb yb xc yc k)
+  }
+
+theorem orient_step_x
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint (Suc xa) ya) (MkPoint (Suc xb) yb) (MkPoint (Suc xc) yc))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  orient_common_addend
+    (add (add (mul (Suc xa) yb) (mul (Suc xb) yc)) (mul (Suc xc) ya))
+    (add (add (mul ya (Suc xb)) (mul yb (Suc xc))) (mul yc (Suc xa)))
+    (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+    (add (add (mul ya xb) (mul yb xc)) (mul yc xa))
+    (add (add yb yc) ya)
+    (trans
+      Nat
+      (add (add (mul (Suc xa) yb) (mul (Suc xb) yc)) (mul (Suc xc) ya))
+      (add (add (add (mul xa yb) yb) (add (mul xb yc) yc)) (add (mul xc ya) ya))
+      (add (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (add (add yb yc) ya))
+      (orient_sum_congr
+        (mul (Suc xa) yb)
+        (add (mul xa yb) yb)
+        (mul (Suc xb) yc)
+        (add (mul xb yc) yc)
+        (mul (Suc xc) ya)
+        (add (mul xc ya) ya)
+        (orient_shift_product xa yb)
+        (orient_shift_product xb yc)
+        (orient_shift_product xc ya))
+      (orient_interleave (mul xa yb) yb (mul xb yc) yc (mul xc ya) ya))
+    (trans
+      Nat
+      (add (add (mul ya (Suc xb)) (mul yb (Suc xc))) (mul yc (Suc xa)))
+      (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (add (add ya yb) yc))
+      (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (add (add yb yc) ya))
+      (orient_interleave (mul ya xb) ya (mul yb xc) yb (mul yc xa) yc)
+      (cong
+        Nat
+        Nat
+        (add (add ya yb) yc)
+        (add (add yb yc) ya)
+        (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)))
+        (sym Nat (add (add yb yc) ya) (add (add ya yb) yc) (orient_rotate_sum ya yb yc))))
+
+theorem orient_step_y
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint xa (Suc ya)) (MkPoint xb (Suc yb)) (MkPoint xc (Suc yc)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  orient_common_addend
+    (add (add (mul xa (Suc yb)) (mul xb (Suc yc))) (mul xc (Suc ya)))
+    (add (add (mul (Suc ya) xb) (mul (Suc yb) xc)) (mul (Suc yc) xa))
+    (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+    (add (add (mul ya xb) (mul yb xc)) (mul yc xa))
+    (add (add xa xb) xc)
+    (orient_interleave (mul xa yb) xa (mul xb yc) xb (mul xc ya) xc)
+    (trans
+      Nat
+      (add (add (mul (Suc ya) xb) (mul (Suc yb) xc)) (mul (Suc yc) xa))
+      (add (add (add (mul ya xb) xb) (add (mul yb xc) xc)) (add (mul yc xa) xa))
+      (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (add (add xa xb) xc))
+      (orient_sum_congr
+        (mul (Suc ya) xb)
+        (add (mul ya xb) xb)
+        (mul (Suc yb) xc)
+        (add (mul yb xc) xc)
+        (mul (Suc yc) xa)
+        (add (mul yc xa) xa)
+        (orient_shift_product ya xb)
+        (orient_shift_product yb xc)
+        (orient_shift_product yc xa))
+      (trans
+        Nat
+        (add (add (add (mul ya xb) xb) (add (mul yb xc) xc)) (add (mul yc xa) xa))
+        (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (add (add xb xc) xa))
+        (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (add (add xa xb) xc))
+        (orient_interleave (mul ya xb) xb (mul yb xc) xc (mul yc xa) xa)
+        (cong
+          Nat
+          Nat
+          (add (add xb xc) xa)
+          (add (add xa xb) xc)
+          (add (add (add (mul ya xb) (mul yb xc)) (mul yc xa)))
+          (orient_rotate_sum xa xb xc))))
+
+theorem orient_common_addend
+      (l2 : Nat)
+      (r2 : Nat)
+      (l : Nat)
+      (r : Nat)
+      (s : Nat)
+      (left : Equal Nat l2 (add l s))
+      (right : Equal Nat r2 (add r s))
+    : Equal OrdResult (compare l2 r2) (compare l r) =
+  trans
+    OrdResult
+    (compare l2 r2)
+    (compare (add l s) r2)
+    (compare l r)
+    (cong Nat OrdResult l2 (add l s) (λu. (compare u r2)) left)
+    (trans
+      OrdResult
+      (compare (add l s) r2)
+      (compare (add l s) (add r s))
+      (compare l r)
+      (cong Nat OrdResult r2 (add r s) (compare (add l s)) right)
+      ((proof add_cancel_r for compare) l r s))
+
+theorem orient_shift_product (a : Nat) (b : Nat) : Equal Nat (mul (Suc a) b) (add (mul a b) b) =
+  trans
+    Nat
+    (mul (Suc a) b)
+    (add (mul a b) (mul (Suc Zero) b))
+    (add (mul a b) b)
+    (mul_add_distrib_l a (Suc Zero) b)
+    (cong Nat Nat (mul (Suc Zero) b) b (add (mul a b)) ((proof one_l for mul) b))
+
+theorem orient_sum_congr
+      (a : Nat)
+      (a2 : Nat)
+      (b : Nat)
+      (b2 : Nat)
+      (c : Nat)
+      (c2 : Nat)
+      (p : Equal Nat a a2)
+      (q : Equal Nat b b2)
+      (r : Equal Nat c c2)
+    : Equal Nat (add (add a b) c) (add (add a2 b2) c2) =
+  trans
+    Nat
+    (add (add a b) c)
+    (add (add a2 b) c)
+    (add (add a2 b2) c2)
+    (cong Nat Nat a a2 (λu. (add (add u b) c)) p)
+    (trans
+      Nat
+      (add (add a2 b) c)
+      (add (add a2 b2) c)
+      (add (add a2 b2) c2)
+      (cong Nat Nat b b2 (λu. (add (add a2 u) c)) q)
+      (cong Nat Nat c c2 (add (add a2 b2)) r))
+
+theorem orient_interleave
+      (a : Nat) (x : Nat) (b : Nat) (y : Nat) (c : Nat) (z : Nat)
+    : Equal Nat
+        (add (add (add a x) (add b y)) (add c z))
+        (add (add (add a b) c) (add (add x y) z)) =
+  trans
+    Nat
+    (add (add (add a x) (add b y)) (add c z))
+    (add (add (add a b) (add x y)) (add c z))
+    (add (add (add a b) c) (add (add x y) z))
+    (cong
+      Nat
+      Nat
+      (add (add a x) (add b y))
+      (add (add a b) (add x y))
+      (λu. (add u (add c z)))
+      (orient_swap4 a x b y))
+    (orient_swap4 (add a b) (add x y) c z)
+
+theorem orient_swap4
+      (a : Nat) (x : Nat) (b : Nat) (y : Nat)
+    : Equal Nat (add (add a x) (add b y)) (add (add a b) (add x y)) =
+  trans
+    Nat
+    (add (add a x) (add b y))
+    (add (add (add a x) b) y)
+    (add (add a b) (add x y))
+    ((proof assoc for add) (add a x) b y)
+    (trans
+      Nat
+      (add (add (add a x) b) y)
+      (add (add (add a b) x) y)
+      (add (add a b) (add x y))
+      (cong Nat Nat (add (add a x) b) (add (add a b) x) (λu. (add u y)) (orient_reorder a x b))
+      (sym
+        Nat
+        (add (add a b) (add x y))
+        (add (add (add a b) x) y)
+        ((proof assoc for add) (add a b) x y)))
+
+theorem orient_rotate_sum
+      (p : Nat) (q : Nat) (r : Nat)
+    : Equal Nat (add (add q r) p) (add (add p q) r) =
+  trans
+    Nat
+    (add (add q r) p)
+    (add p (add q r))
+    (add (add p q) r)
+    ((proof comm for add) (add q r) p)
+    ((proof assoc for add) p q r)
+
 theorem orient_reorder
       (p : Nat) (q : Nat) (r : Nat)
     : Equal Nat (add (add p q) r) (add (add p r) q) =
@@ -444,3 +690,16 @@ theorem orient_reorder
       (cong Nat Nat (add q r) (add r q) (add p) ((proof comm for add) q r))
       ((proof assoc for add) p r q)))
 ```
+
+## Trust & derivation
+
+`orient_translate` realizes the shared-translation law in the
+[geometry spec](../../../../spec/50-stdlib/67-geometry.md) §21. It consumes the
+checked Nat Order cancellation proof and adds no trusted declaration. The
+translation steps and sum rearrangements are private; the public law states
+only equality of the two orientation results.
+
+The package tests check the open law, exact trusted identity equality, and
+closed cases. For `(0,0), (1,0), (0,1)`, adding `(2,3)` to every point
+preserves `Gt`. Moving only the first point instead changes the cross sums
+to `1` and `5`, giving `Lt`.

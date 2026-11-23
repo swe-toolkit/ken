@@ -51,6 +51,10 @@ The paired-successor branches reuse those premises at smaller
 arguments; a positive bound against `Zero` contradicts its premise.
 `sub` is saturating natural-number subtraction; `compare` returns the
 three-way result `OrdResult` from `Core.Logic.OrdResult`.
+`compare::add_cancel_r` says that adding the same right summand to both
+operands leaves this result unchanged. Induction on the summand works
+because `add` recurses on the right and comparing two successors reduces
+to comparing their predecessors.
 Strict `lt_nat` recurses on its right argument so the checked
 successor-order bridge has the same reduction order:
 
@@ -545,6 +549,14 @@ pub proof self_eq for compare (n : Nat) : Equal OrdResult (compare n n) Eq =
   match n {
     Zero ↦ Proved;
     Suc n2 ↦ proof self_eq for compare n2
+  }
+
+pub proof add_cancel_r for compare
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal OrdResult (compare (add a c) (add b c)) (compare a b) =
+  match c {
+    Zero ↦ Refl;
+    Suc c2 ↦ proof add_cancel_r for compare a b c2
   }
 
 proof from_lt for compare
@@ -1211,8 +1223,8 @@ argument and its bridge exposes the canonical successor relation.
    the three `compare` agreements; the eight inductive `sub` proofs,
    including `sub::add_cancel`, `sub::leq_left`, `sub::left_mono`, and
    `sub::right_antitone`; `mul_sub_distrib_l` and `mul_sub_distrib_r`;
-   and the public `compare::swap` law. `compare` returns the canonical
-   `Core.Logic.OrdResult` identity.
+   and `compare::swap`, `compare::self_eq`, and `compare::add_cancel_r`.
+   `compare` returns the canonical `Core.Logic.OrdResult` identity.
 2. **Source map.**
 
    | Task | Section |
@@ -1250,7 +1262,9 @@ argument and its bridge exposes the canonical successor relation.
    comparison operations and strict-order proofs, including subtraction's
    checked cancellation and monotonicity laws. Geometry and gcd clients
    reuse these laws and the multiplication/subtraction distribution theorems
-   instead of carrying private copies. Consumers of exact rational values
+   instead of carrying private copies. Natural-point orientation uses
+   `compare::add_cancel_r` to cancel the common term in both cross sums
+   after a unit translation. Consumers of exact rational values
    can import both positive-scaling order directions without constructing a
    new `Ord Nat`.
 7. **Validation evidence.** Deferred-boundary and compatibility-root identity
