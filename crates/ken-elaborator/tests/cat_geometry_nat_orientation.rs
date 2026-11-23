@@ -315,19 +315,31 @@ fn orient_reorder_stays_private_to_the_checked_package() {
 
 /// SOURCE: spec/50-stdlib/67-geometry.md §21, Architect AC-0.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: a fresh client cannot selectively import `orient_step_x`.
-/// CLAIMED: the unit shift is internal proof machinery, not a public law.
-/// THE GAP: this exercises one representative helper, not all private names.
-/// Unrelated exports stay green; exporting the unit step fails.
+/// MEASURED: each of the nine translation helpers refuses its own selective
+/// import with its exact qualified UnboundName after a fresh provider load.
+/// CLAIMED: the translation proof steps are not public laws.
+/// THE GAP: this checks selective imports, not how the proof uses the helpers.
+/// Unrelated exports or additional private helpers stay green; making any
+/// of these helpers selectively importable fails at its own probe.
 #[test]
-fn orient_step_x_stays_private_to_the_checked_package() {
-    match loaded_orientation()
-        .elaborate_file("import Algorithm.Geometry.NatOrientation (orient_step_x)")
-    {
-        Err(ElabError::UnboundName { name, .. }) => {
-            assert_eq!(name, format!("{GEOMETRY}.orient_step_x"))
+fn translation_helpers_stay_private_to_the_checked_package() {
+    for helper in [
+        "orient_translate_y",
+        "orient_step_x",
+        "orient_step_y",
+        "orient_common_addend",
+        "orient_shift_product",
+        "orient_sum_congr",
+        "orient_interleave",
+        "orient_swap4",
+        "orient_rotate_sum",
+    ] {
+        match loaded_orientation().elaborate_file(&format!("import {GEOMETRY} ({helper})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{GEOMETRY}.{helper}"), "import of {helper}");
+            }
+            other => panic!("{helper} must refuse selective import: {other:?}"),
         }
-        other => panic!("orient_step_x must refuse selective import: {other:?}"),
     }
 }
 
