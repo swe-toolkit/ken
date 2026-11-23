@@ -293,6 +293,7 @@ runtime_host_spine_v1! {
     px10_kind_pipe_write,
     px10_exit_exited,
     px10_exit_signaled,
+    option_none,
 }
 
 /// The decoded, validated checked-runtime role record.

@@ -557,6 +557,7 @@ fn linux_raw_facts() -> Vec<(&'static str, u64)> {
         ("O_NOFOLLOW", general::O_NOFOLLOW.into()),
         ("O_CLOEXEC", general::O_CLOEXEC.into()),
         ("AT_REMOVEDIR", general::AT_REMOVEDIR.into()),
+        ("AT_EMPTY_PATH", general::AT_EMPTY_PATH.into()),
         (
             "MODE_FILE_CREATE",
             (general::S_IRUSR
@@ -577,6 +578,7 @@ fn linux_raw_facts() -> Vec<(&'static str, u64)> {
         ("SYS_RENAMEAT", general::__NR_renameat.into()),
         ("SYS_READLINKAT", general::__NR_readlinkat.into()),
         ("SYS_FCHMOD", general::__NR_fchmod.into()),
+        ("SYS_STATX", general::__NR_statx.into()),
         ("SYS_MMAP", general::__NR_mmap.into()),
         ("SYS_MUNMAP", general::__NR_munmap.into()),
         ("ERRNO_ENOENT", errno::ENOENT.into()),

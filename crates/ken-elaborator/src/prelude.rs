@@ -250,6 +250,7 @@ canonical_runtime_roles! {
     create_new => "CreateNew",
     create_or_truncate => "CreateOrTruncate",
     create_or_keep => "CreateOrKeep",
+    option_none => "None",
 }
 
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`
@@ -1065,7 +1066,7 @@ fn register_prelude_inductives(elab: &mut ElabEnv) -> Result<(), ElabError> {
         .map_err(|e| ElabError::Internal(format!("prelude FileError failed: {}", e)))?;
     elab.elaborate_decl("data FileKind = KFile | KDirectory | KSymlink | KOther")
         .map_err(|e| ElabError::Internal(format!("prelude FileKind failed: {}", e)))?;
-    elab.elaborate_decl("data FileMetadata = MkFileMetadata Int FileKind")
+    elab.elaborate_decl("data FileMetadata = MkFileMetadata Int FileKind (Option Int) (Option Int) Int Int (Option Int) (Option Instant) (Option Instant) (Option Instant) (Option Instant)")
         .map_err(|e| ElabError::Internal(format!("prelude FileMetadata failed: {}", e)))?;
     elab.elaborate_decl("data DirEntry = MkDirEntry Bytes FileKind")
         .map_err(|e| ElabError::Internal(format!("prelude DirEntry failed: {}", e)))?;

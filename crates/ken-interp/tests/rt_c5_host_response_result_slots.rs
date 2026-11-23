@@ -375,10 +375,10 @@ impl Fixture {
                 } else {
                     100
                 };
-                self.construct(
-                    "FileMetadata.MkFileMetadata",
-                    [EvalVal::Int(size), args[1].clone()],
-                )
+                assert_eq!(args.len(), 11, "complete FileMetadata payload");
+                let mut different = args.to_vec();
+                different[0] = EvalVal::Int(size);
+                self.construct("FileMetadata.MkFileMetadata", different)
             }
             "(List DirEntry)" => {
                 assert!(

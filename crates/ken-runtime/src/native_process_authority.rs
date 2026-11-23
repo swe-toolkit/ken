@@ -623,6 +623,7 @@ fn native_process_symbols_from_record(
         itree_vis: spine.vis.clone(),
         coproduct_in_l: spine.in_l.clone(),
         option_some: spine.option_some.clone(),
+        option_none: spine.option_none.clone(),
         file_error: spine.file_error.clone(),
         file_operation_read: spine.file_operation_read.clone(),
         file_operation_write: spine.file_operation_write.clone(),

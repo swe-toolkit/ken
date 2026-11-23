@@ -371,14 +371,60 @@ pub fn run_bound_process_effect_observation_with_region_end(
     (ken_host::EffectObservation, Option<ken_host::ActivationRegionEndV1>),
     NativeEffectRunErrorV1,
 > {
+    run_bound_process_observation(artifact, options, stdin, None)
+}
+
+/// Run a metadata-only witness without reading directory entries or file
+/// contents. Both can perturb the very timestamps the witness is measuring.
+/// The caller supplies scratch space outside the observed root; no filesystem
+/// delta is asserted on this route.
+pub fn run_bound_process_metadata_observation(
+    artifact: &BoundProcessExecutableArtifact,
+    options: &NativeEffectRunOptionsV1,
+    scratch: &std::path::Path,
+) -> Result<ken_host::EffectObservation, NativeEffectRunErrorV1> {
+    let (observation, _) = run_bound_process_observation(artifact, options, &[], Some(scratch))?;
+    if observation.effect_trace.iter().any(|event| {
+        !matches!(
+            event.request,
+            ken_host::CanonicalRequestV1::FsMetadata { .. }
+                | ken_host::CanonicalRequestV1::FsOpen {
+                    mode: ken_host::FsOpenModeV1::Metadata,
+                    ..
+                }
+                | ken_host::CanonicalRequestV1::FsHandleMetadata
+                | ken_host::CanonicalRequestV1::ResourceRelease
+        )
+    }) {
+        return Err(NativeEffectRunErrorV1::ObservationBoundaryUnavailable);
+    }
+    Ok(observation)
+}
+
+fn run_bound_process_observation(
+    artifact: &BoundProcessExecutableArtifact,
+    options: &NativeEffectRunOptionsV1,
+    stdin: &[u8],
+    metadata_scratch: Option<&std::path::Path>,
+) -> Result<
+    (
+        ken_host::EffectObservation,
+        Option<ken_host::ActivationRegionEndV1>,
+    ),
+    NativeEffectRunErrorV1,
+> {
     if artifact.trap_catalog.runtime_artifact != artifact.runtime_artifact {
         return Err(NativeEffectRunErrorV1::BindingMismatch);
     }
     let cwd = fs::canonicalize(&options.cwd)?;
-    let observation_root = cwd
-        .parent()
-        .ok_or(NativeEffectRunErrorV1::ObservationBoundaryUnavailable)?;
-    let before = snapshot_effect_root_v1(&cwd)?;
+    let (observation_root, before) = match metadata_scratch {
+        Some(scratch) => (scratch, None),
+        None => (
+            cwd.parent()
+                .ok_or(NativeEffectRunErrorV1::ObservationBoundaryUnavailable)?,
+            Some(snapshot_effect_root_v1(&cwd)?),
+        ),
+    };
     let trace_path = observation_root.join(format!(
         "ken-effect-observation-{}-{}",
         std::process::id(),
@@ -407,7 +453,10 @@ pub fn run_bound_process_effect_observation_with_region_end(
         .output();
     let _ = fs::remove_file(&stdin_path);
     let mut output = output?;
-    let after = snapshot_effect_root_v1(&cwd)?;
+    let filesystem_delta = match before {
+        Some(before) => filesystem_delta_v1(&before, &snapshot_effect_root_v1(&cwd)?),
+        None => Vec::new(),
+    };
     let trace_bytes = fs::read(&trace_path)?;
     let _ = fs::remove_file(&trace_path);
     let trace = ken_host::decode_linked_effect_trace(&trace_bytes)
@@ -481,7 +530,7 @@ pub fn run_bound_process_effect_observation_with_region_end(
         ken_host::EffectObservation {
             stdout: output.stdout,
             stderr: output.stderr,
-            filesystem_delta: filesystem_delta_v1(&before, &after),
+            filesystem_delta,
             terminal_error,
             effect_trace: trace.effect_trace,
             terminal_exit: trace.terminal_exit,

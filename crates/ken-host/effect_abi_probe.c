@@ -81,12 +81,27 @@ struct ResourceErrorReplyV1 {
     uint64_t expected_kind;
     uint64_t actual_kind;
 };
+struct FileMetadataReplyV1 {
+    uint64_t present;
+    uint64_t size;
+    uint64_t kind;
+    uint64_t mode;
+    uint64_t links;
+    uint64_t device_major;
+    uint64_t device_minor;
+    uint64_t inode;
+    uint8_t modified[16];
+    uint8_t changed[16];
+    uint8_t accessed[16];
+    uint8_t born[16];
+};
 struct HostReplyV1 {
     uint64_t tag;
     uint64_t detail;
     struct SliceV1 bytes;
     struct ResourceErrorReplyV1 resource_error;
     uint64_t effective_request;
+    struct FileMetadataReplyV1 metadata;
 };
 
 #define FACT_SIZE(T) printf("SIZE_%s=%zu\n", #T, sizeof(struct T))
@@ -146,6 +161,19 @@ int main(void) {
     FACT_SIZE(NetShutdownRequestV1); FACT_ALIGN(NetShutdownRequestV1); FACT_OFFSET(NetShutdownRequestV1, stream); FACT_OFFSET(NetShutdownRequestV1, how);
     FACT_SIZE(NetLocalAddressRequestV1); FACT_ALIGN(NetLocalAddressRequestV1); FACT_OFFSET(NetLocalAddressRequestV1, target);
     FACT_SIZE(ResourceErrorReplyV1); FACT_ALIGN(ResourceErrorReplyV1); FACT_OFFSET(ResourceErrorReplyV1, schema_version); FACT_OFFSET(ResourceErrorReplyV1, resource_kind); FACT_OFFSET(ResourceErrorReplyV1, identity); FACT_OFFSET(ResourceErrorReplyV1, io); FACT_OFFSET(ResourceErrorReplyV1, required); FACT_OFFSET(ResourceErrorReplyV1, held); FACT_OFFSET(ResourceErrorReplyV1, expected_kind); FACT_OFFSET(ResourceErrorReplyV1, actual_kind);
-    FACT_SIZE(HostReplyV1); FACT_ALIGN(HostReplyV1); FACT_OFFSET(HostReplyV1, tag); FACT_OFFSET(HostReplyV1, detail); FACT_OFFSET(HostReplyV1, bytes); FACT_OFFSET(HostReplyV1, resource_error); FACT_OFFSET(HostReplyV1, effective_request);
+    FACT_SIZE(FileMetadataReplyV1); FACT_ALIGN(FileMetadataReplyV1);
+    FACT_OFFSET(FileMetadataReplyV1, present);
+    FACT_OFFSET(FileMetadataReplyV1, size);
+    FACT_OFFSET(FileMetadataReplyV1, kind);
+    FACT_OFFSET(FileMetadataReplyV1, mode);
+    FACT_OFFSET(FileMetadataReplyV1, links);
+    FACT_OFFSET(FileMetadataReplyV1, device_major);
+    FACT_OFFSET(FileMetadataReplyV1, device_minor);
+    FACT_OFFSET(FileMetadataReplyV1, inode);
+    FACT_OFFSET(FileMetadataReplyV1, modified);
+    FACT_OFFSET(FileMetadataReplyV1, changed);
+    FACT_OFFSET(FileMetadataReplyV1, accessed);
+    FACT_OFFSET(FileMetadataReplyV1, born);
+    FACT_SIZE(HostReplyV1); FACT_ALIGN(HostReplyV1); FACT_OFFSET(HostReplyV1, tag); FACT_OFFSET(HostReplyV1, detail); FACT_OFFSET(HostReplyV1, bytes); FACT_OFFSET(HostReplyV1, resource_error); FACT_OFFSET(HostReplyV1, effective_request); FACT_OFFSET(HostReplyV1, metadata);
     return 0;
 }

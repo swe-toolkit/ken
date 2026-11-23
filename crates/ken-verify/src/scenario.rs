@@ -132,6 +132,7 @@ pub struct CanonicalDifferentialRun {
     artifact: BoundProcessExecutableArtifact,
     plan_hash: u64,
     roots: TwinRealRoots,
+    shared_metadata_root: Option<std::path::PathBuf>,
     interpreter_wall_window: WallClockWindow,
     native_wall_window: WallClockWindow,
 }
@@ -262,6 +263,15 @@ impl std::error::Error for FsAppendFileDifferentialError {}
 pub enum FsMetadataField {
     Size,
     Kind,
+    Mode,
+    Links,
+    DeviceMajor,
+    DeviceMinor,
+    Inode,
+    Modified,
+    Changed,
+    Accessed,
+    Born,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -452,11 +462,18 @@ impl CanonicalDifferentialRun {
     ) -> Result<(), FsMetadataDifferentialError> {
         let interpreter_expected = expected_fs_metadata(
             "interpreter",
-            self.roots.interpreter(),
+            self.shared_metadata_root
+                .as_deref()
+                .unwrap_or(self.roots.interpreter()),
             paths,
         )?;
-        let native_expected =
-            expected_fs_metadata("native", self.roots.native(), paths)?;
+        let native_expected = expected_fs_metadata(
+            "native",
+            self.shared_metadata_root
+                .as_deref()
+                .unwrap_or(self.roots.native()),
+            paths,
+        )?;
         compare_fs_metadata_observations(
             &self.interpreter,
             &self.native,
@@ -652,14 +669,30 @@ pub fn run_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
 // measured headroom without depending on ambient `RUST_MIN_STACK`.
 const SCENARIO_COMPILER_STACK_BYTES: usize = 8 * 1024 * 1024;
 
-fn execute_scenario(
+fn execute_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, HarnessError> {
+    execute_scenario_with_roots(scenario, None)
+}
+
+// Read-only metadata witnesses use the same inode in both lanes. Snapshots
+// read contents and can change atime; do not take them in this route.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy)]
+enum SharedMetadataRoot<'a> {
+    Fixture,
+    Existing(&'a std::path::Path),
+}
+
+fn execute_scenario_with_roots(
     scenario: &Scenario,
+    shared: Option<SharedMetadataRoot<'_>>,
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     std::thread::scope(|scope| {
         std::thread::Builder::new()
             .name("ken-verify-scenario-compiler".to_string())
             .stack_size(SCENARIO_COMPILER_STACK_BYTES)
-            .spawn_scoped(scope, || execute_scenario_on_compiler_stack(scenario))
+            .spawn_scoped(scope, || {
+                execute_scenario_on_compiler_stack(scenario, shared)
+            })
             .expect("the stated scenario compiler stack must spawn")
             .join()
             .unwrap_or_else(|payload| std::panic::resume_unwind(payload))
@@ -668,6 +701,7 @@ fn execute_scenario(
 
 fn execute_scenario_on_compiler_stack(
     scenario: &Scenario,
+    shared: Option<SharedMetadataRoot<'_>>,
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
     let roots = TwinRealRoots::create(&scenario.initial_filesystem)?;
@@ -684,12 +718,25 @@ fn execute_scenario_on_compiler_stack(
     let argv0 = raw_path_bytes(&build.artifact.executable_path)?;
     let mut arguments = vec![argv0];
     arguments.extend(scenario.process_input.arguments.clone());
-    let cwd = raw_path_bytes(roots.native())?;
+    let shared_root = shared.map(|choice| match choice {
+        SharedMetadataRoot::Fixture => roots.interpreter().to_path_buf(),
+        SharedMetadataRoot::Existing(path) => path.to_path_buf(),
+    });
+    let interpreter_root = shared_root.as_deref().unwrap_or(roots.interpreter());
+    let native_root = shared_root.as_deref().unwrap_or(roots.native());
+    let cwd = raw_path_bytes(native_root)?;
 
-    let interpreter_before = roots.snapshot_interpreter()?;
-    let native_before = roots.snapshot_native()?;
+    let observe_root = |path| {
+        if shared.is_none() {
+            crate::filesystem::snapshot_root(path).map_err(HarnessError::TwinRoots)
+        } else {
+            Ok(Default::default())
+        }
+    };
+    let interpreter_before = observe_root(interpreter_root)?;
+    let native_before = observe_root(native_root)?;
     let mut host = ScriptedPosixHost::new_scoped(
-        roots.interpreter(),
+        interpreter_root,
         scenario.ambient.clone(),
         scenario.program_caps.fs_authority,
         &scenario.program_caps.relative_root,
@@ -710,7 +757,7 @@ fn execute_scenario_on_compiler_stack(
     )
     .map_err(|error| HarnessError::Interpreter(format!("{error:?}")))?;
     let interpreter_window_end = wall_clock_nanoseconds();
-    let interpreter_after = roots.snapshot_interpreter()?;
+    let interpreter_after = observe_root(interpreter_root)?;
     host.finish_assertions()
         .map_err(HarnessError::Interpreter)?;
     if !interpreter.filesystem_delta.is_empty() {
@@ -739,18 +786,26 @@ fn execute_scenario_on_compiler_stack(
             .iter()
             .map(|(key, value)| Ok((raw_os_string(key)?, raw_os_string(value)?)))
             .collect::<Result<Vec<_>, HarnessError>>()?,
-        cwd: roots.native().to_path_buf(),
+        cwd: native_root.to_path_buf(),
         plan_hash: build.plan_transport_hash,
     };
     let native_window_start = wall_clock_nanoseconds();
-    let native = ken_runtime::run_bound_process_effect_observation_with_stdin(
-        &build.artifact,
-        &options,
-        &scenario.ambient.stdin,
-    )
+    let native = if shared.is_some() {
+        ken_runtime::run_bound_process_metadata_observation(
+            &build.artifact,
+            &options,
+            roots.artifacts(),
+        )
+    } else {
+        ken_runtime::run_bound_process_effect_observation_with_stdin(
+            &build.artifact,
+            &options,
+            &scenario.ambient.stdin,
+        )
+    }
     .map_err(HarnessError::NativeRun)?;
     let native_window_end = wall_clock_nanoseconds();
-    let native_after = roots.snapshot_native()?;
+    let native_after = observe_root(native_root)?;
     let native_actions = LaneActionEvidence {
         root_before: native_before,
         root_after: native_after,
@@ -770,6 +825,7 @@ fn execute_scenario_on_compiler_stack(
         artifact: build.artifact,
         plan_hash: build.plan_transport_hash,
         roots,
+        shared_metadata_root: shared_root,
         interpreter_wall_window: WallClockWindow {
             start_nanoseconds: interpreter_window_start,
             end_nanoseconds: interpreter_window_end,
@@ -1161,28 +1217,32 @@ fn validate_fs_metadata_observation(
                 reason: "event did not return FileMetadata".to_string(),
             });
         };
-        if actual.size != expected.size {
-            return Err(FsMetadataDifferentialError::Field {
-                lane,
-                event: index,
-                field: FsMetadataField::Size,
-                reason: format!(
-                    "expected {}, observed {}",
-                    expected.size, actual.size
-                ),
-            });
+        macro_rules! exact_field {
+            ($field:ident, $name:ident) => {
+                if actual.$field != expected.$field {
+                    return Err(FsMetadataDifferentialError::Field {
+                        lane,
+                        event: index,
+                        field: FsMetadataField::$name,
+                        reason: format!(
+                            "expected {:?}, observed {:?}",
+                            expected.$field, actual.$field
+                        ),
+                    });
+                }
+            };
         }
-        if actual.kind != expected.kind {
-            return Err(FsMetadataDifferentialError::Field {
-                lane,
-                event: index,
-                field: FsMetadataField::Kind,
-                reason: format!(
-                    "expected {:?}, observed {:?}",
-                    expected.kind, actual.kind
-                ),
-            });
-        }
+        exact_field!(size, Size);
+        exact_field!(kind, Kind);
+        exact_field!(mode, Mode);
+        exact_field!(links, Links);
+        exact_field!(device_major, DeviceMajor);
+        exact_field!(device_minor, DeviceMinor);
+        exact_field!(inode, Inode);
+        exact_field!(modified, Modified);
+        exact_field!(changed, Changed);
+        exact_field!(accessed, Accessed);
+        exact_field!(born, Born);
     }
     Ok(())
 }
@@ -1710,26 +1770,21 @@ fn expected_fs_metadata(
                     reason: error.to_string(),
                 }
             })?;
-            let metadata = std::fs::symlink_metadata(root.join(path))
-                .map_err(|error| FsMetadataDifferentialError::Shape {
-                    lane,
-                    event,
-                    reason: format!("cannot observe fixture metadata: {error}"),
-                })?;
-            let file_type = metadata.file_type();
-            let kind = if file_type.is_file() {
-                ken_host::FsNodeKindV1::File
-            } else if file_type.is_dir() {
-                ken_host::FsNodeKindV1::Directory
-            } else if file_type.is_symlink() {
-                ken_host::FsNodeKindV1::Symlink
-            } else {
-                ken_host::FsNodeKindV1::Other
+            let error = |reason: &dyn fmt::Display| FsMetadataDifferentialError::Shape {
+                lane,
+                event,
+                reason: format!("cannot observe fixture metadata: {reason}"),
             };
-            Ok(ken_host::FileMetadataV1 {
-                size: metadata.len(),
-                kind,
-            })
+            let target = root.join(path);
+            let parent = target.parent().expect("fixture file has a parent");
+            let leaf = target.file_name().expect("fixture file has a name");
+            let root = ken_host::RootPath::new(parent).map_err(|err| error(&err))?;
+            let root = ken_host::open_root(&root).map_err(|err| error(&err))?;
+            let leaf =
+                ken_host::PathComponent::new(leaf.as_encoded_bytes()).map_err(|err| error(&err))?;
+            let handle = ken_host::open_at(&root, &leaf, ken_host::OpenRequest::Read)
+                .map_err(|err| error(&err))?;
+            ken_host::file_metadata_v1(&handle).map_err(|err| error(&err))
         })
         .collect()
 }
@@ -1969,7 +2024,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                 (\file_result. match file_result {
                   Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 94) ;
                   Ok file_metadata_result |-> match file_metadata_result {
-                    FileMetadata.MkFileMetadata file_size file_kind |->
+                    FileMetadata.MkFileMetadata file_size file_kind _mode _links _major _minor _inode _modified _changed _accessed _born |->
                       match eq_int file_size 5 {
                         False |-> host_pure APartial ExitCode (ExitCode.Failure 95) ;
                         True |-> match file_kind {
@@ -1983,7 +2038,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps APartial)
                               (\directory_result. match directory_result {
                                 Err _ |-> host_pure APartial ExitCode (ExitCode.Failure 99) ;
                                 Ok directory_metadata |-> match directory_metadata {
-                                  FileMetadata.MkFileMetadata _directory_size directory_kind |->
+                                  FileMetadata.MkFileMetadata _directory_size directory_kind _mode _links _major _minor _inode _modified _changed _accessed _born |->
                                     match directory_kind {
                                       FileKind.KFile |-> host_pure APartial ExitCode (ExitCode.Failure 100) ;
                                       FileKind.KSymlink |-> host_pure APartial ExitCode (ExitCode.Failure 101) ;
@@ -4284,23 +4339,215 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }
     }
 
+    const ABI_S4_BOTH_METADATA_SOURCE: &str = r#"program capabilities FS AFull
+import Capability.Filesystem.Authority (file_metadata)
+import Capability.Process.Exit (host_bind, host_fs, host_pure)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, resourceMetadata, withResource)
+
+fn file_witness (meta : FileMetadata) : Bool =
+  match meta {
+    FileMetadata.MkFileMetadata size kind mode links major minor inode modified changed accessed born |->
+      match kind {
+        FileKind.KFile |-> match born { None |-> True; Some timestamp |-> False };
+        FileKind.KDirectory |-> False;
+        FileKind.KSymlink |-> False;
+        FileKind.KOther |-> False
+      }
+  }
+
+fn handle_result (outcome : Result ResourceError FileMetadata)
+  : HostIO AFull (ResourceBodyResult ResourceError Bool) =
+  match outcome {
+    Err error |-> host_pure AFull (ResourceBodyResult ResourceError Bool)
+      (ResourceBodyErr ResourceError Bool error);
+    Ok metadata |-> host_pure AFull (ResourceBodyResult ResourceError Bool)
+      (ResourceBodyOk ResourceError Bool (file_witness metadata))
+  }
+
+proc handle_body (resource : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult ResourceError Bool) visits [FS] =
+  host_bind AFull (Result ResourceError FileMetadata) (ResourceBodyResult ResourceError Bool)
+    (resourceMetadata AFull resource) (\outcome. handle_result outcome)
+
+fn finish (outcome : Result FileError (ResourceBracketResult ResourceError Bool))
+  : HostIO AFull ExitCode =
+  match outcome {
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 31);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk ok |-> match ok {
+        True |-> host_pure AFull ExitCode ExitCode.Success;
+        False |-> host_pure AFull ExitCode (ExitCode.Failure 32)
+      };
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 33);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 34);
+      ResourceBracketBodyAndReleaseError body release |-> host_pure AFull ExitCode (ExitCode.Failure 35)
+    }
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      host_bind AFull (Result FileError FileMetadata) ExitCode
+        (host_fs AFull (Result FileError FileMetadata) (file_metadata AFull cap (bytes_encode "version")))
+        (\outcome. match outcome {
+          Err error |-> host_pure AFull ExitCode (ExitCode.Failure 36);
+          Ok metadata |-> match file_witness metadata {
+            False |-> host_pure AFull ExitCode (ExitCode.Failure 37);
+            True |-> host_bind AFull (Result FileError (ResourceBracketResult ResourceError Bool)) ExitCode
+              (withResource AFull ResourceError Bool cap (bytes_encode "version")
+                ResourceOpenMode.ResourceMetadata handle_body)
+              (\outcome. finish outcome)
+          }
+        })
+  }
+"#;
+
+    fn metadata_result(
+        observation: &EffectObservation,
+        op: HostOpV1,
+        lane: &str,
+    ) -> ken_host::FileMetadataV1 {
+        let event = observation
+            .effect_trace
+            .iter()
+            .find(|row| row.operation == op)
+            .unwrap_or_else(|| {
+                panic!("ABI-S4 /proc/version premise: {lane} reached {op:?}: {observation:?}")
+            });
+        match &event.outcome {
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) => {
+                metadata.clone()
+            }
+            outcome => panic!(
+                "ABI-S4 /proc/version premise: {lane} statx succeeds for {op:?}: {outcome:?}"
+            ),
+        }
+    }
+
+    /// MEASURED: two lanes read the same opened procfs file and consume the
+    /// checked metadata constructors after each operation. CLAIMED: a missing
+    /// btime reaches both lanes as None. THE GAP: the runner kernel and procfs
+    /// are premises, not assumptions; each is checked here before the law.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn abi_s4_real_procfs_absence_matches_path_and_descriptor_lanes() {
+        use rustix::fs::{statx, AtFlags, StatxFlags as F};
+        let proc = std::path::Path::new("/proc");
+        let fd = std::fs::File::open(proc.join("version"))
+            .expect("ABI-S4 /proc/version premise: open succeeds");
+        let status = statx(&fd, "", AtFlags::EMPTY_PATH, F::BASIC_STATS | F::BTIME)
+            .expect("ABI-S4 /proc/version premise: statx succeeds");
+        let mask = F::from_bits_retain(status.stx_mask);
+        assert!(
+            mask.contains(F::SIZE),
+            "ABI-S4 /proc/version premise: STATX_SIZE present"
+        );
+        assert!(
+            mask.contains(F::TYPE),
+            "ABI-S4 /proc/version premise: STATX_TYPE present"
+        );
+        assert!(
+            !mask.contains(F::BTIME),
+            "ABI-S4 /proc/version premise: STATX_BTIME absent"
+        );
+        let mut scenario = fs_metadata_success_scenario();
+        // The combined witness constructs two records and a resource bracket.
+        // The starter profile stops during the bracket return at node 65.
+        scenario.boundary_resource_profile.persistent.nodes = 128;
+        scenario.boundary_resource_profile.persistent.words = 512;
+        scenario.entry.identity = "abi-s4-procfs-absence".to_owned();
+        scenario.entry.source = ABI_S4_BOTH_METADATA_SOURCE.to_owned();
+        scenario.initial_filesystem.clear();
+        scenario.process_input.arguments.clear();
+        scenario.program_caps.fs_authority = ken_elaborator::capabilities::AUTH_FULL;
+        scenario.program_caps.relative_root.clear();
+        scenario.program_caps.rights = RightSet::METADATA;
+        scenario.expected_fs = vec![ExpectedFsEffect::Metadata {
+            path: b"version".to_vec(),
+        }];
+        let mut run =
+            execute_scenario_with_roots(&scenario, Some(SharedMetadataRoot::Existing(proc)))
+                .expect("ABI-S4 /proc/version exact artifacts execute");
+        let expected =
+            ken_host::file_metadata_from_statx(&status).expect("procfs status has ruled fields");
+        let witnesses = [HostOpV1::FsMetadata, HostOpV1::FsHandleMetadata].map(|op| {
+            let left = metadata_result(&run.interpreter, op, "interpreter");
+            let right = metadata_result(&run.native, op, "native");
+            assert_eq!(
+                (left.device_major, left.device_minor),
+                (right.device_major, right.device_minor),
+                "ABI-S4 /proc/version premise: device equal across lane processes ({op:?})"
+            );
+            assert_eq!(
+                left.inode, right.inode,
+                "ABI-S4 /proc/version premise: inode equal across lane processes ({op:?})"
+            );
+            assert_eq!(
+                (left.modified, left.changed, left.accessed),
+                (right.modified, right.changed, right.accessed),
+                "ABI-S4 /proc/version premise: times equal across lane processes ({op:?})"
+            );
+            (op, left, right)
+        });
+        assert_eq!(
+            run.interpreter.exit_status, 0,
+            "interpreter matches both constructors: {:?}",
+            run.interpreter
+        );
+        assert_eq!(
+            run.native.exit_status, 0,
+            "native matches both constructors: {:?}",
+            run.native
+        );
+        run.compare_exact()
+            .expect("ABI-S4 /proc/version canonical parity");
+        for (op, left, right) in witnesses {
+            assert_eq!(
+                left.born, None,
+                "interpreter preserves absent birth time ({op:?})"
+            );
+            assert_eq!(
+                right.born, None,
+                "native preserves absent birth time ({op:?})"
+            );
+            assert_eq!(left, expected);
+            assert_eq!(right, expected);
+            assert_eq!(
+                confirm_native_tested_transition(op, NativeTestedEvidence::from_run(op, &run)),
+                Ok(HostOpAvailabilityV1::NativeTested)
+            );
+        }
+        apply_canonical_mutation(&mut run.native, CanonicalMutation::FileMetadataBorn).unwrap();
+        assert_eq!(
+            confirm_native_tested_transition(
+                HostOpV1::FsMetadata,
+                NativeTestedEvidence::from_run(HostOpV1::FsMetadata, &run)
+            ),
+            Err(StatusTransitionError::ExternalObservationMismatch(
+                HostOpV1::FsMetadata
+            ))
+        );
+    }
+
     /// Promise class: durable invariant.
     ///
-    /// MEASURED: each real lane reports both size and kind for one known
-    /// regular file and one known directory, with each response independently
-    /// bound to that lane's OS artifact before full canonical comparison.
-    /// CLAIMED: promoted native FsMetadata agrees exactly with the interpreter
-    /// on the complete landed `{size, kind}` contract for both node classes.
-    /// THE GAP: correct-vs-correct equality alone cannot show either field is
-    /// read; independent wrong-native size and kind mutations must each redden.
+    /// MEASURED: each lane observes all ruled fields for a regular file and
+    /// directory on a shared read-only root. CLAIMED: their canonical values
+    /// agree, including device and inode. THE GAP: agreement alone cannot
+    /// distinguish a shared mapper bug; independent statx/mask pins and
+    /// wrong-size and wrong-kind controls cover distinct failure modes.
     #[test]
     fn fs_metadata_real_artifact_fields_are_exact_and_discriminating() {
         const PATHS: &[(&[u8], &[u8])] = &[
             (b"file.bin", b"data/file.bin"),
             (b"known-dir", b"data/known-dir"),
         ];
-        let run = run_scenario(&fs_metadata_success_scenario())
-            .expect("FsMetadata real-artifact differential executes");
+        let run = execute_scenario_with_roots(
+            &fs_metadata_success_scenario(),
+            Some(SharedMetadataRoot::Fixture),
+        )
+        .expect("FsMetadata real-artifact differential executes");
         run.compare_fs_metadata(PATHS)
             .expect("exact file and directory metadata parity");
         assert_eq!(run.interpreter.exit_status, 0);
@@ -4316,13 +4563,16 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
         let interpreter_expected = expected_fs_metadata(
             "interpreter",
-            run.roots.interpreter(),
+            run.shared_metadata_root.as_deref().unwrap(),
             PATHS,
         )
         .expect("interpreter fixtures have metadata");
-        let native_expected =
-            expected_fs_metadata("native", run.roots.native(), PATHS)
-                .expect("native fixtures have metadata");
+        let native_expected = expected_fs_metadata(
+            "native",
+            run.shared_metadata_root.as_deref().unwrap(),
+            PATHS,
+        )
+        .expect("native fixtures have metadata");
 
         let mut wrong_size = run.native.clone();
         let CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(metadata)) =

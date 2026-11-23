@@ -100,6 +100,15 @@ pub enum CanonicalMutation {
     OperationStatusTransition,
     FileMetadataSize,
     FileMetadataKind,
+    FileMetadataMode,
+    FileMetadataLinks,
+    FileMetadataDeviceMajor,
+    FileMetadataDeviceMinor,
+    FileMetadataInode,
+    FileMetadataModified,
+    FileMetadataChanged,
+    FileMetadataAccessed,
+    FileMetadataBorn,
     DirectoryEntryName,
     DirectoryEntryKind,
     UnknownFamilyIdentity,
@@ -246,6 +255,79 @@ pub fn apply_canonical_mutation(
             let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
                 .ok_or_else(|| missing("metadata-kind control needs FileMetadata"))?;
             metadata.kind = different_kind(metadata.kind);
+        }
+        CanonicalMutation::FileMetadataMode => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.mode = if metadata.mode.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataLinks => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.links = if metadata.links.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataDeviceMajor => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.device_major = metadata.device_major.wrapping_add(1);
+        }
+        CanonicalMutation::FileMetadataDeviceMinor => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.device_minor = metadata.device_minor.wrapping_add(1);
+        }
+        CanonicalMutation::FileMetadataInode => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.inode = if metadata.inode.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataModified => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.modified = if metadata.modified.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataChanged => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.changed = if metadata.changed.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataAccessed => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.accessed = if metadata.accessed.is_some() {
+                None
+            } else {
+                Some(0)
+            };
+        }
+        CanonicalMutation::FileMetadataBorn => {
+            let metadata = first_metadata_reply_mut(&mut observation.effect_trace)
+                .ok_or_else(|| missing("metadata control needs FileMetadata"))?;
+            metadata.born = if metadata.born.is_some() {
+                None
+            } else {
+                Some(0)
+            };
         }
         CanonicalMutation::DirectoryEntryName => {
             let entry = first_directory_entry_mut(&mut observation.effect_trace)
@@ -489,10 +571,9 @@ mod tests {
                     CanonicalRequestV1::FsMetadata {
                         path: b"metadata".to_vec(),
                     },
-                    CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(FileMetadataV1 {
-                        size: 7,
-                        kind: FsNodeKindV1::File,
-                    })),
+                    CanonicalOutcomeV1::Success(CanonicalReplyV1::FileMetadata(
+                        FileMetadataV1::without_optional_fields(7, FsNodeKindV1::File, 0, 0),
+                    )),
                 ),
                 event(
                     2,
@@ -554,6 +635,15 @@ mod tests {
             CanonicalMutation::OperationStatusTransition,
             CanonicalMutation::FileMetadataSize,
             CanonicalMutation::FileMetadataKind,
+            CanonicalMutation::FileMetadataMode,
+            CanonicalMutation::FileMetadataLinks,
+            CanonicalMutation::FileMetadataDeviceMajor,
+            CanonicalMutation::FileMetadataDeviceMinor,
+            CanonicalMutation::FileMetadataInode,
+            CanonicalMutation::FileMetadataModified,
+            CanonicalMutation::FileMetadataChanged,
+            CanonicalMutation::FileMetadataAccessed,
+            CanonicalMutation::FileMetadataBorn,
             CanonicalMutation::DirectoryEntryName,
             CanonicalMutation::DirectoryEntryKind,
             CanonicalMutation::UnknownFamilyIdentity,
@@ -585,6 +675,15 @@ mod tests {
             CanonicalMutation::PathByteNormalization,
             CanonicalMutation::FileMetadataSize,
             CanonicalMutation::FileMetadataKind,
+            CanonicalMutation::FileMetadataMode,
+            CanonicalMutation::FileMetadataLinks,
+            CanonicalMutation::FileMetadataDeviceMajor,
+            CanonicalMutation::FileMetadataDeviceMinor,
+            CanonicalMutation::FileMetadataInode,
+            CanonicalMutation::FileMetadataModified,
+            CanonicalMutation::FileMetadataChanged,
+            CanonicalMutation::FileMetadataAccessed,
+            CanonicalMutation::FileMetadataBorn,
             CanonicalMutation::DirectoryEntryName,
             CanonicalMutation::DirectoryEntryKind,
             CanonicalMutation::UnknownFamilyIdentity,

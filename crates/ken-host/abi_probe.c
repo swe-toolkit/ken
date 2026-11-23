@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -35,6 +36,7 @@ int main(void) {
     printf("O_NOFOLLOW=%lld\n", (long long)O_NOFOLLOW);
     printf("O_CLOEXEC=%lld\n", (long long)O_CLOEXEC);
     printf("AT_REMOVEDIR=%lld\n", (long long)AT_REMOVEDIR);
+    printf("AT_EMPTY_PATH=%lld\n", (long long)AT_EMPTY_PATH);
     printf("MODE_FILE_CREATE=%lld\n", (long long)(S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH));
     printf("MODE_DIRECTORY_CREATE=%lld\n", (long long)(S_IRWXU | S_IRWXG | S_IRWXO));
     printf("SYS_OPENAT=%lld\n", (long long)SYS_openat);
@@ -43,6 +45,7 @@ int main(void) {
     printf("SYS_RENAMEAT=%lld\n", (long long)SYS_renameat);
     printf("SYS_READLINKAT=%lld\n", (long long)SYS_readlinkat);
     printf("SYS_FCHMOD=%lld\n", (long long)SYS_fchmod);
+    printf("SYS_STATX=%lld\n", (long long)SYS_statx);
     printf("SYS_MMAP=%lld\n", (long long)SYS_mmap);
     printf("SYS_MUNMAP=%lld\n", (long long)SYS_munmap);
     printf("ERRNO_ENOENT=%lld\n", (long long)ENOENT);

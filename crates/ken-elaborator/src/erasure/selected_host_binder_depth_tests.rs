@@ -138,6 +138,7 @@ fn selected_host_fixture() -> SelectedHostFixture {
         result_err: unused.clone(),
         result_ok: unused.clone(),
         option_some: unused.clone(),
+        option_none: unused.clone(),
         file_error: unused.clone(),
         file_operation_read: unused.clone(),
         file_operation_write: unused.clone(),

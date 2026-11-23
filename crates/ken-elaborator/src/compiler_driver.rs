@@ -3247,6 +3247,7 @@ fn emit_native_program_preparation(
                 itree_vis: host_spine.vis.to_string(),
                 coproduct_in_l: host_spine.in_l.to_string(),
                 option_some: host_spine.option_some.to_string(),
+                option_none: host_spine.option_none.to_string(),
                 file_error: host_spine.file_error.to_string(),
                 file_operation_read: host_spine.file_operation_read.to_string(),
                 file_operation_write: host_spine.file_operation_write.to_string(),
@@ -4404,6 +4405,7 @@ fn checked_host_spine_v1(
         result_err: resolve_id(roles.result_err)?,
         result_ok: resolve_id(roles.result_ok)?,
         option_some: resolve_id(roles.option_some)?,
+        option_none: resolve_id(roles.option_none)?,
         file_error: resolve_id(roles.file_error)?,
         file_operation_read: resolve_id(roles.file_operation_read)?,
         file_operation_write: resolve_id(roles.file_operation_write)?,
@@ -4704,6 +4706,7 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.px10_kind_symbols[3],
         &spine.px10_exit_symbols[0],
         &spine.px10_exit_symbols[1],
+        &spine.option_none,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -8970,6 +8973,7 @@ mod d1b_role_c1_roster_identity {
             ("result_err", record.spine.result_err.clone()),
             ("result_ok", record.spine.result_ok.clone()),
             ("option_some", record.spine.option_some.clone()),
+            ("option_none", record.spine.option_none.clone()),
             ("file_error", record.spine.file_error.clone()),
             (
                 "file_operation_read",

@@ -223,6 +223,55 @@ fn assert_current_target_abi() -> HostResult<()> {
         .map_err(|error| io::Error::new(io::ErrorKind::Unsupported, error.to_string()).into())
 }
 
+/// Convert a single Linux status record without consulting any other source.
+#[cfg(target_os = "linux")]
+pub fn file_metadata_from_statx(status: &rustix::fs::Statx) -> io::Result<FileMetadataV1> {
+    use rustix::fs::{FileType, StatxFlags as F, StatxTimestamp};
+    let mask = F::from_bits_retain(status.stx_mask);
+    if !mask.contains(F::SIZE | F::TYPE) {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "statx did not supply size and type",
+        ));
+    }
+    let time = |bit, value: StatxTimestamp| {
+        if !mask.contains(bit) {
+            Ok(None)
+        } else if value.tv_nsec >= 1_000_000_000 {
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "invalid statx timestamp nanoseconds",
+            ))
+        } else {
+            Ok(Some(
+                i128::from(value.tv_sec) * 1_000_000_000 + i128::from(value.tv_nsec),
+            ))
+        }
+    };
+    Ok(FileMetadataV1 {
+        size: status.stx_size,
+        kind: match FileType::from_raw_mode(status.stx_mode.into()) {
+            FileType::RegularFile => FsNodeKindV1::File,
+            FileType::Directory => FsNodeKindV1::Directory,
+            FileType::Symlink => FsNodeKindV1::Symlink,
+            _ => FsNodeKindV1::Other,
+        },
+        mode: mask
+            .contains(F::MODE)
+            .then_some(u64::from(status.stx_mode & 0o7777)),
+        links: mask
+            .contains(F::NLINK)
+            .then_some(u64::from(status.stx_nlink)),
+        device_major: u64::from(status.stx_dev_major),
+        device_minor: u64::from(status.stx_dev_minor),
+        inode: mask.contains(F::INO).then_some(status.stx_ino),
+        modified: time(F::MTIME, status.stx_mtime)?,
+        changed: time(F::CTIME, status.stx_ctime)?,
+        accessed: time(F::ATIME, status.stx_atime)?,
+        born: time(F::BTIME, status.stx_btime)?,
+    })
+}
+
 #[cfg(target_os = "linux")]
 mod linux {
     use super::*;
@@ -348,34 +397,22 @@ mod linux {
         })
     }
 
-    pub(super) fn resource_metadata(handle: &ResourceHandle) -> io::Result<Metadata> {
-        use std::os::unix::fs::{FileTypeExt, MetadataExt};
-        let metadata = File::from(handle.0.try_clone()?).metadata()?;
-        let file_type = metadata.file_type();
-        let kind = if file_type.is_file() {
-            FileKind::File
-        } else if file_type.is_dir() {
-            FileKind::Directory
-        } else if file_type.is_symlink() {
-            FileKind::Symlink
-        } else if file_type.is_socket()
-            || file_type.is_fifo()
-            || file_type.is_block_device()
-            || file_type.is_char_device()
-        {
-            FileKind::Other
-        } else {
-            FileKind::Other
-        };
-        Ok(Metadata {
-            size: metadata.len(),
-            kind,
-            mode: Some((metadata.mode() & 0o7777) as u16),
-            identity: FileIdentity {
-                device: metadata.dev(),
-                inode: metadata.ino(),
-            },
-        })
+    fn statx_metadata(fd: impl rustix::fd::AsFd) -> io::Result<FileMetadataV1> {
+        let status = fs::statx(
+            fd,
+            "",
+            AtFlags::EMPTY_PATH,
+            fs::StatxFlags::BASIC_STATS | fs::StatxFlags::BTIME,
+        )?;
+        file_metadata_from_statx(&status)
+    }
+
+    pub(super) fn file_metadata_v1(handle: &Handle) -> io::Result<FileMetadataV1> {
+        statx_metadata(&*handle.0)
+    }
+
+    pub(super) fn resource_metadata(handle: &ResourceHandle) -> io::Result<FileMetadataV1> {
+        statx_metadata(&handle.0)
     }
 
     pub(super) fn resource_read_at(
@@ -923,7 +960,7 @@ pub fn open_resource_at_v1(
     }
 }
 
-pub fn resource_metadata_v1(handle: &ResourceHandleV1) -> HostResult<Metadata> {
+pub fn resource_metadata_v1(handle: &ResourceHandleV1) -> HostResult<FileMetadataV1> {
     assert_current_target_abi()?;
     #[cfg(target_os = "linux")]
     {
@@ -1127,6 +1164,7 @@ macro_rules! handle_op {
 }
 
 handle_op!(metadata, Metadata);
+handle_op!(file_metadata_v1, FileMetadataV1);
 handle_op!(read, Vec<u8>);
 handle_op!(read_directory, Vec<DirectoryEntry>);
 
@@ -1247,6 +1285,85 @@ pub fn rename(
 mod tests {
     use super::*;
 
+    /// MEASURED: clearing each bit removes just that field, even if its slot
+    /// still contains data. CLAIMED: absence is keyed only by the status mask.
+    /// THE GAP: the real descriptor path is exercised by the verify rows.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn statx_metadata_demands_required_fields_and_preserves_each_optional_bit() {
+        use rustix::fs::{statx, AtFlags, StatxFlags as F};
+        let fd = File::open(".").expect("test directory");
+        let mut status = statx(&fd, "", AtFlags::EMPTY_PATH, F::BASIC_STATS | F::BTIME)
+            .expect("statx test seed");
+        status.stx_mask = (F::BASIC_STATS | F::BTIME).bits();
+        status.stx_mode = libc::S_IFIFO as u16 | 0o640;
+        status.stx_size = 100;
+        status.stx_nlink = 3;
+        status.stx_dev_major = 22;
+        status.stx_dev_minor = 33;
+        status.stx_ino = 44;
+        status.stx_mtime.tv_sec = -2;
+        status.stx_mtime.tv_nsec = 500_000_000;
+        status.stx_ctime.tv_sec = 6;
+        status.stx_ctime.tv_nsec = 7;
+        status.stx_atime.tv_sec = 8;
+        status.stx_atime.tv_nsec = 9;
+        status.stx_btime.tv_sec = 10;
+        status.stx_btime.tv_nsec = 11;
+        let full = FileMetadataV1 {
+            size: 100,
+            kind: FsNodeKindV1::Other,
+            mode: Some(0o640),
+            links: Some(3),
+            device_major: 22,
+            device_minor: 33,
+            inode: Some(44),
+            modified: Some(-1_500_000_000),
+            changed: Some(6_000_000_007),
+            accessed: Some(8_000_000_009),
+            born: Some(10_000_000_011),
+        };
+        assert_eq!(file_metadata_from_statx(&status).unwrap(), full);
+        let cases: [(F, fn(&mut FileMetadataV1)); 7] = [
+            (F::MODE, |x| x.mode = None),
+            (F::NLINK, |x| x.links = None),
+            (F::INO, |x| x.inode = None),
+            (F::MTIME, |x| x.modified = None),
+            (F::CTIME, |x| x.changed = None),
+            (F::ATIME, |x| x.accessed = None),
+            (F::BTIME, |x| x.born = None),
+        ];
+        for (bit, remove) in cases {
+            let mut masked = status;
+            masked.stx_mask &= !bit.bits();
+            let mut expected = full.clone();
+            remove(&mut expected);
+            assert_eq!(
+                file_metadata_from_statx(&masked).unwrap(),
+                expected,
+                "{bit:?}"
+            );
+        }
+        for bit in [F::SIZE, F::TYPE] {
+            let mut masked = status;
+            masked.stx_mask &= !bit.bits();
+            assert_eq!(
+                file_metadata_from_statx(&masked).unwrap_err().kind(),
+                io::ErrorKind::Unsupported,
+                "{bit:?}"
+            );
+        }
+        status.stx_btime.tv_nsec = 1_000_000_000;
+        assert_eq!(
+            file_metadata_from_statx(&status).unwrap_err().kind(),
+            io::ErrorKind::Unsupported
+        );
+        status.stx_mask &= !F::BTIME.bits();
+        let mut expected = full;
+        expected.born = None;
+        assert_eq!(file_metadata_from_statx(&status).unwrap(), expected);
+    }
+
     #[derive(Clone)]
     struct ScriptedHomeLookup {
         expected_uid: EffectiveUidSnapshotV1,
@@ -1336,7 +1453,7 @@ mod tests {
         // trips `parse_probe`'s "duplicate probe fact". Those pre-existing gates
         // are the real first line for duplicates; this anchor is not, and does
         // not claim to be.
-        const EXPECTED_ABI_FACT_NAMES: [&str; 39] = [
+        const EXPECTED_ABI_FACT_NAMES: [&str; 41] = [
             "POINTER_WIDTH",
             "POINTER_ALIGNMENT",
             "C_CHAR_WIDTH",
@@ -1364,6 +1481,7 @@ mod tests {
             "O_NOFOLLOW",
             "O_CLOEXEC",
             "AT_REMOVEDIR",
+            "AT_EMPTY_PATH",
             "MODE_FILE_CREATE",
             "MODE_DIRECTORY_CREATE",
             "SYS_OPENAT",
@@ -1372,6 +1490,7 @@ mod tests {
             "SYS_RENAMEAT",
             "SYS_READLINKAT",
             "SYS_FCHMOD",
+            "SYS_STATX",
             "SYS_MMAP",
             "SYS_MUNMAP",
             "ERRNO_ENOENT",
