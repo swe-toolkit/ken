@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-SINGLETONS-SORT
 title: "Spec 69 states trace_merge's ordering, count, membership and argument-order laws, and Data.Collections.Derived proves insertion sort ordered, a permutation and stable, but no law connects the two, so a client that merges single-event traces cannot use the sort laws for the result. Rule from a checked D0 at zero trust that merging a single event into a trace is insert by event_before, and that trace_merge_all over single-event traces is sort by event_before, and state it with a seed that separates the tie order"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
