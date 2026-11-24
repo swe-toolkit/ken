@@ -1,0 +1,20 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Net.Stream (SocketAddress, socket_unix_path)
+
+import Capability.Process.Exit (host_pure)
+
+fn main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Cons path _ ↦
+          match socket_unix_path path {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+            Ok _ ↦ host_pure AFull ExitCode ExitCode.Success
+          }
+      }
+  }
