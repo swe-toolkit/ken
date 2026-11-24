@@ -19,7 +19,8 @@
 > SPEC-GEOMETRY-BOX-INTERSECT-HULL-MONOTONE §17;
 > SPEC-GEOMETRY-NAT-ORIENTATION §18;
 > SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19;
-> SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20).** Sections 1–4,
+> SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20;
+> SPEC-GEOMETRY-ORIENT-TRANSLATE §21).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1687,3 +1688,64 @@ refusal, not an expression-exact span; the separate CV-owned seed
 must not claim finer localization from that measurement. The
 finite pair shows why the premise cannot be dropped; it does not
 replace a generic checked proof or an assembled trust gate.
+
+## 21. A shared translation preserves orientation
+
+> **Section 21 status: DRAFT v0 (SPEC-GEOMETRY-ORIENT-TRANSLATE).**
+> Architect's AC-0 on `df1ade4e5` reports that both modified packages
+> passed `ken check` and `ken fmt --check` in scratch. The shared-shift
+> client checked, the one-point-only client refused with `TypeMismatch`,
+> and omitting the new Order law gave `UnboundName` for
+> `Data.Numeric.Nat.Order.compare::add_cancel_r`. Source inspection found
+> no added `Axiom`, foreign declaration or primitive; exact trusted
+> `GlobalId` identity-set equality remains for assembled AC-T. These
+> scratch checks do not establish official conformance, CI or landing.
+
+`Data.Numeric.Nat.Order` must export this public Transparent checked
+proof selector immediately after `self_eq for compare`:
+
+```ken
+pub proof add_cancel_r for compare
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal OrdResult (compare (add a c) (add b c)) (compare a b)
+```
+
+Adding the same right summand to both arguments leaves their comparison
+result unchanged. This is a Nat order law, not a geometry-private copy.
+Induction on `c` uses `add`'s recursion on the right and the reduction
+of `compare (Suc x) (Suc y)` to `compare x y`.
+
+`Algorithm.Geometry.NatOrientation` must export this public Transparent
+checked theorem after `orient_shared_y`:
+
+```ken
+pub theorem orient_translate
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+      (dx : Nat) (dy : Nat)
+    : Equal OrdResult
+        (orient
+          (MkPoint (add xa dx) (add ya dy))
+          (MkPoint (add xb dx) (add yb dy))
+          (MkPoint (add xc dx) (add yc dy)))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+```
+
+The same `dx` and `dy` apply to every point. The equation is
+unconditional over the displayed natural coordinates and offsets,
+including zero offsets and collinear or repeated points. It equates
+turn results, not the point triples. It introduces no translation
+operation and changes no §§1–20 operation or law type.
+
+The checked proof iterates unit shifts along each axis. An x step adds
+the sum of the three y coordinates to each cross sum; a y step adds
+the sum of the three x coordinates. After rearranging the sums,
+`compare::add_cancel_r` removes the common right summand. This needs
+no normalization procedure; the unit-step and rearrangement lemmas
+remain private.
+
+For `(0,0), (1,0), (0,1)`, the turn is `Gt`. Translating all three
+points by `(2,3)` gives `(2,3), (3,3), (2,4)`, still `Gt`. Moving only
+the first point gives `(2,3), (1,0), (0,1)` and flips the result to
+`Lt`; the same-form equality with the original turn must refuse.
+These closed cases distinguish a shared translation from arbitrary
+per-point movement; they do not prove the generic law.

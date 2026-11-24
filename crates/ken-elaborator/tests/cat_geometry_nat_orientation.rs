@@ -1,4 +1,4 @@
-//! Natural-point orientation: spec/50-stdlib/67-geometry.md §§18–19.
+//! Natural-point orientation: spec/50-stdlib/67-geometry.md §§18–19, 21.
 //! Promise class: durable invariant. Checked public laws and independently
 //! reduced closed values distinguish shared-axis collinearity from an off-line
 //! triple; false claims reject only after complete accepted prefixes.
@@ -63,6 +63,73 @@ theorem refuse_off_line_law
   orient_shared_x n2 n1 n3 n7
 "#;
 
+const ORDER: &str = "Data.Numeric.Nat.Order";
+const TRANSLATE_OPEN: &str = r#"import Algorithm.Geometry.NatOrientation (orient, orient_translate)
+import Algorithm.Geometry.NatBox (MkPoint)
+import Core.Logic.OrdResult (OrdResult)
+import Data.Numeric.Nat.Arithmetic (add)
+import Data.Numeric.Nat.Order (compare)
+
+theorem open_compare_cancel (a : Nat) (b : Nat) (c : Nat)
+  : Equal OrdResult (compare (add a c) (add b c)) (compare a b) =
+  (proof add_cancel_r for compare) a b c
+
+theorem open_translate
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (dx : Nat) (dy : Nat)
+  : Equal OrdResult
+      (orient (MkPoint (add xa dx) (add ya dy))
+              (MkPoint (add xb dx) (add yb dy))
+              (MkPoint (add xc dx) (add yc dy)))
+      (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  orient_translate xa ya xb yb xc yc dx dy
+"#;
+
+const TRANSLATE_ACCEPTED: &str = r#"import Algorithm.Geometry.NatOrientation (orient, orient_cross, orient_translate)
+import Algorithm.Geometry.NatBox (MkPoint)
+import Core.Logic.OrdResult (OrdResult, Lt, Gt)
+import Data.Numeric.Nat.Arithmetic (add, mul)
+import Data.Numeric.Nat.Order (compare)
+
+const n0 : Nat = Zero
+const n1 : Nat = Suc n0
+const n2 : Nat = Suc n1
+const n3 : Nat = Suc n2
+const n4 : Nat = Suc n3
+const n5 : Nat = Suc n4
+
+theorem original_gt
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) Gt = Proved
+
+theorem shared_translation_gt
+  : Equal OrdResult (orient (MkPoint n2 n3) (MkPoint n3 n3) (MkPoint n2 n4)) Gt = Proved
+
+theorem shared_translation_by_law
+  : Equal OrdResult
+      (orient (MkPoint n2 n3) (MkPoint n3 n3) (MkPoint n2 n4))
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) =
+  orient_translate n0 n0 n1 n0 n0 n1 n2 n3
+
+theorem one_point_left_sum
+  : Equal Nat (add (add (mul n2 n0) (mul n1 n1)) (mul n0 n3)) n1 = Proved
+
+theorem one_point_right_sum
+  : Equal Nat (add (add (mul n3 n1) (mul n0 n0)) (mul n1 n2)) n5 = Proved
+
+theorem one_point_compare
+  : Equal OrdResult (orient (MkPoint n2 n3) (MkPoint n1 n0) (MkPoint n0 n1)) (compare n1 n5) =
+  orient_cross n2 n3 n1 n0 n0 n1
+
+theorem one_point_lt
+  : Equal OrdResult (orient (MkPoint n2 n3) (MkPoint n1 n0) (MkPoint n0 n1)) Lt = Proved
+"#;
+
+const TRANSLATE_REFUSED: &str = r#"
+theorem refuse_one_point_translation
+  : Equal OrdResult
+      (orient (MkPoint n2 n3) (MkPoint n1 n0) (MkPoint n0 n1))
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) = Proved
+"#;
+
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
 }
@@ -106,53 +173,126 @@ fn term_contains_const(term: &Term, owner: GlobalId) -> bool {
     false
 }
 
-/// SOURCE: spec/50-stdlib/67-geometry.md §19, Architect AC-0.
+fn proof_uses_order_law(
+    env: &ElabEnv,
+    geometry_owned: &[GlobalId],
+    theorem: GlobalId,
+    target: GlobalId,
+) -> bool {
+    let mut pending = vec![theorem];
+    let mut visited = BTreeSet::new();
+    while let Some(id) = pending.pop() {
+        if !visited.insert(id) {
+            continue;
+        }
+        let Some((_, body)) = env.env.transparent_body(id) else {
+            continue;
+        };
+        let mut terms = vec![&body];
+        while let Some(term) = terms.pop() {
+            if let Term::Const { id, .. } = term {
+                if *id == target {
+                    return true;
+                }
+                if geometry_owned.contains(id) {
+                    pending.push(*id);
+                }
+            }
+            terms.extend(term.children());
+        }
+    }
+    false
+}
+
+fn owned_open_law(
+    env: &ElabEnv,
+    package: &str,
+    owned: &[GlobalId],
+    law: &str,
+    client: &str,
+) -> GlobalId {
+    let owner = env.globals[&format!("{package}.{law}")];
+    assert!(owned.contains(&owner), "{law} is owned by {package}");
+    assert!(
+        matches!(env.env.lookup(owner), Some(Decl::Transparent { .. })),
+        "{law} is a checked Transparent body"
+    );
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals[client])
+        .expect("open law client has a checked body");
+    assert!(term_contains_const(&body, owner), "{client} cites {law}");
+    owner
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §§19 and 21, Architect AC-0.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: actual providers root-load first; the exact trusted GlobalId
-/// sets before and after NatOrientation load match; both new laws are owned
-/// by NatOrientation with checked Transparent bodies. Complete open clients
-/// cite each checked owner Const under selective imports.
-/// CLAIMED: shared-axis geometry adds zero trust and exports both laws.
-/// THE GAP: provider trust remains inherited; clients do not replace the
-/// catalog's kernel-checked generic proofs.
+/// MEASURED: provider-relative trust identity equality for each package;
+/// exact owned Transparent law identities in complete open clients; and the
+/// checked Order cancellation identity reachable from the translation proof.
+/// CLAIMED: the laws are available at their public types without new trust.
+/// THE GAP: providers carry their own trust, measured before each load.
+/// Adding unrelated exports or refactoring proofs around the cancellation
+/// seam stays green. New trust or a lost law type, owner, or checked use fails.
 #[test]
-fn shared_axis_laws_have_checked_owners_and_zero_new_trust() {
+fn shared_axis_and_translation_laws_have_checked_owners_and_zero_new_trust() {
     let mut env = ElabEnv::new().expect("fresh elaborator");
     for provider in [
-        "Algorithm.Geometry.NatBox",
+        "Core.Classes.LawfulClasses",
         "Core.Logic.OrdResult",
         "Core.Logic.Transport",
         "Data.Numeric.Nat.Arithmetic",
-        "Data.Numeric.Nat.Order",
     ] {
         env.elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("{provider} root-loads: {error:?}"));
     }
+    let before_order = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let order = env
+        .elaborate_module_from_roots(&[catalog_root()], ORDER)
+        .expect("Order root-loads after its providers");
+    let after_order = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "Order trusted GlobalIds: {} → {}",
+        before_order.len(),
+        after_order.len()
+    );
+    assert_eq!(after_order, before_order, "Order adds no trusted identity");
+
+    env.elaborate_module_from_roots(&[catalog_root()], "Algorithm.Geometry.NatBox")
+        .expect("NatBox root-loads before orientation");
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     let owned = env
         .elaborate_module_from_roots(&[catalog_root()], GEOMETRY)
         .expect("NatOrientation root-loads after its providers");
     let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "NatOrientation trusted GlobalIds: {} → {}",
+        before.len(),
+        after.len()
+    );
     assert_eq!(after, before, "orientation adds no trusted identity");
+    env.elaborate_file(TRANSLATE_OPEN)
+        .expect("open translation and comparison cancellation clients check");
+    let translate = owned_open_law(&env, GEOMETRY, &owned, "orient_translate", "open_translate");
+    let cancel = owned_open_law(
+        &env,
+        ORDER,
+        &order,
+        "compare::add_cancel_r",
+        "open_compare_cancel",
+    );
+    assert!(
+        proof_uses_order_law(&env, &owned, translate, cancel),
+        "the translation proof consumes the Order law through geometry-owned proofs"
+    );
+
     env.elaborate_file(AXIS_ACCEPTED)
-        .expect("complete selective-imported client checks");
-    for law in ["orient_shared_x", "orient_shared_y"] {
-        let owner = env.globals[&format!("{GEOMETRY}.{law}")];
-        assert!(owned.contains(&owner), "{law} is owned by NatOrientation");
-        assert!(
-            matches!(env.env.lookup(owner), Some(Decl::Transparent { .. })),
-            "{law} is a checked Transparent body"
-        );
-        let client = if law == "orient_shared_x" {
-            "open_shared_x"
-        } else {
-            "open_shared_y"
-        };
-        let (_, body) = env
-            .env
-            .transparent_body(env.globals[client])
-            .expect("open law client has a checked body");
-        assert!(term_contains_const(&body, owner), "{client} cites {law}");
+        .expect("complete selective-imported axis client checks");
+    for (law, client) in [
+        ("orient_shared_x", "open_shared_x"),
+        ("orient_shared_y", "open_shared_y"),
+    ] {
+        owned_open_law(&env, GEOMETRY, &owned, law, client);
     }
 }
 
@@ -170,6 +310,36 @@ fn orient_reorder_stays_private_to_the_checked_package() {
             assert_eq!(name, format!("{GEOMETRY}.orient_reorder"))
         }
         other => panic!("orient_reorder must refuse selective import: {other:?}"),
+    }
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §21, Architect AC-0.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: each of the nine translation helpers refuses its own selective
+/// import with its exact qualified UnboundName after a fresh provider load.
+/// CLAIMED: the translation proof steps are not public laws.
+/// THE GAP: this checks selective imports, not how the proof uses the helpers.
+/// Unrelated exports or additional private helpers stay green; making any
+/// of these helpers selectively importable fails at its own probe.
+#[test]
+fn translation_helpers_stay_private_to_the_checked_package() {
+    for helper in [
+        "orient_translate_y",
+        "orient_step_x",
+        "orient_step_y",
+        "orient_common_addend",
+        "orient_shift_product",
+        "orient_sum_congr",
+        "orient_interleave",
+        "orient_swap4",
+        "orient_rotate_sum",
+    ] {
+        match loaded_orientation().elaborate_file(&format!("import {GEOMETRY} ({helper})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{GEOMETRY}.{helper}"), "import of {helper}");
+            }
+            other => panic!("{helper} must refuse selective import: {other:?}"),
+        }
     }
 }
 
@@ -195,7 +365,10 @@ fn refuses_only_at_added_theorem(accepted: &str, label: &str, appended: &str) {
             span,
         }) if span.start >= theorem_start
             && span.start < span.end
-            && span.end <= candidate.len() => {}
+            && span.end <= candidate.len() =>
+        {
+            eprintln!("{label}: KernelRejected(TypeMismatch) at {span:?}");
+        }
         other => panic!("{label} must kernel-refuse at its added theorem: {other:?}"),
     }
 }
@@ -252,4 +425,38 @@ fn off_line_equal_by_proved_refuses_at_own_theorem() {
 #[test]
 fn off_line_equal_by_law_refuses_at_own_theorem() {
     refuses_only_at_added_theorem(AXIS_ACCEPTED, "refuse_off_line_law", AXIS_R2);
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §21, AC-2 shared-translation row.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the translation-law application checks, and independent direct
+/// reductions give Gt before and after the common shift.
+/// CLAIMED: a common shift on both axes preserves the observed turn.
+/// THE GAP: the closed coordinates supplement rather than prove the open law.
+/// Equivalent orientation algorithms stay green; a changed turn or a law
+/// that no longer specializes to these moved points fails.
+#[test]
+fn shared_translation_preserves_a_counterclockwise_turn() {
+    loaded_orientation()
+        .elaborate_file(TRANSLATE_ACCEPTED)
+        .expect("shared translation preserves Gt; shifting only one point gives Lt");
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §21, AC-2 one-point refusal.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the fresh accepted prefix checks L=1/R=5 (Lt) via `orient_cross`
+/// and direct computation, then a separate load refuses equality with the
+/// original Gt triple at the appended theorem with a kernel TypeMismatch.
+/// CLAIMED: preserving the turn under common translation does not imply
+/// preserving it under a shift of only one point.
+/// THE GAP: some one-point shifts do preserve the turn; this is a counterexample.
+/// Equivalent arithmetic implementations stay green; accepting the false
+/// equality, or rejecting the accepted prefix instead, fails this test.
+#[test]
+fn translating_only_one_point_refuses_at_its_own_theorem() {
+    refuses_only_at_added_theorem(
+        TRANSLATE_ACCEPTED,
+        "refuse_one_point_translation",
+        TRANSLATE_REFUSED,
+    );
 }
