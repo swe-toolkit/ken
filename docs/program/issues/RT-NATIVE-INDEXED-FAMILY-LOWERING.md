@@ -18,8 +18,8 @@ origin: "Architect scope post evt_7v56x4vmh5nc1 on PX11 Inc2's E0075 refusal at 
 
 A natively built program that computes a value of an indexed family, and
 matches on it, builds and runs, and agrees with the interpreter. That
-covers `Vec` convoys and the prelude's `socket_ipv6` over a runtime
-`Vec UInt8 16`.
+covers the prelude's `socket_ipv6` over a runtime `Vec UInt8 16`.
+Convoys are RT-NATIVE-INDEXED-CONVOY-LOWERING.
 
 ## Settled inputs (main `4a4ce82f2`; Architect `evt_7v56x4vmh5nc1`)
 
@@ -63,13 +63,15 @@ runtime `Vec`.
   exemption as the in-tree precedent. AC-0 may split the node into
   increments.
 - **AC-1.** Native rows compared with `ken_cli::run_program` or the
-  interpreter:
-  - the rt_c5 sentinel's replacement, native Int and String `Vec` convoys;
-  - `loopback_tail` plus `socket_ipv6` over a runtime `Vec`, measuring
-    plane (I);
+  interpreter, as recut by Architect `evt_6a134t5e4mfkr`:
+  - `loopback_tail` (W3) plus `socket_ipv6`'s public mirror (W4') over a
+    runtime `Vec`, measuring plane (I);
+  - the Int and String `Vec` convoys (W1, W2') refuse E0075
+    `unsupported_dependent_motive` at `zipPrimitive`, pinned. The rt_c5
+    sentinel's successor sentence names RT-NATIVE-INDEXED-CONVOY-LOWERING;
   - the three pinned refusals, restated to what the ruling still refuses.
-- **AC-2.** Revert the repair: the convoy and `socket_ipv6` rows refuse
-  again at their named planes. Restore it byte-identically.
+- **AC-2.** Revert the repair: the W3 and W4' rows refuse again at their
+  named planes. Restore it byte-identically.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
