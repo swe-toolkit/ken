@@ -1,0 +1,68 @@
+program capabilities FS AFull
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyOk,
+    ResourceBodyResult,
+    ResourceBracketBodyAndReleaseError,
+    ResourceBracketBodyError,
+    ResourceBracketOk,
+    ResourceBracketReleaseError,
+    ResourceBracketResult,
+    withResource)
+
+fn finish
+      (outcome : Result FileError (ResourceBracketResult Unit ExitCode))
+    : HostIO AFull ExitCode =
+  host_pure
+    AFull
+    ExitCode
+    (match outcome {
+      Err _ ↦ ExitCode.Failure 80;
+      Ok bracket ↦
+        match bracket {
+          ResourceBracketOk status ↦ status;
+          ResourceBracketBodyError _ ↦ ExitCode.Failure 81;
+          ResourceBracketReleaseError _ ↦ ExitCode.Failure 82;
+          ResourceBracketBodyAndReleaseError _ _ ↦ ExitCode.Failure 83
+        }
+    })
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS] =
+  match input {
+    MkProcessInput args _ _ ↦
+      match caps {
+        ProgramCaps.MkProgramCaps fs ↦
+          host_bind
+            AFull
+            (Result FileError (ResourceBracketResult Unit ExitCode))
+            ExitCode
+            (withResource
+              AFull
+              Unit
+              ExitCode
+              fs
+              (bytes_encode "sample.txt")
+              ResourceOpenMode.ResourceRead
+              (λ_file.
+                host_pure
+                  AFull
+                  (ResourceBodyResult Unit ExitCode)
+                  (ResourceBodyOk
+                    Unit
+                    ExitCode
+                    (match args {
+                      Nil ↦ ExitCode.Failure 84;
+                      Cons _ rest ↦
+                        match rest {
+                          Nil ↦ ExitCode.Success;
+                          Cons _ _ ↦ ExitCode.Failure 23
+                        }
+                    }))))
+            (λoutcome. finish outcome)
+      }
+  }

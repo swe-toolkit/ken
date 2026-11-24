@@ -1454,6 +1454,75 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
     });
 }
 
+#[cfg(target_os = "linux")]
+// Promise class: durable differential.
+// MEASURED: both argv cases execute the acquire/release pair and return the
+// exact branch status in the interpreter and the linked artifact.
+// CLAIMED: the computed status survives bracket settlement.
+// THE GAP: this pins one checked bracket shape, not every ExitCode producer.
+#[test]
+fn computed_bracket_exit_keeps_both_statuses() {
+    let source = include_str!("fixtures/scalar_join_bracket_exit.ken");
+    let root = output_dir("scalar-join-bracket-exit");
+    std::fs::write(root.path().join("sample.txt"), b"sample\n").unwrap();
+    let roots =
+        [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")];
+    let output = ken_cli::build_native_program_with_roots(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &roots,
+        "scalar_join_bracket_exit",
+        root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+    .expect("computed bracket result native-builds");
+    for (extra, expected) in [(None, 0), (Some("extra"), 23)] {
+        let native_arguments: Vec<std::ffi::OsString> = extra.into_iter().map(Into::into).collect();
+        // The linked entry includes argv[0]; the interpreter API takes argv
+        // as supplied, so pass the same executable path before the extra arg.
+        let arguments: Vec<_> = std::iter::once(output.artifact.executable_path.as_os_str())
+            .chain(native_arguments.iter().map(|arg| arg.as_os_str()))
+            .map(|arg| arg.as_encoded_bytes().to_vec())
+            .collect();
+        let mut host = ken_interp::PosixHost::new_at(root.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            source,
+            ken_cli::SourceFormat::Ken,
+            &roots,
+            &arguments,
+            &[],
+            root.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .expect("bracket runs in the interpreter");
+        let native = ken_runtime::run_bound_process_effect_observation(
+            &output.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: native_arguments,
+                environment: Vec::new(),
+                cwd: root.path().to_owned(),
+                plan_hash: output.plan_transport_hash,
+            },
+        )
+        .expect("bracket runs in the linked artifact");
+        for observation in [&interpreted, &native] {
+            assert_eq!(observation.exit_status, expected);
+            assert_eq!(observation.terminal_error, None);
+            assert_eq!(
+                observation
+                    .effect_trace
+                    .iter()
+                    .map(|event| event.operation)
+                    .collect::<Vec<_>>(),
+                [
+                    ken_runtime::HostOpV1::FsOpen,
+                    ken_runtime::HostOpV1::ResourceRelease,
+                ],
+            );
+        }
+    }
+}
+
 /// Promise class: transition sentinel for the selected-call fixture shape.
 /// MEASURED: the pre-schema transport source names the r2 S5→S6 call, and
 /// exactly one plane owns it: the checked ResourceRelease bracket settlement

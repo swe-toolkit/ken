@@ -1812,6 +1812,15 @@ impl SemanticPlane {
         Ok(ConstructorIdentity(span))
     }
 
+    pub(super) fn is_bool_constructor(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        let identity = self.constructor_symbol_identity(origin)?;
+        Ok(identity == self.bool_constructor_identity(BoolConstructorRole::False)?
+            || identity == self.bool_constructor_identity(BoolConstructorRole::True)?)
+    }
+
     pub(super) fn validate_bool_constructor_inventory(
         &self,
     ) -> Result<(), CraneliftBackendError> {

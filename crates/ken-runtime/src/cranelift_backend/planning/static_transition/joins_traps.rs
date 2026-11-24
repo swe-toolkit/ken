@@ -25,7 +25,7 @@ use super::{
     StaticOriginId, StaticTransitionPlan,
 };
 use super::construction::Planner;
-use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode};
+use crate::{RuntimeExpr, RuntimePartiality, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
 /// The exact catalog value for a generated dynamic-constructor table whose
 /// runtime discriminator selects none of its planner-authorized alternatives.
@@ -75,6 +75,14 @@ pub(in crate::cranelift_backend) enum JoinResultRepresentation {
     CarrierWord,
 }
 
+/// Whether a specialized join's stored scalar can spill to a persistent node.
+/// `SpillFree` only on proof; every unproven form is `MaySpill`.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) enum JoinScalarSpill {
+    SpillFree,
+    MaySpill,
+}
+
 /// Move-only evidence that a particular source join was planned.
 ///
 /// Fields and construction stay in the planner.  Lowering can consume the
@@ -103,6 +111,7 @@ impl JoinPlanToken {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct PlannedJoinResult {
     pub(super) representation: JoinResultRepresentation,
+    pub(super) scalar_spill: JoinScalarSpill,
     has_continuing_predecessor: bool,
 }
 
@@ -167,6 +176,7 @@ struct ResultPhaseSummary {
     /// Keeping this orthogonal to `phase` closes the bound-lexical-closure form
     /// without weakening the value's specialized closure representation.
     callable_result: Option<ResultPhase>,
+    scalar_spill: JoinScalarSpill,
 }
 
 impl ResultPhaseSummary {
@@ -174,12 +184,14 @@ impl ResultPhaseSummary {
         phase: ResultPhase::SpecializedOnly,
         continues: false,
         callable_result: None,
+        scalar_spill: JoinScalarSpill::SpillFree,
     };
 
     const SPECIALIZED: Self = Self {
         phase: ResultPhase::SpecializedOnly,
         continues: true,
         callable_result: None,
+        scalar_spill: JoinScalarSpill::MaySpill,
     };
 
     fn carrier() -> Self {
@@ -187,6 +199,7 @@ impl ResultPhaseSummary {
             phase: ResultPhase::CarrierRequired,
             continues: true,
             callable_result: None,
+            scalar_spill: JoinScalarSpill::MaySpill,
         }
     }
 
@@ -195,6 +208,7 @@ impl ResultPhaseSummary {
             phase: ResultPhase::SpecializedOnly,
             continues: true,
             callable_result: Some(result),
+            scalar_spill: JoinScalarSpill::MaySpill,
         }
     }
 
@@ -203,6 +217,7 @@ impl ResultPhaseSummary {
             phase: self.phase.max(other.phase),
             continues: self.continues || other.continues,
             callable_result: self.callable_result.max(other.callable_result),
+            scalar_spill: self.scalar_spill.max(other.scalar_spill),
         }
     }
 
@@ -213,6 +228,7 @@ impl ResultPhaseSummary {
             // A sequence returns its right-hand value. Callable provenance is
             // therefore not an effect to accumulate from the left.
             callable_result: other.callable_result,
+            scalar_spill: other.scalar_spill,
         }
     }
 }
@@ -370,6 +386,7 @@ fn summarize_result_phase(
                 let mut case_environment = Vec::with_capacity(case.binders + environment.len());
                 case_environment.extend((0..case.binders).map(|_| ResultPhaseSummary {
                     continues: true,
+                    scalar_spill: JoinScalarSpill::MaySpill,
                     ..scrutinee
                 }));
                 case_environment.extend_from_slice(environment);
@@ -419,6 +436,7 @@ fn summarize_result_phase(
                     phase: scrutinee_summary.phase,
                     continues: true,
                     callable_result: scrutinee_summary.callable_result,
+                    scalar_spill: JoinScalarSpill::MaySpill,
                 }));
                 case_environment.extend_from_slice(environment);
                 result = result.join(summarize_child(1 + index, &case_environment, joins)?);
@@ -496,6 +514,14 @@ fn summarize_result_phase(
             {
                 result.phase = ResultPhase::CarrierRequired;
             }
+            result.scalar_spill = if args.is_empty()
+                && matches!(expr, RuntimeExpr::Construct { .. })
+                && plan.semantic.is_bool_constructor(origin)?
+            {
+                JoinScalarSpill::SpillFree
+            } else {
+                JoinScalarSpill::MaySpill
+            };
             result
         }
         RuntimeExpr::Record { fields } => {
@@ -506,6 +532,7 @@ fn summarize_result_phase(
                 },
             )?;
             result.callable_result = None;
+            result.scalar_spill = JoinScalarSpill::MaySpill;
             result
         }
         RuntimeExpr::Project { .. } => summarize_child(0, environment, joins)?,
@@ -521,6 +548,7 @@ fn summarize_result_phase(
             // This planner tracks the representation of the call result, not
             // higher-order provenance of values returned by an opaque call.
             result.callable_result = None;
+            result.scalar_spill = JoinScalarSpill::MaySpill;
             result
         }
         RuntimeExpr::Var(index) => {
@@ -575,6 +603,10 @@ fn summarize_result_phase(
                 ResultPhaseSummary::SPECIALIZED
             }
         }
+        RuntimeExpr::Value(RuntimeValue::Bool(_)) => ResultPhaseSummary {
+            scalar_spill: JoinScalarSpill::SpillFree,
+            ..ResultPhaseSummary::SPECIALIZED
+        },
         RuntimeExpr::Value(_)
         | RuntimeExpr::ImportedDeclarationRef { .. }
         | RuntimeExpr::Effect { .. } => ResultPhaseSummary::SPECIALIZED,
@@ -613,6 +645,7 @@ fn summarize_result_phase(
                 ResultPhase::SpecializedOnly => JoinResultRepresentation::NativeScalarPair,
                 ResultPhase::CarrierRequired => JoinResultRepresentation::CarrierWord,
             },
+            scalar_spill: summary.scalar_spill,
             has_continuing_predecessor: summary.continues,
         };
         let entry = joins
@@ -627,6 +660,7 @@ fn summarize_result_phase(
                 } else {
                     JoinResultRepresentation::NativeScalarPair
                 },
+                scalar_spill: previous.scalar_spill.max(result.scalar_spill),
                 has_continuing_predecessor: previous.has_continuing_predecessor
                     || result.has_continuing_predecessor,
             },

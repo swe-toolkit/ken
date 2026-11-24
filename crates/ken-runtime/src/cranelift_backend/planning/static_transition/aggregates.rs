@@ -42,6 +42,7 @@ use super::{
     SynthesizedFixedConstructorRole,
 };
 use super::closure::{derive_case_producer_fact, CaseProducerSet};
+use super::joins_traps::JoinScalarSpill;
 use crate::boundary_value::{BoundaryClass, BoundaryTag};
 use crate::RuntimeExpr;
 
@@ -3339,9 +3340,11 @@ pub(in crate::cranelift_backend) struct PlannedAggregateOwnership {
 /// - **Lifetime** ([`lifetime_referent_affinity`]) — how long the referent may
 ///   live. `ActivationOwned` admits the invocation arena; `Persistent` does not.
 /// - **Representation** ([`JoinResultRepresentation`]) — whether there is a
-///   referent to own at all. A child emitted as a `NativeScalarPair` has no
-///   heap node. A source Match may instead use the process-composed CarrierWord
-///   interface; its possible referents remain bounded by the child's lifetime.
+///   referent to own at all. A child emitted as a `NativeScalarPair` stores its
+///   scalar's closed immediate: `NoReferent` for a spill-free `Bool`,
+///   `{NoReferent, PersistentStore}` otherwise. A source Match may instead use
+///   the process-composed CarrierWord interface; its possible referents remain
+///   bounded by the child's lifetime.
 ///
 /// Reading only the first is what makes every call-shaped child look
 /// arena-owned. `derive_occurrence_lifetime` answers `ActivationOwned` for
@@ -3363,23 +3366,28 @@ pub(in crate::cranelift_backend::planning::static_transition) fn aggregate_child
     child: &PlannedOccurrenceChildAuthority,
 ) -> Result<Vec<BoundaryReferentOwner>, CraneliftBackendError> {
     let by_lifetime = lifetime_referent_affinity(child.lifetime);
-    let representation = plan
+    let planned = plan
         .join_results
         .get(child.origin.0 as usize)
         .and_then(|slot| slot.as_ref())
-        .map(|result| result.representation);
-    match representation {
-        // The scalar-pair result has no referent only when this join cannot
-        // instead use the process-composed CarrierWord interface at emission.
-        Some(JoinResultRepresentation::NativeScalarPair)
+        .map(|result| (result.representation, result.scalar_spill));
+    match planned {
+        // A scalar pair has no node while it is a pair, but the field stores the
+        // scalar's closed immediate, and every scalar except Bool has a
+        // persistent spill arm. Never the arena, so the parent's lane is unchanged.
+        Some((JoinResultRepresentation::NativeScalarPair, spill))
             if !plan.join_may_take_process_carrier(child.origin)? =>
         {
-            Ok(vec![BoundaryReferentOwner::NoReferent])
+            Ok(match spill {
+                JoinScalarSpill::SpillFree => vec![BoundaryReferentOwner::NoReferent],
+                JoinScalarSpill::MaySpill => vec![
+                    BoundaryReferentOwner::NoReferent,
+                    BoundaryReferentOwner::PersistentStore,
+                ],
+            })
         }
-        // A possible carrier may name a referent. Preserve the child's
-        // lifetime affinity rather than narrowing to a non-existent node.
-        Some(JoinResultRepresentation::NativeScalarPair)
-        | Some(JoinResultRepresentation::CarrierWord)
+        Some((JoinResultRepresentation::NativeScalarPair, _))
+        | Some((JoinResultRepresentation::CarrierWord, _))
         | None => Ok(by_lifetime),
     }
 }
