@@ -23084,7 +23084,7 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         ConsoleRead | ConsoleWrite | ConsoleFlush | ConsoleIsTerminal => RowSummand::Console,
         ClockWallNow | ClockMonotonicNow | ClockSleepUntil => RowSummand::Clock,
         EntropyRandomBytes => RowSummand::Entropy,
-        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsReadDirectory
+        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsOpenDirectory | FsReadDirectoryBatch
         | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
         | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
         | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease

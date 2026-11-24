@@ -391,15 +391,6 @@ impl Fixture {
                 ];
                 self.construct("FileMetadata.MkFileMetadata", different)
             }
-            "(List DirEntry)" => {
-                assert!(
-                    matches!(actual, EvalVal::Ctor { id, .. }
-                    if *id == self.fs.cons_id),
-                    "fixture directory must be nonempty"
-                );
-                let dir_entry = self.eval_expr("DirEntry");
-                self.construct("Nil", [dir_entry])
-            }
             other => {
                 panic!("Ok {other} has no same-constructor content negative; select a host Err row")
             }
@@ -624,12 +615,35 @@ fn fs_file_error_file_metadata() {
 }
 
 #[test]
-fn fs_file_error_directory_entries() {
+fn fs_resource_error_directory_progress() {
     let mut f = Fixture::new();
     let mut host = host();
-    let tree = f.fs_action("read_directory", [Fixture::bytes(b"root")]);
-    let response = f.verify_pair(tree, "FileError", "(List DirEntry)", &mut host);
-    assert!(matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.ok_id));
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let cap = EvalVal::Cap(PosixHost::new_at(root).mint_fs_cap(AUTH_FULL));
+    let full = f.full();
+    let unit = f.eval_expr("Unit");
+    let acquire = f.call(
+        "withDirectory",
+        [full.clone(), unit.clone(), unit, cap,
+            Fixture::bytes(b"conformance/fs/fixtures"), EvalVal::Neutral],
+    );
+    let ty = f.ty("Result FileError (Resource ResourceKind.FsHandle)");
+    let response = f.capture_first(acquire, &ty, &mut host);
+    let file = resource_token(&response, &f.ids);
+    // The Rust harness replaces the checked bracket continuation to observe
+    // the acquisition. Rewrap its result exactly as that continuation would.
+    let directory = f.elab.env.inductive(f.id("DirectoryHandle"))
+        .expect("checked DirectoryHandle family");
+    let [wrapper] = directory.constructors.as_slice() else {
+        panic!("DirectoryHandle must have one constructor")
+    };
+    let wrapper = f.value(&Term::constructor(wrapper.id, vec![]));
+    let handle = apply(wrapper, file, &f.elab.env, &mut f.store);
+    let tree = f.call("readDirectoryBatch", [full, handle]);
+    let response = f.verify_pair(tree, "ResourceError", "DirectoryProgress", &mut host);
+    // capture_first creates a new invocation, so the token is not live in
+    // this resource table. This row checks the Result slots on refusal.
+    assert!(matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.err_id));
 }
 
 #[test]

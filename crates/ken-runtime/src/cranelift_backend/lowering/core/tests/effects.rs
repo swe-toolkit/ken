@@ -939,8 +939,8 @@ fn compile_b2f_carried_site_operand_fixture(
 }
 
 thread_local! {
-    static DIRECTORY_REPLY_PAYLOAD: std::cell::RefCell<Vec<u8>> =
-        const { std::cell::RefCell::new(Vec::new()) };
+    static DIRECTORY_REPLY_PAYLOAD: std::cell::RefCell<(u64, Vec<u8>)> =
+        const { std::cell::RefCell::new((0, Vec::new())) };
 }
 
 extern "C" fn directory_reply_probe(
@@ -950,17 +950,31 @@ extern "C" fn directory_reply_probe(
     _request_size: i64,
     reply: *mut std::ffi::c_void,
 ) -> i64 {
-    if operation != ken_host::HostOpV1::FsReadDirectory as i64 || reply.is_null() {
+    use ken_host::HostOpV1 as Op;
+    let Some(op) = [Op::FsOpenDirectory, Op::FsReadDirectoryBatch]
+        .into_iter()
+        .find(|&op| operation == op as i64)
+    else {
+        return -1;
+    };
+    if reply.is_null() {
         return -1;
     }
-    let layout = ken_host::host_effect_wire_layout_v1(
-        ken_host::HostOpV1::FsReadDirectory,
-    )
-    .expect("FsReadDirectory has a generated wire layout");
-    DIRECTORY_REPLY_PAYLOAD.with(|payload| {
-        let payload = payload.borrow();
+    let layout = ken_host::host_effect_wire_layout_v1(op).expect("directory wire layout");
+    unsafe { std::ptr::write_bytes(reply.cast::<u8>(), 0, layout.reply_size as usize) };
+    let store = |offset: u32, value: u64| unsafe {
+        *reply.cast::<u8>().add(offset as usize).cast::<u64>() = value;
+    };
+    if op == Op::FsOpenDirectory {
+        store(layout.reply_tag_offset, layout.reply_resource_tag);
+        store(layout.reply_detail_offset, 11);
+        return 0;
+    }
+    DIRECTORY_REPLY_PAYLOAD.with(|held| {
+        let held = held.borrow();
+        let (detail, payload) = &*held;
+        store(layout.reply_detail_offset, *detail);
         unsafe {
-            std::ptr::write_bytes(reply.cast::<u8>(), 0, layout.reply_size as usize);
             *(reply
                 .cast::<u8>()
                 .add(layout.reply_tag_offset as usize)
@@ -968,7 +982,7 @@ extern "C" fn directory_reply_probe(
             *(reply
                 .cast::<u8>()
                 .add(layout.reply_bytes_data_offset as usize)
-                .cast::<*const u8>()) = payload.as_ptr();
+                .cast::<*const u8>()) = if payload.is_empty() { std::ptr::null() } else { payload.as_ptr() };
             *(reply
                 .cast::<u8>()
                 .add(layout.reply_bytes_len_offset as usize)
@@ -978,12 +992,12 @@ extern "C" fn directory_reply_probe(
     0
 }
 
-fn directory_reply_fixture() -> RuntimeExpr {
-    RuntimeExpr::Let {
-        value: Box::new(RuntimeExpr::Effect {
+fn directory_reply_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Effect {
             bracket_acquire: None,
             family: "FS".to_string(),
-            operation: ken_host::HostOpV1::FsReadDirectory,
+            operation: ken_host::HostOpV1::FsOpenDirectory,
             capability: Some(crate::RuntimeCapabilityUse {
                 identity: "directory.reply.capability".to_string(),
                 value: Box::new(RuntimeExpr::Var(1)),
@@ -992,10 +1006,27 @@ fn directory_reply_fixture() -> RuntimeExpr {
                 b"directory".to_vec(),
             ))],
         }),
-        body: Box::new(RuntimeExpr::Construct {
-            constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
-            args: Vec::new(),
-        }),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_ok.clone(),
+            binders: 1,
+            body: RuntimeExpr::Let {
+                value: Box::new(RuntimeExpr::Effect {
+                    bracket_acquire: None,
+                    family: "FS".to_string(),
+                    operation: ken_host::HostOpV1::FsReadDirectoryBatch,
+                    capability: None,
+                    args: vec![RuntimeExpr::Var(0)],
+                }),
+                body: Box::new(RuntimeExpr::Construct {
+                    constructor: symbols.exit_success.clone(),
+                    args: Vec::new(),
+                }),
+            },
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "directory probe must acquire a resource".to_string(),
+        },
     }
 }
 
@@ -1012,7 +1043,7 @@ fn compile_directory_reply_fixture(
         JITModule::new(jit),
         "abi_a3_directory_reply_decoder",
         Linkage::Local,
-        &directory_reply_fixture(),
+        &directory_reply_fixture(&symbols),
         &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
         BTreeMap::new(),
         None,
@@ -1023,8 +1054,8 @@ fn compile_directory_reply_fixture(
     )
 }
 
-fn run_directory_reply_fixture(payload: Vec<u8>) -> i64 {
-    DIRECTORY_REPLY_PAYLOAD.with(|held| *held.borrow_mut() = payload);
+fn run_directory_reply_fixture(detail: u64, payload: Vec<u8>) -> i64 {
+    DIRECTORY_REPLY_PAYLOAD.with(|held| *held.borrow_mut() = (detail, payload));
     let compiled = compile_directory_reply_fixture()
         .expect("DirectoryEntries decoder fixture lowers");
     let input = BorrowedFixtureValue {
@@ -1055,26 +1086,30 @@ fn directory_entries_decoder_is_bounded_and_consumes_the_whole_payload() {
         1, 0, 0, 0, 0, 0, 0, 0,
         1, 0, 0, 0, 0, 0, 0, 0, b'a', 0,
     ];
-    assert_eq!(run_directory_reply_fixture(vec![0; 8]), 0);
-    assert_eq!(run_directory_reply_fixture(valid.clone()), 0);
+    use ken_host::{DIRECTORY_BATCH_END_V1 as END, DIRECTORY_BATCH_ENTRIES_V1 as ENTRIES};
+    assert_eq!(run_directory_reply_fixture(END, vec![]), 0);
+    assert_eq!(run_directory_reply_fixture(END, valid.clone()), -1);
+    assert_eq!(run_directory_reply_fixture(u64::MAX, vec![]), -1);
+    assert_eq!(run_directory_reply_fixture(ENTRIES, vec![0; 8]), -1, "Entries must contain at least one entry");
+    assert_eq!(run_directory_reply_fixture(ENTRIES, valid.clone()), 0);
 
     for end in [0, 7, 8, 16, 17] {
         assert_eq!(
-            run_directory_reply_fixture(valid[..end].to_vec()),
+            run_directory_reply_fixture(ENTRIES, valid[..end].to_vec()),
             -1,
             "payload truncation at {end} must fail closed"
         );
     }
     let mut trailing = valid.clone();
     trailing.push(0);
-    assert_eq!(run_directory_reply_fixture(trailing), -1);
+    assert_eq!(run_directory_reply_fixture(ENTRIES, trailing), -1);
     let mut invalid_kind = valid.clone();
     *invalid_kind.last_mut().unwrap() = 4;
-    assert_eq!(run_directory_reply_fixture(invalid_kind), -1);
+    assert_eq!(run_directory_reply_fixture(ENTRIES, invalid_kind), -1);
     let mut impossible_count = valid;
     impossible_count[0] = 2;
-    assert_eq!(run_directory_reply_fixture(impossible_count), -1);
-    DIRECTORY_REPLY_PAYLOAD.with(|held| held.borrow_mut().clear());
+    assert_eq!(run_directory_reply_fixture(ENTRIES, impossible_count), -1);
+    DIRECTORY_REPLY_PAYLOAD.with(|held| held.borrow_mut().1.clear());
 }
 
 /// Promise class: durable ownership-source invariant for each decoded name.
@@ -3710,7 +3745,7 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
         ken_host::HostOpV1::FsWriteFile,
         ken_host::HostOpV1::FsAppendFile,
         ken_host::HostOpV1::FsMetadata,
-        ken_host::HostOpV1::FsReadDirectory,
+        ken_host::HostOpV1::FsOpenDirectory,
         ken_host::HostOpV1::FsCreateDirectory,
         ken_host::HostOpV1::FsRemoveFile,
         ken_host::HostOpV1::FsRemoveDirectory,
@@ -5764,7 +5799,7 @@ fn ac_4_byte_span_seats_are_activated_exactly_where_evidence_proved_them() {
             (ken_host::HostOpV1::FsWriteFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsAppendFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsMetadata, EffectSeatSlot::Argument(0)),
-            (ken_host::HostOpV1::FsReadDirectory, EffectSeatSlot::Argument(0)),
+            (ken_host::HostOpV1::FsOpenDirectory, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsCreateDirectory, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsRemoveFile, EffectSeatSlot::Argument(0)),
             (ken_host::HostOpV1::FsRemoveDirectory, EffectSeatSlot::Argument(1)),

@@ -374,7 +374,7 @@ impl fmt::Display for FsDirectoryDifferentialError {
                 reason,
             } => write!(formatter, "{lane} {operation:?} shape: {reason}"),
             Self::Listing { lane, reason } => {
-                write!(formatter, "{lane} FsReadDirectory listing: {reason}")
+                write!(formatter, "{lane} FsReadDirectoryBatch listing: {reason}")
             }
             Self::Transition {
                 operation,
@@ -508,12 +508,12 @@ impl CanonicalDifferentialRun {
 
     /// Compare a whole-directory response as a name-sorted `{name, kind}` set.
     /// Raw host iteration order is deliberately not part of this projection.
-    pub fn compare_fs_read_directory(
+    pub fn compare_directory_stream(
         &self,
         request_path: &[u8],
         expected_entries: &[ken_host::DirEntryV1],
     ) -> Result<(), FsDirectoryDifferentialError> {
-        compare_fs_read_directory_observations(
+        compare_directory_stream_observations(
             &self.interpreter,
             &self.native,
             request_path,
@@ -677,14 +677,15 @@ fn execute_scenario(scenario: &Scenario) -> Result<CanonicalDifferentialRun, Har
 // read contents and can change atime; do not take them in this route.
 #[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy)]
-enum SharedMetadataRoot<'a> {
-    Fixture,
+enum SharedScenarioRoot<'a> {
+    DirectoryFixture,
+    MetadataFixture,
     Existing(&'a std::path::Path),
 }
 
 fn execute_scenario_with_roots(
     scenario: &Scenario,
-    shared: Option<SharedMetadataRoot<'_>>,
+    shared: Option<SharedScenarioRoot<'_>>,
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     std::thread::scope(|scope| {
         std::thread::Builder::new()
@@ -701,7 +702,7 @@ fn execute_scenario_with_roots(
 
 fn execute_scenario_on_compiler_stack(
     scenario: &Scenario,
-    shared: Option<SharedMetadataRoot<'_>>,
+    shared: Option<SharedScenarioRoot<'_>>,
 ) -> Result<CanonicalDifferentialRun, HarnessError> {
     validate_native_ambient(&scenario.ambient)?;
     let roots = TwinRealRoots::create(&scenario.initial_filesystem)?;
@@ -719,15 +720,16 @@ fn execute_scenario_on_compiler_stack(
     let mut arguments = vec![argv0];
     arguments.extend(scenario.process_input.arguments.clone());
     let shared_root = shared.map(|choice| match choice {
-        SharedMetadataRoot::Fixture => roots.interpreter().to_path_buf(),
-        SharedMetadataRoot::Existing(path) => path.to_path_buf(),
+        SharedScenarioRoot::MetadataFixture | SharedScenarioRoot::DirectoryFixture => roots.interpreter().to_path_buf(),
+        SharedScenarioRoot::Existing(path) => path.to_path_buf(),
     });
     let interpreter_root = shared_root.as_deref().unwrap_or(roots.interpreter());
     let native_root = shared_root.as_deref().unwrap_or(roots.native());
     let cwd = raw_path_bytes(native_root)?;
 
+    let metadata_only = matches!(shared, Some(SharedScenarioRoot::MetadataFixture | SharedScenarioRoot::Existing(_)));
     let observe_root = |path| {
-        if shared.is_none() {
+        if !metadata_only {
             crate::filesystem::snapshot_root(path).map_err(HarnessError::TwinRoots)
         } else {
             Ok(Default::default())
@@ -790,7 +792,7 @@ fn execute_scenario_on_compiler_stack(
         plan_hash: build.plan_transport_hash,
     };
     let native_window_start = wall_clock_nanoseconds();
-    let native = if shared.is_some() {
+    let native = if metadata_only {
         ken_runtime::run_bound_process_metadata_observation(
             &build.artifact,
             &options,
@@ -1402,102 +1404,54 @@ fn validate_fs_rename_observation(
     Ok(())
 }
 
-fn compare_fs_read_directory_observations(
+fn compare_directory_stream_observations(
     interpreter: &EffectObservation,
     native: &EffectObservation,
     request_path: &[u8],
     expected_entries: &[ken_host::DirEntryV1],
 ) -> Result<(), FsDirectoryDifferentialError> {
     let mut expected = expected_entries.to_vec();
-    sort_directory_entries(&mut expected);
-    for (lane, observation) in [
-        ("interpreter", interpreter),
-        ("native", native),
-    ] {
-        let [event] = observation.effect_trace.as_slice() else {
-            return Err(FsDirectoryDifferentialError::Shape {
-                operation: ken_host::HostOpV1::FsReadDirectory,
-                lane,
-                reason: format!(
-                    "expected one event, observed {}",
-                    observation.effect_trace.len()
-                ),
-            });
+    expected.sort_by(|a, b| a.name.cmp(&b.name));
+    for (lane, observation) in [("interpreter", interpreter), ("native", native)] {
+        use ken_host::{CanonicalOutcomeV1::Success, CanonicalReplyV1 as Reply, HostOpV1 as Op};
+        let shape = |reason: &str| FsDirectoryDifferentialError::Shape {
+            operation: Op::FsReadDirectoryBatch, lane, reason: reason.to_owned(),
         };
-        if event.sequence != 0
-            || event.operation != ken_host::HostOpV1::FsReadDirectory
-            || event.capability.is_none()
-            || !event.resource_bindings.is_empty()
-            || event.request
-                != (ken_host::CanonicalRequestV1::FsReadDirectory {
-                    path: request_path.to_vec(),
-                })
+        let [open, batches @ .., release] = observation.effect_trace.as_slice() else {
+            return Err(shape("expected an acquisition, batches, and release"));
+        };
+        if open.operation != Op::FsOpenDirectory || open.capability.is_none()
+            || open.request != (ken_host::CanonicalRequestV1::FsOpenDirectory { path: request_path.to_vec() })
+            || !matches!(open.outcome, Success(Reply::ResourceAcquired { .. }))
+            || release.operation != Op::ResourceRelease
+            || open.resource_bindings != release.resource_bindings
             || observation.terminal_error.is_some()
             || observation.terminal_exit != ken_host::TerminalExitClass::NormalReturn
-            || observation.exit_status != 0
-            || !observation.filesystem_delta.is_empty()
-        {
-            return Err(FsDirectoryDifferentialError::Shape {
-                operation: ken_host::HostOpV1::FsReadDirectory,
-                lane,
-                reason: "event/result is not the exact read-only success shape"
-                    .to_string(),
-            });
+            || observation.exit_status != 0 || !observation.filesystem_delta.is_empty()
+        { return Err(shape("expected a successful read-only traversal with release")); }
+        let mut actual = Vec::new();
+        let mut ended = false;
+        for event in batches {
+            if ended || event.operation != Op::FsReadDirectoryBatch || event.capability.is_some()
+                || event.resource_bindings != open.resource_bindings
+                || event.request != ken_host::CanonicalRequestV1::FsReadDirectoryBatch
+            { return Err(shape("expected batches on the acquired handle, ending once")); }
+            match &event.outcome {
+                Success(Reply::DirectoryEnd) => ended = true,
+                Success(Reply::DirectoryEntries(entries)) if !entries.is_empty() => actual.extend_from_slice(entries),
+                _ => return Err(shape("expected a nonempty batch or End")),
+            }
         }
-        let ken_host::CanonicalOutcomeV1::Success(
-            ken_host::CanonicalReplyV1::DirectoryEntries(entries),
-        ) = &event.outcome
-        else {
-            return Err(FsDirectoryDifferentialError::Listing {
-                lane,
-                reason: "response is not DirectoryEntries".to_string(),
-            });
-        };
-        let mut actual = entries.clone();
-        sort_directory_entries(&mut actual);
+        if !ended { return Err(shape("expected DirectoryEnd")); }
+        actual.sort_by(|a, b| a.name.cmp(&b.name));
         if actual != expected {
             return Err(FsDirectoryDifferentialError::Listing {
                 lane,
-                reason: format!(
-                    "expected canonicalized {expected:?}, observed {actual:?}"
-                ),
+                reason: format!("expected exact entry population ({}), observed {}", expected.len(), actual.len()),
             });
         }
     }
-    let mut interpreter = interpreter.clone();
-    let mut native = native.clone();
-    normalize_directory_listing(&mut interpreter);
-    normalize_directory_listing(&mut native);
-    compare_canonical_exact(&interpreter, &native)
-        .map_err(FsDirectoryDifferentialError::Observation)
-}
-
-fn sort_directory_entries(entries: &mut [ken_host::DirEntryV1]) {
-    let kind = |kind| match kind {
-        ken_host::FsNodeKindV1::File => 0,
-        ken_host::FsNodeKindV1::Directory => 1,
-        ken_host::FsNodeKindV1::Symlink => 2,
-        ken_host::FsNodeKindV1::Other => 3,
-    };
-    entries.sort_by(|left, right| {
-        left.name
-            .cmp(&right.name)
-            .then_with(|| kind(left.kind).cmp(&kind(right.kind)))
-    });
-}
-
-fn normalize_directory_listing(observation: &mut EffectObservation) {
-    for event in &mut observation.effect_trace {
-        if event.operation != ken_host::HostOpV1::FsReadDirectory {
-            continue;
-        }
-        if let ken_host::CanonicalOutcomeV1::Success(
-            ken_host::CanonicalReplyV1::DirectoryEntries(entries),
-        ) = &mut event.outcome
-        {
-            sort_directory_entries(entries);
-        }
-    }
+    compare_canonical_exact(interpreter, native).map_err(FsDirectoryDifferentialError::Observation)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2109,77 +2063,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                   Err _ |-> host_pure AFull ExitCode (ExitCode.Failure 104)
                 })
           }
-        }
-      }
-    }
-  }
-"#;
-
-    // FileOperation matches must enumerate every constructor: a new op needs a poison arm here. Only native builds elaborate this fixture, so CI catches omissions.
-    const FS_READ_DIRECTORY_SOURCE: &str = r#"program capabilities FS AFull "./data"
-import Capability.Filesystem.Authority (read_directory)
-import Capability.Process.Exit (host_bind, host_fs, host_pure)
-proc main (input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match input {
-    MkProcessInput arguments _environment _cwd |-> match arguments {
-      Nil |-> host_pure AFull ExitCode (ExitCode.Failure 110) ;
-      Cons _argv0 rest |-> match rest {
-        Nil |-> host_pure AFull ExitCode (ExitCode.Failure 111) ;
-        Cons path _ |-> match caps {
-          ProgramCaps.MkProgramCaps cap |->
-            host_bind AFull (Result FileError (List DirEntry)) ExitCode
-              (host_fs AFull (Result FileError (List DirEntry))
-                (read_directory AFull cap path))
-              (\observed. match observed {
-                Err error |-> match error {
-                  MkFileError file_operation _path cause |-> match file_operation {
-                    FileOperation.OpReadDirectory |-> match cause {
-                      IOError.CapabilityDenied |-> host_pure AFull ExitCode (ExitCode.Failure 44) ;
-                      IOError.NotFound |-> host_pure AFull ExitCode (ExitCode.Failure 45) ;
-                      IOError.PermissionDenied |-> host_pure AFull ExitCode (ExitCode.Failure 46) ;
-                      IOError.BrokenPipe |-> host_pure AFull ExitCode (ExitCode.Failure 47) ;
-                      IOError.Interrupted |-> host_pure AFull ExitCode (ExitCode.Failure 48) ;
-                      IOError.AlreadyExists |-> host_pure AFull ExitCode (ExitCode.Failure 49) ;
-                      IOError.InvalidInput |-> host_pure AFull ExitCode (ExitCode.Failure 50) ;
-                      IOError.IsDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 51) ;
-                      IOError.NotDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 52) ;
-                      IOError.NotEmpty |-> host_pure AFull ExitCode (ExitCode.Failure 53) ;
-                      IOError.Unsupported |-> host_pure AFull ExitCode (ExitCode.Failure 54) ;
-                      IOError.Revoked |-> host_pure AFull ExitCode (ExitCode.Failure 55) ;
-                      IOError.Other _ |-> host_pure AFull ExitCode (ExitCode.Failure 56)
-                    } ;
-                    FileOperation.OpReadFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpWriteFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpChangeMode |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpAppendFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpMetadata |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpCreateDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRemoveFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRemoveDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSeek |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetLength |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSync |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpGetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpDuplicate |-> host_pure AFull ExitCode (ExitCode.Failure 199)
-                  }
-                } ;
-                Ok entries |-> match entries {
-                  Nil |-> host_pure AFull ExitCode (ExitCode.Failure 112) ;
-                  Cons _ rest1 |-> match rest1 {
-                    Nil |-> host_pure AFull ExitCode (ExitCode.Failure 113) ;
-                    Cons _ rest2 |-> match rest2 {
-                      Nil |-> host_pure AFull ExitCode (ExitCode.Failure 114) ;
-                      Cons _ rest3 |-> match rest3 {
-                        Nil |-> host_pure AFull ExitCode ExitCode.Success ;
-                        Cons _ _ |-> host_pure AFull ExitCode (ExitCode.Failure 115)
-                      }
-                    }
-                  }
-                }
-              })
         }
       }
     }
@@ -2999,39 +2882,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         }]
     }
 
-    fn fs_read_directory_success_scenario() -> Scenario {
-        let mut nodes = abi_a3_base_nodes();
-        nodes.extend([
-            SeedNode {
-                relative_path: b"data/listing".to_vec(),
-                kind: crate::SeedNodeKind::Directory,
-            },
-            SeedNode {
-                relative_path: b"data/listing/file.bin".to_vec(),
-                kind: crate::SeedNodeKind::File(b"payload".to_vec()),
-            },
-            SeedNode {
-                relative_path: b"data/listing/subdir".to_vec(),
-                kind: crate::SeedNodeKind::Directory,
-            },
-            SeedNode {
-                relative_path: b"data/listing/link".to_vec(),
-                kind: crate::SeedNodeKind::Symlink(b"file.bin".to_vec()),
-            },
-        ]);
-        abi_a3_scenario(
-            "abi-a3-fs-read-directory-success",
-            FS_READ_DIRECTORY_SOURCE.to_string(),
-            AUTH_FULL,
-            RightSet::ALL,
-            b"listing".to_vec(),
-            nodes,
-            ExpectedFsEffect::ReadDirectory {
-                path: b"listing".to_vec(),
-            },
-        )
-    }
-
     fn fs_create_directory_scenario(identity: &str, path: &[u8], nodes: Vec<SeedNode>) -> Scenario {
         abi_a3_scenario(
             identity,
@@ -3101,13 +2951,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         policy: AbiA3PolicyCase,
     ) -> (Scenario, CapabilityDeniedV1) {
         let (source, expected_fs, required) = match operation {
-            HostOpV1::FsReadDirectory => (
-                FS_READ_DIRECTORY_SOURCE.to_string(),
-                ExpectedFsEffect::ReadDirectory {
-                    path: Vec::new(),
-                },
-                ken_host::FsCapabilityOperationV1::Enumerate,
-            ),
             HostOpV1::FsCreateDirectory => (
                 FS_CREATE_DIRECTORY_SOURCE.to_string(),
                 ExpectedFsEffect::CreateDirectory { path: Vec::new() },
@@ -3191,9 +3034,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
             }
         };
         let expected_fs = match expected_fs {
-            ExpectedFsEffect::ReadDirectory { .. } => {
-                ExpectedFsEffect::ReadDirectory { path: path.clone() }
-            }
             ExpectedFsEffect::CreateDirectory { .. } => {
                 ExpectedFsEffect::CreateDirectory { path: path.clone() }
             }
@@ -3649,116 +3489,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
         ));
     }
 
-    /// Promise class: durable invariant over the provisional whole-directory
-    /// payload. Intended streaming replacement keeps this set-level test green.
-    #[test]
-    fn fs_read_directory_real_artifact_is_order_independent_and_discriminating() {
-        let expected = vec![
-            ken_host::DirEntryV1 {
-                name: b"file.bin".to_vec(),
-                kind: ken_host::FsNodeKindV1::File,
-            },
-            ken_host::DirEntryV1 {
-                name: b"subdir".to_vec(),
-                kind: ken_host::FsNodeKindV1::Directory,
-            },
-            ken_host::DirEntryV1 {
-                name: b"link".to_vec(),
-                kind: ken_host::FsNodeKindV1::Symlink,
-            },
-        ];
-        let run = execute_scenario(&fs_read_directory_success_scenario())
-            .expect("FsReadDirectory real-artifact differential executes");
-        run.compare_fs_read_directory(b"listing", &expected)
-            .expect("name/kind set parity");
-        assert_eq!(run.interpreter_actions.fs_actions_after_resolve, Some(1));
-        assert_eq!(
-            confirm_native_tested_transition(
-                HostOpV1::FsReadDirectory,
-                NativeTestedEvidence::from_fs_read_directory_run(
-                    &run,
-                    b"listing",
-                    &expected,
-                ),
-            ),
-            Ok(HostOpAvailabilityV1::NativeTested)
-        );
-
-        let mut reordered = run.native.clone();
-        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
-            &mut reordered.effect_trace[0].outcome
-        else {
-            panic!("listing fixture must return DirectoryEntries")
-        };
-        entries.reverse();
-        compare_fs_read_directory_observations(
-            &run.interpreter,
-            &reordered,
-            b"listing",
-            &expected,
-        )
-        .expect("raw listing order is not contractual");
-
-        let mut missing = run.native.clone();
-        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
-            &mut missing.effect_trace[0].outcome
-        else {
-            panic!("listing fixture must return DirectoryEntries")
-        };
-        entries.pop();
-        assert!(matches!(
-            compare_fs_read_directory_observations(
-                &run.interpreter,
-                &missing,
-                b"listing",
-                &expected,
-            ),
-            Err(FsDirectoryDifferentialError::Listing {
-                lane: "native",
-                ..
-            })
-        ));
-
-        let mut wrong_name = run.native.clone();
-        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
-            &mut wrong_name.effect_trace[0].outcome
-        else {
-            panic!("listing fixture must return DirectoryEntries")
-        };
-        entries[0].name.push(0xff);
-        assert!(matches!(
-            compare_fs_read_directory_observations(
-                &run.interpreter,
-                &wrong_name,
-                b"listing",
-                &expected,
-            ),
-            Err(FsDirectoryDifferentialError::Listing {
-                lane: "native",
-                ..
-            })
-        ));
-
-        let mut wrong_kind = run.native.clone();
-        let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(entries)) =
-            &mut wrong_kind.effect_trace[0].outcome
-        else {
-            panic!("listing fixture must return DirectoryEntries")
-        };
-        entries[0].kind = ken_host::FsNodeKindV1::Other;
-        assert!(matches!(
-            compare_fs_read_directory_observations(
-                &run.interpreter,
-                &wrong_kind,
-                b"listing",
-                &expected,
-            ),
-            Err(FsDirectoryDifferentialError::Listing {
-                lane: "native",
-                ..
-            })
-        ));
-    }
+    mod directory_stream;
 
     /// Promise class: durable state-transition and failure-classification
     /// invariant (spec 38 §1.12, AC-0). MEASURED: both lanes report the
@@ -4183,10 +3914,6 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
 
     /// Promise class: durable invariant over the landed scoped-root, NoFollow,
     /// and Enumerate-right gate.
-    #[test]
-    fn fs_read_directory_exercises_every_path_policy_refusal() {
-        assert_abi_a3_path_policy(HostOpV1::FsReadDirectory);
-    }
 
     /// Promise class: durable invariant over the landed scoped-root, NoFollow,
     /// and Create-right gate.
@@ -4487,7 +4214,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         let scenario =
             abi_s4_both_metadata_scenario("abi-s4-procfs-absence", absent_birth, absent_birth);
         let mut run =
-            execute_scenario_with_roots(&scenario, Some(SharedMetadataRoot::Existing(proc)))
+            execute_scenario_with_roots(&scenario, Some(SharedScenarioRoot::Existing(proc)))
                 .expect("ABI-S4 /proc/version exact artifacts execute");
         let expected =
             ken_host::file_metadata_from_statx(&status).expect("procfs status has ruled fields");
@@ -4593,7 +4320,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
             abi_s4_both_metadata_scenario("abi-s4-returned-options", &path_check, &handle_check);
         let run = execute_scenario_with_roots(
             &scenario,
-            Some(SharedMetadataRoot::Existing(fixture.interpreter())),
+            Some(SharedScenarioRoot::Existing(fixture.interpreter())),
         )
         .expect("ABI-S4 returned-option artifacts execute");
         for (lane, observation) in [("interpreter", &run.interpreter), ("native", &run.native)] {
@@ -4620,7 +4347,7 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         ];
         let run = execute_scenario_with_roots(
             &fs_metadata_success_scenario(),
-            Some(SharedMetadataRoot::Fixture),
+            Some(SharedScenarioRoot::MetadataFixture),
         )
         .expect("FsMetadata real-artifact differential executes");
         run.compare_fs_metadata(PATHS)

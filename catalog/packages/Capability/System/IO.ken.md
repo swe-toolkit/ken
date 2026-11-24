@@ -45,6 +45,7 @@ export write_all_exact_prefix_prop,
   write_all_advance_start_prop,
   write_all_advance_start,
   readAt,
+  readDirectoryBatch,
   writeAt,
   writeAll,
   spanBytes

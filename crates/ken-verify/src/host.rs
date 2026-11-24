@@ -11,7 +11,7 @@ use std::path::Path;
 use ken_elaborator::capabilities::{self, Cap};
 use ken_host::{CreatePolicyV1, HostOpV1};
 use ken_interp::{
-    CapabilityDenied, ConsoleStream, FsOpKind, HostCreatePolicy, HostDirEntry, HostFileMetadata,
+    CapabilityDenied, ConsoleStream, FsOpKind, HostCreatePolicy, HostFileMetadata,
     HostHandler, HostRead, PosixHost, Resolution, ResolveError,
 };
 use num_bigint::BigInt;
@@ -48,9 +48,6 @@ pub enum ExpectedFsEffect {
     Metadata {
         path: Vec<u8>,
     },
-    ReadDirectory {
-        path: Vec<u8>,
-    },
     CreateDirectory {
         path: Vec<u8>,
     },
@@ -78,7 +75,6 @@ impl ExpectedFsEffect {
             Self::WriteFile { .. } => HostOpV1::FsWriteFile,
             Self::AppendFile { .. } => HostOpV1::FsAppendFile,
             Self::Metadata { .. } => HostOpV1::FsMetadata,
-            Self::ReadDirectory { .. } => HostOpV1::FsReadDirectory,
             Self::CreateDirectory { .. } => HostOpV1::FsCreateDirectory,
             Self::RemoveFile { .. } => HostOpV1::FsRemoveFile,
             Self::RemoveDirectory { .. } => HostOpV1::FsRemoveDirectory,
@@ -93,7 +89,6 @@ impl ExpectedFsEffect {
             | (Self::WriteFile { path, .. }, FsOpKind::Write)
             | (Self::AppendFile { path, .. }, FsOpKind::Append)
             | (Self::Metadata { path }, FsOpKind::Metadata)
-            | (Self::ReadDirectory { path }, FsOpKind::Enumerate)
             | (Self::CreateDirectory { path }, FsOpKind::CreateDirectory)
             | (Self::RemoveFile { path }, FsOpKind::RemoveFile)
             | (Self::RemoveDirectory { path, .. }, FsOpKind::RemoveDirectory)
@@ -437,11 +432,6 @@ impl HostHandler for ScriptedPosixHost {
     fn fs_metadata_at(&mut self, handle: &Self::Handle) -> io::Result<HostFileMetadata> {
         self.take_pending(HostOpV1::FsMetadata);
         self.inner.fs_metadata_at(handle)
-    }
-
-    fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>> {
-        self.take_pending(HostOpV1::FsReadDirectory);
-        self.inner.fs_read_directory_at(handle)
     }
 
     fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {

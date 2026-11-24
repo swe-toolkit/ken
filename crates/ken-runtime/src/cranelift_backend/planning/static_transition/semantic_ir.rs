@@ -135,6 +135,8 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     FileOperationRemoveFile,
     FileOperationRemoveDirectory,
     DirEntry,
+    DirectoryEntries,
+    DirectoryEnd,
     ListNil,
     ListCons,
     /// ABI-S1 descriptor-operation error identities append without moving prior roles.
@@ -161,7 +163,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 60] = [
+    pub(super) const ALL: [Self; 62] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -203,6 +205,8 @@ impl SynthesizedFixedConstructorRole {
         Self::FileOperationRemoveFile,
         Self::FileOperationRemoveDirectory,
         Self::DirEntry,
+        Self::DirectoryEntries,
+        Self::DirectoryEnd,
         Self::ListNil,
         Self::ListCons,
         Self::FileOperationSeek,
@@ -270,6 +274,8 @@ impl SynthesizedFixedConstructorRole {
             Self::FileOperationRemoveFile => &symbols.file_operation_remove_file,
             Self::FileOperationRemoveDirectory => &symbols.file_operation_remove_directory,
             Self::DirEntry => &symbols.dir_entry,
+            Self::DirectoryEntries => &symbols.directory_entries,
+            Self::DirectoryEnd => &symbols.directory_end,
             Self::ListNil => &symbols.list_nil,
             Self::ListCons => &symbols.list_cons,
             Self::FileOperationSeek => &symbols.file_operation_seek,

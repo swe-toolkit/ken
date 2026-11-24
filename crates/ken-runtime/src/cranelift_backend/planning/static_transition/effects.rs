@@ -347,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 34] = [
+    [ken_host::HostOpV1; 35] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
@@ -365,7 +365,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsAppendFile,
     ken_host::HostOpV1::FsMetadata,
-    ken_host::HostOpV1::FsReadDirectory,
+    ken_host::HostOpV1::FsOpenDirectory,
     ken_host::HostOpV1::FsCreateDirectory,
     ken_host::HostOpV1::FsRemoveFile,
     ken_host::HostOpV1::FsRemoveDirectory,
@@ -374,6 +374,7 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::FsOpen,
     ken_host::HostOpV1::FsHandleMetadata,
     ken_host::HostOpV1::FsReadAt,
+    ken_host::HostOpV1::FsReadDirectoryBatch,
     ken_host::HostOpV1::FsWriteAt,
     ken_host::HostOpV1::ResourceRelease,
     ken_host::HostOpV1::BufferAllocate,
@@ -415,7 +416,7 @@ fn host_effect_seat_contract(
                 | Op::FsWriteFile
                 | Op::FsAppendFile
                 | Op::FsMetadata
-                | Op::FsReadDirectory
+                | Op::FsOpenDirectory
                 | Op::FsCreateDirectory
                 | Op::FsRemoveFile
                 | Op::FsRemoveDirectory
@@ -433,6 +434,7 @@ fn host_effect_seat_contract(
                 Op::ConsoleWrite
                 | Op::ConsoleFlush
                 | Op::ConsoleIsTerminal
+                | Op::FsReadDirectoryBatch
                 | Op::FsHandleMetadata
                 | Op::FsReadAt
                 | Op::FsWriteAt
@@ -540,7 +542,7 @@ fn host_effect_seat_contract(
         | (Op::FsWriteFile, 0)
         | (Op::FsAppendFile, 0)
         | (Op::FsMetadata, 0)
-        | (Op::FsReadDirectory, 0)
+        | (Op::FsOpenDirectory, 0)
         | (Op::FsCreateDirectory, 0)
         | (Op::FsRemoveFile, 0)
         | (Op::FsRename, 0)
@@ -550,7 +552,8 @@ fn host_effect_seat_contract(
         (Op::FsRemoveDirectory, 1) => Some(bytes),
         (Op::FsWriteFile, 1) | (Op::FsOpen, 1) => Some(tag),
         (Op::FsChangeMode, 1) => Some(exact_int),
-        (Op::FsHandleMetadata, 0)
+        (Op::FsReadDirectoryBatch, 0)
+        | (Op::FsHandleMetadata, 0)
         | (Op::ResourceRelease, 0)
         | (Op::MappingAcquireFile, 0) => Some(resource),
         // The file-backed differential reaches this exact ordinal carried:
@@ -655,14 +658,15 @@ fn host_effect_seat_contract(
             | Op::FsWriteFile
             | Op::FsAppendFile
             | Op::FsMetadata
-            | Op::FsReadDirectory
+            | Op::FsOpenDirectory
             | Op::FsCreateDirectory
             | Op::FsRemoveFile
             | Op::FsRemoveDirectory
             | Op::FsRename
             | Op::FsChangeMode
             | Op::FsOpen
-            | Op::FsHandleMetadata
+            | Op::FsReadDirectoryBatch
+                | Op::FsHandleMetadata
             | Op::FsReadAt
             | Op::FsWriteAt
             | Op::ResourceRelease

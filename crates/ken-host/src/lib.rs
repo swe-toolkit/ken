@@ -523,29 +523,53 @@ mod linux {
         fs::fchmod(&*handle.0, Mode::from_bits_retain(u32::from(mode))).map_err(io::Error::from)
     }
 
-    pub(super) fn read_directory(handle: &Handle) -> io::Result<Vec<DirectoryEntry>> {
-        use std::os::fd::AsRawFd;
-        use std::os::unix::ffi::OsStringExt;
-        let path = PathBuf::from(format!("/proc/self/fd/{}", handle.0.as_raw_fd()));
+    pub(super) fn read_directory_batch(handle: &ResourceHandle) -> io::Result<DirectoryBatch> {
+        use std::mem::MaybeUninit;
+        use rustix::fs::FileType;
+
+        let mut buffer = [MaybeUninit::uninit(); DIRECTORY_BATCH_BYTES];
+        let mut dir = fs::RawDir::new(&handle.0, &mut buffer);
         let mut entries = Vec::new();
-        for entry in std::fs::read_dir(path)? {
-            let entry = entry?;
-            let kind = if entry.file_type()?.is_file() {
-                FileKind::File
-            } else if entry.file_type()?.is_dir() {
-                FileKind::Directory
-            } else if entry.file_type()?.is_symlink() {
-                FileKind::Symlink
-            } else {
-                FileKind::Other
+        loop {
+            let Some(entry) = dir.next() else {
+                return Ok(DirectoryBatch::End);
             };
-            entries.push(DirectoryEntry {
-                name: entry.file_name().into_vec(),
-                kind,
-            });
+            let entry = entry?;
+            let name = entry.file_name();
+            if !matches!(name.to_bytes(), b"." | b"..") {
+                let kind = match entry.file_type() {
+                    FileType::Unknown => {
+                        let status = fs::statx(
+                            &handle.0,
+                            name,
+                            AtFlags::SYMLINK_NOFOLLOW,
+                            fs::StatxFlags::TYPE,
+                        )?;
+                        if !fs::StatxFlags::from_bits_retain(status.stx_mask)
+                            .contains(fs::StatxFlags::TYPE)
+                        {
+                            return Err(io::ErrorKind::Unsupported.into());
+                        }
+                        FileType::from_raw_mode(status.stx_mode.into())
+                    },
+                    kind => kind,
+                };
+                entries.push(DirEntryV1 {
+                    name: name.to_bytes().to_vec(),
+                    kind: match kind {
+                        FileType::RegularFile => FsNodeKindV1::File,
+                        FileType::Directory => FsNodeKindV1::Directory,
+                        FileType::Symlink => FsNodeKindV1::Symlink,
+                        _ => FsNodeKindV1::Other,
+                    },
+                });
+            }
+            // Don't let next() refill after a nonempty batch. A fill with
+            // only dot entries is skipped within this call, not exposed.
+            if dir.is_buffer_empty() && !entries.is_empty() {
+                return Ok(DirectoryBatch::Entries(entries));
+            }
         }
-        entries.sort_by(|left, right| left.name.cmp(&right.name));
-        Ok(entries)
     }
 
     pub(super) fn create_directory(parent: &Handle, leaf: &PathComponent) -> io::Result<()> {
@@ -1167,7 +1191,33 @@ macro_rules! handle_op {
 handle_op!(metadata, Metadata);
 handle_op!(file_metadata_v1, FileMetadataV1);
 handle_op!(read, Vec<u8>);
-handle_op!(read_directory, Vec<DirectoryEntry>);
+/// Byte capacity of one kernel directory fill, before filtering dot entries.
+pub const DIRECTORY_BATCH_BYTES: usize = 32768;
+
+/// Raw reply detail discriminants for `FsReadDirectoryBatch`.
+pub const DIRECTORY_BATCH_END_V1: u64 = 0;
+pub const DIRECTORY_BATCH_ENTRIES_V1: u64 = 1;
+
+/// One nonempty filtered fill, or exhaustion of the descriptor.
+#[derive(Debug)]
+pub enum DirectoryBatch {
+    Entries(Vec<DirEntryV1>),
+    End,
+}
+
+/// Read through the existing open file description. The resource table owns
+/// the End latch; this primitive only observes the next kernel fill.
+pub fn read_directory_batch(handle: &ResourceHandleV1) -> io::Result<DirectoryBatch> {
+    #[cfg(target_os = "linux")]
+    {
+        linux::read_directory_batch(&handle.inner)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = handle;
+        Err(io::ErrorKind::Unsupported.into())
+    }
+}
 
 pub fn replace(handle: &RootedHandle, bytes: &[u8]) -> HostResult<()> {
     assert_current_target_abi()?;
@@ -1454,7 +1504,7 @@ mod tests {
         // trips `parse_probe`'s "duplicate probe fact". Those pre-existing gates
         // are the real first line for duplicates; this anchor is not, and does
         // not claim to be.
-        const EXPECTED_ABI_FACT_NAMES: [&str; 41] = [
+        const EXPECTED_ABI_FACT_NAMES: [&str; 43] = [
             "POINTER_WIDTH",
             "POINTER_ALIGNMENT",
             "C_CHAR_WIDTH",
@@ -1483,6 +1533,7 @@ mod tests {
             "O_CLOEXEC",
             "AT_REMOVEDIR",
             "AT_EMPTY_PATH",
+            "AT_SYMLINK_NOFOLLOW",
             "MODE_FILE_CREATE",
             "MODE_DIRECTORY_CREATE",
             "SYS_OPENAT",
@@ -1492,6 +1543,7 @@ mod tests {
             "SYS_READLINKAT",
             "SYS_FCHMOD",
             "SYS_STATX",
+            "SYS_GETDENTS64",
             "SYS_MMAP",
             "SYS_MUNMAP",
             "ERRNO_ENOENT",
@@ -1752,10 +1804,12 @@ mod tests {
 
         let subdir = PathComponent::new(b"subdir").expect("subdir");
         create_directory(&root, &subdir).expect("mkdir");
-        let entries = read_directory(&root).expect("readdir");
-        assert!(entries.iter().any(|entry| entry.name == b"renamed"));
-        assert!(entries.iter().any(|entry| entry.name == b"link"));
-        assert!(entries.iter().any(|entry| entry.name == b"subdir"));
+        let resource = open_resource_at_v1(&root, &subdir, OpenRequest::ReadDirectory)
+            .expect("open empty subdirectory resource");
+        assert!(matches!(read_directory_batch(&resource), Ok(DirectoryBatch::End)));
+        let parent = open_resource_at_v1(&root, &subdir, OpenRequest::ReadDirectory)
+            .expect("second directory resource");
+        assert!(matches!(read_directory_batch(&parent), Ok(DirectoryBatch::End)));
 
         remove(&root, &link, RemoveKind::File).expect("unlink link");
         remove(&root, &renamed, RemoveKind::File).expect("unlink file");

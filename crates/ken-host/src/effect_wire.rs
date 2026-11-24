@@ -187,10 +187,11 @@ fn put_request(
             put_u8(out, 8);
             put_bytes(out, path)?;
         }
-        CanonicalRequestV1::FsReadDirectory { path } => {
-            put_u8(out, 9);
+        CanonicalRequestV1::FsOpenDirectory { path } => {
+            put_u8(out, 50);
             put_bytes(out, path)?;
         }
+        CanonicalRequestV1::FsReadDirectoryBatch => put_u8(out, 51),
         CanonicalRequestV1::FsCreateDirectory { path } => {
             put_u8(out, 10);
             put_bytes(out, path)?;
@@ -433,7 +434,11 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
                 put_option(out, time, |out, value| out.extend(value.to_be_bytes()));
             }
         }
+        CanonicalReplyV1::DirectoryEnd => put_u8(out, 17),
         CanonicalReplyV1::DirectoryEntries(entries) => {
+            if entries.is_empty() {
+                return Err(EffectTraceWireError);
+            }
             put_u8(out, 7);
             put_u64(
                 out,
@@ -955,9 +960,9 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         8 => CanonicalRequestV1::FsMetadata {
             path: cursor.bytes()?,
         },
-        9 => CanonicalRequestV1::FsReadDirectory {
-            path: cursor.bytes()?,
-        },
+        // Request tag 9 retired with the whole-directory operation.
+        50 => CanonicalRequestV1::FsOpenDirectory { path: cursor.bytes()? },
+        51 => CanonicalRequestV1::FsReadDirectoryBatch,
         10 => CanonicalRequestV1::FsCreateDirectory {
             path: cursor.bytes()?,
         },
@@ -1177,9 +1182,10 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
                 born: get_option(cursor, get_metadata_time)?,
             })
         }
+        17 => CanonicalReplyV1::DirectoryEnd,
         7 => {
             let count = usize::try_from(cursor.u64()?).map_err(|_| EffectTraceWireError)?;
-            if count > cursor.remaining() / 9 {
+            if count == 0 || count > cursor.remaining() / 9 {
                 return Err(EffectTraceWireError);
             }
             let mut entries = Vec::with_capacity(count);

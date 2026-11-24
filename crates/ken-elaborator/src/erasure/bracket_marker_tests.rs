@@ -486,6 +486,39 @@ fn production_static_acquire_deletion_refuses_three_real_brackets() {
     ).expect("restored production acquisition binds again");
 }
 
+/// Durable bracket transport: the checked directory operation binds one
+/// acquire region, and erasure refuses the same source if the executing
+/// static Effect does not receive its marker. No native execution is claimed.
+#[test]
+fn directory_acquire_uses_the_checked_static_bracket_marker() {
+    let source = include_str!("../../../ken-verify/src/scenario/tests/directory_stream.ken");
+    let prepare = || crate::compiler_driver::prepare_native_program_sources(
+        "abi-s2-directory-stream",
+        vec![bracket_native_source(source)],
+    );
+    let prepared = prepare().expect("checked directory bracket prepares");
+    let [region] = prepared.bracket_regions() else {
+        panic!("expected one checked directory bracket region");
+    };
+    assert_eq!(
+        prepared
+            .bracket_host_spine_for_test()
+            .operations
+            .get(&region.acquire_constructor),
+        Some(&ken_host::HostOpV1::FsOpenDirectory),
+    );
+    OMIT_STATIC_ACQUIRE_MARK.with(|flag| flag.set(true));
+    let result = prepare();
+    OMIT_STATIC_ACQUIRE_MARK.with(|flag| flag.set(false));
+    let error = result.expect_err("omitting the directory acquire mark must refuse");
+    assert!(matches!(
+        &error,
+        crate::compiler_driver::NativeProgramBuildError::Erasure(
+            ErasureError::ExpressionLowering { lane, .. }
+        ) if *lane == "checked_bracket_acquire_without_marker"
+    ), "wrong deletion refusal: {error:?}");
+}
+
 /// Promise class: durable counterexample to ordinal matching. This uses the
 /// actual nested source, not a manufactured pair: preserving both marker and
 /// region counts while swapping their binder payloads must still be refused.

@@ -339,6 +339,8 @@ fn runtime_producible_constructors(
         file_operation_remove_file,
         file_operation_remove_directory,
         dir_entry,
+        directory_entries,
+        directory_end,
         file_operation_seek,
         file_operation_set_length,
         file_operation_sync,
@@ -411,6 +413,8 @@ fn runtime_producible_constructors(
         file_operation_remove_file,
         file_operation_remove_directory,
         dir_entry,
+        directory_entries,
+        directory_end,
         file_operation_seek,
         file_operation_set_length,
         file_operation_sync,
@@ -2750,12 +2754,12 @@ impl<'a> Lowering<'a> {
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         response: SafeByteSpan,
+        root: &SynthesizedAggregatePath,
         static_origin: StaticOriginId,
         seats: &ClaimedEffectSeats<'_>,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         use crate::cranelift_backend::planning::{
             PlannedAggregateShape, SynthesizedAggregateNode,
-            SynthesizedAggregatePath, SynthesizedAggregateRoot,
             SynthesizedConstructorRole, SynthesizedFixedConstructorRole as Role,
         };
         use super::aggregates::CarrierAllocationRequest;
@@ -2766,12 +2770,9 @@ impl<'a> Lowering<'a> {
                 "a response list is being decoded outside a declared emission owner",
             )
         })?;
-        let root = SynthesizedAggregatePath::root(
-            SynthesizedAggregateRoot::HostResultOk,
-        );
         let alternatives = self
             .static_transition_plan
-            .synthesized_dynamic_alternatives(static_origin, &root)?;
+            .synthesized_dynamic_alternatives(static_origin, root)?;
         let expected_alternatives = vec![
             SynthesizedConstructorRole::Fixed(Role::ListNil),
             SynthesizedConstructorRole::Fixed(Role::ListCons),
@@ -2834,6 +2835,7 @@ impl<'a> Lowering<'a> {
         let count = builder
             .ins()
             .load(types::I64, MemFlags::trusted(), pointer, 0);
+        Self::require_nonzero(builder, count);
         let after_header = builder.ins().iadd_imm(length, -8);
         let nine = builder.ins().iconst(types::I64, 9);
         let maximum_count = builder.ins().udiv(after_header, nine);
@@ -3603,8 +3605,7 @@ impl<'a> Lowering<'a> {
                         .stack_store(span.len, request, request_offset(2));
                 }
             }
-            ken_host::HostOpV1::FsReadDirectory
-            | ken_host::HostOpV1::FsCreateDirectory
+            ken_host::HostOpV1::FsCreateDirectory
             | ken_host::HostOpV1::FsRemoveFile
             | ken_host::HostOpV1::FsRemoveDirectory => {
                 let (capability_record, capability_operand) =
@@ -3674,6 +3675,7 @@ impl<'a> Lowering<'a> {
             | ken_host::HostOpV1::FsRename
             | ken_host::HostOpV1::FsChangeMode
             | ken_host::HostOpV1::FsOpen
+            | ken_host::HostOpV1::FsOpenDirectory
             | ken_host::HostOpV1::ProcessPlanOpen => {
                 // Lowered and claimed above, with every other operand, so the
                 // claim group's window contains no operand lowering.
@@ -3799,7 +3801,7 @@ impl<'a> Lowering<'a> {
                     builder.ins().stack_store(mode, request, request_offset(3));
                 }
             }
-            ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::ResourceRelease => {
+            ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::ResourceRelease => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
@@ -4446,10 +4448,11 @@ impl<'a> Lowering<'a> {
         } else {
             let success_tag = match operation {
                 ken_host::HostOpV1::ConsoleRead => wire.reply_bytes_tag,
-                ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsReadDirectory => {
+                ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsReadDirectoryBatch => {
                     wire.reply_bytes_tag
                 }
                 ken_host::HostOpV1::FsOpen
+                | ken_host::HostOpV1::FsOpenDirectory
                 | ken_host::HostOpV1::ProcessPlanOpen
                 | ken_host::HostOpV1::ProcessSpawn
                 | ken_host::HostOpV1::ProcessTakePipe => wire.reply_resource_tag,
@@ -4488,6 +4491,7 @@ impl<'a> Lowering<'a> {
                 }
                 ken_host::HostOpV1::BufferFreeze
                 | ken_host::HostOpV1::FsReadAt
+                | ken_host::HostOpV1::FsReadDirectoryBatch
                 | ken_host::HostOpV1::FsWriteAt
                 | ken_host::HostOpV1::ProcessPlanPush
                 | ken_host::HostOpV1::ProcessSpawn
@@ -4663,7 +4667,7 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::FsWriteFile
                     | ken_host::HostOpV1::FsAppendFile
                     | ken_host::HostOpV1::FsMetadata
-                    | ken_host::HostOpV1::FsReadDirectory
+                    | ken_host::HostOpV1::FsOpenDirectory
                     | ken_host::HostOpV1::FsCreateDirectory
                     | ken_host::HostOpV1::FsRemoveFile
                     | ken_host::HostOpV1::FsRemoveDirectory
@@ -4694,7 +4698,7 @@ impl<'a> Lowering<'a> {
                         SynthesizedFixedConstructorRole::FileOperationMetadata,
                         self.process_symbols.file_operation_metadata.clone(),
                     ),
-                    ken_host::HostOpV1::FsReadDirectory => (
+                    ken_host::HostOpV1::FsOpenDirectory => (
                         SynthesizedFixedConstructorRole::FileOperationReadDirectory,
                         self.process_symbols.file_operation_read_directory.clone(),
                     ),
@@ -4767,6 +4771,7 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::MappingReadView
                     | ken_host::HostOpV1::MappingWriteView
                     | ken_host::HostOpV1::FsReadAt
+                | ken_host::HostOpV1::FsReadDirectoryBatch
                     | ken_host::HostOpV1::FsWriteAt
                     | ken_host::HostOpV1::ProcessPlanPush
                     | ken_host::HostOpV1::ProcessSpawn
@@ -5077,7 +5082,7 @@ impl<'a> Lowering<'a> {
                     success_tag,
                 )
             };
-            if operation == ken_host::HostOpV1::FsReadDirectory {
+            if operation == ken_host::HostOpV1::FsReadDirectoryBatch {
                 let response = masked_reply_response_bytes(
                     builder,
                     pointer_type,
@@ -5098,13 +5103,50 @@ impl<'a> Lowering<'a> {
                     .brif(success, success_block, &[], error_block, &[]);
 
                 builder.switch_to_block(success_block);
-                let entries = self.lower_directory_entries_reply(
-                    builder,
-                    response,
-                    static_origin,
-                    &seats,
+                use cranelift_codegen::ir::condcodes::IntCC;
+                use SynthesizedFixedConstructorRole as R;
+                let is_entries = builder.ins().icmp_imm(IntCC::Equal, detail, ken_host::DIRECTORY_BATCH_ENTRIES_V1 as i64);
+                let is_end = builder.ins().icmp_imm(IntCC::Equal, detail, ken_host::DIRECTORY_BATCH_END_V1 as i64);
+                let valid = builder.ins().bor(is_entries, is_end);
+                Self::require_nonzero(builder, valid);
+                let entries_block = builder.create_block();
+                let end_block = builder.create_block();
+                builder.ins().brif(is_entries, entries_block, &[], end_block, &[]);
+
+                builder.switch_to_block(entries_block);
+                let entries_path = ok_root.alternative(0);
+                let list = self.lower_directory_entries_reply(
+                    builder, response, &entries_path.field(0), static_origin, &seats,
                 )?;
+                let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+                    LoweringCause::PlannerInvariant, "DirectoryEntries", "missing response emission owner",
+                ))?;
+                let occurrence = self.static_transition_plan.synthesized_aggregate_occurrence(
+                    owner, static_origin, &entries_path, SynthesizedConstructorRole::Fixed(R::DirectoryEntries),
+                )?;
+                let entries = self.emit_carrier_alloc(
+                    builder,
+                    super::aggregates::CarrierAllocationRequest::PlannedAggregate {
+                        occurrence, shape: PlannedAggregateShape::Constructor,
+                    },
+                    BoundaryClass::Constructor, 1,
+                )?;
+                let identity = self.synthesized_fixed_identity(R::DirectoryEntries)?.tag_abi_word()?;
+                self.emit_carrier_store_tag_id(builder, entries, identity)?;
+                self.emit_carrier_store_field(builder, entries, 0, list)?;
                 builder.ins().jump(selected, &[entries.word.into()]);
+
+                builder.switch_to_block(end_block);
+                let no_len = builder.ins().icmp_imm(IntCC::Equal, response.len(), 0);
+                let no_data = builder.ins().icmp_imm(IntCC::Equal, response.pointer(), 0);
+                let empty = builder.ins().band(no_len, no_data);
+                Self::require_nonzero(builder, empty);
+                let end = self.synthesized_constructor(
+                    static_origin, &ok_root.alternative(1), R::DirectoryEnd,
+                    self.process_symbols.directory_end.clone(), Vec::new(), &seats,
+                )?;
+                let end = self.emit_carrier_transfer(builder, static_origin, &end)?;
+                builder.ins().jump(selected, &[end.word.into()]);
 
                 builder.switch_to_block(error_block);
                 let error = self.emit_carrier_transfer(
@@ -5202,7 +5244,7 @@ impl<'a> Lowering<'a> {
                     success,
                 )
             } else if matches!(operation,
-                ken_host::HostOpV1::FsOpen | ken_host::HostOpV1::ProcessPlanOpen
+                ken_host::HostOpV1::FsOpen | ken_host::HostOpV1::FsOpenDirectory | ken_host::HostOpV1::ProcessPlanOpen
                 | ken_host::HostOpV1::ProcessSpawn | ken_host::HostOpV1::ProcessTakePipe) {
                 Lowered::ResourceToken { value: detail }
             } else if matches!(

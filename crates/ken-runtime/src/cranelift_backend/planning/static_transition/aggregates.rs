@@ -3954,6 +3954,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
                 ],
             },
         ]));
+    const DIRECTORY_PROGRESS: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::Fixed { role: R::DirectoryEntries, children: &[DIRECTORY_LIST] },
+            N::nullary(R::DirectoryEnd),
+        ]));
     const UNIT: SynthesizedAggregateNode = N::nullary(R::Unit);
     /// `ResourceStreamRead` success: the `FsReadAt` shape, with the span bound
     /// to the seat's operand 1 (the stream read's buffer token).
@@ -4001,7 +4006,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::FsWriteFile => (WRITE_FILE_ERROR, UNIT),
         Op::FsAppendFile => (APPEND_FILE_ERROR, UNIT),
         Op::FsMetadata => (METADATA_ERROR, FILE_METADATA),
-        Op::FsReadDirectory => (READ_DIRECTORY_ERROR, DIRECTORY_LIST),
+        Op::FsOpenDirectory => (READ_DIRECTORY_ERROR, N::Absent),
+        Op::FsReadDirectoryBatch => (RESOURCE_SURFACE, DIRECTORY_PROGRESS),
         Op::FsCreateDirectory => (CREATE_DIRECTORY_ERROR, UNIT),
         Op::FsRemoveFile => (REMOVE_FILE_ERROR, UNIT),
         Op::FsRemoveDirectory => (REMOVE_DIRECTORY_ERROR, UNIT),
@@ -13788,7 +13794,8 @@ mod tests {
             Op::FsWriteFile,
             Op::FsAppendFile,
             Op::FsMetadata,
-            Op::FsReadDirectory,
+            Op::FsOpenDirectory,
+            Op::FsReadDirectoryBatch,
             Op::FsCreateDirectory,
             Op::FsRemoveFile,
             Op::FsRemoveDirectory,

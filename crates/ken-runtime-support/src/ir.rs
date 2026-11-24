@@ -294,6 +294,8 @@ runtime_host_spine_v1! {
     px10_exit_exited,
     px10_exit_signaled,
     option_none,
+    directory_entries,
+    directory_end,
 }
 
 /// The decoded, validated checked-runtime role record.

@@ -3277,6 +3277,8 @@ fn emit_native_program_preparation(
                     .file_operation_remove_directory
                     .to_string(),
                 dir_entry: host_spine.dir_entry.to_string(),
+                directory_entries: host_spine.directory_entries.to_string(),
+                directory_end: host_spine.directory_end.to_string(),
                 file_operation_seek: host_spine.file_operation_seek.to_string(),
                 file_operation_set_length: host_spine.file_operation_set_length.to_string(),
                 file_operation_sync: host_spine.file_operation_sync.to_string(),
@@ -4317,10 +4319,6 @@ fn checked_host_spine_v1(
         (roles.op_fs_append_file, ken_host::HostOpV1::FsAppendFile),
         (roles.op_fs_metadata, ken_host::HostOpV1::FsMetadata),
         (
-            roles.op_fs_read_directory,
-            ken_host::HostOpV1::FsReadDirectory,
-        ),
-        (
             roles.op_fs_create_directory,
             ken_host::HostOpV1::FsCreateDirectory,
         ),
@@ -4336,6 +4334,8 @@ fn checked_host_spine_v1(
     }
     for (id, operation) in [
         (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
+        (prelude.private_fs_open_directory_id, ken_host::HostOpV1::FsOpenDirectory),
+        (prelude.private_fs_read_directory_batch_id, ken_host::HostOpV1::FsReadDirectoryBatch),
         (
             prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
@@ -4431,6 +4431,8 @@ fn checked_host_spine_v1(
         file_operation_remove_file: resolve_id(roles.file_operation_remove_file)?,
         file_operation_remove_directory: resolve_id(roles.file_operation_remove_directory)?,
         dir_entry: resolve_id(roles.dir_entry)?,
+        directory_entries: resolve_id(roles.directory_entries)?,
+        directory_end: resolve_id(roles.directory_end)?,
         file_operation_seek: resolve_id(roles.file_operation_seek)?,
         file_operation_set_length: resolve_id(roles.file_operation_set_length)?,
         file_operation_sync: resolve_id(roles.file_operation_sync)?,
@@ -4697,6 +4699,8 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_remove_file,
         &spine.file_operation_remove_directory,
         &spine.dir_entry,
+        &spine.directory_entries,
+        &spine.directory_end,
         // ABI-S1 appends without changing established positional identities.
         &spine.file_operation_seek,
         &spine.file_operation_set_length,
@@ -9131,6 +9135,8 @@ mod d1b_role_c1_roster_identity {
                 record.spine.file_operation_remove_directory.clone(),
             ),
             ("dir_entry", record.spine.dir_entry.clone()),
+            ("directory_entries", record.spine.directory_entries.clone()),
+            ("directory_end", record.spine.directory_end.clone()),
             (
                 "file_operation_seek",
                 record.spine.file_operation_seek.clone(),
@@ -9218,7 +9224,6 @@ mod d1b_role_c1_roster_identity {
             "op_fs_write_file",
             "op_fs_append_file",
             "op_fs_metadata",
-            "op_fs_read_directory",
             "op_fs_create_directory",
             "op_fs_remove_file",
             "op_fs_remove_directory",
@@ -9251,7 +9256,6 @@ mod d1b_role_c1_roster_identity {
             "op_fs_write_file",
             "op_fs_append_file",
             "op_fs_metadata",
-            "op_fs_read_directory",
             "op_fs_create_directory",
             "op_fs_remove_file",
             "op_fs_remove_directory",

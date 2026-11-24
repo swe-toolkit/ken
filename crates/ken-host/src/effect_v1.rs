@@ -25,7 +25,7 @@ pub enum HostOpV1 {
     FsWriteFile = 0x0302,
     FsAppendFile = 0x0303,
     FsMetadata = 0x0304,
-    FsReadDirectory = 0x0305,
+    // 0x0305 retired with the whole-directory operation.
     FsCreateDirectory = 0x0306,
     FsRemoveFile = 0x0307,
     FsRemoveDirectory = 0x0308,
@@ -41,6 +41,8 @@ pub enum HostOpV1 {
     FsGetInheritance = 0x0312,
     FsSetInheritance = 0x0313,
     FsDuplicate = 0x0314,
+    FsOpenDirectory = 0x0315,
+    FsReadDirectoryBatch = 0x0316,
     ResourceRelease = 0x0401,
     BufferAllocate = 0x0402,
     BufferFreeze = 0x0403,
@@ -136,8 +138,7 @@ impl HostOpV1 {
             Self::FsReadFile => Some(Self::FsWriteFile),
             Self::FsWriteFile => Some(Self::FsAppendFile),
             Self::FsAppendFile => Some(Self::FsMetadata),
-            Self::FsMetadata => Some(Self::FsReadDirectory),
-            Self::FsReadDirectory => Some(Self::FsCreateDirectory),
+            Self::FsMetadata => Some(Self::FsCreateDirectory),
             Self::FsCreateDirectory => Some(Self::FsRemoveFile),
             Self::FsRemoveFile => Some(Self::FsRemoveDirectory),
             Self::FsRemoveDirectory => Some(Self::FsRename),
@@ -152,7 +153,9 @@ impl HostOpV1 {
             Self::FsSync => Some(Self::FsGetInheritance),
             Self::FsGetInheritance => Some(Self::FsSetInheritance),
             Self::FsSetInheritance => Some(Self::FsDuplicate),
-            Self::FsDuplicate => Some(Self::ResourceRelease),
+            Self::FsDuplicate => Some(Self::FsOpenDirectory),
+            Self::FsOpenDirectory => Some(Self::FsReadDirectoryBatch),
+            Self::FsReadDirectoryBatch => Some(Self::ResourceRelease),
             Self::ResourceRelease => Some(Self::BufferAllocate),
             Self::BufferAllocate => Some(Self::BufferFreeze),
             Self::BufferFreeze => Some(Self::MappingAllocate),
@@ -209,7 +212,8 @@ impl HostOpV1 {
             Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
             Self::FsAppendFile => HostOpAvailabilityV1::NativeTested,
             Self::FsMetadata => HostOpAvailabilityV1::NativeTested,
-            Self::FsReadDirectory => HostOpAvailabilityV1::NativeTested,
+            Self::FsOpenDirectory => HostOpAvailabilityV1::NativeTested,
+            Self::FsReadDirectoryBatch => HostOpAvailabilityV1::NativeTested,
             Self::FsCreateDirectory => HostOpAvailabilityV1::NativeTested,
             Self::FsRemoveFile => HostOpAvailabilityV1::NativeTested,
             Self::FsRemoveDirectory => HostOpAvailabilityV1::NativeTested,
@@ -286,7 +290,8 @@ impl HostOpV1 {
             Self::FsWriteFile => false,
             Self::FsAppendFile => false,
             Self::FsMetadata => false,
-            Self::FsReadDirectory => false,
+            Self::FsOpenDirectory => false,
+            Self::FsReadDirectoryBatch => false,
             Self::FsCreateDirectory => false,
             Self::FsRemoveFile => false,
             Self::FsRemoveDirectory => false,
@@ -336,7 +341,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 34] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 35] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -346,7 +351,8 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 34] = [
     HostOpV1::FsWriteFile,
     HostOpV1::FsAppendFile,
     HostOpV1::FsMetadata,
-    HostOpV1::FsReadDirectory,
+    HostOpV1::FsOpenDirectory,
+    HostOpV1::FsReadDirectoryBatch,
     HostOpV1::FsCreateDirectory,
     HostOpV1::FsRemoveFile,
     HostOpV1::FsRemoveDirectory,
@@ -568,7 +574,7 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::ClockWallNow => Vec::new(),
         HostOpV1::FsReadFile
         | HostOpV1::FsMetadata
-        | HostOpV1::FsReadDirectory
+        | HostOpV1::FsOpenDirectory
         | HostOpV1::FsCreateDirectory
         | HostOpV1::FsRemoveFile => {
             let path = slice("path")?;
@@ -635,7 +641,7 @@ pub fn host_effect_wire_layout_v1(
                 checked_u32(field("mode")?)?,
             ]
         }
-        HostOpV1::FsHandleMetadata | HostOpV1::ResourceRelease => {
+        HostOpV1::FsHandleMetadata | HostOpV1::FsReadDirectoryBatch | HostOpV1::ResourceRelease => {
             vec![checked_u32(field("resource")?)?]
         }
         HostOpV1::FsReadAt => vec![
@@ -1401,6 +1407,10 @@ impl MappingRegionV1 {
 #[derive(Debug)]
 pub enum ResourceOwnerV1 {
     FsHandle(crate::ResourceHandleV1),
+    Directory {
+        handle: crate::ResourceHandleV1,
+        ended: bool,
+    },
     Buffer(BufferRegionV1),
     Mapping(MappingRegionV1),
     SpawnPlan(crate::SpawnPlanV1),
@@ -1795,11 +1805,11 @@ impl ResourceTableV1 {
         first_error.map_or(Ok(settled), Err)
     }
 
-    pub fn resolve_fs_handle(
+    fn resolve_fs_owner(
         &self,
         token: ResourceTokenV1,
         required: crate::RightSet,
-    ) -> Result<(&crate::ResourceHandleV1, ResourceTraceIdentityV1), ResourceErrorV1> {
+    ) -> Result<(&ResourceOwnerV1, ResourceTraceIdentityV1), ResourceErrorV1> {
         let slot = self.lookup(token)?;
         let (owner, kind, rights, identity) = match &slot.state {
             ResourceSlotStateV1::Live {
@@ -1825,10 +1835,34 @@ impl ResourceTableV1 {
                 held: rights.bits(),
             });
         }
-        let ResourceOwnerV1::FsHandle(owner) = owner else {
+        Ok((owner, *identity))
+    }
+
+    pub fn resolve_fs_handle(
+        &self,
+        token: ResourceTokenV1,
+        required: crate::RightSet,
+    ) -> Result<(&crate::ResourceHandleV1, ResourceTraceIdentityV1), ResourceErrorV1> {
+        let (owner, identity) = self.resolve_fs_owner(token, required)?;
+        let ResourceOwnerV1::FsHandle(handle) = owner else {
             return Err(ResourceErrorV1::MalformedResource);
         };
-        Ok((owner, *identity))
+        Ok((handle, identity))
+    }
+
+    fn resolve_directory_mut(
+        &mut self,
+        token: ResourceTokenV1,
+    ) -> Result<(&crate::ResourceHandleV1, &mut bool, ResourceTraceIdentityV1), ResourceErrorV1> {
+        // Check rights before classifying the owner, just as on the file path.
+        let (_, identity) = self.resolve_fs_owner(token, crate::RightSet::ENUMERATE)?;
+        match &mut self.slots[token.slot as usize].state {
+            ResourceSlotStateV1::Live {
+                owner: ResourceOwnerV1::Directory { handle, ended },
+                ..
+            } => Ok((handle, ended, identity)),
+            _ => Err(ResourceErrorV1::MalformedResource),
+        }
     }
 
     fn resolve_fs_handle_with_provenance(
@@ -2310,7 +2344,7 @@ impl ResourceTableV1 {
 
     fn owned_capacity(owner: &ResourceOwnerV1) -> Option<u64> {
         match owner {
-            ResourceOwnerV1::FsHandle(_)
+            ResourceOwnerV1::FsHandle(_) | ResourceOwnerV1::Directory { .. }
             | ResourceOwnerV1::SpawnPlan(_)
             | ResourceOwnerV1::Child(_)
             | ResourceOwnerV1::PipeRead(_)
@@ -2347,7 +2381,9 @@ impl ResourceTableV1 {
             identity,
         } = pending;
         let closed = match owner {
-            ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
+            ResourceOwnerV1::FsHandle(handle) | ResourceOwnerV1::Directory { handle, .. } => {
+                backend.resource_close(handle)
+            }
             ResourceOwnerV1::Buffer(_) => Ok(()),
             ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
             ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
@@ -2411,7 +2447,9 @@ impl ResourceTableV1 {
                 let kind = pending.kind;
                 let identity = pending.identity;
                 let closed = match pending.owner {
-                    ResourceOwnerV1::FsHandle(handle) => backend.resource_close(handle),
+                    ResourceOwnerV1::FsHandle(handle) | ResourceOwnerV1::Directory { handle, .. } => {
+                        backend.resource_close(handle)
+                    }
                     ResourceOwnerV1::Buffer(_) => Ok(()),
                     ResourceOwnerV1::Mapping(region) => backend.resource_unmap(region),
                     ResourceOwnerV1::SpawnPlan(_) | ResourceOwnerV1::PipeRead(_)
@@ -2648,11 +2686,11 @@ pub trait HostEffectBackendV1 {
     ) -> Result<FileMetadataV1, FileErrorCauseV1> {
         Err(FileErrorCauseV1::Io(IoErrorIdentityV1::Unsupported))
     }
-    fn fs_read_directory(
+    fn fs_open_directory(
         &mut self,
         _grant: &CapabilityGrantV1,
         _path: &[u8],
-    ) -> Result<Vec<DirEntryV1>, FileErrorCauseV1> {
+    ) -> Result<crate::ResourceHandleV1, FileErrorCauseV1> {
         Err(FileErrorCauseV1::Io(IoErrorIdentityV1::Unsupported))
     }
     fn fs_create_directory(
@@ -2942,7 +2980,7 @@ impl HostOpV1 {
                 crate::FsCapabilityOperation::Metadata,
                 crate::AUTH_PARTIAL,
             ),
-            Self::FsReadDirectory => CapabilityRequirementV1::Fixed(
+            Self::FsOpenDirectory => CapabilityRequirementV1::Fixed(
                 crate::FsCapabilityOperation::Enumerate,
                 crate::AUTH_PARTIAL,
             ),
@@ -2980,6 +3018,7 @@ impl HostOpV1 {
             | Self::ClockMonotonicNow
             | Self::ClockSleepUntil
             | Self::FsHandleMetadata
+            | Self::FsReadDirectoryBatch
             | Self::FsReadAt
             | Self::FsWriteAt
             | Self::FsSeek
@@ -3017,6 +3056,7 @@ impl HostOpV1 {
     const fn resource_admission_requirement(self) -> ResourceAdmissionRequirementV1 {
         match self {
             Self::FsHandleMetadata
+            | Self::FsReadDirectoryBatch
             | Self::BufferFreeze
             | Self::MappingReadView
             | Self::MappingWriteView
@@ -3048,7 +3088,7 @@ impl HostOpV1 {
             | Self::FsWriteFile
             | Self::FsAppendFile
             | Self::FsMetadata
-            | Self::FsReadDirectory
+            | Self::FsOpenDirectory
             | Self::FsCreateDirectory
             | Self::FsRemoveFile
             | Self::FsRemoveDirectory
@@ -3207,6 +3247,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         (operation, resource),
         (
             HostOpV1::FsHandleMetadata
+                | HostOpV1::FsReadDirectoryBatch
                 | HostOpV1::FsSeek
                 | HostOpV1::FsSetLength
                 | HostOpV1::FsSync
@@ -3240,7 +3281,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     | HostOpV1::FsWriteFile
                     | HostOpV1::FsAppendFile
                     | HostOpV1::FsMetadata
-                    | HostOpV1::FsReadDirectory
+                    | HostOpV1::FsOpenDirectory
                     | HostOpV1::FsCreateDirectory
                     | HostOpV1::FsRemoveFile
                     | HostOpV1::FsRemoveDirectory
@@ -3298,8 +3339,8 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             )
             | (HostOpV1::FsMetadata, CanonicalRequestV1::FsMetadata { .. })
             | (
-                HostOpV1::FsReadDirectory,
-                CanonicalRequestV1::FsReadDirectory { .. }
+                HostOpV1::FsOpenDirectory,
+                CanonicalRequestV1::FsOpenDirectory { .. }
             )
             | (
                 HostOpV1::FsCreateDirectory,
@@ -3319,6 +3360,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 CanonicalRequestV1::FsChangeMode { .. }
             )
             | (HostOpV1::FsOpen, CanonicalRequestV1::FsOpen { .. })
+            | (HostOpV1::FsReadDirectoryBatch, CanonicalRequestV1::FsReadDirectoryBatch)
             | (HostOpV1::ResourceStreamRead, CanonicalRequestV1::ResourceStreamRead { .. })
             | (HostOpV1::ResourceStreamWrite, CanonicalRequestV1::ResourceStreamWrite { .. })
             | (HostOpV1::ProcessPlanOpen, CanonicalRequestV1::ProcessPlanOpen { .. })
@@ -3497,10 +3539,48 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             .fs_metadata(grant.expect("validated FS capability"), path)
             .map(CanonicalReplyV1::FileMetadata)
             .map_err(|cause| file_error(operation, path, cause)),
-        (HostOpV1::FsReadDirectory, CanonicalRequestV1::FsReadDirectory { path }) => backend
-            .fs_read_directory(grant.expect("validated FS capability"), path)
-            .map(CanonicalReplyV1::DirectoryEntries)
-            .map_err(|cause| file_error(operation, path, cause)),
+        (HostOpV1::FsOpenDirectory, CanonicalRequestV1::FsOpenDirectory { path }) => {
+            let grant = grant.expect("validated FS capability");
+            backend.fs_open_directory(grant, path).map(|handle| {
+                let (token, identity) = resources.insert_owner(
+                    ResourceOwnerV1::Directory { handle, ended: false },
+                    ResourceKindV1::FsHandle,
+                    crate::RightSet::ENUMERATE,
+                    Some(grant.revocation_node),
+                );
+                minted_resource = Some(token);
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                CanonicalReplyV1::ResourceAcquired {
+                    schema_version: RESOURCE_OBSERVATION_SCHEMA_VERSION_V1,
+                    resource_kind: ResourceKindV1::FsHandle,
+                    identity,
+                }
+            }).map_err(|cause| file_error(operation, path, cause))
+        }
+        (HostOpV1::FsReadDirectoryBatch, CanonicalRequestV1::FsReadDirectoryBatch) => {
+            let ResourceInputsV1::Target(token) = resource else {
+                unreachable!("resource shape validated")
+            };
+            match resources.resolve_directory_mut(token) {
+                Ok((handle, ended, identity)) => {
+                    resource_bindings.push((ResourceBindingRole::Target, identity));
+                    if *ended {
+                        Ok(CanonicalReplyV1::DirectoryEnd)
+                    } else {
+                        crate::read_directory_batch(handle).map(|batch| match batch {
+                            crate::DirectoryBatch::Entries(entries) => {
+                                CanonicalReplyV1::DirectoryEntries(entries)
+                            }
+                            crate::DirectoryBatch::End => {
+                                *ended = true;
+                                CanonicalReplyV1::DirectoryEnd
+                            }
+                        }).map_err(|error| SemanticErrorV1::Io(io_error_identity_v1(&error)))
+                    }
+                }
+                Err(error) => Err(SemanticErrorV1::Resource(error)),
+            }
+        }
         (
             HostOpV1::FsCreateDirectory,
             CanonicalRequestV1::FsCreateDirectory { path },
@@ -4327,7 +4407,7 @@ fn request_path(request: &CanonicalRequestV1) -> Vec<u8> {
         | CanonicalRequestV1::FsWriteFile { path, .. }
         | CanonicalRequestV1::FsAppendFile { path, .. }
         | CanonicalRequestV1::FsMetadata { path }
-        | CanonicalRequestV1::FsReadDirectory { path }
+        | CanonicalRequestV1::FsOpenDirectory { path }
         | CanonicalRequestV1::FsCreateDirectory { path }
         | CanonicalRequestV1::FsRemoveFile { path }
         | CanonicalRequestV1::FsRemoveDirectory { path, .. } => path.clone(),
@@ -4451,9 +4531,10 @@ pub enum CanonicalRequestV1 {
     FsMetadata {
         path: Vec<u8>,
     },
-    FsReadDirectory {
+    FsOpenDirectory {
         path: Vec<u8>,
     },
+    FsReadDirectoryBatch,
     FsCreateDirectory {
         path: Vec<u8>,
     },
@@ -4644,6 +4725,7 @@ pub enum CanonicalReplyV1 {
     Instant(Vec<u8>),
     FileMetadata(FileMetadataV1),
     DirectoryEntries(Vec<DirEntryV1>),
+    DirectoryEnd,
     ResourceAcquired {
         schema_version: u16,
         resource_kind: ResourceKindV1,
@@ -4797,6 +4879,7 @@ impl CanonicalOutcomeV1 {
                 | CanonicalReplyV1::Instant(_)
                 | CanonicalReplyV1::FileMetadata(_)
                 | CanonicalReplyV1::DirectoryEntries(_)
+                | CanonicalReplyV1::DirectoryEnd
                 | CanonicalReplyV1::ResourceAcquired { .. }
                 | CanonicalReplyV1::ResourceSettlement(_)
                 | CanonicalReplyV1::ChildExit(_)
@@ -5326,13 +5409,13 @@ mod tests {
                 0,
             ))
         }
-        fn fs_read_directory(
+        fn fs_open_directory(
             &mut self,
             _: &CapabilityGrantV1,
             _: &[u8],
-        ) -> Result<Vec<DirEntryV1>, FileErrorCauseV1> {
-            self.0.push(HostOpV1::FsReadDirectory);
-            Ok(Vec::new())
+        ) -> Result<crate::ResourceHandleV1, FileErrorCauseV1> {
+            self.0.push(HostOpV1::FsOpenDirectory);
+            Err(FileErrorCauseV1::Io(IoErrorIdentityV1::Unsupported))
         }
         fn fs_create_directory(
             &mut self,
@@ -5507,13 +5590,13 @@ mod tests {
             HostOpV1::FsWriteFile,
             HostOpV1::FsAppendFile,
             HostOpV1::FsMetadata,
-            HostOpV1::FsReadDirectory,
             HostOpV1::FsCreateDirectory,
             HostOpV1::FsRemoveFile,
             HostOpV1::FsRemoveDirectory,
             HostOpV1::FsRename,
             HostOpV1::FsChangeMode,
             HostOpV1::FsOpen,
+            HostOpV1::FsOpenDirectory,
             HostOpV1::ProcessPlanOpen,
             HostOpV1::NetListen,
             HostOpV1::NetConnect,
@@ -5529,7 +5612,8 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(classified, expected);
 
-        const RESOURCE_SIDE_D2: [HostOpV1; 27] = [
+        const RESOURCE_SIDE_D2: [HostOpV1; 28] = [
+            HostOpV1::FsReadDirectoryBatch,
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
             HostOpV1::FsWriteAt,
@@ -5889,12 +5973,6 @@ mod tests {
                 },
             ),
             (
-                HostOpV1::FsReadDirectory,
-                CanonicalRequestV1::FsReadDirectory {
-                    path: b"a".to_vec(),
-                },
-            ),
-            (
                 HostOpV1::FsCreateDirectory,
                 CanonicalRequestV1::FsCreateDirectory {
                     path: b"a".to_vec(),
@@ -5952,7 +6030,9 @@ mod tests {
             )
             .unwrap();
         }
-        const RESOURCE_BEARING: [HostOpV1; 17] = [
+        const RESOURCE_BEARING: [HostOpV1; 19] = [
+            HostOpV1::FsOpenDirectory,
+            HostOpV1::FsReadDirectoryBatch,
             HostOpV1::FsOpen,
             HostOpV1::FsHandleMetadata,
             HostOpV1::FsReadAt,
@@ -7032,7 +7112,7 @@ mod tests {
             .expect("create ABI operation is present");
         assert_eq!((row.3, row.4), ("FsPathRequestV1", 2));
         let create = host_effect_wire_layout_v1(HostOpV1::FsCreateDirectory).unwrap();
-        let read = host_effect_wire_layout_v1(HostOpV1::FsReadDirectory).unwrap();
+        let read = host_effect_wire_layout_v1(HostOpV1::FsOpenDirectory).unwrap();
         assert_eq!(create, read, "create and read share the complete path layout");
         assert_eq!(create.request_offsets.len(), 3, "capability, pointer, length");
     }
@@ -8561,6 +8641,21 @@ mod tests {
             .map_err(|error| FileErrorCauseV1::Io(io_error_identity_v1(&error.into_io_error())))
         }
 
+        fn fs_open_directory(
+            &mut self,
+            _: &CapabilityGrantV1,
+            path: &[u8],
+        ) -> Result<crate::ResourceHandleV1, FileErrorCauseV1> {
+            crate::open_resource_at_v1(
+                &self.root,
+                &crate::PathComponent::new(path).map_err(|error| {
+                    FileErrorCauseV1::Io(io_error_identity_v1(&error.into_io_error()))
+                })?,
+                crate::OpenRequest::ReadDirectory,
+            )
+            .map_err(|error| FileErrorCauseV1::Io(io_error_identity_v1(&error.into_io_error())))
+        }
+
         fn fs_resource_metadata(
             &mut self,
             handle: &crate::ResourceHandleV1,
@@ -8572,6 +8667,155 @@ mod tests {
             crate::resource_metadata_v1(handle)
                 .map_err(|error| io_error_identity_v1(&error.into_io_error()))
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    struct DirectoryDispatchFixture {
+        root: std::path::PathBuf,
+        backend: RealResourceBackend,
+        capabilities: CapabilityTableV1,
+        revocation: RevocationDomain,
+        resources: ResourceTableV1,
+        capability: CapabilityTokenV1,
+    }
+
+    #[cfg(target_os = "linux")]
+    impl DirectoryDispatchFixture {
+        fn new(case: &str) -> Self {
+            let root = std::env::temp_dir().join(format!("ken-abi-s2-{case}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(root.join("directory")).unwrap();
+            std::fs::write(root.join("file"), b"file data").unwrap();
+            let rooted = crate::open_root(&crate::RootPath::new(&root).unwrap()).unwrap();
+            let metadata = crate::metadata(&rooted).unwrap();
+            let cap = crate::Cap::mint_scoped(
+                crate::AUTH_PARTIAL,
+                "FS",
+                crate::FsScope::root(
+                    crate::RightSet::READ.union(crate::RightSet::ENUMERATE),
+                    crate::FsHandle::Posix(rooted.clone()),
+                    crate::FsIdentity::Posix {
+                        device: metadata.identity.device,
+                        inode: metadata.identity.inode,
+                    },
+                    crate::SymlinkPolicy::NoFollow,
+                ),
+            );
+            let mut revocation = RevocationDomain::default();
+            let mut capabilities = CapabilityTableV1::default();
+            let capability = capabilities.insert(CapabilityGrantV1::mint_root(
+                crate::program_caps_fs_trace_identity_v1(), cap, &mut revocation,
+            ));
+            Self {
+                root,
+                backend: RealResourceBackend { root: rooted, metadata_calls: 0, metadata_error: None },
+                capabilities,
+                revocation,
+                resources: ResourceTableV1::default(),
+                capability,
+            }
+        }
+
+        fn call(
+            &mut self,
+            op: HostOpV1,
+            resource: ResourceInputsV1,
+            request: CanonicalRequestV1,
+        ) -> HostDispatchReplyV1 {
+            let capability = matches!(op, HostOpV1::FsOpenDirectory | HostOpV1::FsOpen)
+                .then_some(self.capability);
+            dispatch_host_op_v1(
+                &mut self.backend, &self.capabilities, &self.revocation, &mut self.resources,
+                op, capability, resource, &request,
+            )
+            .expect("shared dispatch returns a typed reply")
+        }
+
+        fn open_directory(&mut self) -> ResourceTokenV1 {
+            self.call(
+                HostOpV1::FsOpenDirectory,
+                ResourceInputsV1::None,
+                CanonicalRequestV1::FsOpenDirectory { path: b"directory".to_vec() },
+            )
+            .resource_token
+            .expect("the directory is acquired")
+        }
+
+        fn batch(&mut self, target: ResourceTokenV1) -> CanonicalOutcomeV1 {
+            self.call(
+                HostOpV1::FsReadDirectoryBatch,
+                ResourceInputsV1::Target(target),
+                CanonicalRequestV1::FsReadDirectoryBatch,
+            ).outcome
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    impl Drop for DirectoryDispatchFixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    /// Durable invariant: the two crossed reads fail at rights admission,
+    /// and both descriptor populations still settle normally.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_stream_and_positioned_read_rights_are_disjoint() {
+        let mut f = DirectoryDispatchFixture::new("partition");
+        let directory = f.open_directory();
+        let file = f.call(
+            HostOpV1::FsOpen,
+            ResourceInputsV1::None,
+            CanonicalRequestV1::FsOpen { path: b"file".to_vec(), mode: FsOpenModeV1::Read },
+        ).resource_token.expect("the read file is acquired");
+        let buffer = f.call(
+            HostOpV1::BufferAllocate,
+            ResourceInputsV1::None,
+            CanonicalRequestV1::BufferAllocate { capacity: 4 },
+        ).resource_token.expect("the positioned read has a valid buffer");
+        let denied = |required: crate::RightSet, held: crate::RightSet| {
+            CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::RightNotHeld {
+                required: required.bits(), held: held.bits(),
+            }))
+        };
+        assert_eq!(
+            f.call(
+                HostOpV1::FsReadAt,
+                ResourceInputsV1::FileBuffer { file: directory, buffer },
+                CanonicalRequestV1::FsReadAt { file_offset: 0, buffer_start: 0, length: 4 },
+            ).outcome,
+            denied(crate::RightSet::READ, crate::RightSet::ENUMERATE),
+        );
+        assert_eq!(f.batch(file), denied(crate::RightSet::ENUMERATE, crate::RightSet::READ));
+        for token in [directory, file, buffer] {
+            assert!(matches!(
+                f.call(HostOpV1::ResourceRelease, ResourceInputsV1::Target(token),
+                    CanonicalRequestV1::ResourceRelease).outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceSettlement(_))
+            ));
+        }
+    }
+
+    /// Durable invariant: two opens of the same removed inode differ only
+    /// in whether this handle has already delivered End. A generic conversion
+    /// of ENOENT to End is not equivalent to the latch.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_end_is_sticky_after_removal_but_not_for_an_unread_handle() {
+        let mut f = DirectoryDispatchFixture::new("removed");
+        let exhausted = f.open_directory();
+        let unread = f.open_directory();
+        let end = CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEnd);
+        assert_eq!(f.batch(exhausted), end);
+        std::fs::remove_dir(f.root.join("directory")).unwrap();
+        // Keep the observations independent so the m7 control is evaluated
+        // even when the previously exhausted handle no longer returns End.
+        let unread_after_removal = f.batch(unread);
+        let exhausted_after_removal = f.batch(exhausted);
+        assert_eq!(unread_after_removal, CanonicalOutcomeV1::Error(
+            SemanticErrorV1::Io(IoErrorIdentityV1::NotFound)), "unread handle");
+        assert_eq!(exhausted_after_removal, end, "handle already at End");
     }
 
     /// Promise class: durable discriminator. MEASURED: a metadata resource

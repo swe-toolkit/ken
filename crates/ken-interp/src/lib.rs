@@ -13,7 +13,7 @@ pub use eval::{
     apply, check_fs_capability, decimal_value, drive_h, drive_h_instrumented, eval,
     fs_target_components, run_io, run_io_effect_observation, CapabilityDenied, CaptureHost,
     ClockIds, ClockTrace, ConsoleIds, ConsoleStream, ConsoleTrace, CoproductIds, Env, EvalStore,
-    EvalVal, FSIds, FsOpKind, FsTrace, HostCreatePolicy, HostDirEntry, HostFileKind,
+    EvalVal, FSIds, FsOpKind, FsTrace, HostCreatePolicy, HostFileKind,
     HostFileMetadata, HostHandler, HostRead, ITreeIds, PosixHost, Resolution, ResolveError,
     RunIoError, SlotId, VfsNodeId, VirtualFsNode, INTERPRETER_TARGET_ABI_MANIFEST_HASH,
 };

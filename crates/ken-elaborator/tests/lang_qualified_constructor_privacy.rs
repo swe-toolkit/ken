@@ -22,6 +22,8 @@ fn elaborate(entry: Entry, source: &str) -> Result<(), ElabError> {
         Some(("Capability.System.Buffer", "BufferHandle"))
     } else if source.contains("MappingHandle") {
         Some(("Capability.System.Mapping", "MappingHandle"))
+    } else if source.contains("DirectoryHandle") || source.contains("private_with_directory_after_open") {
+        Some(("Capability.Filesystem.Authority", "withDirectory"))
     } else {
         None
     };
@@ -192,6 +194,26 @@ fn bracket_finalizer_constructor_not_source_resolvable() {
     }
 }
 
+/// Durable opacity: neither the raw directory acquisition nor the wrapper
+/// and its raw handle can be reached through a bare or qualified source name.
+#[test]
+fn directory_acquisition_and_wrapper_are_not_source_resolvable() {
+    for entry in [Entry::Decl, Entry::File] {
+        for spelling in [
+            "PrivateFsOpenDirectory",
+            "FSOp.PrivateFsOpenDirectory",
+            "PrivateFsReadDirectoryBatch",
+            "FSOp.PrivateFsReadDirectoryBatch",
+            "PrivateDirectoryHandle",
+            "DirectoryHandle.PrivateDirectoryHandle",
+            "private_with_directory_after_open",
+            "Capability.Filesystem.Authority.private_with_directory_after_open",
+        ] {
+            assert_missing(entry, &format!("let exposed = {spelling}"), spelling);
+        }
+    }
+}
+
 /// Promise class: durable invariant (spec 33 §3.3).
 /// The same untyped-reference form as the six private-constructor probes
 /// accepts a reachable constructor through both source entries. If this form
@@ -248,8 +270,10 @@ fn hidden_roster_sweeps_all_kernel_constructor_identities() {
         .inductive(env.globals["MappingHandle"])
         .expect("checked MappingHandle");
     assert_eq!(mapping.constructors.len(), 1);
-    let private: [GlobalId; 17] = [
+    let private: [GlobalId; 19] = [
         p.private_fs_open_id,
+        p.private_fs_open_directory_id,
+        p.private_fs_read_directory_batch_id,
         p.private_fs_handle_metadata_id,
         p.private_resource_release_id,
         p.private_bracket_release_id,

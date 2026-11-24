@@ -139,18 +139,18 @@ impl NativeTestedEvidence {
         }
     }
 
-    /// FsReadDirectory evidence uses the same order-independent `{name, kind}`
-    /// projection as its real-artifact comparator.
-    pub fn from_fs_read_directory_run(
+    /// Compare the entries against an independent oracle without rewriting either trace.
+    pub fn from_directory_stream_run(
+        operation: HostOpV1,
         run: &CanonicalDifferentialRun,
         request_path: &[u8],
         expected_entries: &[ken_host::DirEntryV1],
     ) -> Self {
-        let operation = HostOpV1::FsReadDirectory;
+        assert!(matches!(operation, HostOpV1::FsOpenDirectory | HostOpV1::FsReadDirectoryBatch));
         Self {
             exact_artifact_executed: run.exact_artifact_executed,
             canonical_observation_equal: run
-                .compare_fs_read_directory(request_path, expected_entries)
+                .compare_directory_stream(request_path, expected_entries)
                 .is_ok(),
             operation_observed_in_both_lanes: [&run.interpreter, &run.native]
                 .into_iter()

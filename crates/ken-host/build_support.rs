@@ -63,7 +63,11 @@ fn derive_producer_inventory(
         .ok_or_else(|| "cannot isolate the PosixHost consumer".to_owned())?;
 
     let mut host_syscalls = call_identifiers_after(production, "fs::", Some("std::"));
-    for (call, name) in [("libc::mmap(", "mmap"), ("libc::munmap(", "munmap")] {
+    for (call, name) in [
+        ("libc::mmap(", "mmap"),
+        ("libc::munmap(", "munmap"),
+        ("RawDir::new(", "getdents64"),
+    ] {
         if production.contains(call) {
             host_syscalls.insert(name.to_owned());
         }
@@ -87,7 +91,7 @@ fn registry_inventory(facts: &[(&str, u64)]) -> Result<ProducerInventory, String
         at_flags: BTreeSet::from(["empty".to_owned()]),
         modes: BTreeSet::new(),
         host_syscalls: BTreeSet::new(),
-        std_fs: BTreeSet::from(["read_dir".to_owned(), "remove_dir_all".to_owned()]),
+        std_fs: BTreeSet::from(["remove_dir_all".to_owned()]),
         errno_kinds: BTreeSet::new(),
     };
     for (name, _) in facts {

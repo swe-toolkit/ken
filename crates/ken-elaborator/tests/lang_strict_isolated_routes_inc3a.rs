@@ -36,7 +36,7 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
                 "append_file",
                 "change_mode",
                 "create_directory",
-                "read_directory",
+                "withDirectory",
                 "remove_directory",
                 "remove_file",
                 "rename_file",
