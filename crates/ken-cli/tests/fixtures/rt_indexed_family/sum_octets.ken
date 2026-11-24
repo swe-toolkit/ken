@@ -1,0 +1,20 @@
+program capabilities FS APartial
+
+import Capability.Process.Exit (host_pure)
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+fn loopback_tail (n : Nat) : Vec UInt8 (Suc n) =
+  match n {
+    Zero ↦ VCons UInt8 Zero (1 : UInt8) (VNil UInt8);
+    Suc rest ↦ VCons UInt8 (Suc rest) (0 : UInt8) (loopback_tail rest)
+  }
+
+fn sum_octets (n : Nat) (octets : Vec UInt8 n) : Int =
+  match octets {
+    VNil ↦ 0;
+    VCons rest byte tail ↦ add_int (uint8_to_int byte) (sum_octets rest tail)
+  }
+
+fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  host_pure APartial ExitCode (ExitCode.Failure (int_to_uint8_raw (add_int 40 (sum_octets (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))))))))) (loopback_tail (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))))))))))

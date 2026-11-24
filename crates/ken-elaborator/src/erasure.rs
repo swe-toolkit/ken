@@ -417,7 +417,8 @@ fn collect_checked_body_declaration_refs(
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
         | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm
+        | CheckedCoreBodyTerm::Unreachable => {}
     }
 }
 
@@ -1914,8 +1915,12 @@ impl NativeJoinPlanCollector {
         path: &[u64],
         view: &checked_core::CheckedCoreMatchView,
         runtime: &RuntimeExpr,
+        semantic: &checked_core::CheckedCoreSemanticInputs,
     ) -> Result<Option<u64>, ErasureError> {
-        let Some(result_type) = checked_core::checked_constant_motive_result_type(&view.motive)
+        let data = semantic.data_metadata.get(&view.family_symbol).ok_or_else(|| {
+            expression_lowering_error(owner, "native_join_plan_motive", "missing match family metadata")
+        })?;
+        let Some(result_type) = checked_core::checked_constant_motive_result_type(&view.motive, data.index_count + 1)
             .map_err(|reason| {
                 expression_lowering_error(owner, "native_join_plan_motive", reason)
             })?
@@ -3554,18 +3559,6 @@ fn lower_body_term_with_plans(
             &constructor.constructor_lowerability,
             "constructor_lowerability_blocked",
         )?;
-        if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
-            && !is_generated_all_support(semantic, &constructor.family_symbol)
-        {
-            return Err(expression_lowering_error(
-                root,
-                "dependent_constructor_lowering_unsupported",
-                format!(
-                    "constructor {} belongs to indexed family {}",
-                    constructor.symbol, constructor.family_symbol
-                ),
-            ));
-        }
         let expected = constructor.family_parameter_count + constructor.argument_count;
         if arguments.len() != expected {
             return Err(expression_lowering_error(
@@ -3761,14 +3754,6 @@ fn lower_body_term_with_plans(
         }
         CheckedCoreBodyTerm::Match(view) => {
             reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
-            if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol)
-            {
-                return Err(expression_lowering_error(
-                    root,
-                    "unsupported_dependent_motive",
-                    format!("match over {} carries runtime indices", view.family_symbol),
-                ));
-            }
             let computational = match_uses_computational_recursive_hypothesis(view, root)?;
             let mut direct_path = path.to_vec();
             direct_path.push(19);
@@ -3895,18 +3880,6 @@ fn lower_body_term_with_plans(
                     &constructor.constructor_lowerability,
                     "constructor_lowerability_blocked",
                 )?;
-                if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
-                    && !is_generated_all_support(semantic, &constructor.family_symbol)
-                {
-                    return Err(expression_lowering_error(
-                        root,
-                        "dependent_constructor_lowering_unsupported",
-                        format!(
-                            "match branch constructor {} belongs to indexed family {}",
-                            constructor.symbol, constructor.family_symbol
-                        ),
-                    ));
-                }
                 let erased_count = constructor.recursive_positions.len();
                 let source_binders = constructor.argument_count + erased_count;
                 let method = peel_match_branch_method(
@@ -4002,7 +3975,7 @@ fn lower_body_term_with_plans(
             let join_site = native_plans
                 .joins
                 .as_mut()
-                .map(|joins| joins.record_match(&owner, path, view, &runtime))
+                .map(|joins| joins.record_match(&owner, path, view, &runtime, semantic))
                 .transpose()?
                 .flatten();
             let runtime = if let Some(pending) = pending {
@@ -4033,6 +4006,13 @@ fn lower_body_term_with_plans(
     }
 }
 
+fn lower_unreachable(owner: &StableSymbol) -> RuntimeExpr {
+    RuntimeExpr::Trap(RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: format!("impossible branch in {owner}"),
+    })
+}
+
 fn lower_checked_host_computation(
     term: &CheckedCoreBodyTerm,
     declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
@@ -4050,6 +4030,9 @@ fn lower_checked_host_computation(
         .last()
         .expect("expression lowering stack always has an owner")
         .clone();
+    if matches!(term, CheckedCoreBodyTerm::Unreachable) {
+        return Ok(lower_unreachable(&owner));
+    }
     if let Some((slot_template_id, arguments)) =
         computational_ih_application_spine(term, branch_remap)
     {
@@ -4126,13 +4109,6 @@ fn lower_checked_host_computation(
     }
     if let CheckedCoreBodyTerm::Match(view) = term {
         reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
-        if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol) {
-            return Err(expression_lowering_error(
-                root,
-                "host_match_identity",
-                "checked host Match carries runtime indices",
-            ));
-        }
         let computational = match_uses_computational_recursive_hypothesis(view, root)?;
         if let Some(plans) = native_plans.as_deref_mut() {
             let mut scrutinee_path = path.to_vec();
@@ -4272,15 +4248,6 @@ fn lower_checked_host_computation(
                 &constructor.constructor_lowerability,
                 "constructor_lowerability_blocked",
             )?;
-            if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
-                && !is_generated_all_support(semantic, &constructor.family_symbol)
-            {
-                return Err(expression_lowering_error(
-                    root,
-                    "host_match_identity",
-                    "checked host Match branch belongs to an indexed family",
-                ));
-            }
             let erased_count = constructor.recursive_positions.len();
             let source_binders = constructor.argument_count + erased_count;
             let method = peel_match_branch_method(
@@ -4367,7 +4334,7 @@ fn lower_checked_host_computation(
         let join_site = native_plans
             .as_deref_mut()
             .and_then(|plans| plans.joins.as_mut())
-            .map(|joins| joins.record_match(root, path, view, &runtime))
+            .map(|joins| joins.record_match(root, path, view, &runtime, semantic))
             .transpose()?
             .flatten();
         let runtime = if let Some(pending) = pending_oriented_frame {
@@ -6227,6 +6194,7 @@ fn lower_body_term_inner(
             "erased_omega_subterm_reached_computation",
             "an Ω subterm cannot be lowered as a runtime expression",
         )),
+        CheckedCoreBodyTerm::Unreachable => Ok(lower_unreachable(&owner)),
         CheckedCoreBodyTerm::Match(view) => lower_match_view(
             view,
             declarations,
@@ -7411,18 +7379,6 @@ fn lower_constructor_application(
         &constructor.constructor_lowerability,
         "constructor_lowerability_blocked",
     )?;
-    if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
-        && !is_generated_all_support(semantic, &constructor.family_symbol)
-    {
-        return Err(expression_lowering_error(
-            root_symbol,
-            "dependent_constructor_lowering_unsupported",
-            format!(
-                "constructor {} belongs to indexed family {}",
-                constructor.symbol, constructor.family_symbol
-            ),
-        ));
-    }
     let expected = constructor.family_parameter_count + constructor.argument_count;
     if args.len() != expected {
         return Err(expression_lowering_error(
@@ -7467,13 +7423,6 @@ fn lower_match_view(
     branch_remap: Option<&BranchBinderRemap>,
 ) -> Result<RuntimeExpr, ErasureError> {
     reject_level_args_for_family(root_symbol, &view.level_args, semantic, &view.family_symbol)?;
-    if !view.indices.is_empty() && !is_generated_all_support(semantic, &view.family_symbol) {
-        return Err(expression_lowering_error(
-            root_symbol,
-            "unsupported_dependent_motive",
-            format!("match over {} carries runtime indices", view.family_symbol),
-        ));
-    }
     let scrutinee = Box::new(lower_body_term_inner(
         &view.scrutinee,
         declarations,
@@ -7505,18 +7454,6 @@ fn lower_match_view(
             &constructor.constructor_lowerability,
             "constructor_lowerability_blocked",
         )?;
-        if (constructor.family_index_count != 0 || constructor.target_index_count != 0)
-            && !is_generated_all_support(semantic, &constructor.family_symbol)
-        {
-            return Err(expression_lowering_error(
-                root_symbol,
-                "dependent_constructor_lowering_unsupported",
-                format!(
-                    "match branch constructor {} belongs to indexed family {}",
-                    constructor.symbol, constructor.family_symbol
-                ),
-            ));
-        }
         let erased_count = constructor.recursive_positions.len();
         let source_binder_count = constructor.argument_count + erased_count;
         let body = peel_match_branch_method(
@@ -7713,7 +7650,8 @@ fn has_free_variable_at_or_above(term: &CheckedCoreBodyTerm, bound: usize) -> bo
             .any(|argument| has_free_variable_at_or_above(argument, bound)),
         CheckedCoreBodyTerm::ConstructorReference(_) => false,
         CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-        | CheckedCoreBodyTerm::ErasedOmegaSubterm => false,
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm
+        | CheckedCoreBodyTerm::Unreachable => false,
         CheckedCoreBodyTerm::Lambda { body, .. } => has_free_variable_at_or_above(body, bound + 1),
         CheckedCoreBodyTerm::Application { function, argument } => {
             has_free_variable_at_or_above(function, bound)

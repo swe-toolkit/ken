@@ -1317,7 +1317,7 @@ fn missing_match_branch_data_rejects_before_runtime_program_success() {
 }
 
 #[test]
-fn unsupported_dependent_motive_rejects_before_runtime_program_success() {
+fn unreadable_match_motive_sort_rejects_before_runtime_program_success() {
     let (mut package, target) = data_match_package("nc14_dependent_motive_pkg");
     let (bool_ty, _, _) = bool_data_symbols("nc14_dependent_motive_pkg");
     package
@@ -1333,7 +1333,7 @@ fn unsupported_dependent_motive_rejects_before_runtime_program_success() {
 
     assert_eq!(
         erasure_lane(&package, &target),
-        "unsupported_dependent_motive"
+        "unreadable_match_motive_sort"
     );
 }
 

@@ -1,0 +1,76 @@
+program capabilities FS APartial
+
+import Capability.Process.Exit (host_pure)
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+fn loopback_tail (n : Nat) : Vec UInt8 (Suc n) =
+  match n {
+    Zero ↦ VCons UInt8 Zero (1 : UInt8) (VNil UInt8);
+    Suc rest ↦ VCons UInt8 (Suc rest) (0 : UInt8) (loopback_tail rest)
+  }
+
+
+fn end_octets (octets : Vec UInt8 (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))))))) : Int =
+  match octets {
+    VCons _ a tail_a ↦
+      match tail_a {
+        VCons _ b tail_b ↦
+          match tail_b {
+            VCons _ c tail_c ↦
+              match tail_c {
+                VCons _ d tail_d ↦
+                  after_four a b c d tail_d
+              }
+          }
+      }
+  }
+
+fn after_four (a : UInt8) (b : UInt8) (c : UInt8) (d : UInt8) (octets : Vec UInt8 (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))) : Int =
+  match octets {
+    VCons _ e tail_e ↦
+      match tail_e {
+        VCons _ f tail_f ↦
+          match tail_f {
+            VCons _ g tail_g ↦
+              match tail_g {
+                VCons _ h tail_h ↦
+                  after_eight a b c d e f g h tail_h
+              }
+          }
+      }
+  }
+
+fn after_eight (a : UInt8) (b : UInt8) (c : UInt8) (d : UInt8) (e : UInt8) (f : UInt8) (g : UInt8) (h : UInt8) (octets : Vec UInt8 (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))) : Int =
+  match octets {
+    VCons _ i tail_i ↦
+      match tail_i {
+        VCons _ j tail_j ↦
+          match tail_j {
+            VCons _ k tail_k ↦
+              match tail_k {
+                VCons _ l tail_l ↦
+                  after_twelve a b c d e f g h i j k l tail_l
+              }
+          }
+      }
+  }
+
+fn after_twelve (a : UInt8) (b : UInt8) (c : UInt8) (d : UInt8) (e : UInt8) (f : UInt8) (g : UInt8) (h : UInt8) (i : UInt8) (j : UInt8) (k : UInt8) (l : UInt8) (octets : Vec UInt8 (Suc (Suc (Suc (Suc Zero))))) : Int =
+  match octets {
+    VCons _ m tail_m ↦
+      match tail_m {
+        VCons _ n tail_n ↦
+          match tail_n {
+            VCons _ o tail_o ↦
+              match tail_o {
+                VCons _ p _ ↦
+                  add_int (sub_int (uint8_to_int p) (uint8_to_int a)) 40
+              }
+          }
+      }
+  }
+
+fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  host_pure APartial ExitCode
+    (ExitCode.Failure (int_to_uint8_raw (end_octets (loopback_tail (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))))))))))))

@@ -474,6 +474,8 @@ pub enum CheckedCoreBodyTerm {
         term: Vec<u8>,
     },
     ErasedOmegaSubterm,
+    /// An absurd elimination whose checked proof child is erased.
+    Unreachable,
     Lambda {
         parameter_type: Vec<u8>,
         erased_parameter: bool,
@@ -1633,7 +1635,8 @@ pub(crate) fn checked_runtime_match_census(
             | CheckedCoreBodyTerm::PrimitiveLiteral(_)
             | CheckedCoreBodyTerm::ConstructorReference(_)
             | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-            | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
+            | CheckedCoreBodyTerm::ErasedOmegaSubterm
+            | CheckedCoreBodyTerm::Unreachable => {}
             CheckedCoreBodyTerm::PrimitiveApplication(view) => {
                 for argument in &view.arguments {
                     visit(argument, next_computational_ordinal, occurrences)?;
@@ -1719,7 +1722,8 @@ fn runtime_body_references_outer_binder_range(
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
         | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-        | CheckedCoreBodyTerm::ErasedOmegaSubterm => false,
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm
+        | CheckedCoreBodyTerm::Unreachable => false,
         CheckedCoreBodyTerm::PrimitiveApplication(view) => view.arguments.iter().any(|child| {
             runtime_body_references_outer_binder_range(child, start, end, local_depth)
         }),
@@ -3452,9 +3456,21 @@ fn decode_supported_body_term_after_tag(
                 body,
             })
         }
-        "absurd" => Err(CheckedCoreBodyViewError::UnjustifiedImpossibleBranch {
-            symbol: owner.clone(),
-        }),
+        "absurd" => {
+            skip_term(cursor).map_err(|reason| malformed_body(owner, reason))?; // motive
+            let erased_proof = plan.is_some_and(|ctx| {
+                ctx.indices
+                    .get(&cursor.pos)
+                    .is_some_and(|id| ctx.plan.erased_subterms.contains(id))
+            });
+            if !erased_proof {
+                return Err(CheckedCoreBodyViewError::UnjustifiedImpossibleBranch {
+                    symbol: owner.clone(),
+                });
+            }
+            skip_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
+            Ok(CheckedCoreBodyTerm::Unreachable)
+        }
         "pair" => decode_supported_pair_construction(
             cursor,
             semantic,
@@ -3473,6 +3489,31 @@ fn decode_supported_body_term_after_tag(
             type_context,
             plan,
         ),
+        "cast" => {
+            // Index refinement changes types but not the stored representation.
+            let source =
+                capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
+            let target =
+                capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
+            if !index_erased_equal(semantic, &source, &target)
+                .map_err(|reason| malformed_body(owner, reason))?
+            {
+                return Err(CheckedCoreBodyViewError::UnsupportedTermShape {
+                    symbol: owner.clone(),
+                    tag,
+                });
+            }
+            skip_term(cursor).map_err(|reason| malformed_body(owner, reason))?; // evidence
+            decode_supported_body_term(
+                cursor,
+                semantic,
+                selection,
+                owner,
+                type_context,
+                Some(&source),
+                plan,
+            )
+        }
         _ => Err(CheckedCoreBodyViewError::UnsupportedTermShape {
             symbol: owner.clone(),
             tag,
@@ -4538,7 +4579,7 @@ fn decode_supported_match_view(
     let computational_recursive_hypotheses =
         validate_supported_match_motive(semantic, owner, &family_symbol, data, &motive)?;
     let convoy_erased_proof_binder = matches!(
-        inspect_non_dependent_motive(semantic, &motive)
+        inspect_non_dependent_motive(semantic, &motive, data.index_count + 1)
             .map_err(|reason| malformed_body(owner, reason))?,
         Some(MotiveShape::Convoyed)
     );
@@ -4614,12 +4655,6 @@ fn decode_supported_match_view(
                 data.index_count,
                 indices.len()
             ),
-        });
-    }
-    if data.index_count != 0 && !semantic.all_support_origins.contains_key(&family_symbol) {
-        return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-            symbol: owner.clone(),
-            family: family_symbol,
         });
     }
 
@@ -4719,16 +4754,10 @@ fn validate_supported_match_motive(
     if semantic.all_support_origins.contains_key(family) {
         return Ok(true);
     }
-    if data.index_count != 0 {
-        return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-            symbol: owner.clone(),
-            family: family.clone(),
-        });
-    }
-    match inspect_non_dependent_motive(semantic, motive)
+    match inspect_non_dependent_motive(semantic, motive, data.index_count + 1)
         .map_err(|reason| malformed_body(owner, reason))?
     {
-        Some(MotiveShape::ConstantType | MotiveShape::Convoyed) => Ok(true),
+        Some(MotiveShape::ConstantType | MotiveShape::Convoyed | MotiveShape::IndexDependent) => Ok(true),
         Some(MotiveShape::Dependent) => Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
             symbol: owner.clone(),
             family: family.clone(),
@@ -4765,13 +4794,120 @@ enum MotiveShape {
     /// Any dependence on the scrutinee is confined to the domain of a
     /// trailing Π whose branch binder and call argument the plan erases.
     Convoyed,
+    IndexDependent,
     Dependent,
     ProofOnly,
+}
+
+/// A rigid family spine's symbol and head bytes (including level arguments).
+/// A `const` head is not rigid: it can name a large elimination.
+fn family_spine_head(
+    cursor: &mut CanonicalCursor<'_>,
+    args: &mut Vec<Vec<u8>>,
+) -> Result<Option<(StableSymbol, Vec<u8>)>, String> {
+    let start = cursor.pos;
+    match cursor.read_tag()?.as_str() {
+        "ind_former" => {
+            let symbol = decode_stable_symbol(cursor)?;
+            skip_levels(cursor)?;
+            Ok(Some((symbol, cursor.bytes[start..cursor.pos].to_vec())))
+        }
+        "app" => {
+            let Some(head) = family_spine_head(cursor, args)? else {
+                return Ok(None);
+            };
+            args.push(capture_canonical_term(cursor)?);
+            Ok(Some(head))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Two canonical types equal except in index arguments, compared through Π.
+/// Family heads, level arguments, and parameters must be byte-identical.
+fn index_erased_equal(
+    semantic: &CheckedCoreSemanticInputs,
+    left: &[u8],
+    right: &[u8],
+) -> Result<bool, String> {
+    if left == right {
+        return Ok(true);
+    }
+    let mut l = CanonicalCursor::new(left);
+    let mut r = CanonicalCursor::new(right);
+    if l.read_tag()? == "pi" && r.read_tag()? == "pi" {
+        let left_domain = capture_canonical_term(&mut l)?;
+        let left_codomain = capture_canonical_term(&mut l)?;
+        let right_domain = capture_canonical_term(&mut r)?;
+        let right_codomain = capture_canonical_term(&mut r)?;
+        return Ok(l.remaining() == 0
+            && r.remaining() == 0
+            && index_erased_equal(semantic, &left_domain, &right_domain)?
+            && index_erased_equal(semantic, &left_codomain, &right_codomain)?);
+    }
+    let (mut left_args, mut right_args) = (Vec::new(), Vec::new());
+    let mut l = CanonicalCursor::new(left);
+    let mut r = CanonicalCursor::new(right);
+    let (Some((family, left_head)), Some((_, right_head))) = (
+        family_spine_head(&mut l, &mut left_args)?,
+        family_spine_head(&mut r, &mut right_args)?,
+    ) else {
+        return Ok(false);
+    };
+    if left_head != right_head || l.remaining() != 0 || r.remaining() != 0 {
+        return Ok(false);
+    }
+    let Some(data) = semantic.data_metadata.get(&family) else {
+        return Ok(false);
+    };
+    let arity = data.parameter_count + data.index_count;
+    Ok(data.index_count > 0
+        && left_args.len() == arity
+        && right_args.len() == arity
+        && left_args[..data.parameter_count] == right_args[..data.parameter_count])
+}
+
+/// An indexed family's parameters must be independent of every motive binder.
+fn index_only_dependent_motive_body(
+    semantic: &CheckedCoreSemanticInputs,
+    body: &[u8],
+    binders: usize,
+) -> Result<bool, String> {
+    let mut cursor = CanonicalCursor::new(body);
+    let mut args = Vec::new();
+    let Some((family, _)) = family_spine_head(&mut cursor, &mut args)? else {
+        return Ok(false);
+    };
+    if cursor.remaining() != 0 {
+        return Ok(false);
+    }
+    let Some(data) = semantic.data_metadata.get(&family) else {
+        return Ok(false);
+    };
+    if data.index_count == 0 || args.len() != data.parameter_count + data.index_count {
+        return Ok(false);
+    }
+    for parameter in &args[..data.parameter_count] {
+        if mentions_motive_binder(parameter, binders)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn mentions_motive_binder(body: &[u8], binders: usize) -> Result<bool, String> {
+    for binder in 0..binders {
+        if canonical_term_contains_free_var(body, binder)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn inspect_non_dependent_motive(
     semantic: &CheckedCoreSemanticInputs,
     motive: &[u8],
+    binders: usize,
 ) -> Result<Option<MotiveShape>, String> {
     let mut cursor = CanonicalCursor::new(motive);
     let ascribed = match cursor.read_tag()?.as_str() {
@@ -4785,15 +4921,23 @@ fn inspect_non_dependent_motive(
         _ => return Ok(None),
     };
     skip_term(&mut cursor)?;
+    for _ in 1..binders {
+        if cursor.read_tag()? != "lam" {
+            return Ok(None);
+        }
+        skip_term(&mut cursor)?;
+    }
     let body = capture_canonical_term(&mut cursor)?;
-    let dependent = canonical_term_contains_free_var(&body, 0)?;
+    let dependent = mentions_motive_binder(&body, binders)?;
     let kind = if ascribed {
         let ascription = capture_canonical_term(&mut cursor)?;
         let mut pi = CanonicalCursor::new(&ascription);
-        if pi.read_tag()? != "pi" {
-            return Ok(None);
+        for _ in 0..binders {
+            if pi.read_tag()? != "pi" {
+                return Ok(None);
+            }
+            skip_term(&mut pi)?;
         }
-        skip_term(&mut pi)?;
         let codomain = capture_canonical_term(&mut pi)?;
         if pi.remaining() != 0 {
             return Ok(None);
@@ -4813,9 +4957,7 @@ fn inspect_non_dependent_motive(
         if pi.read_tag()? == "pi" {
             skip_term(&mut pi)?; // syntactic candidate; the method's plan marker is authority
             let codomain = capture_canonical_term(&mut pi)?;
-            pi.remaining() == 0
-                && !canonical_term_contains_free_var(&codomain, 0)?
-                && !canonical_term_contains_free_var(&codomain, 1)?
+            pi.remaining() == 0 && !mentions_motive_binder(&codomain, binders + 1)?
         } else {
             false
         }
@@ -4825,7 +4967,13 @@ fn inspect_non_dependent_motive(
     Ok(match kind {
         Some(SortKind::Omega) => Some(MotiveShape::ProofOnly),
         Some(SortKind::Type) if dependent && erased_only_dependency => Some(MotiveShape::Convoyed),
-        Some(SortKind::Type) if dependent => Some(MotiveShape::Dependent),
+        Some(SortKind::Type) if dependent => {
+            Some(if index_only_dependent_motive_body(semantic, &body, binders)? {
+                MotiveShape::IndexDependent
+            } else {
+                MotiveShape::Dependent
+            })
+        }
         Some(SortKind::Type) => Some(MotiveShape::ConstantType),
         None => None,
     })
@@ -5006,22 +5154,28 @@ fn head_spine_sort_kind(
     delivered_sort_literal(semantic, &head_type)
 }
 
-/// Return the exact checked result type of a constant, non-indexed Match
+/// Return the exact checked result type of a constant Match
 /// motive.  Native join planning consumes this checked fact before erasure;
 /// erased Runtime syntax is never used to reconstruct it.
 pub(crate) fn checked_constant_motive_result_type(
     motive: &[u8],
+    binders: usize,
 ) -> Result<Option<Vec<u8>>, String> {
     let mut cursor = CanonicalCursor::new(motive);
-    if cursor.read_tag()?.as_str() != "ascript" || cursor.read_tag()?.as_str() != "lam" {
+    if cursor.read_tag()? != "ascript" {
         return Ok(None);
     }
-    skip_term(&mut cursor)?;
+    for _ in 0..binders {
+        if cursor.read_tag()? != "lam" {
+            return Ok(None);
+        }
+        skip_term(&mut cursor)?;
+    }
     let body = capture_canonical_term(&mut cursor)?;
-    if canonical_term_contains_free_var(&body, 0)? {
+    if mentions_motive_binder(&body, binders)? {
         return Ok(None);
     }
-    if inspect_non_indexed_motive_type_sort(&mut cursor)? != MotiveShape::ConstantType
+    if inspect_motive_type_sort(&mut cursor, binders)? != MotiveShape::ConstantType
         || cursor.remaining() != 0
     {
         return Ok(None);
@@ -5037,13 +5191,16 @@ pub(crate) fn checked_type_head_symbol(
     record_head_symbol_from_type(checked_type)
 }
 
-fn inspect_non_indexed_motive_type_sort(
+fn inspect_motive_type_sort(
     cursor: &mut CanonicalCursor<'_>,
+    binders: usize,
 ) -> Result<MotiveShape, String> {
-    if cursor.read_tag()?.as_str() != "pi" {
-        return Ok(MotiveShape::Dependent);
+    for _ in 0..binders {
+        if cursor.read_tag()? != "pi" {
+            return Ok(MotiveShape::Dependent);
+        }
+        skip_term(cursor)?;
     }
-    skip_term(cursor)?;
     match cursor.read_tag()?.as_str() {
         "type" => {
             skip_level(cursor)?;
@@ -5746,7 +5903,7 @@ mod tests {
         let motive = Term::lam(ty.clone(), result.clone());
         let bytes = canonical_term_bytes(&motive, &table).unwrap();
         assert_eq!(
-            inspect_non_dependent_motive(&semantic, &bytes).unwrap(),
+            inspect_non_dependent_motive(&semantic, &bytes, 1).unwrap(),
             Some(MotiveShape::ProofOnly)
         );
         let owner_decl = Decl::Opaque {
@@ -5777,7 +5934,7 @@ mod tests {
         );
         semantic.declarations.remove(&head);
         assert_eq!(
-            inspect_non_dependent_motive(&semantic, &bytes).unwrap(),
+            inspect_non_dependent_motive(&semantic, &bytes, 1).unwrap(),
             None,
             "a missing delivered head may not be supplied by producer metadata"
         );
@@ -5790,6 +5947,7 @@ mod tests {
             inspect_non_dependent_motive(
                 &semantic,
                 &canonical_term_bytes(&dependent_type, &table).unwrap(),
+                1,
             )
             .unwrap(),
             // A dependent Pi with a constant codomain is only a candidate:
@@ -5873,7 +6031,7 @@ mod tests {
         );
         let prop_motive = encode(&motive(constant(GlobalId(2))));
         assert_eq!(
-            inspect_non_dependent_motive(&semantic, &prop_motive).unwrap(),
+            inspect_non_dependent_motive(&semantic, &prop_motive, 1).unwrap(),
             Some(MotiveShape::ProofOnly)
         );
         let data = DataMetadata {
@@ -5911,7 +6069,7 @@ mod tests {
             canonical_decl_bytes(&head_decl(constant(GlobalId(3))), &table).unwrap(),
         );
         assert_eq!(
-            inspect_non_dependent_motive(&semantic, &encode(&motive(constant(GlobalId(3)))))
+            inspect_non_dependent_motive(&semantic, &encode(&motive(constant(GlobalId(3)))), 1)
                 .unwrap(),
             None,
             "a transparent alias to a non-sort must fail closed"
@@ -5922,7 +6080,7 @@ mod tests {
         );
         semantic.declarations.remove(&prop);
         assert_eq!(
-            inspect_non_dependent_motive(&semantic, &prop_motive).unwrap(),
+            inspect_non_dependent_motive(&semantic, &prop_motive, 1).unwrap(),
             None,
             "a missing delivered Prop declaration cannot be supplied by metadata"
         );
@@ -5998,7 +6156,7 @@ mod tests {
                 skip_terms(&mut eliminator).unwrap();
                 let motive = capture_canonical_term(&mut eliminator).unwrap();
                 assert_eq!(
-                    inspect_non_dependent_motive(semantic, &motive).unwrap(),
+                    inspect_non_dependent_motive(semantic, &motive, 1).unwrap(),
                     Some(MotiveShape::ProofOnly),
                     "the prelude's elaborated dependent proof motive takes ProofOnly"
                 );
@@ -7352,6 +7510,201 @@ mod tests {
             }
         ));
         assert_eq!(err.lane(), "missing_match_branch_data");
+    }
+
+    fn indexed_type_fixture() -> (CheckedCoreSemanticInputs, StableSymbolTable) {
+        let nat = decl_symbol("Nat");
+        let succ = StableSymbol::constructor(&nat, "Suc");
+        let vec = decl_symbol("Vec");
+        let other = decl_symbol("OtherIndexed");
+        let mut semantic = CheckedCoreSemanticInputs::default();
+        for symbol in [vec.clone(), other.clone()] {
+            semantic.data_metadata.insert(
+                symbol,
+                DataMetadata {
+                    parameter_count: 1,
+                    index_count: 1,
+                    constructors: Vec::new(),
+                    eliminator: LowerabilityStatus::Supported,
+                    lowerability: LowerabilityStatus::Supported,
+                },
+            );
+        }
+        let table = table_many(&[
+            (GlobalId(1), nat),
+            (GlobalId(2), vec),
+            (GlobalId(3), decl_symbol("F")),
+            (GlobalId(4), succ),
+            (GlobalId(5), other),
+            (GlobalId(6), decl_symbol("Int")),
+        ]);
+        (semantic, table)
+    }
+
+    fn indexed_type(family: u32, parameter: Term, index: Term) -> Term {
+        Term::app(
+            Term::app(Term::indformer(GlobalId(family), vec![]), parameter),
+            index,
+        )
+    }
+
+    #[test]
+    fn motive_dependence_in_rigid_family_index_is_admitted() {
+        let (semantic, table) = indexed_type_fixture();
+        let nat = Term::indformer(GlobalId(1), vec![]);
+        let motive = constant_type_motive(
+            nat.clone(),
+            indexed_type(
+                2,
+                Term::var(2),
+                Term::app(Term::constructor(GlobalId(4), vec![]), Term::var(0)),
+            ),
+        );
+        let bytes = canonical_term_bytes(&motive, &table).unwrap();
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &bytes, 1).unwrap(),
+            Some(MotiveShape::IndexDependent)
+        );
+        let family = decl_symbol("Nat");
+        let data = DataMetadata {
+            parameter_count: 0,
+            index_count: 0,
+            constructors: Vec::new(),
+            eliminator: LowerabilityStatus::Supported,
+            lowerability: LowerabilityStatus::Supported,
+        };
+        assert!(validate_supported_match_motive(
+            &semantic,
+            &decl_symbol("owner"),
+            &family,
+            &data,
+            &bytes
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn motive_dependence_in_parameter_or_const_head_is_refused() {
+        let (semantic, table) = indexed_type_fixture();
+        let owner = decl_symbol("owner");
+        let family = decl_symbol("Nat");
+        let data = DataMetadata {
+            parameter_count: 0,
+            index_count: 0,
+            constructors: Vec::new(),
+            eliminator: LowerabilityStatus::Supported,
+            lowerability: LowerabilityStatus::Supported,
+        };
+        let dependent_application = Term::app(Term::const_(GlobalId(3), vec![]), Term::var(0));
+        for (label, body) in [
+            (
+                "dependent Vec parameter",
+                indexed_type(2, dependent_application.clone(), Term::var(2)),
+            ),
+            ("const head", dependent_application),
+        ] {
+            let motive = constant_type_motive(Term::indformer(GlobalId(1), vec![]), body);
+            let bytes = canonical_term_bytes(&motive, &table).unwrap();
+            assert_eq!(
+                validate_supported_match_motive(&semantic, &owner, &family, &data, &bytes),
+                Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+                    symbol: owner.clone(),
+                    family: family.clone(),
+                }),
+                "{label}",
+            );
+        }
+    }
+
+    #[test]
+    fn decoded_function_valued_vec_convoy_motive_is_refused() {
+        let (semantic, table) = indexed_type_fixture();
+        let nat = Term::indformer(GlobalId(1), vec![]);
+        let int = Term::const_(GlobalId(6), vec![]);
+        // λk. λv. Π(Eq Nat k n). Π(Vec Int k). Vec Int n, with n free.
+        // k = @1 and n = @4 before the two Π binders.
+        let body = Term::pi(
+            Term::Eq(
+                Box::new(nat.clone()),
+                Box::new(Term::var(1)),
+                Box::new(Term::var(4)),
+            ),
+            Term::pi(
+                indexed_type(2, int.clone(), Term::var(2)),
+                indexed_type(2, int.clone(), Term::var(6)),
+            ),
+        );
+        let vec_k = indexed_type(2, int, Term::var(0));
+        let motive = Term::Ascript(
+            Box::new(Term::lam(nat.clone(), Term::lam(vec_k.clone(), body))),
+            Box::new(Term::pi(nat, Term::pi(vec_k, Term::ty(Level::zero())))),
+        );
+        let bytes = canonical_term_bytes(&motive, &table).unwrap();
+        let owner = decl_symbol("zipPrimitive");
+        let family = decl_symbol("Vec");
+        assert_eq!(
+            validate_supported_match_motive(
+                &semantic,
+                &owner,
+                &family,
+                &semantic.data_metadata[&family],
+                &bytes
+            ),
+            Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+                symbol: owner,
+                family
+            }),
+        );
+    }
+
+    #[test]
+    fn cast_identity_compares_family_heads_levels_and_parameters_except_indices() {
+        let (semantic, table) = indexed_type_fixture();
+        let vec_an = indexed_type(2, Term::var(4), Term::var(3));
+        let vec_am = indexed_type(2, Term::var(4), Term::var(2));
+        let wrap = |term: &Term| Term::pi(term.clone(), ken_kernel::subst::shift(term, 1, 0));
+        for (label, left, right, expected) in [
+            ("index only", vec_an.clone(), vec_am.clone(), true),
+            ("index only under pi", wrap(&vec_an), wrap(&vec_am), true),
+            (
+                "different parameter",
+                vec_an.clone(),
+                indexed_type(2, Term::var(5), Term::var(3)),
+                false,
+            ),
+            (
+                "different family",
+                vec_an.clone(),
+                indexed_type(5, Term::var(4), Term::var(3)),
+                false,
+            ),
+            (
+                "different levels",
+                vec_an,
+                Term::app(
+                    Term::app(
+                        Term::indformer(GlobalId(2), vec![Level::zero()]),
+                        Term::var(4),
+                    ),
+                    Term::var(3),
+                ),
+                false,
+            ),
+            (
+                "const head",
+                Term::app(Term::const_(GlobalId(3), vec![]), Term::var(3)),
+                Term::app(Term::const_(GlobalId(3), vec![]), Term::var(2)),
+                false,
+            ),
+        ] {
+            let l = canonical_term_bytes(&left, &table).unwrap();
+            let r = canonical_term_bytes(&right, &table).unwrap();
+            assert_eq!(
+                index_erased_equal(&semantic, &l, &r).unwrap(),
+                expected,
+                "{label}"
+            );
+        }
     }
 
     #[test]
