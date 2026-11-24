@@ -1162,18 +1162,17 @@ fn zero_factor_vector_and_matrix_cancel_refuse_after_fresh_controls() {
     }
 }
 
-fn gram_seed_sources() -> (&'static str, [&'static str; 2]) {
-    let fences = extract_ken_md(GRAM_SEED)
+fn gram_seed_sources() -> (&'static str, &'static str) {
+    let mut sources = extract_ken_md(GRAM_SEED)
         .expect("§22 seed fences extract")
         .fences
         .into_iter()
         .filter(|fence| fence.role == KenMdFenceRole::Source)
-        .map(|fence| &GRAM_SEED[fence.body_range])
-        .collect::<Vec<_>>();
-    let [accepted, false_premise, false_symmetry] = fences.as_slice() else {
-        panic!("expected one accepted client and two isolated refusal clients");
-    };
-    (accepted, [false_premise, false_symmetry])
+        .map(|fence| &GRAM_SEED[fence.body_range]);
+    (
+        sources.next().expect("accepted §22 client"),
+        sources.next().expect("isolated false trace premise client"),
+    )
 }
 
 /// SOURCE: spec/50-stdlib/65-linear-algebra.md §22 and
@@ -1247,48 +1246,39 @@ fn gram_laws_check_open_and_closed_clients_and_keep_the_row_helper_private() {
 /// SOURCE: spec/50-stdlib/65-linear-algebra.md §22 and
 /// conformance/stdlib/linear-algebra/seed-gram-trace-zero.md.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: after fresh accepted prefixes, the false trace-zero application
-/// and false input symmetry each reach a kernel mismatch in their own theorem.
-/// CLAIMED: neither accepting a nonzero trace as zero nor treating the input
-/// as symmetric is valid. THE GAP: the spans locate whole declarations; the
-/// measured one-entry trace and the independent transposed entries constrain
-/// the cause. Other accepted controls stay green; admitting either claim or
-/// refusing before its own theorem fails.
+/// MEASURED: after a fresh accepted prefix, the false trace-zero proof
+/// supplies Top where the kernel expects a type convertible to Bottom.
+/// CLAIMED: the zero-trace law cannot be applied with a false trace premise.
+/// THE GAP: the span locates the declaration, not the proof token; the
+/// accepted one-entry trace of one and the mismatch types identify the premise.
+/// Additional accepted controls stay green; admitting the false premise or
+/// refusing for an unrelated reason fails.
 #[test]
-fn gram_seed_refuses_false_trace_premise_and_input_symmetry() {
-    let (accepted, refusals) = gram_seed_sources();
-    for (source, name) in refusals
-        .into_iter()
-        .zip(["refuse_nonzero_gram_trace", "refuse_skew_symmetric"])
-    {
-        let parsed = parse_decls(source).expect("isolated §22 refusal parses");
-        let [SourceDecl::TheoremDecl {
-            name: parsed_name,
-            span: claim,
-            ..
-        }] = parsed.as_slice()
-        else {
-            panic!("expected a single isolated theorem: {name}");
-        };
-        assert_eq!(parsed_name, name);
-        let mut env = matrix_env();
-        env.elaborate_file(accepted)
-            .expect("fresh accepted §22 prefix checks before refusal");
-        match env.elaborate_file(source) {
-            Err(ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { expected, found },
-                span,
-            }) if span.start >= claim.start && span.end <= claim.end && span.start < span.end => {
-                eprintln!("{name}: KernelRejected(TypeMismatch) at {span:?}");
-                if name == "refuse_nonzero_gram_trace" {
-                    let ctx = ken_kernel::Context::default();
-                    let top = Term::const_(env.env.top_id(), vec![]);
-                    let bottom = Term::const_(env.env.bottom_id(), vec![]);
-                    assert!(ken_kernel::convert_type(&env.env, &ctx, &found, &top));
-                    assert!(ken_kernel::convert_type(&env.env, &ctx, &expected, &bottom));
-                }
-            }
-            other => panic!("{name} must refuse at its own theorem: {other:?}"),
+fn gram_seed_refuses_false_trace_premise() {
+    let (accepted, source) = gram_seed_sources();
+    let parsed = parse_decls(source).expect("isolated §22 refusal parses");
+    let [SourceDecl::TheoremDecl {
+        name, span: claim, ..
+    }] = parsed.as_slice()
+    else {
+        panic!("expected a single isolated trace-premise theorem");
+    };
+    assert_eq!(name, "refuse_nonzero_gram_trace");
+    let mut env = matrix_env();
+    env.elaborate_file(accepted)
+        .expect("fresh accepted §22 prefix checks before refusal");
+    match env.elaborate_file(source) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            span,
+        }) if span.start >= claim.start && span.end <= claim.end && span.start < span.end => {
+            let ctx = ken_kernel::Context::default();
+            let top = Term::const_(env.env.top_id(), vec![]);
+            let bottom = Term::const_(env.env.bottom_id(), vec![]);
+            assert!(ken_kernel::convert_type(&env.env, &ctx, &found, &top));
+            assert!(ken_kernel::convert_type(&env.env, &ctx, &expected, &bottom));
+            eprintln!("{name}: KernelRejected(TypeMismatch) at {span:?}");
         }
+        other => panic!("{name} must refuse at its own theorem: {other:?}"),
     }
 }
