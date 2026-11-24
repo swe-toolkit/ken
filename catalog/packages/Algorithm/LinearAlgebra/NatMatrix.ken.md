@@ -2165,6 +2165,59 @@ pub theorem trace_product_comm
             (row_dot_sum_comm n m at b)
             (sym Nat swapped (row_dot_sum n m b at) (trace_row_dot_sum n m b at)))))
 
+pub theorem matrix_zero_of_trace_gram_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal Nat (trace m (matrix_product m n m a (transpose m n a))) Zero
+      → Equal (Vec (Vec Nat n) m) a (matrix_zero m n) =
+  λtrace_zero.
+    row_dot_sum_self_zero
+      m
+      n
+      a
+      (trans
+        Nat
+        (row_dot_sum m n a a)
+        (trace m (matrix_product m n m a (transpose m n a)))
+        Zero
+        (sym
+          Nat
+          (trace m (matrix_product m n m a (transpose m n a)))
+          (row_dot_sum m n a a)
+          (trans
+            Nat
+            (trace m (matrix_product m n m a (transpose m n a)))
+            (row_dot_sum m n a (transpose n m (transpose m n a)))
+            (row_dot_sum m n a a)
+            (trace_row_dot_sum m n a (transpose n m (transpose m n a)))
+            (cong
+              (Vec (Vec Nat n) m)
+              Nat
+              (transpose n m (transpose m n a))
+              a
+              (row_dot_sum m n a)
+              (transpose_invol m n a))))
+        trace_zero)
+
+pub theorem transpose_gram
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat m) m)
+        (transpose m m (matrix_product m n m a (transpose m n a)))
+        (matrix_product m n m a (transpose m n a)) =
+  trans
+    (Vec (Vec Nat m) m)
+    (transpose m m (matrix_product m n m a (transpose m n a)))
+    (matrix_product m n m (transpose n m (transpose m n a)) (transpose m n a))
+    (matrix_product m n m a (transpose m n a))
+    (transpose_product m n m a (transpose m n a))
+    (cong
+      (Vec (Vec Nat n) m)
+      (Vec (Vec Nat m) m)
+      (transpose n m (transpose m n a))
+      a
+      (λrows. matrix_product m n m rows (transpose m n a))
+      (transpose_invol m n a))
+
 theorem matrix_add_assoc_cons
       (k : Nat)
       (n : Nat)
@@ -2579,6 +2632,41 @@ theorem row_dot_sum_comm
                       (dot_comm n r s))
               }
           }
+  }
+
+theorem row_dot_sum_self_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal Nat (row_dot_sum m n a a) Zero → Equal (Vec (Vec Nat n) m) a (matrix_zero m n) =
+  match a {
+    VNil ↦ λsum_zero. Proved;
+    VCons k row rest ↦
+      λsum_zero.
+        trans
+          (Vec (Vec Nat n) (Suc k))
+          (VCons (Vec Nat n) k row rest)
+          (VCons (Vec Nat n) k (vector_zero n) rest)
+          (VCons (Vec Nat n) k (vector_zero n) (matrix_zero k n))
+          (cong
+            (Vec Nat n)
+            (Vec (Vec Nat n) (Suc k))
+            row
+            (vector_zero n)
+            (λr. VCons (Vec Nat n) k r rest)
+            (vector_zero_of_dot_self_zero
+              n
+              row
+              ((proof eq_zero_r for add) (row_dot_sum k n rest rest) (dot n row row) sum_zero)))
+          (cong
+            (Vec (Vec Nat n) k)
+            (Vec (Vec Nat n) (Suc k))
+            rest
+            (matrix_zero k n)
+            (VCons (Vec Nat n) k (vector_zero n))
+            (row_dot_sum_self_zero
+              k
+              n
+              rest
+              ((proof eq_zero_l for add) (row_dot_sum k n rest rest) (dot n row row) sum_zero)))
   }
 
 theorem dot_zero_width (x : Vec Nat Zero) (y : Vec Nat Zero) : Equal Nat (dot Zero x y) Zero =
@@ -4896,8 +4984,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–21 owns
-seventy-two public names across twelve operations and sixty laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–22 owns
+seventy-four public names across twelve operations and sixty-two laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -4932,8 +5020,15 @@ are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
 `matrix_vector_scale` follows `matrix_product_scale_right` as a public law,
 uses `dot_scale` for its row step and adds no private helper. `trace` follows
 `matrix_scale`, and its four laws follow `matrix_vector_scale` as their
-public family. `trace_product_comm` follows `trace_identity` as the final
-public law; its nine row-pairing helpers stay private. The trace helpers
+public family. `trace_product_comm` follows `trace_identity`; its nine
+row-pairing helpers stay private. The final two public laws are
+`matrix_zero_of_trace_gram_zero` and `transpose_gram`. The first uses
+`trace_row_dot_sum` and `transpose_invol` to rewrite the Gram trace as a
+sum of row self-dots. The private `row_dot_sum_self_zero` splits the zero
+sum using the two Nat Arithmetic laws and applies
+`vector_zero_of_dot_self_zero` to each row. The second uses
+`transpose_product` and `transpose_invol` to prove symmetry of the product.
+Neither law requires a square input or introduces a Gram operation. The trace helpers
 for the corner entry, the minor and their transport steps also stay private.
 `vector_add_cancel_right` follows `vector_add_zero_right`, and
 `matrix_add_cancel_right` follows `matrix_add_zero_right`; their private
@@ -4941,8 +5036,8 @@ projection, cons-view and eta proofs use the public Nat `add_cancel_r` and
 cancel each matrix row by the checked vector law. `vector_scale_cancel`
 follows its §20 vector cancellation sibling, and `matrix_scale_cancel`
 follows its §20 matrix cancellation sibling. Their `map_injective`,
-`map_view` and `mul_cancel_left` helpers remain private. All sixty laws
-have checked bodies.
+`map_view` and `mul_cancel_left` helpers remain private. All sixty-two
+laws have checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,
@@ -4991,5 +5086,10 @@ factor-zero premises with false conclusions. The matrix package test checks
 both generic scale-cancellation laws, factor-two values, empty vectors,
 private-helper imports and the exact trusted-identity set; it refuses the
 same-form factor-zero vector and matrix claims on fresh accepted prefixes.
-These tests use root-loaded exports and are not official conformance-runner
-runs or claims of CI, publication or landing.
+The [Gram trace seed][gram-seed] checks the trace boundary on zero and
+one-entry inputs, a rectangular zero input, and symmetry of the Gram product
+of a non-symmetric matrix. The package test checks these clients and their
+isolated refusals. These tests use root-loaded exports and are not official
+conformance-runner runs or claims of CI, publication or landing.
+
+[gram-seed]: ../../../../conformance/stdlib/linear-algebra/seed-gram-trace-zero.md
