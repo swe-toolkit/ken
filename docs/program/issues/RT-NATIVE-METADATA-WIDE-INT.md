@@ -111,3 +111,6 @@ measured, so AC-0 rules on the rest.
 1. int_view's View output carries a limb pointer into the helper's own
    stack frame for a native-arena Small. Keyed on the storage lifetime of
    the native resolver's view slot, which is helper-local.
+2. The in-process JIT metadata fixture lowers the reply specialized, so no
+   carrier word lies between the decode and the Int primitive. Keyed on the
+   fixture's unit structure, which is one function with no crossing.

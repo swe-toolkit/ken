@@ -1,12 +1,12 @@
 ---
 id: ABI-S2
 title: "read_directory returns a whole sorted List DirEntry, which the host builds by reopening the descriptor through /proc/self/fd and collecting every entry into one reply, so a large or concurrently changing directory is either held whole or truncated by an unstated bound. Rule from an AC-0 whether directory reading becomes a handle-based stream read in batches to an end, or keeps the whole-list shape with a stated bound and a typed refusal past it, and land the ruled result on both lanes"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [RT-NATIVE-SCALAR-JOIN-REFERENT-OWNERS]
 blocks: [LINUX-ABI-EXIT-SERVICE-SUPERVISOR]
 github: null
 origin: "docs/program/10-linux-abi-completion.md §4 Track S. Node filed by the Steward 2026-07-25. Framed 2026-11-23 as the third L1b node on the Language ring (operator 2026-11-22: \"Approved. Use the language ring.\"), absorbing the Architect's FSCREATE AC-0 carry on directory access through /proc/self/fd (evt_5zrw3xt08fewp). L1 Linux ABI program, Steward order."
