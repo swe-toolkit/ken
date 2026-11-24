@@ -12,7 +12,9 @@ Spec: `spec/50-stdlib/65-linear-algebra.md` §22.
   in its upper-left entry changes the trace to one. The 1 × 3 zero input
   also admits the zero conclusion. For `skew = [[1,2],[0,1]]`, the
   transpose is `[[1,0],[2,1]]` but the Gram product is `[[5,2],[2,1]]`:
-  the product, not its input, is symmetric.
+  the product, not its input, is symmetric. The separate `zero2_symmetric`
+  control accepts `Refl` on a true matrix-valued equality.
+- promise class: durable invariant.
 - why: check the public laws without a squareness premise. Literal
   entries and traces give independent value checks, not consequences
   computed using the two new proofs.
@@ -85,6 +87,8 @@ theorem wide_gram_recovers_input
     : Equal (Vec (Vec Nat three) one) wide_zero (matrix_zero one three) =
   matrix_zero_of_trace_gram_zero one three wide_zero Proved
 
+theorem zero2_symmetric : Equal (Vec (Vec Nat two) two) (transpose two two zero2) zero2 = Refl
+
 theorem skew_transpose_value
     : Equal
         (Vec (Vec Nat two) two)
@@ -116,6 +120,7 @@ theorem skew_gram_symmetric
 - expect: rejects (kernel `TypeMismatch` in the appended theorem). `Proved`
   cannot inhabit its trace-zero premise; the diagnostic need not isolate
   that token.
+- promise class: durable invariant.
 - why: the law cannot be used on a nonzero matrix with a positive Gram
   trace.
 
@@ -129,14 +134,19 @@ theorem refuse_nonzero_gram_trace
 
 - spec: `spec/50-stdlib/65-linear-algebra.md` §22.
 - given: append this theorem to the accepted client, independently of the
-  premise refusal above.
-- expect: rejects (kernel `TypeMismatch` in the appended theorem).
-- why: the Gram symmetry example must not start with a symmetric input.
+  premise refusal above. Relative to `zero2_symmetric`, change only the
+  matrix from `zero2` to `skew` on both sides, keeping the equality type
+  and `Refl` proof form.
+- expect: rejects at the appended theorem's `Refl` because `transpose skew`
+  and `skew` have different entries.
+- promise class: durable invariant.
+- why: `Refl` checks the symmetric control, so refusal distinguishes the
+  non-symmetric input from its symmetric Gram product.
 
 ```ken
 theorem refuse_skew_symmetric : Equal (Vec (Vec Nat two) two) (transpose two two skew) skew =
-  Proved
+  Refl
 ```
 
-These are authored seed cases. Checking them in the package test is not
-execution by the official conformance runner.
+The package test checks the accepted client and the trace-premise refusal;
+that is not execution by the official conformance runner.
