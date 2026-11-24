@@ -242,21 +242,22 @@ fn socket_unix_path_matches_interpreter() {
     std::fs::write(
         &wrapper,
         format!(
-            r#"#include <stddef.h>
+            r#"#include <stdbool.h>
+#include <stddef.h>
 extern int ken_test_process_main(int, char **, char **);
 extern size_t __real_strlen(const char *);
 static char path[] = {{ {initializer}, 0 }};
-static unsigned path_reads;
+static bool supplied_path_length;
 size_t __wrap_strlen(const char *value) {{
     if (value != path) return __real_strlen(value);
-    ++path_reads;
+    supplied_path_length = true;
     return sizeof(path) - 1;
 }}
 int main(void) {{
     char *args[] = {{ path, NULL }};
     char *env[] = {{ NULL }};
     int status = ken_test_process_main(1, args, env);
-    return path_reads == 1 ? status : 76;
+    return supplied_path_length ? status : 76;
 }}
 "#
         ),
