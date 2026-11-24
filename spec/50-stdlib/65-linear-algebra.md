@@ -20,7 +20,8 @@
 > SPEC-LINEAR-ALGEBRA-TRACE §18;
 > SPEC-LINEAR-ALGEBRA-TRACE-PRODUCT-COMM §19;
 > SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20;
-> SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21;
+> SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO §22).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1888,8 +1889,61 @@ expression-exact span. A separate false-conclusion control refuses
 factor boundary but does not prove the generic theorems or execute
 the CV-owned seed.
 
-The current roster after these two new laws is **twelve operations,
-sixty laws and seventy-two public names**. Section 20's
-fifty-eight-law/seventy-name count describes the historical §20
-step, not the current package floor; neither it nor §19's older
-count is rewritten in place.
+The roster at the end of §21 was **twelve operations, sixty laws and
+seventy-two public names**. The counts in §§19–21 describe those respective
+steps in the contract.
+
+## 22. The Gram trace detects zero and the Gram product is symmetric
+
+> **Section 22 status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO).**
+> Architect AC-0 `evt_363q07ast3fb6` reports successful scratch checks on
+> `4a4ce82f2`: the generic proofs and closed clients checked, the false
+> premise refused, and no `Axiom`, foreign declaration or primitive was
+> added. D0 did not measure trusted identity-set equality; the package test
+> compares exact identities after loading the package over its providers.
+> These are not official conformance, CI, or landed-trust results. The §1a
+> chain stays at zero: AC-0 preceded Spec text and neither stop fired.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export two checked Transparent
+laws. For `m × n` input `a`, its Gram matrix is the `m × m` product of
+`a` and its transpose; there is no separate Gram operation. The exact
+public types are:
+
+```ken
+pub theorem matrix_zero_of_trace_gram_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal Nat (trace m (matrix_product m n m a (transpose m n a))) Zero
+      → Equal (Vec (Vec Nat n) m) a (matrix_zero m n)
+
+pub theorem transpose_gram
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat m) m)
+        (transpose m m (matrix_product m n m a (transpose m n a)))
+        (matrix_product m n m a (transpose m n a))
+```
+
+The first law needs only the stated trace equality and concludes structural
+matrix equality. The second is premise-free. Both allow independent `m`
+and `n`, including zero dimensions. The laws follow `trace_product_comm`
+in the order shown and leave §§1–21 operation and law types unchanged.
+The roster is twelve operations and sixty-two laws, seventy-four public
+names in total.
+
+The existing private `trace_row_dot_sum` and public `transpose_invol`
+rewrite the trace as a sum of self-dot products of the rows. The private
+`row_dot_sum_self_zero` uses the existing public Nat Arithmetic proofs
+`add::eq_zero_l` and `add::eq_zero_r` to split a zero sum into zero summands.
+The §14 law gives a zero head row and recursion gives the zero tail. The
+symmetry proof reverses the factors using `transpose_product` and removes
+the double transpose with `transpose_invol`. Neither proof requires a new
+Nat law, a new trusted declaration, or a kernel or surface change.
+
+The [closed seed](../../conformance/stdlib/linear-algebra/seed-gram-trace-zero.md)
+checks the 2 × 2 zero input and a rectangular 1 × 3 zero input. For
+`[[1,0],[0,0]]`, the Gram trace is one, so the first law refuses when
+applied with `Proved` at the false trace-zero premise. For `[[1,2],[0,1]]`,
+the input differs from its transpose but its Gram product is
+`[[5,2],[2,1]]`, to which the second law applies. These finite observations
+distinguish the premises and the product from its input; the checked
+public laws establish the generic claims.

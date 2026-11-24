@@ -24,6 +24,11 @@ const SHIPPED_SEED: &str = include_str!(concat!(
     "/../../conformance/stdlib/linear-algebra/seed-nat-matrix.md"
 ));
 
+const GRAM_SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/linear-algebra/seed-gram-trace-zero.md"
+));
+
 // The accepted client stands alone under selective public imports. The
 // rejected variant keeps its same 2-vector fixtures and proof form and
 // changes only the right-hand operand from v12 to v21.
@@ -311,18 +316,20 @@ fn matrix_env() -> ElabEnv {
     env
 }
 
-/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–18. The generic
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–18, 22. The generic
 /// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2;
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of seventy-two public identities is selectively
+/// MEASURED: the exact set of seventy-four public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
 /// the §14 law has a separate exact generic client in its named test;
-/// the §17 law has an exact open-dimension client in its named test.
+/// the §17 law and both §22 laws have separate open-dimension clients.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
+/// Private proof refactoring stays green; missing or extra exports and a
+/// changed trusted identity set fail.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
 fn public_operations_and_generic_laws_preserve_provider_trust_set() {
@@ -395,6 +402,8 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "trace_transpose",
         "trace_identity",
         "trace_product_comm",
+        "matrix_zero_of_trace_gram_zero",
+        "transpose_gram",
         "matrix_add_comm",
         "matrix_add_assoc",
         "vector_scale_distrib",
@@ -454,7 +463,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has seventy-two checked names and no private helper"
+        "the exact public set has seventy-four checked names and no private helper"
     );
     env.elaborate_file(
         r#"
@@ -1150,5 +1159,126 @@ fn zero_factor_vector_and_matrix_cancel_refuse_after_fresh_controls() {
                 && span.start == refl
                 && span.end == refl + "Refl".len() => {}
         other => panic!("distinct vector conclusion must fail at Refl: {other:?}"),
+    }
+}
+
+fn gram_seed_sources() -> (&'static str, &'static str) {
+    let mut sources = extract_ken_md(GRAM_SEED)
+        .expect("§22 seed fences extract")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+        .map(|fence| &GRAM_SEED[fence.body_range]);
+    (
+        sources.next().expect("accepted §22 client"),
+        sources.next().expect("isolated false trace premise client"),
+    )
+}
+
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §22 and
+/// conformance/stdlib/linear-algebra/seed-gram-trace-zero.md.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: both open clients cite the root-loaded Transparent law owners;
+/// closed square and rectangular applications and independent value checks
+/// elaborate, while the internal row proof refuses selective import.
+/// CLAIMED: the laws are reusable at independent dimensions, with no public
+/// proof helper. THE GAP: the closed cases alone would not prove the laws.
+/// Private proof refactors and unrelated exports stay green; changing the law
+/// types, closed results, or helper visibility fails.
+#[test]
+fn gram_laws_check_open_and_closed_clients_and_keep_the_row_helper_private() {
+    let mut env = ElabEnv::new().expect("prelude bootstrap");
+    let owned = env
+        .elaborate_module_from_roots(&[root()], MATRIX)
+        .expect("NatMatrix package roots-loads");
+    let (accepted, _) = gram_seed_sources();
+    env.elaborate_file(accepted)
+        .expect("all §22 accepted seed controls check");
+    for (law, clients) in [
+        (
+            "matrix_zero_of_trace_gram_zero",
+            &[
+                "open_gram_trace_zero",
+                "zero_gram_recovers_input",
+                "wide_gram_recovers_input",
+            ][..],
+        ),
+        (
+            "transpose_gram",
+            &["open_gram_symmetry", "skew_gram_symmetric"][..],
+        ),
+    ] {
+        let id = env.globals[&format!("{MATRIX}.{law}")];
+        assert!(owned.contains(&id), "NatMatrix owns {law}");
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        for client in clients {
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals[*client])
+                .expect("checked client");
+            assert!(term_contains_const(&body, id), "{client} cites {law}");
+        }
+    }
+    for value_check in [
+        "zero_gram_trace",
+        "one_entry_gram_trace",
+        "skew_transpose_value",
+        "skew_gram_value",
+    ] {
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[value_check])
+            .expect("checked comparison with a literal value");
+        for law in ["matrix_zero_of_trace_gram_zero", "transpose_gram"] {
+            assert!(
+                !term_contains_const(&body, env.globals[&format!("{MATRIX}.{law}")]),
+                "{value_check} must check without citing {law}"
+            );
+        }
+    }
+    let helper = "row_dot_sum_self_zero";
+    match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
+        Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, format!("{MATRIX}.{helper}")),
+        other => panic!("{helper} must refuse selective import: {other:?}"),
+    }
+}
+
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §22 and
+/// conformance/stdlib/linear-algebra/seed-gram-trace-zero.md.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: after a fresh accepted prefix, the false trace-zero proof
+/// supplies Top where the kernel expects a type convertible to Bottom.
+/// CLAIMED: the zero-trace law cannot be applied with a false trace premise.
+/// THE GAP: the span locates the declaration, not the proof token; the
+/// accepted one-entry trace of one and the mismatch types identify the premise.
+/// Additional accepted controls stay green; admitting the false premise or
+/// refusing for an unrelated reason fails.
+#[test]
+fn gram_seed_refuses_false_trace_premise() {
+    let (accepted, source) = gram_seed_sources();
+    let parsed = parse_decls(source).expect("isolated §22 refusal parses");
+    let [SourceDecl::TheoremDecl {
+        name, span: claim, ..
+    }] = parsed.as_slice()
+    else {
+        panic!("expected a single isolated trace-premise theorem");
+    };
+    assert_eq!(name, "refuse_nonzero_gram_trace");
+    let mut env = matrix_env();
+    env.elaborate_file(accepted)
+        .expect("fresh accepted §22 prefix checks before refusal");
+    match env.elaborate_file(source) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { expected, found },
+            span,
+        }) if span.start >= claim.start && span.end <= claim.end && span.start < span.end => {
+            let ctx = ken_kernel::Context::default();
+            let top = Term::const_(env.env.top_id(), vec![]);
+            let bottom = Term::const_(env.env.bottom_id(), vec![]);
+            assert!(ken_kernel::convert_type(&env.env, &ctx, &found, &top));
+            assert!(ken_kernel::convert_type(&env.env, &ctx, &expected, &bottom));
+            eprintln!("{name}: KernelRejected(TypeMismatch) at {span:?}");
+        }
+        other => panic!("{name} must refuse at its own theorem: {other:?}"),
     }
 }
