@@ -6999,18 +6999,13 @@ mod tests {
         );
     }
 
-    /// Promise class: transition sentinel. MEASURED: the existing
-    /// `FsHandleMetadata` operation has the frozen descriptor-metadata ABI
-    /// identity, native catalog profile, target-resource admission, and live
-    /// wire layout, while the next append-only descriptor opcode remains
-    /// unassigned and D5 flows directly to resource settlement. CLAIMED:
-    /// ABI-S1 reuses this operation for descriptor metadata and D6 adds no
-    /// second descriptor-metadata operation. THE GAP: the existing native
-    /// dispatch test independently exercises the fstat-shaped result; ABI-S4
-    /// owns any later statx-shaped field-availability surface and must retire
-    /// this sentinel if it occupies the next descriptor opcode.
+    /// Promise class: normative compatibility vector. MEASURED: the existing
+    /// `FsHandleMetadata` operation has the descriptor-metadata ABI identity,
+    /// native catalog profile, target-resource admission, and a live wire layout.
+    /// CLAIMED: D6's reused operation keeps its ABI contract. THE GAP: this
+    /// does not exercise native dispatch or the field-availability contract.
     #[test]
-    fn abi_s1_d6_reuses_native_fs_handle_metadata_and_adds_no_operation() {
+    fn abi_s1_d6_preserves_native_fs_handle_metadata_abi() {
         let operation = HostOpV1::FsHandleMetadata;
         assert_eq!(operation as u16, 0x030c);
         assert_eq!(operation.availability(), HostOpAvailabilityV1::NativeTested);
@@ -7037,13 +7032,25 @@ mod tests {
             )]
         );
         assert!(host_effect_wire_layout_v1(operation).is_ok());
-        assert_eq!(
-            HostOpV1::try_from(0x0315),
-            Err(UnknownHostOpV1(0x0315)),
-            "ABI-S1 D6 must not add a descriptor operation after FsDuplicate"
-        );
+    }
+
+    /// Promise class: transition sentinel. MEASURED: the three successor
+    /// links through the directory operations. CLAIMED: ABI-S2 inserts the
+    /// open and batch operations between descriptor duplication and settlement
+    /// in the inventory. THE GAP: wire identities and dispatch are separate
+    /// tests. Retire this chain when the next slice appends after the batch op.
+    #[test]
+    fn abi_s2_directory_operations_follow_descriptor_duplication_in_inventory() {
         assert_eq!(
             HostOpV1::FsDuplicate.next_in_inventory(),
+            Some(HostOpV1::FsOpenDirectory)
+        );
+        assert_eq!(
+            HostOpV1::FsOpenDirectory.next_in_inventory(),
+            Some(HostOpV1::FsReadDirectoryBatch)
+        );
+        assert_eq!(
+            HostOpV1::FsReadDirectoryBatch.next_in_inventory(),
             Some(HostOpV1::ResourceRelease)
         );
     }

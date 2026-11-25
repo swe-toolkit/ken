@@ -4,14 +4,13 @@
 //! "no role in either producer is selected by source spelling" — that one is
 //! not a test's to make, and the section below says who makes it instead.
 //!
-//! 1. **Substitution resistance.** A package that declares its own constructors
-//!    under the prelude's role spellings must not redirect any stored Runtime
-//!    role onto them. The record must still carry the roles the *canonical
-//!    prelude* `GlobalId`s denote.
+//! 1. **Substitution resistance.** Package constructors cannot redirect
+//!    captured Runtime roles. Bare prelude constructor collisions are
+//!    rejected, while bare leaves of scoped `DirectoryProgress` constructors
+//!    can be rebound without changing the captured prelude `GlobalId`s.
 //! 2. **Roster inventory.** Every role the canonical roster carries is either
-//!    covered by property 1's fixture or is a constructor of an exact closed-
-//!    floor parent and therefore unshadowable before allocation. This keeps the
-//!    substitution control exhaustive over the shadowable roster as it changes.
+//!    covered by a shadow fixture or has structural floor protection. This
+//!    keeps the controls exhaustive over the roster as it changes.
 //!
 //! **The producer property is closed by the SIGNATURE, not by this file.** Both
 //! `checked_host_spine_v1` and `checked_runtime_symbols_v1` take `&PreludeEnv`
@@ -40,13 +39,14 @@
 //! is the identity, and the parent is what a substitution changes.
 //!
 //! **MEASURED (reframed by `LANG-CONSTRUCTOR-NAMESPACE-SHADOWING-GUARD`).** A
-//! package can no longer DECLARE a constructor under a prelude/runtime role's
-//! spelling: the flat constructor namespace rejects the collision at declaration
-//! time (`DuplicateConstructorSpelling`, naming both sites). The former
+//! package cannot redeclare a constructor under a bare prelude role binding:
+//! the constructor namespace rejects the collision at declaration time. The former
 //! measurement — declare every shadow, then check that none redirected a stored
 //! role — is retired because its fixture is now unrepresentable; the first test
 //! below asserts the rejection directly (on a Runtime-role constructor spelling).
-//! The roster-inventory relation in the second test still holds and is measured.
+//! Scoped `DirectoryProgress` is different: both bare leaves can be declared
+//! in a package, so a separate control checks their captured IDs after doing so.
+//! The roster-inventory test still measures coverage of the canonical role set.
 //!
 //! **CLAIMED.** No package declaration can capture a Runtime role. For
 //! constructor roles this is now enforced by declaration-time rejection —
@@ -79,6 +79,8 @@ use ken_elaborator::prelude::CanonicalRuntimeRoles;
 use ken_elaborator::{ElabEnv, ElabError};
 
 const PACKAGE: &str = "d1b_role_a_shadow_pkg";
+const SHADOW_DIRECTORY_PROGRESS: &str =
+    "data ShadowDirectoryProgress = DirectoryEntries | DirectoryEnd";
 
 /// A package that declares colliding names across every class of role the two
 /// producers resolve: the six former entry-plan roles, the ITree/coproduct
@@ -112,7 +114,7 @@ data ShadowFileOps =
   OpReadDirectory | OpCreateDirectory | OpRemoveFile | OpRemoveDirectory | OpSeek | OpSetLength | OpSync |
   OpGetInheritance | OpSetInheritance | OpDuplicate
 data ShadowMetadata = MkFileMetadata | MkDirEntry | KFile | KDirectory | KSymlink | KOther
-data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | ReadDirectory | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
+data ShadowOps = Read | Write | Flush | IsTerminal | WallNow | MonotonicNow | SleepUntil | RandomBytes | ReadFile | WriteFile | AppendFile | Metadata | CreateDirectory | RemoveFile | RemoveDirectory | Rename | ChangeMode
 
 const two : Nat = Suc (Suc Zero)
 "#;
@@ -124,6 +126,8 @@ const two : Nat = Suc (Suc Zero)
 /// a producer without adding it here cannot quietly escape the control — the
 /// role's spelling is shadowed and its redirection would be observed.
 const SHADOWED_ROLES: &[(&str, &str)] = &[
+    ("ShadowDirectoryProgress", "DirectoryEntries"),
+    ("ShadowDirectoryProgress", "DirectoryEnd"),
     ("ShadowPlan", "MkProd"),
     ("ShadowPlan", "MkProcessInput"),
     ("ShadowPlan", "MkProgramCaps"),
@@ -205,7 +209,6 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowOps", "WriteFile"),
     ("ShadowOps", "AppendFile"),
     ("ShadowOps", "Metadata"),
-    ("ShadowOps", "ReadDirectory"),
     ("ShadowOps", "CreateDirectory"),
     ("ShadowOps", "RemoveFile"),
     ("ShadowOps", "RemoveDirectory"),
@@ -216,7 +219,10 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
 fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
     compile_ken_package_sources(
         &CompilerManifest::new(PACKAGE, Vec::new()),
-        vec![CompilerSource::new("src/main.ken", SHADOWING_SOURCE)],
+        vec![CompilerSource::new(
+            "src/main.ken",
+            format!("{SHADOW_DIRECTORY_PROGRESS}\n{SHADOWING_SOURCE}"),
+        )],
         TargetSelector::StableSymbol {
             package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PACKAGE.to_string()]),
             symbol: StableSymbol::new(
@@ -305,13 +311,43 @@ fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: package source can bind both
+/// bare leaves to a different parent, but the captured role IDs still match
+/// the qualified constructors of the prelude floor. CLAIMED: such a bare
+/// substitution does not change the captured directory role authority. THE
+/// GAP: this measures capture, not transport through the native wire record.
+#[test]
+fn d1b_role_a_directory_roles_keep_their_prelude_ids_under_shadowing() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let floor = env.globals["DirectoryProgress"];
+    assert!(PRELUDE_FLOOR_NAMES.contains(&"DirectoryProgress"));
+    let entries = env.globals["DirectoryProgress.DirectoryEntries"];
+    let end = env.globals["DirectoryProgress.DirectoryEnd"];
+    assert_ne!(entries, end);
+    let shadow_parent = env
+        .elaborate_decl(SHADOW_DIRECTORY_PROGRESS)
+        .expect("the scoped prelude constructors leave these bare names available");
+    for (leaf, expected, captured) in [
+        (
+            "DirectoryEntries",
+            entries,
+            env.prelude_env.runtime_roles.directory_entries,
+        ),
+        ("DirectoryEnd", end, env.prelude_env.runtime_roles.directory_end),
+    ] {
+        assert_eq!(env.env.constructor(expected).unwrap().0.id, floor);
+        let shadow = env.globals[leaf];
+        assert_eq!(env.env.constructor(shadow).unwrap().0.id, shadow_parent);
+        assert_ne!(shadow, expected, "{leaf} must be genuinely shadowed");
+        assert_eq!(captured, expected, "{leaf} must retain its prelude identity");
+    }
+}
+
 /// Roster inventory, stated as a **relation between two artifacts**.
 ///
-/// The test above proves a package cannot declare a Runtime-role constructor
-/// spelling (the guard rejects it). That inventory stays meaningful over the
-/// roster only if the fixture's table tracks every role the roster carries —
-/// and the table is hand-written, so on its own it is a snapshot that a newly
-/// added role would silently escape.
+/// The controls above reject a collision with a bare prelude role and measure
+/// non-capture for the two scoped directory leaves. Their hand-written tables
+/// must track the shadowable roster, or an added role could silently escape.
 ///
 /// This keeps the two in step: the roster's spelling table is compared against
 /// the union of the fixture's shadow inventory and constructors whose recorded
