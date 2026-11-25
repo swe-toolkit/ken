@@ -110,6 +110,22 @@ impl<'a> Lowering<'a> {
                 .map(LoweringOperand::Carried);
         }
 
+        // Two compile-time literals still fold in the compiler. Any runtime operand
+        // takes the emitted route, whose result is a fresh region Bytes node.
+        if primitive.symbol == "bytes_concat"
+            && !matches!(
+                lowered_args.as_slice(),
+                [
+                    LoweringOperand::Specialized(Lowered::Bytes(_)),
+                    LoweringOperand::Specialized(Lowered::Bytes(_)),
+                ]
+            )
+        {
+            return self
+                .lower_dynamic_bytes_concat(builder, &lowered_args)
+                .map(LoweringOperand::Carried);
+        }
+
         // A primitive's static symbol determines whether its operands are
         // scalar Ints or Bools. A carried word in one of those positions is
         // projected through the emitted scalar helper; no runtime tag chooses
@@ -1036,6 +1052,145 @@ impl<'a> Lowering<'a> {
         };
         lhs.extend(rhs);
         Ok(Lowered::Bytes(lhs))
+    }
+
+    /// `bytes_concat` with a runtime operand. Lengths are read first, the result
+    /// is claimed at their sum, and each source is copied at its offset. A
+    /// persistent Bytes source is viewed again after the claim, because a byte
+    /// view is stable only until the next reservation of its image (AC-11).
+    fn lower_dynamic_bytes_concat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        args: &[LoweringOperand],
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let [lhs, rhs] = args else {
+            return Err(unsupported(
+                LoweringCause::PlannerInvariant,
+                "PrimitiveCall",
+                "bytes_concat requires exactly two bytes operands",
+            ));
+        };
+        let lhs_len = self.bytes_concat_operand_len(builder, lhs)?;
+        let rhs_len = self.bytes_concat_operand_len(builder, rhs)?;
+        let total = builder.ins().iadd(lhs_len, rhs_len);
+        let wrapped = builder.ins().icmp(IntCC::UnsignedLessThan, total, lhs_len);
+        let wrapped = builder.ins().uextend(types::I64, wrapped);
+        Self::require_i64(builder, wrapped, 0);
+        let (tag, class) = Self::carrier_handle_disposition(&Lowered::Bytes(Vec::new()))?;
+        let word = self.emit_carrier_bytes_claim(builder, tag, class, total)?;
+        self.copy_bytes_concat_operand(builder, word, lhs, lhs_len, None)?;
+        self.copy_bytes_concat_operand(builder, word, rhs, rhs_len, Some(lhs_len))?;
+        Ok(word)
+    }
+
+    fn bytes_concat_operand_len(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        operand: &LoweringOperand,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        match operand {
+            LoweringOperand::Specialized(Lowered::Bytes(bytes)) => {
+                let len = i64::try_from(bytes.len()).map_err(|_| {
+                    unsupported(
+                        LoweringCause::Capacity,
+                        "PrimitiveCall",
+                        "a bytes_concat literal is longer than the ABI can name",
+                    )
+                })?;
+                Ok(builder.ins().iconst(types::I64, len))
+            }
+            LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => Ok(span.len()),
+            LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) => {
+                Ok(Self::borrowed_bytes_view(builder, *pointer).1)
+            }
+            LoweringOperand::Carried(word) => {
+                match self.lower_carried_bytes_operand(builder, *word)? {
+                    Lowered::ResponseBytes(span) => Ok(span.len()),
+                    _ => Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "a carried bytes operand did not normalize to a byte span",
+                    )),
+                }
+            }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "bytes_concat requires an ordinary bytes value",
+                },
+            ),
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                LoweringCause::Fragment,
+                "PrimitiveCall",
+                "bytes_concat only supports Bytes arguments in native lowering",
+            )),
+        }
+    }
+
+    fn copy_bytes_concat_operand(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+        operand: &LoweringOperand,
+        len: cranelift_codegen::ir::Value,
+        offset: Option<cranelift_codegen::ir::Value>,
+    ) -> Result<(), CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        match operand {
+            LoweringOperand::Specialized(Lowered::Bytes(bytes)) => {
+                let refs = self.carrier_refs()?;
+                let arena = self.carrier_arena()?;
+                for (index, byte) in bytes.iter().enumerate() {
+                    let index = i64::try_from(index).map_err(|_| {
+                        unsupported(
+                            LoweringCause::Capacity,
+                            "PrimitiveCall",
+                            "a bytes_concat literal is longer than the ABI can name",
+                        )
+                    })?;
+                    let position = match offset {
+                        Some(offset) => builder.ins().iadd_imm(offset, index),
+                        None => builder.ins().iconst(types::I64, index),
+                    };
+                    let byte = builder.ins().iconst(types::I64, i64::from(*byte));
+                    let write = builder
+                        .ins()
+                        .call(refs.store_byte, &[arena, word.word, position, byte]);
+                    Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+                }
+                Ok(())
+            }
+            LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => {
+                self.emit_carrier_bytes_copy(builder, word, span.pointer(), len, offset)
+            }
+            LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) => {
+                let (data, _) = Self::borrowed_bytes_view(builder, *pointer);
+                self.emit_carrier_bytes_copy(builder, word, data, len, offset)
+            }
+            LoweringOperand::Carried(source) => {
+                // Viewed again after the claim; only the length survives the first view.
+                let Lowered::ResponseBytes(span) =
+                    self.lower_carried_bytes_operand(builder, *source)?
+                else {
+                    return Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "a carried bytes operand did not normalize to a byte span",
+                    ));
+                };
+                let same = builder.ins().icmp(IntCC::Equal, span.len(), len);
+                let same = builder.ins().uextend(types::I64, same);
+                Self::require_i64(builder, same, 1);
+                self.emit_carrier_bytes_copy(builder, word, span.pointer(), len, offset)
+            }
+            LoweringOperand::Residual(_) | LoweringOperand::Specialized(_) => {
+                Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "PrimitiveCall",
+                    "bytes_concat copied an operand its length pass refused",
+                ))
+            }
+        }
     }
 
     fn lower_bytes_encode(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {

@@ -10247,6 +10247,99 @@ fn d4_seat(need: EffectSeatNeed) -> PlannedEffectSeat {
     PlannedEffectSeat::for_observer_control(need)
 }
 
+fn bytes_concat_fixture(args: Vec<RuntimeExpr>) -> RuntimeExpr {
+    RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "bytes_concat".into(),
+            partiality: RuntimePartiality::Total,
+        },
+        args,
+    }
+}
+
+/// Durable invariant: the emitted primitive copies a persistent lhs and a
+/// response span rhs in argument order. This witnesses that pair only, not
+/// address invalidation on reservation in the current backing store.
+#[test]
+fn bytes_concat_copies_carried_lhs_then_response_span() {
+    let fixture = bytes_concat_fixture(vec![RuntimeExpr::Var(0), RuntimeExpr::Var(1)]);
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let chunk = [3_u8];
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let lhs = compiler.transfer_into_carrier(builder, root, &Lowered::Bytes(vec![1, 2]))?;
+        let pointer = builder.ins().iconst(types::I64, chunk.as_ptr() as i64);
+        let length = builder.ins().iconst(types::I64, chunk.len() as i64);
+        let rhs = Lowered::ResponseBytes(SafeByteSpan::for_control(pointer, length));
+        let result = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: &fixture,
+                static_origin: root,
+            },
+            &[
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(lhs)),
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(rhs)),
+            ],
+        )?;
+        let LoweringOperand::Carried(word) = result else {
+            panic!("runtime concat must produce a carried word");
+        };
+        let (pointer, length, outcome) = compiler.observe_carried_bytes_span(
+            builder,
+            d4_seat(EffectSeatNeed::BytesPointerLength).into(),
+            word,
+        )?;
+        Lowering::require_i64(builder, outcome, 0);
+        Lowering::require_i64(builder, length, 3);
+        Ok(pointer)
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let pointer = ac_c7_run(code, base);
+    assert!(pointer > 0, "expected a three-byte view, got {pointer}");
+    // The emitted observation checked the length; the store is still alive,
+    // and no reservation intervenes between observing and reading the view.
+    let bytes = unsafe { std::slice::from_raw_parts(pointer as *const u8, 3) };
+    assert_eq!(bytes, &[1, 2, 3]);
+}
+
+/// Durable invariant: two literal operands fold to a specialized byte value
+/// without allocating an arena node in the emitted function.
+#[test]
+fn bytes_concat_two_literals_fold_without_allocating() {
+    let fixture = bytes_concat_fixture(vec![
+        RuntimeExpr::Value(RuntimeValue::Bytes(vec![1, 2])),
+        RuntimeExpr::Value(RuntimeValue::Bytes(vec![3])),
+    ]);
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let result = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: &fixture,
+                static_origin: root,
+            },
+            &[],
+        )?;
+        let LoweringOperand::Specialized(Lowered::Bytes(bytes)) = result else {
+            panic!("literal concat must fold to specialized Bytes");
+        };
+        assert_eq!(bytes, [1, 2, 3]);
+        Ok(builder.ins().iconst(types::I64, 0))
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let before = store.image().0.node_count();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(ac_c7_run(code, base), 0);
+    assert_eq!(store.image().0.node_count(), before);
+}
+
 /// Transfer `literal` into the carrier, observe it through the `D4` observer,
 /// and return the SSA value at `field` (0 pointer, 1 length, 2 outcome).
 fn d4_observe(
