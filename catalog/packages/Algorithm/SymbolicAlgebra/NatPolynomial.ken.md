@@ -69,8 +69,10 @@ slope zero at the given environment. `eval_coincidence` says that evaluation
 depends only on the variables that occur: two environments that agree at every
 index where `occurs` answers `True` give the expression equal values.
 Likewise, `substitute_coincidence` gives structurally equal results when two
-substitutions produce equal expressions at every occurring index. Three
-further public laws state that ordered normalization is transparent to
+substitutions produce equal expressions at every occurring index.
+`substitute_fresh` shows that a variable absent from all replacements used
+in the expression is absent from the substituted result. Three further
+public laws state that ordered normalization is transparent to
 `poly_eq` itself, to differentiation, and to substitution. The latter two
 follow from the first and the existing `poly_eq`-preservation laws.
 `expr_pow` gives the unit constant at Zero and
@@ -1429,6 +1431,45 @@ pub theorem substitute_coincidence
             s
             t
             (λw. λh. agree w (or_right (occurs w a) (occurs w b) h)))
+  }
+
+pub theorem substitute_fresh
+      (v : Nat) (s : Nat → Expr) (e : Expr)
+    : ((w : Nat) → Equal Bool (occurs w e) True → Equal Bool (occurs v (s w)) False)
+      → Equal Bool (occurs v (substitute s e)) False =
+  match e {
+    EConst c ↦ λfresh. Proved;
+    EVar w ↦ λfresh. fresh w (nat_same_complete w w Refl);
+    EAdd a b ↦
+      λfresh.
+        trans
+          Bool
+          (bool_or (occurs v (substitute s a)) (occurs v (substitute s b)))
+          (bool_or False (occurs v (substitute s b)))
+          False
+          (cong
+            Bool
+            Bool
+            (occurs v (substitute s a))
+            False
+            (λx. bool_or x (occurs v (substitute s b)))
+            (substitute_fresh v s a (λw. λh. fresh w (or_left (occurs w a) (occurs w b) h))))
+          (substitute_fresh v s b (λw. λh. fresh w (or_right (occurs w a) (occurs w b) h)));
+    EMul a b ↦
+      λfresh.
+        trans
+          Bool
+          (bool_or (occurs v (substitute s a)) (occurs v (substitute s b)))
+          (bool_or False (occurs v (substitute s b)))
+          False
+          (cong
+            Bool
+            Bool
+            (occurs v (substitute s a))
+            False
+            (λx. bool_or x (occurs v (substitute s b)))
+            (substitute_fresh v s a (λw. λh. fresh w (or_left (occurs w a) (occurs w b) h))))
+          (substitute_fresh v s b (λw. λh. fresh w (or_right (occurs w a) (occurs w b) h)))
   }
 
 pub theorem deriv_substitute
@@ -3489,6 +3530,15 @@ recursive equalities. If `v` is absent, any occurring index differs from
 `t = EVar`. Then `substitute_var` identifies the result with the original
 expression. `substitute_absent` keeps its own export and proof.
 
+`substitute_fresh` inducts on the expression before introducing the freshness
+premise. Constants contain no variables, and at a variable the premise
+applies to its replacement. For a sum or product, `or_left` and `or_right`
+lift each operand's occurrences to the whole expression. `cong` rewrites the
+left operand's occurrence test to `False`; `bool_or False` then reduces to
+the right operand's test, which the other induction hypothesis proves false.
+The resulting absence proof supplies the premise of `eval_absent` or
+`deriv_absent` on the substituted expression.
+
 For derivative after substitution, induction on the expression uses the two
 pointwise derivative premises on a variable. The product case reuses
 `eval_substitute` for its underived factors, then lifts the induction
@@ -3600,7 +3650,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and forty-one checked theorems; Horner, substitution and differentiation
+and forty-two checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3648,6 +3698,10 @@ agreement proof once one of those variables occurs. The
 identities, the open law and its `substitute_absent` consequence, and the
 closed substitution values both when the changed variables are absent and
 when one occurs. The same agreement proof refuses in the latter case.
+The `cat_symbolic_algebra_substitute_fresh` package test compares exact trust
+identities, checks open uses with `eval_absent` and `deriv_absent`, and
+separates a fresh variable from one introduced by a replacement. The latter
+row refuses at the client's freshness premise, not at the law application.
 
 The normalization-congruence package test checks the new generic public
 law under a selective import, compares exact trusted-`GlobalId` identity
