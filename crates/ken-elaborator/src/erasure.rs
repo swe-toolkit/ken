@@ -9520,7 +9520,7 @@ mod px7l_tests {
             frames
                 .windows(2)
                 .all(|pair| { pair[0].output_interface == pair[1].input_interface }),
-            "every checked answer endpoint closes before Runtime erasure"
+            "every child output in this postorder chain composes with its parent input"
         );
         assert!(
             frames
