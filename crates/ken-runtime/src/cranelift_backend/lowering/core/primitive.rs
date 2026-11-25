@@ -31,6 +31,7 @@ pub(super) enum NativePrimitive {
     BytesEncode,
     BytesDecode,
     BytesToList,
+    ListToBytes,
     ListCharToString,
     ByteLength,
     CharLength,
@@ -54,7 +55,7 @@ pub(super) enum OperandRoute {
 }
 
 impl NativePrimitive {
-    pub(super) const ALL: [Self; 21] = [
+    pub(super) const ALL: [Self; 22] = [
         Self::AddInt,
         Self::SubInt,
         Self::MulInt,
@@ -73,6 +74,7 @@ impl NativePrimitive {
         Self::BytesEncode,
         Self::BytesDecode,
         Self::BytesToList,
+        Self::ListToBytes,
         Self::ListCharToString,
         Self::ByteLength,
         Self::CharLength,
@@ -99,6 +101,7 @@ impl NativePrimitive {
             Self::BytesEncode => "bytes_encode",
             Self::BytesDecode => "bytes_decode",
             Self::BytesToList => "bytes_to_list",
+            Self::ListToBytes => "list_to_bytes",
             Self::ListCharToString => "list_char_to_string",
             Self::ByteLength => "byte_length",
             Self::CharLength => "char_length",
@@ -130,6 +133,7 @@ impl NativePrimitive {
             Self::BytesEncode => OperandRoute::SpecializedOnly,
             Self::BytesDecode => OperandRoute::SpecializedOnly,
             Self::BytesToList => OperandRoute::Emitted,
+            Self::ListToBytes => OperandRoute::Emitted,
             Self::ListCharToString => OperandRoute::SpecializedOnly,
             Self::ByteLength => OperandRoute::SpecializedOnly,
             Self::CharLength => OperandRoute::SpecializedOnly,
@@ -162,6 +166,7 @@ mod operand_table_tests {
             "bytes_encode",
             "bytes_decode",
             "bytes_to_list",
+            "list_to_bytes",
             "list_char_to_string",
             "byte_length",
             "char_length",
@@ -193,6 +198,7 @@ mod operand_table_tests {
             (NativePrimitive::BytesEncode, OperandRoute::SpecializedOnly),
             (NativePrimitive::BytesDecode, OperandRoute::SpecializedOnly),
             (NativePrimitive::BytesToList, OperandRoute::Emitted),
+            (NativePrimitive::ListToBytes, OperandRoute::Emitted),
             (NativePrimitive::ListCharToString, OperandRoute::SpecializedOnly),
             (NativePrimitive::ByteLength, OperandRoute::SpecializedOnly),
             (NativePrimitive::CharLength, OperandRoute::SpecializedOnly),
@@ -293,6 +299,16 @@ impl<'a> Lowering<'a> {
         let native = NativePrimitive::from_symbol(&primitive.symbol);
         let route = native.map(NativePrimitive::operand_route);
         if let Some(OperandRoute::Emitted) = route {
+            if native == Some(NativePrimitive::ListToBytes) {
+                let [operand] = lowered_args.as_slice() else {
+                    return Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "list_to_bytes requires exactly one list operand",
+                    ));
+                };
+                return self.lower_list_to_bytes(builder, operand);
+            }
             if native == Some(NativePrimitive::BytesToList) {
                 let [operand] = lowered_args.as_slice() else {
                     return Err(unsupported(
@@ -510,6 +526,7 @@ impl<'a> Lowering<'a> {
             NativePrimitive::ByteLength => self.lower_string_byte_length(builder, lowered_args),
             NativePrimitive::CharLength => self.lower_string_char_length(builder, lowered_args),
             NativePrimitive::BytesToList => unreachable!("the emitted bytes_to_list returned above"),
+            NativePrimitive::ListToBytes => unreachable!("the emitted list_to_bytes returned above"),
         };
         // ⭐ Back onto the spine: a primitive's result is a fresh specialized
         // value re-entering the phase sum.
@@ -1223,6 +1240,94 @@ impl<'a> Lowering<'a> {
                 args: Vec::new(),
             },
         })
+    }
+
+    /// Walk only the compiler's list template, not a list in the runtime heap.
+    fn lower_list_to_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        operand: &LoweringOperand,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let wrong_shape = || {
+            unsupported(
+                LoweringCause::Fragment,
+                "PrimitiveCall",
+                "list_to_bytes requires a statically shaped List UInt8 in native lowering",
+            )
+        };
+        let mut node = match operand {
+            LoweringOperand::Specialized(node @ Lowered::Constructor { .. }) => node,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
+                return Err(wrong_shape());
+            }
+            LoweringOperand::Residual(_) => {
+                return Err(CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "list_to_bytes requires an ordinary list value",
+                });
+            }
+        };
+        let mut elements = Vec::new();
+        loop {
+            let Lowered::Constructor {
+                constructor, args, ..
+            } = node
+            else {
+                return Err(wrong_shape());
+            };
+            match args.as_slice() {
+                [] if constructor == &self.process_symbols.list_nil => break,
+                [head, tail] if constructor == &self.process_symbols.list_cons => {
+                    let Lowered::Int { value, known } =
+                        head.specialized_at("a list_to_bytes element")?
+                    else {
+                        return Err(wrong_shape());
+                    };
+                    elements.push((*value, *known));
+                    node = tail.specialized_at("a list_to_bytes tail")?;
+                }
+                _ => return Err(wrong_shape()),
+            }
+        }
+        if elements.iter().all(|(_, known)| known.is_some()) {
+            let bytes = elements
+                .into_iter()
+                .map(|(_, known)| {
+                    u8::try_from(known.expect("all elements are known")).map_err(|_| {
+                        unsupported(
+                            LoweringCause::PlannerInvariant,
+                            "PrimitiveCall",
+                            "a list_to_bytes element is outside UInt8",
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(LoweringOperand::Specialized(Lowered::Bytes(bytes)));
+        }
+        let length = i64::try_from(elements.len()).map_err(|_| {
+            unsupported(
+                LoweringCause::Capacity,
+                "PrimitiveCall",
+                "a list_to_bytes spine is longer than the ABI can name",
+            )
+        })?;
+        let length = builder.ins().iconst(types::I64, length);
+        let (tag, class) = Self::carrier_handle_disposition(&Lowered::Bytes(Vec::new()))?;
+        let word = self.emit_carrier_bytes_claim(builder, tag, class, length)?;
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        for (index, (value, known)) in elements.into_iter().enumerate() {
+            // Every index fits in the checked length above.
+            let position = builder.ins().iconst(types::I64, index as i64);
+            let value = match known {
+                Some(value) => builder.ins().iconst(types::I64, value),
+                None => value,
+            };
+            let write = builder
+                .ins()
+                .call(refs.store_byte, &[arena, word.word, position, value]);
+            Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+        }
+        Ok(LoweringOperand::Carried(word))
     }
 
     fn lower_bytes_concat(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {

@@ -10443,6 +10443,198 @@ fn bytes_concat_two_literals_fold_without_allocating() {
     assert_eq!(store.image().0.node_count(), before);
 }
 
+fn list_to_bytes_fixture(list: RuntimeExpr) -> RuntimeExpr {
+    RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "list_to_bytes".into(),
+            partiality: RuntimePartiality::Total,
+        },
+        args: vec![list],
+    }
+}
+
+fn list_to_bytes_octet_spine(elements: [RuntimeExpr; 4]) -> RuntimeExpr {
+    let symbols = crate::NativeProcessSymbols::legacy_prelude();
+    elements.into_iter().rev().fold(
+        RuntimeExpr::Construct {
+            constructor: symbols.list_nil,
+            args: vec![],
+        },
+        |tail, head| RuntimeExpr::Construct {
+            constructor: symbols.list_cons.clone(),
+            args: vec![head, tail],
+        },
+    )
+}
+
+/// Durable invariant: a fixed spine with four runtime octets writes them in
+/// list order; the real `bytes_length` and `bytes_at` consumers read the result.
+#[test]
+fn list_to_bytes_runtime_spine_preserves_length_and_order() {
+    let none = "ctor:prelude::Option::None";
+    let some = "ctor:prelude::Option::Some";
+    let byte_at = |index: i64| RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "bytes_at".into(),
+            partiality: RuntimePartiality::SafeOption {
+                none: none.into(),
+                some: some.into(),
+                obligation: None,
+            },
+        },
+        args: vec![
+            RuntimeExpr::Var(0),
+            RuntimeExpr::Value(RuntimeValue::Int(index.into())),
+        ],
+    };
+    let args = vec![
+        list_to_bytes_fixture(list_to_bytes_octet_spine(
+            [0, 1, 2, 3].map(RuntimeExpr::Var),
+        )),
+        RuntimeExpr::PrimitiveCall {
+            primitive: RuntimePrimitive {
+                symbol: "bytes_length".into(),
+                partiality: RuntimePartiality::Total,
+            },
+            args: vec![RuntimeExpr::Var(0)],
+        },
+        byte_at(0),
+        byte_at(3),
+    ];
+    let fixture = RuntimeExpr::Construct {
+        constructor: "fixture::Observations".into(),
+        args,
+    };
+    let RuntimeExpr::Construct { args, .. } = &fixture else {
+        unreachable!()
+    };
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (_module, code) =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 4, |compiler, builder, params| {
+            let arena = compiler.carrier_arena()?;
+            let pointer_type = builder.func.dfg.value_type(arena);
+            compiler.function_local.native_int_arena = Some(builder.ins().load(
+                pointer_type,
+                MemFlags::trusted(),
+                arena,
+                crate::boundary_value::ARENA_NATIVE_INT,
+            ));
+            let env = params
+                .iter()
+                .map(|&value| {
+                    LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
+                        compiler.lower_dynamic_small_int(builder, value),
+                    ))
+                })
+                .collect::<Vec<_>>();
+            let convert = compiler.child_occurrence(root, 0, &args[0])?;
+            let bytes = compiler.lower_expr(builder, convert, &env)?;
+            assert!(
+                matches!(bytes, LoweringOperand::Carried(_)),
+                "runtime spine must emit Bytes"
+            );
+            let env = [LoweringEnvironmentBinding::Value(bytes)];
+            let length = compiler.child_occurrence(root, 1, &args[1])?;
+            let LoweringOperand::Specialized(Lowered::Int { value: length, .. }) =
+                compiler.lower_expr(builder, length, &env)?
+            else {
+                panic!("bytes_length must return an Int");
+            };
+            let mut answer = length;
+            for (index, expr) in args.iter().enumerate().skip(2) {
+                let occurrence = compiler.child_occurrence(root, index, expr)?;
+                let LoweringOperand::Specialized(Lowered::BorrowedOption {
+                    present, value, ..
+                }) = compiler.lower_expr(builder, occurrence, &env)?
+                else {
+                    panic!("bytes_at must observe the emitted span");
+                };
+                Lowering::require_i64(builder, present, 1);
+                let shifted = builder.ins().ishl_imm(answer, 8);
+                answer = builder.ins().bor(shifted, value);
+            }
+            Ok(answer)
+        })
+        .expect("the fixed runtime spine and byte observers emit");
+    let function: extern "C" fn(*const u64, i64, i64, i64, i64) -> i64 =
+        unsafe { std::mem::transmute(code) };
+    let native = crate::native_int::NativeIntArenaV1::default();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = b2f_d9_bind_wide_arena(&mut store, &native);
+    let answer = function(base, 127, 0, 0, 1);
+    assert_eq!(
+        [answer >> 16, (answer >> 8) & 255, answer & 255],
+        [4, 127, 1]
+    );
+}
+
+/// Durable invariant: a wholly literal list folds without emitting a claim.
+#[test]
+fn list_to_bytes_literal_spine_folds_without_allocating() {
+    let fixture = list_to_bytes_fixture(list_to_bytes_octet_spine(
+        [127_i64, 0, 0, 1].map(|byte| RuntimeExpr::Value(RuntimeValue::Int(byte.into()))),
+    ));
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let result = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: &fixture,
+                static_origin: root,
+            },
+            &[],
+        )?;
+        let LoweringOperand::Specialized(Lowered::Bytes(bytes)) = result else {
+            panic!("literal spine must fold");
+        };
+        assert_eq!(bytes, [127, 0, 0, 1]);
+        Ok(builder.ins().iconst(types::I64, 0))
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let before = store.image().0.node_count();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(ac_c7_run(code, base), 0);
+    assert_eq!(store.image().0.node_count(), before);
+}
+
+/// Durable invariant: the static-template route refuses a carried operand
+/// during lowering, before it could inspect the runtime list.
+#[test]
+fn list_to_bytes_carried_spine_refuses_during_lowering() {
+    let fixture = list_to_bytes_fixture(RuntimeExpr::Var(0));
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let result =
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, params| {
+            let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+                CarriedBoundaryWord { word: params[0] },
+            ))];
+            compiler.lower_expr(
+                builder,
+                SourceOccurrence {
+                    expr: &fixture,
+                    static_origin: root,
+                },
+                &env,
+            )?;
+            Ok(builder.ins().iconst(types::I64, 0))
+        });
+    let Err(CraneliftBackendError::Unsupported(error)) = result else {
+        panic!("expected a list-shape refusal");
+    };
+    assert_eq!(error.construct, "PrimitiveCall");
+    assert_eq!(error.cause, LoweringCause::Fragment);
+    assert_eq!(
+        error.reason,
+        "list_to_bytes requires a statically shaped List UInt8 in native lowering"
+    );
+}
+
 /// Transfer `literal` into the carrier, observe it through the `D4` observer,
 /// and return the SSA value at `field` (0 pointer, 1 length, 2 outcome).
 fn d4_observe(
