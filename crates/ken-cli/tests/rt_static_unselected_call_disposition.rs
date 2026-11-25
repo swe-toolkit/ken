@@ -41,6 +41,8 @@ fn static_match_ret_skips_console_vis_in_both_lanes() {
     assert_ret_skips_console(MATCH, "18446744073709551616");
 }
 
+// GAP (K-upstream): neither backend If seat is reached on this surface
+// fixture. This row pins behavior, not the KnownBoolIf disposition.
 #[test]
 fn static_if_ret_skips_console_vis_in_both_lanes() {
     assert_ret_skips_console(IF, "256");

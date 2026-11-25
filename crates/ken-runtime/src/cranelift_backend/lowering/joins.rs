@@ -35,6 +35,19 @@
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum UnselectedRootSeat {
+    MatchCloseout,
+    KnownBoolIf,
+    LetAfterTrap,
+}
+
+// LetAfterTrap is unmeasured and must not authorize call settlement.
+const WITNESSED_UNSELECTED_SEATS: &[UnselectedRootSeat] = &[
+    UnselectedRootSeat::MatchCloseout,
+    UnselectedRootSeat::KnownBoolIf,
+];
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
     static FORCE_OWNER_VIS_JOIN_CONSUMED: std::cell::Cell<bool> =
@@ -2031,8 +2044,9 @@ impl<'a> Lowering<'a> {
         pub(super) fn disposition_statically_unselected_source_subtree(
             &mut self,
             root: StaticOriginId,
+            seat: UnselectedRootSeat,
         ) -> Result<(), CraneliftBackendError> {
-            self.function_local.statically_unselected_roots.insert(root);
+            self.function_local.statically_unselected_roots.entry(root).or_insert(seat);
             #[cfg(test)]
             if D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get)
                 == JoinConsumptionMutation::IncludeStaticallyUnselected
@@ -2220,7 +2234,7 @@ impl<'a> Lowering<'a> {
             let calls = self.static_transition_plan.continuation_calls()?;
             loop {
                 let mut dead = BTreeSet::new();
-                for &root in &self.function_local.statically_unselected_roots {
+                for &root in self.function_local.statically_unselected_roots.keys() {
                     dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(root)?);
                 }
                 for (case_bodies, _, final_reachable) in matches.values() {
@@ -2270,7 +2284,7 @@ impl<'a> Lowering<'a> {
                         omitted_for_mutation = true;
                         continue;
                     }
-                    self.disposition_statically_unselected_source_subtree(root)?;
+                    self.disposition_statically_unselected_source_subtree(root, UnselectedRootSeat::MatchCloseout)?;
                 }
             }
             Ok(())
@@ -2390,14 +2404,19 @@ impl<'a> Lowering<'a> {
             function: PredeclaredFunctionId,
         ) -> Result<(), CraneliftBackendError> {
             let owner = ContinuationEmissionOwner::Predeclared(function);
-            let mut dead = BTreeSet::new();
-            for &root in &self.function_local.statically_unselected_roots {
-                dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(root)?);
+            let mut dead_all = BTreeSet::new();
+            let mut dead_witnessed = BTreeSet::new();
+            for (&root, seat) in &self.function_local.statically_unselected_roots {
+                let subtree = self.static_transition_plan.source_origins_in_owner_subtree(root)?;
+                if WITNESSED_UNSELECTED_SEATS.contains(seat) {
+                    dead_witnessed.extend(subtree.iter().copied());
+                }
+                dead_all.extend(subtree);
             }
             for identity in self.static_transition_plan.ordinary_continuation_call_identities()? {
                 let producer = identity.producer_construct_origin();
                 if identity.emission_owner() != owner
-                    || !dead.contains(&producer)
+                    || !dead_all.contains(&producer)
                     || self.continuation_candidate_is_consumed(&identity)
                 {
                     continue;
@@ -2410,12 +2429,21 @@ impl<'a> Lowering<'a> {
                             .to_string(),
                     ));
                 }
+                if !dead_witnessed.contains(&producer) {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a planned continuation call lies only under a statically unselected root whose \
+                         seat has no witnessed producer; its disposition is unmeasured, so it is refused \
+                         rather than settled".to_string(),
+                    ));
+                }
                 self.settle_continuation_candidate(
                     &identity,
                     super::units::CandidateDisposition::StaticallyUnselected,
                 )?;
                 self.function_local.statically_unselected_calls.insert(identity);
             }
+            self.function_local.unselected_calls_settled = true;
             Ok(())
         }
 }

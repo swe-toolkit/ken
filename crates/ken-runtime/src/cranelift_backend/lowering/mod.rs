@@ -1184,7 +1184,8 @@ impl ArtifactHelpers<'_> {
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
-            statically_unselected_roots: BTreeSet::new(),
+            statically_unselected_roots: BTreeMap::new(),
+            unselected_calls_settled: false,
             lowered_construct_origins: BTreeSet::new(),
             statically_unselected_calls: BTreeSet::new(),
             continuation_calls: BTreeMap::new(),
@@ -1519,7 +1520,8 @@ struct FunctionLocalRefs {
     /// Each generated call's exact finished status/Trap/Result obligation.
     pending_call_result_obligations: Vec<PendingCallResultObligation>,
     /// Source subtree roots explicitly excluded in this function.
-    statically_unselected_roots: BTreeSet<StaticOriginId>,
+    statically_unselected_roots: BTreeMap<StaticOriginId, joins::UnselectedRootSeat>,
+    unselected_calls_settled: bool,
     /// Construct occurrences reached in this function, not across the artifact.
     lowered_construct_origins: BTreeSet<StaticOriginId>,
     /// Ordinary calls this function settled without emission at join closeout.

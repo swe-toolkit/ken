@@ -35,7 +35,9 @@ pub use per_emitter_availability::{
 /// `planning.rs`. Test-only, and deliberately re-exporting the one fixture
 /// rather than opening the module.
 #[cfg(test)]
-pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
+pub(in crate::cranelift_backend) use continuations::tests::{
+    contspec_activation_owned_worker_captures_fixture, statically_unselected_if_fixture,
+};
 mod effects;
 mod immediate_bridge;
 mod joins_traps;
