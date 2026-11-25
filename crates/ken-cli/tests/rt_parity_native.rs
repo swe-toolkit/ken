@@ -6040,7 +6040,10 @@ fn assert_continuation_inheritance_mutation_child() {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")
             }))
-        } else if matches!(mode.as_str(), "earlier-result-p2" | "later-capture-parameters-p2") {
+        } else if matches!(
+            mode.as_str(),
+            "earlier-result-p2" | "later-capture-parameters-p2"
+        ) {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 fresh_population_differential("fresh-population-p2-mutation", FRESH_POPULATION_P2)
             }))

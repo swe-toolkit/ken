@@ -756,9 +756,9 @@ pub(in crate::cranelift_backend) enum CheckedIhFreshResultRoute {
         /// D3-RECUT (b2/R3, Case-B): the ordinal, within the producer worker's
         /// captured-environment carrier, of the continuation's bound result
         /// parameter (the `outcome` the k-Match consumes). This is the Tail-route
-        /// analogue of the Direct route's
-        /// [`CheckedIhFreshResultDestination::capture_ordinal`]: recorded here at
-        /// route construction by identity (the unique worker capture whose binder
+        /// analogue of one Direct destination member's
+        /// [`CheckedIhFreshResultCapture::capture_ordinal`]: recorded here at route
+        /// construction by identity (the unique worker capture whose binder
         /// provenance is the continuation closure's parameter), so the composed-
         /// return closeout reads the outcome carrier field by descriptor rather
         /// than by a numeric formula. A compile-time planning fact only; no runtime
@@ -8003,10 +8003,10 @@ fn checked_ih_generated_entry_arrival(
 /// captured-environment carrier, of the continuation's bound result parameter
 /// (the `outcome` the k-Match consumes).
 ///
-/// This is the Tail-route analogue of the Direct route's
-/// [`CheckedIhFreshResultDestination::capture_ordinal`]. The Direct route already
-/// records its fresh-result -> capture-ordinal mapping at construction; the Tail
-/// route never did, and that asymmetry is the whole gap the composed-return
+/// This is the Tail-route analogue of one Direct destination member's
+/// [`CheckedIhFreshResultCapture::capture_ordinal`]. The Direct destination
+/// records a fresh-result-to-capture-ordinal mapping for each member; the Tail
+/// route did not, and that asymmetry is the whole gap the composed-return
 /// closeout hit (Architect ruling `evt_6s66s11vtf2m1`). We resolve it here, at the
 /// route site where the facts are live, by SOURCE IDENTITY -- never a numeric
 /// formula (recursive_position + 1, method_argument_count, and selected_index all
