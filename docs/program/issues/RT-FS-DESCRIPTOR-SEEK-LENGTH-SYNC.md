@@ -1,15 +1,15 @@
 ---
 id: RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC
 title: "ABI-S1 merged host implementations of FsSeek, FsSetLength and FsSync, but no Ken source can reach them and all three are RepresentedUnavailable, so a Ken program cannot truncate a file or make a write durable. Rule from an AC-0 whether each operation gains a checked surface and native parity or leaves the catalog, as positional reads and writes may already subsume seek, and land the ruled result"
-status: draft
-owner: runtime
+status: ready
+owner: language
 size: L
 tier: T1
 gate: architect
 depends_on: []
 blocks: [LINUX-ABI-EXIT-SERVICE-SUPERVISOR]
 github: null
-origin: "Steward 2026-11-22 on operator direction (\"Create WPs and update the campaign docs as necessary to capture the gaps you have identified\"). Program §6 requires every operation NativeTested or probed; these three are unavailable only because nobody surfaced or promoted them. L1 Linux ABI program, Steward order."
+origin: "Steward 2026-11-22 on operator direction (\"Create WPs and update the campaign docs as necessary to capture the gaps you have identified\"). Program §6 requires every operation NativeTested or probed; these three are unavailable only because nobody surfaced or promoted them. L1 Linux ABI program, Steward order. Released on the Language ring (L1b, operator 2026-11-22: \"Approved. Use the language ring.\") after ABI-S2, anchors re-checked on ABI-S2 98242db31."
 ---
 
 # Descriptor seek, length and sync
@@ -21,26 +21,26 @@ states. Either a checked Ken wrapper reaches it and it is `NativeTested`
 with interpreter parity, or it has left the operation catalog with its
 host code, wire request and planner arm.
 
-## Settled inputs (main `ccfc01de1`; anchors re-checked at release)
+## Settled inputs (ABI-S2 tree `98242db31` over main `3542c4c60`)
 
-- **Host.** `ken-host/src/lib.rs` implements `resource_seek_v1` (`:988`),
-  `resource_set_length_v1` (`:1001`) and `resource_sync_v1` (`:1014`,
+- **Host.** `ken-host/src/lib.rs` implements `resource_seek_v1` (`:1061`),
+  `resource_set_length_v1` (`:1074`) and `resource_sync_v1` (`:1087`,
   full and data sync). `effect_v1.rs` dispatches their canonical requests
-  (~`:3530`, ~`:3547`, ~`:3565`) and marks all three
-  `RepresentedUnavailable` (`:222` to `:224`).
+  (from ~`:3648`) and marks all three `RepresentedUnavailable` (`:226` to
+  `:228`).
 - **No surface.** The prelude has no constructor for any of the three.
   The open-handle operations that do run (`FsHandleMetadata`, `FsReadAt`,
   `FsWriteAt`) enter through private prelude constructors
-  (`PrivateFsReadAt`, ~`prelude.rs:2573`) with package wrappers such as
-  `writeAt` in `Capability.System.IO` (spec 38 ~`:1444`). `ken-interp`
+  (`PrivateFsReadAt`, ~`prelude.rs:2591`) with package wrappers such as
+  `writeAt` in `Capability.System.IO` (spec 38 ~`:522`). `ken-interp`
   does not decode any of the three.
-- **Seek and positional I/O.** Spec 38 ~`:583` says sequential reads,
+- **Seek and positional I/O.** Spec 38 ~`:588` says sequential reads,
   writes and seek-like state are derived code that threads
   `fileOffset + transferred`, and that PX8 adds no seek.
   `FileOperation.OpSeek`, `OpSetLength` and `OpSync` already exist as
-  error-context cases (spec 38 ~`:1436`).
+  error-context cases (spec 38 ~`:1440`).
 - **Native.** The planner names all three among the operations refused
-  before any seat is derived (`static_transition/effects.rs` ~`:690`).
+  before any seat is derived (`static_transition/effects.rs` ~`:441`, ~`:697`).
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
@@ -57,7 +57,7 @@ handle-open modes, or to the FS root confinement.
 
 - **AC-0 (Architect, before code).** For each operation, rule surface or
   retire against PRINCIPLES' subsume-don't-proliferate item and spec 38
-  ~`:583`. For each surfaced operation, rule its package home, the
+  ~`:588`. For each surfaced operation, rule its package home, the
   handle mode it requires, and its `FileError` context. A retired
   operation's `FileOperation` case follows the same ruling. Sweep every
   consumer of the operation identity across `crates/`, `conformance/`
@@ -82,7 +82,8 @@ handle-open modes, or to the FS root confinement.
 
 Checks: 4 fired. I read the three host functions and dispatch arms, and
 the absence of a prelude constructor or interpreter decoder, on
-`ccfc01de1`. 3 fired. AC-0 sweeps the operation identity, because the
-planner, wire format, export table and row-injection test all name it.
-8 fired. The truncate-then-read row fails on a host that ignores the
-length. The seek row fails on a host that does not move the position.
+`ccfc01de1`, and re-checked them on ABI-S2 `98242db31` at release. 3
+fired. AC-0 sweeps the operation identity, because the planner, wire
+format, export table and row-injection test all name it. 8 fired. The
+truncate-then-read row fails on a host that ignores the length. The seek
+row fails on a host that does not move the position.
