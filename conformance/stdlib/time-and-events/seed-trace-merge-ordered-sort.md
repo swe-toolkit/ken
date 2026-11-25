@@ -71,7 +71,7 @@ theorem merge_result : Equal (List (Event Bool)) (trace_merge Bool xs ys) expect
 - promise class: durable invariant.
 - given: a fresh copy of the shared prefix, without the accepted result block.
 - expect: refuse at this theorem's closing `Refl` with elaborator
-  `TypeMismatch` (`` Refl expects an `Eq`-shaped goal ``).
+  `TypeMismatch`.
 - measured: the unchanged law-based proof with the claimed result changed
   to `[e1, e3, e2]`.
 - claimed: having the same events is insufficient; the result must be in
