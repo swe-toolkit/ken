@@ -78,24 +78,33 @@ struct Differential {
 /// the identical source through the reference interpreter against the same
 /// root, and return both canonical observations.
 fn differential(case: &str, entry: &str) -> Differential {
+    differential_source(
+        case,
+        &RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+}
+
+fn differential_source(
+    case: &str,
+    source: &str,
+    profile: ken_runtime::boundary_resource_profile::BoundaryResourceProfileV3,
+) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("source"), b"ab").unwrap();
-    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
     let catalog = [std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../catalog/packages")];
 
-    let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(
-        || {
-            ken_cli::build_native_program_with_roots(
-                &source,
-                ken_cli::SourceFormat::Ken,
-                &catalog,
-                &format!("rt_parity_{}", case.replace('-', "_")),
-                root.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        },
-    );
+    let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(|| {
+        ken_cli::build_native_program_with_roots(
+            source,
+            ken_cli::SourceFormat::Ken,
+            &catalog,
+            &format!("rt_parity_{}", case.replace('-', "_")),
+            root.path(),
+            profile,
+        )
+    });
     assert!(
         applications.is_empty(),
         "{case}: unexpected checked-control Ret applications: {applications:?}"
@@ -115,7 +124,7 @@ fn differential(case: &str, entry: &str) -> Differential {
 
     let mut host = ken_interp::PosixHost::new_at(root.path());
     let interpreted = ken_cli::run_program_effect_observation(
-        &source,
+        source,
         ken_cli::SourceFormat::Ken,
         &catalog,
         &[],
@@ -679,6 +688,7 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
             };
         let assert_local_shape =
             |label: &str, row: &ken_runtime::CheckedIhContinuationInheritanceObservation| {
+                assert_eq!(row.fresh_result_capture_count, 1);
                 assert_eq!(row.active_frame_lineage.len(), 2);
                 let inherited_frame = row.active_frame_lineage[0];
                 assert_eq!(row.active_frame_lineage[1], row.active_frame_origin);
@@ -6019,7 +6029,8 @@ fn assert_continuation_inheritance_mutation_child() {
         "final-residual-k-locator" => Mutation::SubstituteFinalRecursorResidualLocator,
         "reclassify-ret" => Mutation::ReclassifyRetChildAsIh,
         "descriptor-only" => Mutation::SubstituteDescriptorOnlyAuthority,
-        "earlier-result" => Mutation::SubstituteEarlierResult,
+        "earlier-result" | "earlier-result-p2" => Mutation::SubstituteEarlierResult,
+        "later-capture-parameters-p2" => Mutation::SubstituteLaterCaptureParameterCount,
         "read-write-swap" => Mutation::SwapReadWriteEndpoints,
         other => panic!("unknown continuation-inheritance mutation: {other}"),
     };
@@ -6028,6 +6039,13 @@ fn assert_continuation_inheritance_mutation_child() {
             differential("fs-read-at-offset-single", "rt_read_offset_stage");
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")
+            }))
+        } else if matches!(
+            mode.as_str(),
+            "earlier-result-p2" | "later-capture-parameters-p2"
+        ) {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                fresh_population_differential("fresh-population-p2-mutation", FRESH_POPULATION_P2)
             }))
         } else {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -6891,3 +6909,101 @@ fn px10_native_process_operation_pairs_match_fresh_interpreter() {
         .join()
         .expect("Process parity worker completed");
 }
+
+const FRESH_POPULATION_P1: &str =
+    include_str!("fixtures/rt_checked_ih_fresh_result_population_p1.ken");
+const FRESH_POPULATION_P2: &str =
+    include_str!("fixtures/rt_checked_ih_fresh_result_population_p2.ken");
+
+fn fresh_population_differential(case: &str, source: &str) -> Differential {
+    let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+    // Use the nested pipe-read fixture budget to test captures, not capacity.
+    profile.invocation.nodes = 80;
+    profile.invocation.words = 64 * 8;
+    differential_source(case, source, profile)
+}
+
+/// Promise class: durable invariant. Two sibling closures can consume the
+/// same fresh Ret child without choosing one of the closures.
+#[test]
+fn checked_ih_fresh_result_capture_population() {
+    use ken_runtime::CheckedIhContinuationInheritanceObservation as Row;
+
+    fn final_frame(rows: &[Row]) -> &Row {
+        // The pipe cleanup is the last active frame in each fixture's
+        // occurrence order. Resolve that frame separately in each build.
+        let frame = rows.iter().map(|row| row.active_frame_origin).max();
+        let selected: Vec<_> = rows
+            .iter()
+            .filter(|row| Some(row.active_frame_origin) == frame)
+            .collect();
+        let [row] = selected.as_slice() else {
+            panic!("expected one pipe cleanup inheritance in the final frame");
+        };
+        row
+    }
+
+    fn assert_ret_child(row: &Row) {
+        assert_eq!(
+            row.fresh_result_capture_count,
+            row.fresh_result_captures.len()
+        );
+        assert_eq!(
+            row.fresh_result_constructor_child,
+            format!(
+                "ConstructorChild {{ frame_origin: StaticOriginId({}), field_position: 0 }}",
+                row.active_frame_origin
+            )
+        );
+    }
+
+    in_large_stack_thread("rt-fresh-population", || {
+        let (p2, p2_rows) =
+            ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
+                fresh_population_differential("fresh-population-p2", FRESH_POPULATION_P2)
+            });
+        assert_eq!(p2.native, p2.interpreted);
+        assert_eq!(p2.native.exit_status, 0);
+        let p2_row = final_frame(&p2_rows);
+        assert_eq!(p2_row.fresh_result_capture_count, 2);
+        assert_eq!(
+            p2_rows
+                .iter()
+                .filter(|r| r.fresh_result_capture_count == 2)
+                .count(),
+            1
+        );
+        assert_ret_child(p2_row);
+        let [(first, _), (second, _)] = p2_row.fresh_result_captures.as_slice() else {
+            unreachable!("P2 has two members");
+        };
+        assert!(first < second, "P2 names two distinct, ordered closures");
+
+        let (p1, p1_rows) =
+            ken_runtime::with_checked_ih_continuation_inheritance_observations(|| {
+                fresh_population_differential("fresh-population-p1", FRESH_POPULATION_P1)
+            });
+        assert_eq!(p1.native, p1.interpreted);
+        assert_eq!(p1.native.exit_status, 0);
+        let p1_row = final_frame(&p1_rows);
+        assert_eq!(p1_row.fresh_result_capture_count, 1);
+        assert_ret_child(p1_row);
+    });
+}
+
+generated_entry_checked_case!(
+    continuation_inheritance_earlier_result_p2,
+    CONTINUATION_INHERITANCE_MUTATION_CHILD,
+    in_large_stack_thread,
+    assert_continuation_inheritance_mutation_child,
+    "earlier-result-p2",
+    "an earlier transport source result was substituted into the fresh-result destination"
+);
+generated_entry_checked_case!(
+    continuation_inheritance_later_capture_parameter_count_p2,
+    CONTINUATION_INHERITANCE_MUTATION_CHILD,
+    in_large_stack_thread,
+    assert_continuation_inheritance_mutation_child,
+    "later-capture-parameters-p2",
+    "the fresh-result destination does not reference its exact existing boundary-closure environment record"
+);
