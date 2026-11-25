@@ -1,7 +1,7 @@
 ---
 id: RT-ORIENTED-PARENT-EDGE-COMPOSITION
 title: "Oriented subcontinuation plan validation checks that each frame's output interface equals the input of the frame after it in semantic order. In a chain those pairs are the parent edges, but in a tree post-order puts siblings side by side, so the check compares two unrelated answer types. PX11's exchange main has such a segment and refuses with E0079 checked_oriented_marker_location. Check child against parent along each ParentFrame edge, refuse sibling pairs by name in the invocation-local splice, and leave the retired flat order as it is"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

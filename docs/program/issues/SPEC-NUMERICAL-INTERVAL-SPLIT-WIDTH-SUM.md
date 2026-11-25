@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM
 title: "Spec 68 says a bisection step keeps every member (§21), but no law says what it does to the error bound: nothing relates the widths of MkInterval lo m and MkInterval m hi to the width of MkInterval lo hi, so a client cannot show that refining an enclosure tightens it. Rule from a checked D0 at zero trust that, for lo ≤ m ≤ hi, the two half-widths sum by value to the whole width, and state it with a seed that separates the sum from a wrong total"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

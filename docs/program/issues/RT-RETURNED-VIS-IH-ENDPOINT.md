@@ -1,7 +1,7 @@
 ---
 id: RT-RETURNED-VIS-IH-ENDPOINT
 title: "The static planner's returned-Vis walker resolves a Call's callee only through emitted call edges. A computational induction hypothesis is evaluated inside its owning unit, so no edge names it, and PX11's exchange refuses with N0002 'returned-Vis generated Call at StaticOriginId(33) has an unknown endpoint' at response owner 9 in drain_full. Resolve an IH callee by checked binder provenance and walk every case of the eliminator that bound it; keep the refusal for every other edgeless callee"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
