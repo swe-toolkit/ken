@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES]
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION]
 blocks: [PX11]
 github: null
 origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
