@@ -17,18 +17,20 @@ conformance runner.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue)
+
 import Data.Numeric.Rational
-  (Rational, MkRational, rational_add, rational_equiv, rational_leq,
-   rational_of_nat)
+  (Rational, MkRational, rational_add, rational_equiv, rational_leq, rational_of_nat)
+
 import Algorithm.Numeric.RationalInterval
   (Interval, MkInterval, interval_width, interval_split_width)
 
 const one : Rational = MkRational (Suc Zero) Zero
+
 const two : Rational = MkRational (Suc (Suc Zero)) Zero
-const five : Rational =
-  MkRational (Suc (Suc (Suc (Suc (Suc Zero))))) Zero
-const seven : Rational =
-  MkRational (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))) Zero
+
+const five : Rational = MkRational (Suc (Suc (Suc (Suc (Suc Zero))))) Zero
+
+const seven : Rational = MkRational (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))) Zero
 
 theorem split_width_four
     : rational_equiv
@@ -37,28 +39,23 @@ theorem split_width_four
           (interval_width (MkInterval two five)))
         (rational_of_nat (Suc (Suc (Suc (Suc Zero))))) =
   (proof trans for rational_equiv)
-    (rational_add
-      (interval_width (MkInterval one two))
-      (interval_width (MkInterval two five)))
+    (rational_add (interval_width (MkInterval one two)) (interval_width (MkInterval two five)))
     (interval_width (MkInterval one five))
     (rational_of_nat (Suc (Suc (Suc (Suc Zero)))))
     (interval_split_width one five two Proved Proved)
     Proved
 
-theorem split_width_open_swap (lo : Rational) (hi : Rational) (m : Rational)
+theorem split_width_open_swap
+      (lo : Rational) (hi : Rational) (m : Rational)
     : IsTrue (rational_leq lo m)
       → IsTrue (rational_leq m hi)
       → rational_equiv
         (interval_width (MkInterval lo hi))
-        (rational_add
-          (interval_width (MkInterval lo m))
-          (interval_width (MkInterval m hi))) =
+        (rational_add (interval_width (MkInterval lo m)) (interval_width (MkInterval m hi))) =
   λlower.
     λupper.
       (proof sym for rational_equiv)
-        (rational_add
-          (interval_width (MkInterval lo m))
-          (interval_width (MkInterval m hi)))
+        (rational_add (interval_width (MkInterval lo m)) (interval_width (MkInterval m hi)))
         (interval_width (MkInterval lo hi))
         (interval_split_width lo hi m lower upper)
 ```
@@ -106,9 +103,7 @@ theorem split_width_three_control
           (interval_width (MkInterval two five)))
         (rational_of_nat (Suc (Suc (Suc Zero)))) =
   (proof trans for rational_equiv)
-    (rational_add
-      (interval_width (MkInterval one two))
-      (interval_width (MkInterval two five)))
+    (rational_add (interval_width (MkInterval one two)) (interval_width (MkInterval two five)))
     (interval_width (MkInterval one five))
     (rational_of_nat (Suc (Suc (Suc Zero))))
     (interval_split_width one five two Proved Proved)
