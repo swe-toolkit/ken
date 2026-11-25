@@ -2032,6 +2032,7 @@ impl<'a> Lowering<'a> {
             &mut self,
             root: StaticOriginId,
         ) -> Result<(), CraneliftBackendError> {
+            self.function_local.statically_unselected_roots.insert(root);
             #[cfg(test)]
             if D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get)
                 == JoinConsumptionMutation::IncludeStaticallyUnselected
@@ -2219,6 +2220,9 @@ impl<'a> Lowering<'a> {
             let calls = self.static_transition_plan.continuation_calls()?;
             loop {
                 let mut dead = BTreeSet::new();
+                for &root in &self.function_local.statically_unselected_roots {
+                    dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(root)?);
+                }
                 for (case_bodies, _, final_reachable) in matches.values() {
                     for (index, &body) in case_bodies.iter().enumerate() {
                         if !final_reachable.contains(&index) {
@@ -2231,7 +2235,10 @@ impl<'a> Lowering<'a> {
                 // Cross-owner producers therefore conservatively stay live.
                 let mut changed = false;
                 for call in calls.iter() {
-                    if dead.contains(&call.producer_construct_origin()) {
+                    let producer = call.producer_construct_origin();
+                    if dead.contains(&producer)
+                        && !self.function_local.lowered_construct_origins.contains(&producer)
+                    {
                         continue;
                     }
                     if let Some((bodies, None, final_reachable)) =
@@ -2372,7 +2379,44 @@ impl<'a> Lowering<'a> {
                     },
                 );
             }
-            outcome
+            outcome?;
+            self.settle_statically_unselected_calls(function)
+        }
+
+        /// Settle ordinary calls whose producer Construct this unit owns but
+        /// never reached because its source subtree was statically excluded.
+        fn settle_statically_unselected_calls(
+            &mut self,
+            function: PredeclaredFunctionId,
+        ) -> Result<(), CraneliftBackendError> {
+            let owner = ContinuationEmissionOwner::Predeclared(function);
+            let mut dead = BTreeSet::new();
+            for &root in &self.function_local.statically_unselected_roots {
+                dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(root)?);
+            }
+            for identity in self.static_transition_plan.ordinary_continuation_call_identities()? {
+                let producer = identity.producer_construct_origin();
+                if identity.emission_owner() != owner
+                    || !dead.contains(&producer)
+                    || self.continuation_candidate_is_consumed(&identity)
+                {
+                    continue;
+                }
+                if self.function_local.lowered_construct_origins.contains(&producer) {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a continuation call whose producer Construct was lowered in its emission \
+                         owner lies in a statically unselected subtree and has no disposition"
+                            .to_string(),
+                    ));
+                }
+                self.settle_continuation_candidate(
+                    &identity,
+                    super::units::CandidateDisposition::StaticallyUnselected,
+                )?;
+                self.function_local.statically_unselected_calls.insert(identity);
+            }
+            Ok(())
         }
 }
 

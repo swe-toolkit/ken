@@ -9242,15 +9242,9 @@ pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — what lowering settled a binding
 /// candidate to.**
 ///
-/// The three are settled at three different seats, each of which knows
-/// something the other two do not, and none of them is a discharge on its own:
-/// a discharge is what [`ContinuationClaimLedger`] records, and this enum sits
-/// in front of it.
-///
-/// `InlineNoCall` is deliberately **not** a third arm of the discharge
-/// partition. A third arm would let a program that made no call satisfy a law
-/// whose entire purpose is to say a call was answered. It never enters the
-/// equality, and `D2` derives the call-obligation subset from the other two.
+/// Only direct and composed calls enter the `D2` call-obligation subset.
+/// A disposition without a call is not a discharge: a program that made no
+/// call must not satisfy a law whose purpose is to say a call was answered.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// The verified direct producer/call seat claimed and emitted.
@@ -9264,6 +9258,9 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// source, but no emitted runtime branch used it in this artifact. The edge
     /// has its own verifier and is not a causal-call obligation.
     TransportDormant,
+    /// The producer Construct lies in a subtree lowering statically excluded
+    /// in its emission owner; the call is never emitted and is not an obligation.
+    StaticallyUnselected,
 }
 
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a
@@ -9411,16 +9408,15 @@ impl ContinuationCandidateLedger {
                 ),
             ));
         }
-        // The call-obligation subset. `InlineNoCall` is deliberately absent: it
-        // is not a discharge and never enters the equality below.
+        // Only dispositions that actually call enter the obligation subset.
         Ok(self
             .settled
             .into_iter()
             .filter(|(_, disposition)| match disposition {
                 CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
-                CandidateDisposition::InlineNoCall | CandidateDisposition::TransportDormant => {
-                    false
-                }
+                CandidateDisposition::InlineNoCall
+                | CandidateDisposition::TransportDormant
+                | CandidateDisposition::StaticallyUnselected => false,
             })
             .map(|(identity, _)| identity)
             .collect())
@@ -9818,12 +9814,14 @@ impl ContinuationClaimLedger {
                             "response owner has no installed response row".to_string(),
                         )
                     })?;
-                // Only a relay-promoted owner may be unentered, and only when
-                // no evaluator lowered its source Construct in ANY Function.
-                // `disposition=None` alone proves neither of those facts.
-                if !plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
-                    || lowered_construct_origins.contains(&source)
-                {
+                // A relay-promoted owner or one with a statically unselected
+                // caller may be unentered, but only when no evaluator lowered
+                // its source Construct in any function.
+                let unentered = (plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
+                    || dispositions.get(owner.selected_caller())
+                        == Some(&CandidateDisposition::StaticallyUnselected))
+                    && !lowered_construct_origins.contains(&source);
+                if !unentered {
                     #[cfg(feature = "px8-ds-test-support")]
                     if plan.has_pre_schema_relay_promotion(source, owner.selected_caller()) {
                         RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
