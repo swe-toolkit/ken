@@ -1646,7 +1646,6 @@ mod tests {
         const HOST: &str = r#"
             fn fixture() {
                 let _ = AtFlags::empty();
-                let _ = std::fs::read_dir("fixture");
                 let _ = std::fs::remove_dir_all("fixture");
             }
         "#;
@@ -1662,6 +1661,40 @@ mod tests {
         let consumer = consumer_fixture("");
         build_support::verify_inventory_closure(BUILD, HOST, &consumer, PROBE, FACTS)
             .expect("the closed checker fixture must be accepted");
+
+        for (operation, expected) in [
+            (
+                r#"let _ = std::fs::read_dir("fixture");"#,
+                "unmanifested producer ABI fact: std fs::read_dir",
+            ),
+            (
+                r#"use std::fs as ambient; let _ = ambient::read_dir("fixture");"#,
+                "host producer must call std::fs functions by qualified path, not import or alias them",
+            ),
+            (
+                r#"use std::fs::read_dir as read; let _ = read("fixture");"#,
+                "host producer must call std::fs functions by qualified path, not import or alias them",
+            ),
+            (
+                r#"use std::{fs as ambient}; let _ = ambient::read_dir("fixture");"#,
+                "host producer must name a qualified std member, not import the std namespace",
+            ),
+            (
+                r#"use std as ambient; let _ = ambient::fs::read_dir("fixture");"#,
+                "host producer must name a qualified std member, not import the std namespace",
+            ),
+        ] {
+            let injected = HOST.replacen(
+                "AtFlags::empty();",
+                &format!("AtFlags::empty(); {operation}"),
+                1,
+            );
+            let error = build_support::verify_inventory_closure(
+                BUILD, &injected, &consumer, PROBE, FACTS,
+            )
+            .expect_err("an unregistered filesystem call must not escape the census");
+            assert_eq!(error, expected, "{operation}");
+        }
 
         let injected_host = HOST.replacen(
             "AtFlags::empty();",

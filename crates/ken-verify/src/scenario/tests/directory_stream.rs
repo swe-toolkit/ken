@@ -4,6 +4,10 @@ const SOURCE: &str = include_str!("directory_stream.ken");
 
 fn run_directory(subject_kind: crate::SeedNodeKind, entries: &[ken_host::DirEntryV1]) -> CanonicalDifferentialRun {
     let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+    // Size the fixture for up to 402 reads, not for the number of fills
+    // observed with the production buffer. More reads build more continuations.
+    profile.invocation.nodes = 8192;
+    profile.invocation.words = 32768;
     profile.persistent.nodes = 8192;
     profile.persistent.words = 32768;
     profile.persistent.data_bytes = 131072;
@@ -55,10 +59,20 @@ fn abi_s2_identical_nonempty_batches_and_end() {
     for op in [HostOpV1::FsOpenDirectory, HostOpV1::FsReadDirectoryBatch] {
         assert_eq!(confirm_native_tested_transition(op, NativeTestedEvidence::from_directory_stream_run(op, &run, b"subject", &entries)), Ok(HostOpAvailabilityV1::NativeTested));
     }
-    let event = run.native.effect_trace.iter_mut().find(|e| matches!(e.outcome,
+    let trace = &mut run.native.effect_trace;
+    let index = trace.iter().position(|event| matches!(event.outcome,
         CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(_)))).unwrap();
-    let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(batch)) = &mut event.outcome else { unreachable!() };
-    batch.pop().unwrap();
+    let CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(batch)) = &mut trace[index].outcome else { unreachable!() };
+    if batch.len() == 1 {
+        // Drop the event rather than create an invalid empty Entries reply.
+        // The control must reach the population oracle even for singleton fills.
+        trace.remove(index);
+        for event in &mut trace[index..] {
+            event.sequence -= 1;
+        }
+    } else {
+        batch.pop().unwrap();
+    }
     assert!(matches!(run.compare_directory_stream(b"subject", &entries),
         Err(FsDirectoryDifferentialError::Listing { lane: "native", .. })));
     assert!(confirm_native_tested_transition(HostOpV1::FsReadDirectoryBatch,

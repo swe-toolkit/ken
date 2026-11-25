@@ -79,9 +79,53 @@ fn derive_producer_inventory(
         at_flags: identifiers_after(production, "AtFlags::", None),
         modes: call_arguments(production, "Mode::from_raw_mode(")?,
         host_syscalls,
-        std_fs: call_identifiers_after(production, "std::fs::", None),
+        std_fs: std_fs_inventory(production)?,
         errno_kinds: compared_error_kinds(posix_consumer),
     })
+}
+
+/// Keep filesystem functions visible to the producer census. This is a
+/// source-form restriction on the scanned producer, not Rust name resolution.
+/// In particular, do not import the `std` or `std::fs` namespace as a unit:
+/// an alias or grouped root import could otherwise hide a filesystem call.
+fn std_fs_inventory(source: &str) -> Result<BTreeSet<String>, String> {
+    fn ident_byte(byte: u8) -> bool {
+        byte.is_ascii_alphanumeric() || byte == b'_'
+    }
+
+    let mut calls = BTreeSet::new();
+    for (start, _) in source.match_indices("std") {
+        let prefix = &source[..start];
+        let rest = &source[start + "std".len()..];
+        if prefix.bytes().next_back().is_some_and(ident_byte)
+            || rest.bytes().next().is_some_and(ident_byte)
+        {
+            continue;
+        }
+        let member = rest
+            .trim_start()
+            .strip_prefix("::")
+            .map(str::trim_start)
+            .unwrap_or_default();
+        let count = member.bytes().take_while(|b| ident_byte(*b)).count();
+        if count == 0 {
+            return Err("host producer must name a qualified std member, not import the std namespace".into());
+        }
+        if &member[..count] != "fs" && !member.starts_with("r#fs") {
+            continue;
+        }
+        if prefix.trim_end().ends_with("use") && rest.starts_with("::fs::File;") {
+            // The existing descriptor wrapper type is not an ABI call.
+            continue;
+        }
+        let path = rest.strip_prefix("::fs::").unwrap_or_default();
+        let count = path.bytes().take_while(|b| ident_byte(*b)).count();
+        if count == 0 || !path[count..].trim_start().starts_with('(') {
+            return Err("host producer must call std::fs functions by qualified path, not import or alias them".into());
+        }
+        calls.insert(path[..count].to_owned());
+    }
+    Ok(calls)
 }
 
 fn registry_inventory(facts: &[(&str, u64)]) -> Result<ProducerInventory, String> {
