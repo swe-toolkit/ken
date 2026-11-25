@@ -6917,8 +6917,9 @@ const FRESH_POPULATION_P2: &str =
 
 fn fresh_population_differential(case: &str, source: &str) -> Differential {
     let mut profile = ken_runtime::boundary_resource_profile::starter_smoke_profile();
+    // Use the nested pipe-read fixture budget to test captures, not capacity.
     profile.invocation.nodes = 80;
-    profile.invocation.words = 512;
+    profile.invocation.words = 64 * 8;
     differential_source(case, source, profile)
 }
 
