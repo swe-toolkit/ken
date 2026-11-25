@@ -2259,6 +2259,10 @@ impl<'a> Lowering<'a> {
                         matches.get_mut(&call.continuation_origin())
                     {
                         if final_reachable.len() < bodies.len() {
+                            // M-b GAP: no measured row distinguishes this contribution while consumption
+                            // wins (F1, the join closeout and F2 defer to an emitted or lowered item). It
+                            // keeps a planned item that is neither emitted nor lowered, in a case reached
+                            // through a live call, refused rather than settled StaticallyUnselected.
                             final_reachable.extend(0..bodies.len());
                             changed = true;
                         }
