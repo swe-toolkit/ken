@@ -316,17 +316,17 @@ fn matrix_env() -> ElabEnv {
     env
 }
 
-/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–18, 22. The generic
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2, 14–18, 22–23. The generic
 /// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2;
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of seventy-four public identities is selectively
+/// MEASURED: the exact set of seventy-eight public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
 /// the §14 law has a separate exact generic client in its named test;
-/// the §17 law and both §22 laws have separate open-dimension clients.
+/// the §17, §22 and §23 laws have separate open-dimension clients.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// Private proof refactoring stays green; missing or extra exports and a
 /// changed trusted identity set fail.
@@ -413,6 +413,8 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "vector_add_zero_left",
         "vector_add_zero_right",
         "vector_add_cancel_right",
+        "vector_add_eq_zero_left",
+        "vector_add_eq_zero_right",
         "vector_scale_cancel",
         "vector_scale_zero",
         "dot_zero_left",
@@ -423,6 +425,8 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "matrix_add_zero_left",
         "matrix_add_zero_right",
         "matrix_add_cancel_right",
+        "matrix_add_eq_zero_left",
+        "matrix_add_eq_zero_right",
         "matrix_scale_cancel",
         "matrix_vector_zero_matrix",
         "matrix_product_zero_left",
@@ -463,7 +467,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has seventy-four checked names and no private helper"
+        "the exact public set has seventy-eight checked names and no private helper"
     );
     env.elaborate_file(
         r#"
@@ -1041,6 +1045,199 @@ fn false_sum_premise_refuses_at_its_own_refl_after_fresh_accepted_prefix() {
             && failure.start == refl
             && failure.end == refl + "Refl".len() => {}
         other => panic!("false sum premise must reject at its Refl: {other:?}"),
+    }
+}
+
+const ZERO_SUM_ACCEPTED: &str = r#"import Data.Vector.Vector (Vec, VNil, VCons)
+import Algorithm.LinearAlgebra.NatMatrix
+  (vector_add, vector_zero, matrix_add, matrix_zero,
+   vector_add_eq_zero_left, vector_add_eq_zero_right,
+   matrix_add_eq_zero_left, matrix_add_eq_zero_right)
+
+const n0 : Nat = Zero
+const n1 : Nat = Suc n0
+const n2 : Nat = Suc n1
+
+fn vector2 (x : Nat) (y : Nat) : Vec Nat n2 =
+  VCons Nat n1 x (VCons Nat n0 y (VNil Nat))
+
+fn matrix2 (r0 : Vec Nat n2) (r1 : Vec Nat n2) : Vec (Vec Nat n2) n2 =
+  VCons (Vec Nat n2) n1 r0 (VCons (Vec Nat n2) n0 r1 (VNil (Vec Nat n2)))
+
+const zero2 : Vec Nat n2 = vector2 n0 n0
+const one_zero : Vec Nat n2 = vector2 n1 n0
+const zero22 : Vec (Vec Nat n2) n2 = matrix2 zero2 zero2
+const one_zero22 : Vec (Vec Nat n2) n2 = matrix2 one_zero zero2
+
+theorem open_vector_left
+    (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    (sum_zero : Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n))
+  : Equal (Vec Nat n) xs (vector_zero n) =
+  vector_add_eq_zero_left n xs ys sum_zero
+
+theorem open_vector_right
+    (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    (sum_zero : Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n))
+  : Equal (Vec Nat n) ys (vector_zero n) =
+  vector_add_eq_zero_right n xs ys sum_zero
+
+theorem open_matrix_left
+    (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    (sum_zero : Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n))
+  : Equal (Vec (Vec Nat n) m) a (matrix_zero m n) =
+  matrix_add_eq_zero_left m n a b sum_zero
+
+theorem open_matrix_right
+    (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    (sum_zero : Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n))
+  : Equal (Vec (Vec Nat n) m) b (matrix_zero m n) =
+  matrix_add_eq_zero_right m n a b sum_zero
+
+theorem vector_left_zero_by_law : Equal (Vec Nat n2) zero2 (vector_zero n2) =
+  vector_add_eq_zero_left n2 zero2 zero2 Refl
+
+theorem vector_right_zero_by_law : Equal (Vec Nat n2) zero2 (vector_zero n2) =
+  vector_add_eq_zero_right n2 zero2 zero2 Refl
+
+theorem matrix_left_zero_by_law
+  : Equal (Vec (Vec Nat n2) n2) zero22 (matrix_zero n2 n2) =
+  matrix_add_eq_zero_left n2 n2 zero22 zero22 Refl
+
+theorem matrix_right_zero_by_law
+  : Equal (Vec (Vec Nat n2) n2) zero22 (matrix_zero n2 n2) =
+  matrix_add_eq_zero_right n2 n2 zero22 zero22 Refl
+
+theorem one_zero_sum_is_not_zero_sum
+  : Equal (Vec Nat n2) (vector_add n2 one_zero zero2) one_zero =
+  Refl
+"#;
+
+const ZERO_SUM_REFUSED_LEFT: &str = r#"
+theorem vector_left_zero_by_law_false
+  : Equal (Vec Nat n2) one_zero (vector_zero n2) =
+  vector_add_eq_zero_left n2 one_zero zero2 Refl
+"#;
+
+const ZERO_SUM_REFUSED_RIGHT: &str = r#"
+theorem vector_left_zero_by_law_false_premise
+  : Equal (Vec Nat n2) zero2 (vector_zero n2) =
+  vector_add_eq_zero_left n2 zero2 one_zero Refl
+"#;
+
+const ZERO_SUM_REFUSED_MATRIX: &str = r#"
+theorem matrix_left_zero_by_law_false
+  : Equal (Vec (Vec Nat n2) n2) one_zero22 (matrix_zero n2 n2) =
+  matrix_add_eq_zero_left n2 n2 one_zero22 zero22 Refl
+"#;
+
+/// SOURCE: Architect AC-0 AC-2 clients; Linear Algebra §23 contract routed
+/// separately. PROMISE CLASS: durable invariant.
+/// MEASURED: four polymorphic and four closed clients cite their respective
+/// NatMatrix-owned Transparent laws; the nonzero vector sum computes [1, 0].
+/// CLAIMED: each law takes exactly the zero-sum premise and recovers the
+/// indicated summand at open dimensions. Private refactoring is compatible;
+/// dropping the premise or swapping the conclusion breaks the open clients.
+/// THE GAP: all closed zero-sum rows have two zero operands; those rows alone
+/// cannot distinguish a swapped summand. This is not official seed execution.
+#[test]
+fn zero_sum_laws_check_open_and_closed_summands() {
+    let mut env = matrix_env();
+    env.elaborate_file(ZERO_SUM_ACCEPTED)
+        .expect("complete zero-sum accepted client checks");
+    for (owner, open, closed) in [
+        (
+            "vector_add_eq_zero_left",
+            "open_vector_left",
+            "vector_left_zero_by_law",
+        ),
+        (
+            "vector_add_eq_zero_right",
+            "open_vector_right",
+            "vector_right_zero_by_law",
+        ),
+        (
+            "matrix_add_eq_zero_left",
+            "open_matrix_left",
+            "matrix_left_zero_by_law",
+        ),
+        (
+            "matrix_add_eq_zero_right",
+            "open_matrix_right",
+            "matrix_right_zero_by_law",
+        ),
+    ] {
+        let owner = env.globals[&format!("{MATRIX}.{owner}")];
+        assert!(matches!(
+            env.env.lookup(owner),
+            Some(Decl::Transparent { .. })
+        ));
+        for client in [open, closed] {
+            let (_, body) = env
+                .env
+                .transparent_body(env.globals[client])
+                .expect("client has a checked body");
+            assert!(
+                term_contains_const(&body, owner),
+                "{client} cites its exact law owner"
+            );
+        }
+    }
+}
+
+/// SOURCE: Architect AC-0 AC-2 refusals; Linear Algebra §23.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: three distinct appended declarations on fresh accepted prefixes
+/// each refuse at their own premise `Refl`. The nonzero right operand row
+/// still has a true conclusion because its left operand is zero.
+/// CLAIMED: a false zero-sum premise cannot invoke the left law. New laws
+/// and proof refactoring are compatible; accepting the false premise is not.
+/// THE GAP: these finite refusals locate the premise check, not its proof at
+/// arbitrary dimensions. The open clients check the generic signature.
+#[test]
+fn false_zero_sums_refuse_at_their_own_premise_refl() {
+    for (case, suffix) in [
+        ("nonzero left vector", ZERO_SUM_REFUSED_LEFT),
+        ("nonzero right vector", ZERO_SUM_REFUSED_RIGHT),
+        ("nonzero left matrix", ZERO_SUM_REFUSED_MATRIX),
+    ] {
+        let declarations = parse_decls(suffix).expect("isolated refusal parses");
+        let [SourceDecl::TheoremDecl { span, .. }] = declarations.as_slice() else {
+            panic!("{case}: suffix must be exactly one theorem");
+        };
+        let refl = suffix.rfind("Refl").expect("negative premise uses Refl");
+        assert!(refl >= span.start && refl + "Refl".len() <= span.end);
+        assert!(suffix[refl + "Refl".len()..].trim().is_empty());
+        let expected = ZERO_SUM_ACCEPTED.len() + refl;
+        let mut env = matrix_env();
+        let source = format!("{ZERO_SUM_ACCEPTED}{suffix}");
+        match env.elaborate_file(&source) {
+            Err(ElabError::TypeMismatch { span: failure, .. })
+                if failure.start == expected && failure.end == expected + "Refl".len() =>
+            {
+                eprintln!("{case}: TypeMismatch at premise Refl {failure:?}");
+            }
+            other => panic!("{case}: false zero sum must reject at its premise Refl: {other:?}"),
+        }
+    }
+}
+
+/// SOURCE: Architect AC-0 private-helper ruling for Linear Algebra §23.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: neither checked helper can be selectively imported by qualified
+/// identity. CLAIMED: the cons steps are private, not supported client APIs.
+/// Compatible proof rewrites retain privacy; exporting either step breaks
+/// the pin. THE GAP: the separate roster test checks the entire export set.
+#[test]
+fn zero_sum_cons_helpers_stay_private() {
+    let mut env = matrix_env();
+    for helper in ["vector_add_eq_zero_cons", "matrix_add_eq_zero_cons"] {
+        let qualified = format!("{MATRIX}.{helper}");
+        let id = env.globals[&qualified];
+        assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+        match env.elaborate_file(&format!("import {MATRIX} ({helper})")) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, qualified),
+            other => panic!("{qualified} must stay private: {other:?}"),
+        }
     }
 }
 
