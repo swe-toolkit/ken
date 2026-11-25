@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN]
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN, RT-RETURNED-VIS-IH-ENDPOINT]
 blocks: [PX11]
 github: null
 origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
@@ -181,6 +181,7 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 7. Oriented frame composition refused exchange main once indexed families reached lowering, because post-order adjacency within a segment stood in for the parent edge — keyed on post-order adjacency of frames within a segment. (asked evt_5art9xrpx28s9; confirmed evt_5z0179ybnz8bd)
 8. The static positional capture model refused a 79-capture environment in exchange main, because a fixed-length &'static positional run bounded capture arity at 64 — keyed on captured-environment arity. (asked evt_3ja9x7a1mxxyk; confirmed evt_1552vcx50h6qt)
 9. The returned-Vis settlement could not derive response owner 9's returned set: the Call at StaticOriginId(33) has no emitted call edge — keyed on the callee having a static call edge (provisional, pending P-RV). (evt_12a6ccjxmfnjw)
+9. The returned-Vis walker resolved callees only through emitted call edges, and a computational IH callee, which lowers in its owning unit, has none — keyed on callee class (an IH binder resolved by checked binder provenance). (asked evt_12a6ccjxmfnjw; confirmed evt_427vemb7ks8fd)
 
 §1b classifications:
 - At entry 3 (evt_42ncdsdxj34kk): entries 2, in its ResourceKind half, and 3 share a predicate. The native lane holds hand-enumerated copies of a closed population the host owns, each frozen at the wave that wrote it. The closure was ruled. Entry 1 is independent: it was a missing authority record, not a stale enumeration.
@@ -189,4 +190,5 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 - At entry 6 (evt_7s7gc8j8vnamx): No. Entry 6 copies nothing, and entries 1 and 5 are not keyed on term size. A narrower shared property was left unnamed pending measurement.
 - At entry 9 (evt_12a6ccjxmfnjw): pending P-RV. The candidate predicate X, expansion, covers entry 6 and possibly 8 and 9. Its closure is the M-a deforestation carry (evt_3fx24w31wxxps). P-RV's V-inline arm confirms X, and its other arms answer No for entry 9.
 - The next §1b check is at the 12th entry.
+- At entry 9: No for X. The refusal recurs in bind's own body without inlining. Entries 7 and 9 share a narrower property, a proxy relation used where a checked witness existed; it is recorded, with no class closure at two members. (evt_427vemb7ks8fd)
 ```
