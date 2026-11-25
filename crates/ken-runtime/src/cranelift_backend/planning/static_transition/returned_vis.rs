@@ -11,6 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::continuations::ContinuationContextId;
 use super::occurrences::StaticOriginId;
 use super::continuations::{ContinuationSpecializationId, StaticContinuationFusionId};
+use super::continuations::{
+    build_checked_binder_provenance, CheckedBinderProvenance, CheckedBinderResolution,
+};
 use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
 use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId};
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
@@ -461,6 +464,7 @@ impl StaticTransitionPlan<'_> {
         body: StaticOriginId,
         units: &[EmittableUnit<'_>],
         edges: &[EmittableCallEdge],
+        binders: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
     ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<PredeclaredFunctionId>), CraneliftBackendError> {
         let mut pending = vec![body];
         let mut seen = BTreeSet::new();
@@ -476,8 +480,42 @@ impl StaticTransitionPlan<'_> {
                 | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
-                | RuntimeExpr::CheckedComputationalIHSlots { .. }
-                | RuntimeExpr::CheckedComputationalIHInvocation { .. } => pending.push(child(0)?),
+                | RuntimeExpr::CheckedComputationalIHSlots { .. } => pending.push(child(0)?),
+                RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+                    // A computational IH is a recursor value in the
+                    // invocation's environment, not an emitted call: lowering
+                    // evaluates it inside the owning unit, so no call edge
+                    // names it. Its complete application returns what the
+                    // eliminator that bound it returns on the recursive child,
+                    // whose constructor is unknown here, so every case of that
+                    // eliminator is walked; `seen` closes the recursion. A
+                    // callee that does not resolve to an IH by checked binder
+                    // provenance takes the ordinary Call path, which refuses
+                    // without an edge.
+                    let call = child(0)?;
+                    let binding = match self.source_occurrence(call)? {
+                        RuntimeExpr::Call { .. } => binders
+                            .get(&self.child_static_origin(call, 0)?)
+                            .and_then(|resolution| match resolution.provenance {
+                                CheckedBinderProvenance::InductionHypothesis(binding) => Some(binding),
+                                _ => None,
+                            }),
+                        _ => None,
+                    };
+                    let Some(binding) = binding else {
+                        pending.push(call);
+                        continue;
+                    };
+                    let frame = binding.frame_origin();
+                    let RuntimeExpr::ComputationalMatch { cases, .. } = self.source_occurrence(frame)? else {
+                        return Err(planner_error(format!(
+                            "returned-Vis IH invocation at {origin:?} names a non-computational eliminator",
+                        )));
+                    };
+                    for index in 0..cases.len() {
+                        pending.push(self.child_static_origin(frame, 1 + index)?);
+                    }
+                }
                 RuntimeExpr::Let { .. } => pending.push(child(1)?),
                 RuntimeExpr::If { .. } => {
                     pending.push(child(1)?);
@@ -610,6 +648,7 @@ impl StaticTransitionPlan<'_> {
         let contexts = self.continuation_contexts()?;
         let units = self.emittable_units()?;
         let edges = self.emittable_call_edges()?;
+        let binders = build_checked_binder_provenance(self)?;
         // Each pending context carries the Vis whose response continuation
         // it is: that Vis, not the protocol's root owner, returns a member.
         let mut pending = vec![(owner.k_context(), owner.vis_origin())];
@@ -627,7 +666,7 @@ impl StaticTransitionPlan<'_> {
                     planner_error("returned-Vis successor has no generated K context")
                 })?;
             let (origins, returning_units) =
-                self.returned_vis_in_context(context.worker_body_origin(), &units, &edges)?;
+                self.returned_vis_in_context(context.worker_body_origin(), &units, &edges, &binders)?;
             let mut members = Vec::new();
             for origin in origins {
                 let RuntimeExpr::Construct { args, .. } = self.source_occurrence(origin)? else {
@@ -713,7 +752,11 @@ mod tests {
     use crate::cranelift_backend::planning::{
         plan_static_transition_graph_with_symbols, AbiRootIngress,
     };
-    use crate::{NativeProcessSymbols, RuntimeValue};
+    use crate::{
+        CheckedComputationalIHBinderMorphism, CheckedComputationalIHInvocationKind,
+        NativeProcessSymbols, RuntimeComputationalMatchCase, RuntimeTrap, RuntimeTrapCode,
+        RuntimeValue,
+    };
     use std::collections::BTreeMap;
 
     /// Promise class: normative compatibility vector for the N0002 capacity
@@ -818,6 +861,113 @@ mod tests {
             "pending-Vis frame offset exceeds addressable range");
     }
 
+    fn with_returned_vis_ih_fixture(callee_index: u32, check: impl FnOnce(&StaticTransitionPlan<'_>)) {
+        let mut symbols = NativeProcessSymbols::legacy_prelude();
+        symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
+        let zero = "ctor:fixture::Nat::Zero";
+        let suc = "ctor:fixture::Nat::Suc";
+        let entry = RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Construct {
+                constructor: suc.into(),
+                args: vec![RuntimeExpr::Construct { constructor: zero.into(), args: vec![] }],
+            }),
+            cases: vec![
+                RuntimeComputationalMatchCase {
+                    constructor: zero.into(),
+                    argument_binders: 0,
+                    recursive_positions: vec![],
+                    body: RuntimeExpr::Construct {
+                        constructor: symbols.itree_vis.clone(),
+                        args: vec![
+                            RuntimeExpr::Construct {
+                                constructor: "ctor:fixture::Op::Request".into(),
+                                args: vec![],
+                            },
+                            RuntimeExpr::Value(RuntimeValue::Unknown),
+                        ],
+                    },
+                },
+                RuntimeComputationalMatchCase {
+                    constructor: suc.into(),
+                    argument_binders: 1,
+                    recursive_positions: vec![0],
+                    body: RuntimeExpr::Let {
+                        value: Box::new(RuntimeExpr::Value(RuntimeValue::Int(0.into()))),
+                        body: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
+                            call_template_id: 0,
+                            checked_occurrence_path: vec![],
+                            kind: CheckedComputationalIHInvocationKind::OrdinaryApplication,
+                            binder_morphism: CheckedComputationalIHBinderMorphism {
+                                method_argument_count: 1,
+                                method_ih_count: 1,
+                                source_start: 1,
+                                source_binder_index: 1,
+                                runtime_binder_index: 1,
+                            },
+                            body: Box::new(RuntimeExpr::Call {
+                                callee: Box::new(RuntimeExpr::Var(callee_index)),
+                                args: vec![],
+                            }),
+                        }),
+                    },
+                },
+            ],
+            default: RuntimeTrap {
+                code: RuntimeTrapCode::PatternMatchFailure,
+                message: "unexpected constructor".into(),
+            },
+        };
+        let plan = plan_static_transition_graph_with_symbols(
+            &entry,
+            &BTreeMap::new(),
+            &symbols,
+            AbiRootIngress::Value,
+            true,
+        )
+        .expect("computational-match fixture plans");
+        check(&plan);
+    }
+
+    // Durable invariant: a complete IH's result comes from a recursive child,
+    // not from repeating the case selection on the original scrutinee.
+    #[test]
+    fn returned_vis_from_an_ih_includes_the_originally_unselected_base_case() {
+        with_returned_vis_ih_fixture(1, |plan| {
+            let root = plan.root_static_origin().expect("match origin");
+            let vis = plan.child_static_origin(root, 1).expect("base case origin");
+            let units = plan.emittable_units().expect("units");
+            let edges = plan.emittable_call_edges().expect("edges");
+            let binders = build_checked_binder_provenance(plan).expect("binder provenance");
+            let (returned, returning_units) = plan
+                .returned_vis_in_context(root, &units, &edges, &binders)
+                .expect("the checked IH returns the base case's Vis");
+            assert_eq!(returned, BTreeSet::from([vis]));
+            assert!(returning_units.is_empty(), "an IH is not an emitted unit call");
+        });
+    }
+
+    // Durable invariant: the wrapper does not make an ordinary binder an IH.
+    #[test]
+    fn returned_vis_refuses_an_edgeless_non_ih_under_the_invocation_wrapper() {
+        with_returned_vis_ih_fixture(0, |plan| {
+            let root = plan.root_static_origin().expect("match origin");
+            let recursive_case = plan.child_static_origin(root, 2).expect("recursive case");
+            let invocation = plan.child_static_origin(recursive_case, 1).expect("invocation");
+            let call = plan.child_static_origin(invocation, 0).expect("wrapped call");
+            let callee = plan.child_static_origin(call, 0).expect("callee");
+            let units = plan.emittable_units().expect("units");
+            let edges = plan.emittable_call_edges().expect("edges");
+            let binders = build_checked_binder_provenance(plan).expect("binder provenance");
+            assert!(matches!(binders[&callee].provenance, CheckedBinderProvenance::Ordinary));
+            let error = plan
+                .returned_vis_in_context(root, &units, &edges, &binders)
+                .expect_err("the ordinary binder must not acquire an IH endpoint");
+            assert!(error.to_string().contains(&format!(
+                "returned-Vis generated Call at {call:?} has an unknown endpoint"
+            )), "unexpected refusal: {error}");
+        });
+    }
+
     /// Promise class: durable invariant. The outer result is a generated
     /// call, not a Vis site. Its callee's returned construct is the only Vis
     /// source. Omitting forwarded call edges must make this pin red; omitting
@@ -863,12 +1013,12 @@ mod tests {
             .expect("the callee has a distinct source body")
             .body_occurrence();
         let observed = plan
-            .returned_vis_in_context(root, &units, &edges)
+            .returned_vis_in_context(root, &units, &edges, &build_checked_binder_provenance(&plan).expect("binder provenance"))
             .expect("the generated result is forwarded");
         assert_eq!(observed.0, BTreeSet::from([callee_body]));
         assert_eq!(observed.1.len(), 1, "the returned unit call is on the chain");
         assert!(plan
-            .returned_vis_in_context(root, &units, &[])
+            .returned_vis_in_context(root, &units, &[], &build_checked_binder_provenance(&plan).expect("binder provenance"))
             .expect_err("a missing generated edge must refuse")
             .to_string()
             .contains("unknown endpoint"));
