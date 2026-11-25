@@ -1,15 +1,15 @@
 ---
 id: RT-STATIC-UNSELECTED-CALL-DISPOSITION
 title: "The native planner over-approximates which continuation calls lowering emits, and joins reconcile that by a statically-unselected disposition, but the continuation-call population has none: every consumer that requires a planned call to be emitted, discharged or resolved refuses, one plane at a time, on a call that lowering lawfully never emits. A HostIO proc whose guard folds statically to its Ret arm, with a Vis producer in the other arm, fails the native build. Give the call population one statically-unselected disposition that every consumer reads"
-status: ready
-owner: language
+status: active
+owner: runtime
 size: L
 tier: T1
 gate: architect
 depends_on: []
 blocks: []
 github: null
-origin: "Architect ruling evt_45863hkv60etq on RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC's second overflow stop: entries 1 and 2 share one predicate, and the fix is a Runtime design, not a fold. Steward scope (a)+(b), evt_6gyt3n9jqxe08: DESCRIPTOR proceeds with the native boundary named, and this prerequisite carries the native row. On the Language ring (L1b, operator 2026-11-22: \"Approved. Use the language ring.\") because L1 holds PX11."
+origin: "Architect ruling evt_45863hkv60etq on RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC's second overflow stop: entries 1 and 2 share one predicate, and the fix is a Runtime design, not a fold. Steward scope (a)+(b), evt_6gyt3n9jqxe08: DESCRIPTOR proceeds with the native boundary named, and this prerequisite carries the native row. Moved to the Runtime ring (L1) and kicked evt_2c2xekw0ygyh9 when PX11 Inc2 held on a provider flag (evt_64pjjqr32rmtg)."
 ---
 
 # One statically-unselected disposition for planned continuation calls
