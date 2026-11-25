@@ -2065,7 +2065,7 @@ which members survive without promising a complexity bound.
 
 ## Trust & derivation
 
-**Public API:** `cost_le`, `least_k` and its twelve declarations for eleven
+**Public API:** `cost_le`, `least_k` and its thirteen declarations for twelve
 law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
 `least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
@@ -2132,8 +2132,14 @@ appending from taking the raw appended part results and checks stable ties.
 The `cat_optimization_least_k_append_merge` package test checks the generic
 sort law and its cost instance, exact trusted-base identities, the two
 independent selection results, the left-tie result and the false take claim.
+The [§4.8 map seed][map-seed] uses `reverse_three` to distinguish the
+composed-cost result `[0]` from the uncomposed-cost result `[2]`. The
+`cat_optimization_least_k_map` package test roots-loads the public law,
+compares exact trusted-base identities, checks the accepted client, and
+rejects the uncomposed-cost equality at its law application.
 
 [append-merge-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-append-merge.md
+[map-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-map.md
 [prefix-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-prefix.md
 [saturation-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-saturated.md
 
