@@ -19,7 +19,8 @@
 > SPEC-GRAPHS-UNION-REACHABLE-ASSOC §17;
 > SPEC-GRAPHS-REACHABLE-REVERSE-SWAP §18;
 > SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19;
-> SPEC-GRAPHS-SUCCESSOR-APPEND-UNION §20).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-SUCCESSOR-APPEND-UNION §20;
+> SPEC-GRAPHS-TOPO-ORDER-REVERSE §21).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1875,8 +1876,61 @@ whole-declaration `KernelRejected TypeMismatch`, not an
 expression-exact span. These controls separate the union from
 either input alone without asserting an untested graph equality.
 
-The current roster is **18 public functions and 36 public
+Through §20 the roster is **18 public functions and 36 public
 theorems**. Section 19's 17-function, 35-theorem count remains
 the historical §19 step, not a current total. The closed controls
 and scratch D0 do not replace the independently owned seed or the
 assembled package test's exact trust-identity gate.
+
+## 21. A reversed order orders the reversed graph
+
+> **Section 21 status: DRAFT v0 (SPEC-GRAPHS-TOPO-ORDER-REVERSE).**
+
+`Algorithm.Graphs.Dependency` exports the following Transparent declarations,
+in this order, immediately after `topo_order_edge_antitone`:
+
+```ken
+pub fn topo_order_reverse
+      (q : Type) (d : DecEq q) (g : Graph q)
+    : TopoOrder q d g → TopoOrder q d (graph_reverse q g)
+
+pub theorem topo_order_reverse_vertices
+      (q : Type) (d : DecEq q) (g : Graph q) (order : TopoOrder q d g)
+    : Equal
+        (List q)
+        (ordered_vertices q d (graph_reverse q g) (topo_order_reverse q d g order))
+        (DC.reverse q (ordered_vertices q d g order))
+```
+
+`DC` is `Data.Collections.Derived`. The transfer takes only the existing
+order, with no finite enumeration or extra premise. It rebuilds `MkTopoOrder`
+on the reversed graph and the reversed list, without running the order
+search. The vertex projection gives the stated equality by conversion,
+even for an open `order`.
+
+Derived exports one additional public proof, immediately after
+`reverse::involutive`:
+
+```ken
+pub proof perm for reverse
+      (a : Type) (eqf : a → a → Bool) (xs : List a)
+    : Perm a eqf xs (reverse a xs)
+```
+
+The permutation proof preserves every count, with no laws required of `eqf`.
+Dependency uses it to transport distinctness and coverage through private
+`nodup_perm` and `contains_perm`. The private `before_reverse_flip` uses
+list distinctness to reverse precedence. For an edge `x → y` of the reversed
+graph, the original order supplies `before y x` using the same edge proof
+at the flipped endpoints. Distinctness matters: `[True, False, True]` has
+`before True False`, but its reversal does not have `before False True`.
+No precedence helper is exported.
+
+On the one-edge Boolean graph `True → False`, the declared original order
+`[True, False]` transfers to `[False, True]`. The seed uses the public vertex
+law in both claims; only the final list differs. The unreversed claim must
+refuse at its closing reflexivity proof after an accepted prefix. This finite
+pair does not replace checking the generic types or the exact trust identities.
+
+The current Dependency roster is **19 public functions and 37 public
+theorems**. The §§1–20 types and the historical §20 roster are unchanged.
