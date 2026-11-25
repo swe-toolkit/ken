@@ -1,11 +1,13 @@
 # Natural-point orientation
 
 Three natural points determine an exact turn by comparing two cross sums.
-The seven public laws include `orient_shared_x` and `orient_shared_y`: each
+The eight public laws include `orient_shared_x` and `orient_shared_y`: each
 returns `Eq` when all three points share the named coordinate. They do not
 state a general collinearity theorem for arbitrary distinct points.
 `orient_translate` preserves the turn when the same natural offset is added
 to all three points on each axis. It does not apply to moving just one point.
+`orient_scale` preserves the turn when all six coordinates are multiplied by
+one positive factor.
 
 ## Definition
 
@@ -20,6 +22,13 @@ vertically adds the sum of the three x coordinates to each cross sum.
 Private helpers use distributivity and rearrange the terms to expose the
 common summand; [`compare::add_cancel_r`](../../Data/Numeric/Nat/Order.ken.md)
 then cancels it from the comparison. No signed cross product is needed.
+
+Scaling every coordinate by `Suc k` contributes two copies of that factor
+to each product in the cross sums. Associativity and commutativity group
+those factors, and distributivity moves them outside each sum.
+[`compare::mul_cancel_r`](../../Data/Numeric/Nat/Order.ken.md) then cancels
+the positive right factor twice. A zero factor instead collapses the three
+points to the origin, giving `Eq` even when the original points turn.
 
 ```ken
 import Algorithm.Geometry.NatBox (Point, MkPoint)
@@ -673,6 +682,163 @@ theorem orient_rotate_sum
     ((proof comm for add) (add q r) p)
     ((proof assoc for add) p q r)
 
+pub theorem orient_scale
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (k : Nat)
+    : Equal OrdResult
+        (orient
+          (MkPoint (mul xa (Suc k)) (mul ya (Suc k)))
+          (MkPoint (mul xb (Suc k)) (mul yb (Suc k)))
+          (MkPoint (mul xc (Suc k)) (mul yc (Suc k))))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  trans
+    OrdResult
+    (compare
+      (add
+        (add (mul (mul xa (Suc k)) (mul yb (Suc k))) (mul (mul xb (Suc k)) (mul yc (Suc k))))
+        (mul (mul xc (Suc k)) (mul ya (Suc k))))
+      (add
+        (add (mul (mul ya (Suc k)) (mul xb (Suc k))) (mul (mul yb (Suc k)) (mul xc (Suc k))))
+        (mul (mul yc (Suc k)) (mul xa (Suc k)))))
+    (compare
+      (mul (mul (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (Suc k)) (Suc k))
+      (mul (mul (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (Suc k)) (Suc k)))
+    (compare
+      (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+      (add (add (mul ya xb) (mul yb xc)) (mul yc xa)))
+    (orient_compare_congr
+      (add
+        (add (mul (mul xa (Suc k)) (mul yb (Suc k))) (mul (mul xb (Suc k)) (mul yc (Suc k))))
+        (mul (mul xc (Suc k)) (mul ya (Suc k))))
+      (add
+        (add (mul (mul ya (Suc k)) (mul xb (Suc k))) (mul (mul yb (Suc k)) (mul xc (Suc k))))
+        (mul (mul yc (Suc k)) (mul xa (Suc k))))
+      (mul (mul (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (Suc k)) (Suc k))
+      (mul (mul (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (Suc k)) (Suc k))
+      (orient_scale_sum xa yb xb yc xc ya (Suc k))
+      (orient_scale_sum ya xb yb xc yc xa (Suc k)))
+    (trans
+      OrdResult
+      (compare
+        (mul (mul (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (Suc k)) (Suc k))
+        (mul (mul (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (Suc k)) (Suc k)))
+      (compare
+        (mul (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (Suc k))
+        (mul (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (Suc k)))
+      (compare
+        (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+        (add (add (mul ya xb) (mul yb xc)) (mul yc xa)))
+      ((proof mul_cancel_r for compare)
+        (mul (add (add (mul xa yb) (mul xb yc)) (mul xc ya)) (Suc k))
+        (mul (add (add (mul ya xb) (mul yb xc)) (mul yc xa)) (Suc k))
+        k)
+      ((proof mul_cancel_r for compare)
+        (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+        (add (add (mul ya xb) (mul yb xc)) (mul yc xa))
+        k))
+
+theorem orient_compare_congr
+      (l2 : Nat) (r2 : Nat) (l : Nat) (r : Nat) (left : Equal Nat l2 l) (right : Equal Nat r2 r)
+    : Equal OrdResult (compare l2 r2) (compare l r) =
+  trans
+    OrdResult
+    (compare l2 r2)
+    (compare l r2)
+    (compare l r)
+    (cong Nat OrdResult l2 l (λu. (compare u r2)) left)
+    (cong Nat OrdResult r2 r (compare l) right)
+
+theorem orient_scale_sum
+      (a1 : Nat) (b1 : Nat) (a2 : Nat) (b2 : Nat) (a3 : Nat) (b3 : Nat) (s : Nat)
+    : Equal Nat
+        (add
+          (add (mul (mul a1 s) (mul b1 s)) (mul (mul a2 s) (mul b2 s)))
+          (mul (mul a3 s) (mul b3 s)))
+        (mul (mul (add (add (mul a1 b1) (mul a2 b2)) (mul a3 b3)) s) s) =
+  trans
+    Nat
+    (add
+      (add (mul (mul a1 s) (mul b1 s)) (mul (mul a2 s) (mul b2 s)))
+      (mul (mul a3 s) (mul b3 s)))
+    (add
+      (add (mul (mul (mul a1 b1) s) s) (mul (mul (mul a2 b2) s) s))
+      (mul (mul (mul a3 b3) s) s))
+    (mul (mul (add (add (mul a1 b1) (mul a2 b2)) (mul a3 b3)) s) s)
+    (orient_sum_congr
+      (mul (mul a1 s) (mul b1 s))
+      (mul (mul (mul a1 b1) s) s)
+      (mul (mul a2 s) (mul b2 s))
+      (mul (mul (mul a2 b2) s) s)
+      (mul (mul a3 s) (mul b3 s))
+      (mul (mul (mul a3 b3) s) s)
+      (orient_scale_product a1 b1 s)
+      (orient_scale_product a2 b2 s)
+      (orient_scale_product a3 b3 s))
+    (trans
+      Nat
+      (add
+        (add (mul (mul (mul a1 b1) s) s) (mul (mul (mul a2 b2) s) s))
+        (mul (mul (mul a3 b3) s) s))
+      (mul (add (add (mul (mul a1 b1) s) (mul (mul a2 b2) s)) (mul (mul a3 b3) s)) s)
+      (mul (mul (add (add (mul a1 b1) (mul a2 b2)) (mul a3 b3)) s) s)
+      (orient_factor_sum (mul (mul a1 b1) s) (mul (mul a2 b2) s) (mul (mul a3 b3) s) s)
+      (cong
+        Nat
+        Nat
+        (add (add (mul (mul a1 b1) s) (mul (mul a2 b2) s)) (mul (mul a3 b3) s))
+        (mul (add (add (mul a1 b1) (mul a2 b2)) (mul a3 b3)) s)
+        (λu. (mul u s))
+        (orient_factor_sum (mul a1 b1) (mul a2 b2) (mul a3 b3) s)))
+
+theorem orient_factor_sum
+      (p : Nat) (q : Nat) (r : Nat) (s : Nat)
+    : Equal Nat (add (add (mul p s) (mul q s)) (mul r s)) (mul (add (add p q) r) s) =
+  sym
+    Nat
+    (mul (add (add p q) r) s)
+    (add (add (mul p s) (mul q s)) (mul r s))
+    (trans
+      Nat
+      (mul (add (add p q) r) s)
+      (add (mul (add p q) s) (mul r s))
+      (add (add (mul p s) (mul q s)) (mul r s))
+      (mul_add_distrib_l (add p q) r s)
+      (cong
+        Nat
+        Nat
+        (mul (add p q) s)
+        (add (mul p s) (mul q s))
+        (λu. (add u (mul r s)))
+        (mul_add_distrib_l p q s)))
+
+theorem orient_scale_product
+      (x : Nat) (y : Nat) (s : Nat)
+    : Equal Nat (mul (mul x s) (mul y s)) (mul (mul (mul x y) s) s) =
+  trans
+    Nat
+    (mul (mul x s) (mul y s))
+    (mul (mul (mul x s) y) s)
+    (mul (mul (mul x y) s) s)
+    ((proof assoc for mul) (mul x s) y s)
+    (cong
+      Nat
+      Nat
+      (mul (mul x s) y)
+      (mul (mul x y) s)
+      (λu. (mul u s))
+      (trans
+        Nat
+        (mul (mul x s) y)
+        (mul x (mul s y))
+        (mul (mul x y) s)
+        (sym Nat (mul x (mul s y)) (mul (mul x s) y) ((proof assoc for mul) x s y))
+        (trans
+          Nat
+          (mul x (mul s y))
+          (mul x (mul y s))
+          (mul (mul x y) s)
+          (cong Nat Nat (mul s y) (mul y s) (mul x) ((proof comm for mul) s y))
+          ((proof assoc for mul) x y s))))
+
 theorem orient_reorder
       (p : Nat) (q : Nat) (r : Nat)
     : Equal Nat (add (add p q) r) (add (add p r) q) =
@@ -703,3 +869,7 @@ The package tests check the open law, exact trusted identity equality, and
 closed cases. For `(0,0), (1,0), (0,1)`, adding `(2,3)` to every point
 preserves `Gt`. Moving only the first point instead changes the cross sums
 to `1` and `5`, giving `Lt`.
+
+`orient_scale` realizes the geometry spec's §22 scaling law using the checked
+Nat Order positive-factor cancellation proof. Its four helper proofs are
+private, and the scaling proof adds no trusted declaration.

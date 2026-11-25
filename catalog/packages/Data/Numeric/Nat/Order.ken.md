@@ -559,6 +559,41 @@ pub proof add_cancel_r for compare
     Suc c2 ↦ proof add_cancel_r for compare a b c2
   }
 
+pub proof mul_cancel_r for compare
+      (a : Nat) (b : Nat) (k : Nat)
+    : Equal OrdResult (compare (mul a (Suc k)) (mul b (Suc k))) (compare a b) =
+  trans
+    OrdResult
+    (compare_bits
+      (leq_nat (mul a (Suc k)) (mul b (Suc k)))
+      (leq_nat (mul b (Suc k)) (mul a (Suc k))))
+    (compare_bits (leq_nat a b) (leq_nat (mul b (Suc k)) (mul a (Suc k))))
+    (compare_bits (leq_nat a b) (leq_nat b a))
+    (cong
+      Bool
+      OrdResult
+      (leq_nat (mul a (Suc k)) (mul b (Suc k)))
+      (leq_nat a b)
+      (λu. compare_bits u (leq_nat (mul b (Suc k)) (mul a (Suc k))))
+      (leq_nat_mul_right_equiv a b k))
+    (cong
+      Bool
+      OrdResult
+      (leq_nat (mul b (Suc k)) (mul a (Suc k)))
+      (leq_nat b a)
+      (compare_bits (leq_nat a b))
+      (leq_nat_mul_right_equiv b a k))
+
+fn compare_bits (forward : Bool) (backward : Bool) : OrdResult =
+  match forward {
+    True ↦
+      match backward {
+        True ↦ Eq;
+        False ↦ Lt
+      };
+    False ↦ Gt
+  }
+
 proof from_lt for compare
       (a : Nat) (b : Nat)
     : Equal Bool (lt_nat a b) True → Equal OrdResult (compare a b) Lt =
@@ -1223,8 +1258,8 @@ argument and its bridge exposes the canonical successor relation.
    the three `compare` agreements; the eight inductive `sub` proofs,
    including `sub::add_cancel`, `sub::leq_left`, `sub::left_mono`, and
    `sub::right_antitone`; `mul_sub_distrib_l` and `mul_sub_distrib_r`;
-   and `compare::swap`, `compare::self_eq`, and `compare::add_cancel_r`.
-   `compare` returns the canonical `Core.Logic.OrdResult` identity.
+   and `compare::swap`, `compare::self_eq`, `compare::add_cancel_r`, and
+   `compare::mul_cancel_r`. `compare` returns the canonical `Core.Logic.OrdResult` identity.
 2. **Source map.**
 
    | Task | Section |
