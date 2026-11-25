@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use ken_kernel::subst::{subst0, weaken};
+use ken_kernel::subst::{subst0, subst_levels, subst_outer, subst_tel, weaken};
 use ken_kernel::{infer, whnf, Context, GlobalEnv, InductiveDecl, KernelError, Level, Term};
 
 /// Kernel inference over a normalized body. `ken_kernel::normalize` drops the
@@ -443,6 +443,25 @@ pub(crate) fn checked_body_preorder_id_at_path(
     descend(body, path, &mut 0)
 }
 
+#[cfg(test)]
+thread_local! {
+    static VISIT_INFER_NODES: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+fn node_count(term: &Term) -> usize {
+    1 + term.children().into_iter().map(node_count).sum::<usize>()
+}
+
+#[cfg(test)]
+fn record_visit_infer(term: &Term) {
+    VISIT_INFER_NODES.with(|nodes| {
+        if let Some(total) = nodes.get() {
+            nodes.set(Some(total + node_count(term)));
+        }
+    });
+}
+
 fn visit(
     env: &GlobalEnv,
     ctx: &mut Context,
@@ -462,6 +481,8 @@ fn visit(
     let inferred: Option<Cow<'_, Term>> = if let Some(ty) = expected {
         Some(Cow::Borrowed(ty))
     } else {
+        #[cfg(test)]
+        record_visit_infer(node);
         match infer_node(env, ctx, node) {
             Ok(ty) => Some(Cow::Owned(ty)),
             Err(_) if matches!(node, Term::Lam(..)) => None,
@@ -590,6 +611,8 @@ fn visit(
                     nodes.push((head as *const Term as usize, a.as_ref()));
                     head = f;
                 }
+                #[cfg(test)]
+                record_visit_infer(head);
                 let mut ty = infer_node(env, ctx, head).map_err(|error| {
                     KernelError::Msg(format!(
                         "Ω erasure application head at node {here}: {error}"
@@ -671,6 +694,8 @@ fn visit(
             )
         }
         Term::Proj1(pair) => {
+            #[cfg(test)]
+            record_visit_infer(pair);
             let pair_type = infer_node(env, ctx, pair)?;
             let Term::Sigma(domain, codomain) = whnf(env, ctx, &pair_type) else {
                 return Err(KernelError::Msg(
@@ -721,12 +746,22 @@ fn visit(
             let ind = env.inductive(*fam).ok_or_else(|| {
                 KernelError::Msg(format!("erasure plan has unknown family {fam:?}"))
             })?;
-            for param in params {
+            // The kernel's elimination rule (check.rs infer_elim steps 1, 4, 5)
+            // fixes the type of every parameter, index and the scrutinee. The body
+            // is already admitted, so pass those types down instead of re-inferring:
+            // re-inference re-admits every eliminator nested in a scrutinee.
+            let inst_params: Vec<Term> = ind
+                .params
+                .iter()
+                .map(|p| subst_levels(p, &ind.level_params, level_args))
+                .collect();
+            for (j, param) in params.iter().enumerate() {
+                let param_type = subst_tel(&inst_params[j], &params[..j]);
                 visit(
                     env,
                     ctx,
                     param,
-                    None,
+                    Some(&param_type),
                     next,
                     plan,
                     memo,
@@ -763,19 +798,47 @@ fn visit(
                     KernelError::Msg(format!("Ω erasure eliminator method {k}: {error}"))
                 })?;
             }
-            for index in indices {
+            let inst_indices: Vec<Term> = ind
+                .indices
+                .iter()
+                .map(|i| subst_levels(i, &ind.level_params, level_args))
+                .collect();
+            for (j, index) in indices.iter().enumerate() {
+                let index_type = subst_tel(
+                    &subst_outer(&inst_indices[j], params.len(), params, j),
+                    &indices[..j],
+                );
                 visit(
                     env,
                     ctx,
                     index,
-                    None,
+                    Some(&index_type),
                     next,
                     plan,
                     memo,
                     equations.as_deref_mut(),
                 )?;
             }
-            visit(env, ctx, scrut, None, next, plan, memo, equations)
+            let mut scrut_type = Term::IndFormer {
+                id: *fam,
+                level_args: level_args.clone(),
+            };
+            for param in params {
+                scrut_type = Term::app(scrut_type, param.clone());
+            }
+            for index in indices {
+                scrut_type = Term::app(scrut_type, index.clone());
+            }
+            visit(
+                env,
+                ctx,
+                scrut,
+                Some(&scrut_type),
+                next,
+                plan,
+                memo,
+                equations,
+            )
         }
         Term::J(_, _, evidence) => {
             for child in node.children() {
@@ -945,6 +1008,50 @@ fn rewrite(
 mod tests {
     use super::*;
     use crate::ElabEnv;
+
+    /// Durable invariant. MEASURED: the inference inputs sent by `visit`
+    /// total at most twice the size of an admitted, normalized Bool chain.
+    /// CLAIMED: the planner does not re-admit each nested scrutinee.
+    /// THE GAP: this bounds input work on this chain, not classification
+    /// cost, inference cost per node, or the cost of other term shapes.
+    #[test]
+    fn nested_eliminator_scrutinees_bound_inference_input() {
+        let elaborated = ElabEnv::new().expect("checked prelude");
+        let env = &elaborated.env;
+        let fam = elaborated.globals["Bool"];
+        let bool_type = Term::indformer(fam, vec![]);
+        let constant = Term::constructor(elaborated.globals["True"], vec![]);
+        let ctx = Context::new();
+        let motive = ascribe_motive(
+            env,
+            &mut ctx.clone(),
+            Term::lam(bool_type.clone(), bool_type.clone()),
+        )
+        .expect("constant Bool motive has a checked type");
+        let scrutinee = (0..16).fold(Term::var(0), |scrut, _| Term::Elim {
+            fam,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(motive.clone()),
+            methods: vec![constant.clone(), constant.clone()],
+            indices: vec![],
+            scrut: Box::new(scrut),
+        });
+        let body = Term::lam(bool_type.clone(), scrutinee);
+        let ty = Term::pi(bool_type.clone(), bool_type);
+        ken_kernel::check(env, &ctx, &body, &ty).expect("the closed chain is admitted");
+        let body = ken_kernel::normalize(env, &ctx, &body);
+        let body_nodes = node_count(&body);
+        VISIT_INFER_NODES.with(|nodes| nodes.set(Some(0)));
+        let plan = omega_erasure_plan(env, &body, &ty);
+        let infer_nodes = VISIT_INFER_NODES.with(|nodes| nodes.replace(None).unwrap());
+        plan.expect("the normalized chain receives a plan");
+        eprintln!("visit inference input: {infer_nodes} nodes; body: {body_nodes} nodes");
+        assert!(
+            infer_nodes <= 2 * body_nodes,
+            "visit inferred {infer_nodes} input nodes, exceeding twice the {body_nodes}-node body"
+        );
+    }
 
     /// Promise class: durable invariant (15 §4, 42 §3.2). MEASURED: the
     /// checked Ω-valued J theorem's erased root is the canonical tt constant,
