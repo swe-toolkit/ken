@@ -73,6 +73,39 @@ CI, publication, or landing is claimed.
 - why: callers distinguish data from completion by the explicit variant, not
   by a zero-length batch.
 
+## Directory acquisition preserves capability-root confinement
+
+### surface/ffi-io/directory-acquisition-refuses-root-escape
+
+- promise class: **durable invariant** — directory acquisition cannot escape
+  the filesystem capability root
+- spec: ABI-S2 directory acquisition in
+  `spec/30-surface/38-ffi-io.md`; I-5 path-resolution and confinement pairs
+  in `conformance/security/capabilities/seed-capabilities.md`
+- given: one real runner-minted `Cap AFull` rooted at `dir1/sub`, an
+  in-root directory at `dir1/sub/ok`, and an outside sibling directory at
+  `dir1/outside`. Make two fresh `withDirectory` calls with the same cap and
+  bracket body, changing only the path between `dir1/sub/ok` and
+  `dir1/sub/../outside`. The body records whether it was entered.
+- measured: each outer `withDirectory` result, body-entry observation,
+  filesystem effect trace, and separately recorded resolver outcome. The
+  resolver record does not count as the denied operation reaching the host.
+- claimed: `FsOpenDirectory` applies the existing path-resolution rule at the
+  capability root; resolving and reopening a traversal as an ordinary path
+  must not admit an out-of-root directory.
+- the gap: a valid in-root open alone cannot distinguish root-relative
+  resolution from an implementation that accepts an escaped path. The paired
+  operation and capability hold those inputs fixed.
+- expect: the in-root directory opens and enters the body. The
+  `dir1/sub/../outside` request is refused at the I-5 `ScopeEscape` boundary,
+  before body entry and with an empty filesystem effect trace. Do not pin
+  diagnostic wording or span beyond the refusal specified by I-5.
+- controls: the in-root directory is the positive control under the same cap,
+  operation, and body; only the target path changes.
+- why: I-5 AC1–AC3 already distinguish beneath-root resolution from accepting
+  an escaped path on other filesystem operations. This pair applies that same
+  boundary to the new directory-acquisition operation.
+
 ## Opening a regular file refuses as not a directory
 
 ### surface/ffi-io/regular-file-opened-as-directory-refuses-not-directory
