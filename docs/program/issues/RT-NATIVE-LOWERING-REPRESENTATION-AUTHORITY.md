@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-LOWERING-REPRESENTATION-AUTHORITY
 title: "Native lowering decides per site which Lowered representations a consumer accepts: five match consumers hold four different hand-kept scrutinee subsets, and lower_primitive_call routes runtime operands symbol by symbol with a fall-through refusal. Each upstream repair that makes a value runtime exposes the next consumer (PX11 Inc2 entries 5, 11, 12). Give match scrutinees one exhaustive classification every consumer goes through, and primitives one complete per-symbol operand table"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1
