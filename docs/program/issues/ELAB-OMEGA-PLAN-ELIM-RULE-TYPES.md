@@ -1,7 +1,7 @@
 ---
 id: ELAB-OMEGA-PLAN-ELIM-RULE-TYPES
 title: "The Omega erasure planner visits an eliminator's scrutinee with no expected type, so it calls the kernel's infer on it, and the kernel's infer of an Elim is its full admission rule. In a normal form the scrutinee is often itself a stuck Elim, so every level re-admits everything beneath it: the cost is quadratic in elimination nesting, and on PX11's exchange it is 388 s of a 563 s plan. Pass down the parameter, index and scrutinee types the kernel's own elimination rule fixes, with an unchanged plan"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1

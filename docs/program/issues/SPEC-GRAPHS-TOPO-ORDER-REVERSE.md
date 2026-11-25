@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-TOPO-ORDER-REVERSE
 title: "Spec 62 reverses a graph (§§9-12, §18) and keeps a dependency order across edge removal (§13), but no law carries an order across reversal: a client holding a TopoOrder for g cannot obtain one for graph_reverse g without rerunning the pair scan, although the reversed list is one. Rule from a checked D0 at zero trust that reversing an order's vertex list gives a TopoOrder of the reversed graph, and state it with a seed that separates the reversed list from the original"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-INDEXED-FAMILY-LOWERING
 title: "Native lowering refuses every runtime value of an indexed family: a dependent motive over an unindexed head is refused at the body view, and a match on a Vec that carries a runtime index is refused by both the body view and erasure, with only the generated All support family exempt. So a native program cannot build an address from a computed Vec UInt8 16, and PX11's IPv6 exchange row refuses with E0075 at loopback_tail. Rule from an AC-0 how an indexed-family value is represented natively and what a match on it lowers to once its index equations are erased, then lift both planes"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1
