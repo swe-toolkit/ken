@@ -726,9 +726,7 @@ impl OrientedSubcontinuationPlanV1 {
                     return Err("oriented subcontinuation parent crosses a prompt region");
                 }
                 let parent_frame = by_id[&parent];
-                let child_first = match frame
-                    .semantic_position
-                    .cmp(&parent_frame.semantic_position)
+                let child_first = match frame.semantic_position.cmp(&parent_frame.semantic_position)
                 {
                     std::cmp::Ordering::Less => true,
                     std::cmp::Ordering::Greater => false,
@@ -741,7 +739,9 @@ impl OrientedSubcontinuationPlanV1 {
                     .or_insert(child_first)
                     != child_first
                 {
-                    return Err("oriented subcontinuation prompt region mixes semantic orientations");
+                    return Err(
+                        "oriented subcontinuation prompt region mixes semantic orientations",
+                    );
                 }
                 let (earlier, later) = if child_first {
                     (frame, parent_frame)
