@@ -9,10 +9,16 @@ laws. Its accepted prefix is AC-0's `prefix.ken`, including all four
 open clients. Each refused case starts from a fresh copy of that prefix
 and adds only its named theorem.
 
-The §23 and catalog children that add these declarations are not in this
-seed's base. The cases have not been checked against an assembled
-candidate or run by the official conformance runner. No package-test,
-AC-T, CI, publication, landing, or trust result is claimed.
+This seed was authored against base
+`23474815fd5009fc9554b5d600166fc396b67bf8`, before the §23 and catalog
+children were assembled. Foundation QA's exact-tip AC-T report for
+assembled candidate `c1ded5c24ed5fd758361e776797948a7bf634df4` records the
+named `cat_linear_algebra_nat_matrix` target passing 16/16. The three
+refused cases were rejected at their premise `Refl`; the AC-T trusted
+GlobalId identity-set assertion passed at 109→109. These are
+candidate-local package-test results, not official conformance results.
+No official Markdown seed-runner or full-CI result is claimed. No
+publication, landing, or landed-trust result is claimed.
 
 ## Accepted client
 
@@ -168,7 +174,7 @@ theorem matrix_left_zero_by_law_false
 ## Evidence boundary
 
 The accepted and refused outcomes are the seed oracle, grounded in
-Architect AC-0 for the routed §23 child and its measured clients. They
-have not been executed on the assembled candidate or by the official
-conformance runner. This seed does not assert proof-body correctness or exact
-`trusted_base()` identities; those belong to the package gate.
+Architect AC-0 for the routed §23 child and its measured clients. The
+candidate-local AC-T package result above is not execution by the
+official Markdown seed runner. This seed does not assert proof-body
+correctness.
