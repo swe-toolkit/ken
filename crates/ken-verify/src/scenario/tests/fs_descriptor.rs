@@ -8,6 +8,11 @@ const READ: &str = "ResourceOpenMode.ResourceRead";
 const WRITE: &str = "(ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep)";
 
 fn run_descriptor(mode: &str, body: &str) -> CanonicalDifferentialRun {
+    let scenario = descriptor_scenario(mode, body, "(sub_int 0 1)");
+    execute_scenario(&scenario).expect("descriptor fixture executes in both real roots")
+}
+
+fn descriptor_scenario(mode: &str, body: &str, invalid_length: &str) -> Scenario {
     let entry = if body == "resize_sequence" {
         "resize_sequence cap".to_owned()
     } else {
@@ -24,7 +29,7 @@ fn run_descriptor(mode: &str, body: &str) -> CanonicalDifferentialRun {
     profile.persistent.nodes = 512;
     profile.persistent.words = 2048;
     profile.persistent.data_bytes = 4096;
-    let scenario = Scenario {
+    Scenario {
         boundary_resource_profile: profile,
         process_input: RawProcessInput::default(),
         ambient: AmbientScript::default(),
@@ -33,7 +38,9 @@ fn run_descriptor(mode: &str, body: &str) -> CanonicalDifferentialRun {
             catalog_roots: fixture_catalog_roots(),
             identity: format!("fs-descriptor-{body}"),
             package_name: "fs-descriptor".into(),
-            source: SOURCE.replace("DESCRIPTOR_ENTRY", &entry),
+            source: SOURCE
+                .replace("DESCRIPTOR_ENTRY", &entry)
+                .replace("INVALID_DESCRIPTOR_LENGTH", invalid_length),
         },
         initial_filesystem: vec![
             SeedNode {
@@ -46,8 +53,7 @@ fn run_descriptor(mode: &str, body: &str) -> CanonicalDifferentialRun {
             },
         ],
         expected_fs: Vec::new(),
-    };
-    execute_scenario(&scenario).expect("descriptor fixture executes in both real roots")
+    }
 }
 
 fn subject(run: &CanonicalDifferentialRun) -> [Vec<u8>; 2] {
@@ -281,4 +287,59 @@ fn negative_length_refuses_before_dispatch() {
             .any(|event| event.operation == HostOpV1::FsSetLength));
     }
     assert_eq!(subject(&run), [BEFORE, BEFORE]);
+}
+
+// Durable invariant. MEASURED: the checked program selects InvalidOffset
+// for UInt64::MAX + 1, with no FsSetLength dispatch and unchanged bytes.
+// CLAIMED: interpreter refusal before host dispatch. THE GAP: this does not
+// distinguish the checked guard from the interpreter's defense-in-depth
+// check, or establish native parity. Native lowering currently refuses at
+// build time; RT-STATIC-UNSELECTED-CALL-DISPOSITION owns that boundary.
+#[test]
+fn positive_u64_overflow_refuses_before_dispatch_in_interpreter() {
+    // Use the same stated compiler stack as the differential runner, but do
+    // not build or start a native artifact for this row.
+    std::thread::Builder::new()
+        .name("descriptor-overflow-interpreter".into())
+        .stack_size(SCENARIO_COMPILER_STACK_BYTES)
+        .spawn(|| {
+            let scenario = descriptor_scenario(WRITE, "invalid_length", "18446744073709551616");
+            let roots = TwinRealRoots::create(&scenario.initial_filesystem).unwrap();
+            let root = roots.interpreter();
+            let caps = scenario.program_caps;
+            let mut host = ScriptedPosixHost::new_scoped(
+                root,
+                scenario.ambient,
+                caps.fs_authority,
+                &caps.relative_root,
+                caps.rights,
+                caps.symlink,
+                scenario.expected_fs,
+            )
+            .unwrap();
+            let observation = ken_cli::run_program_effect_observation(
+                &scenario.entry.source,
+                ken_cli::SourceFormat::Ken,
+                &scenario.entry.catalog_roots,
+                &[b"descriptor-overflow".to_vec()],
+                &[],
+                &raw_path_bytes(root).unwrap(),
+                &mut host,
+            )
+            .expect("checked interpreter execution");
+            host.finish_assertions().unwrap();
+            // The fixture exits successfully only after matching InvalidOffset
+            // and settling the WRITE handle; neither Err(other) nor Ok passes.
+            assert_eq!(observation.exit_status, 0, "{observation:#?}");
+            let operations: Vec<_> = observation
+                .effect_trace
+                .iter()
+                .map(|event| event.operation)
+                .collect();
+            assert_eq!(operations, [HostOpV1::FsOpen, HostOpV1::ResourceRelease]);
+            assert_eq!(std::fs::read(root.join("subject")).unwrap(), BEFORE);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

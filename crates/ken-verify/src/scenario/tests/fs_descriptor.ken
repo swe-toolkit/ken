@@ -139,7 +139,7 @@ proc denied_sync (file : Resource ResourceKind.FsHandle)
 proc invalid_length (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (setLength AFull file (sub_int 0 1))
+    (setLength AFull file INVALID_DESCRIPTOR_LENGTH)
     (\outcome. match outcome {
       Err ResourceError.InvalidOffset |-> body_result True;
       Err other |-> body_result False;
