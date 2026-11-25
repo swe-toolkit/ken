@@ -276,18 +276,14 @@ fn missing_proof_terms_file_rejects_despite_in_memory_preload() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: the primitive producer traversal yields exactly eight signature
-/// identities. Nat, Pair, the kernel-keyed proposition/equality members,
-/// entrypoint-ABI and effect/clock identities, ITree, the FS/resource families,
-/// ConsoleStream and eqChar, scoped resource families and State operations
-/// formed the prior forty-member floor. The scoped ConsoleOp family with
-/// console_resp, the FS metadata/operation families (DirEntry, FileKind,
-/// FileMetadata, FileOperation, ReadResult), StateOp, and the ITree/response
-/// combinators itree_bind, resp_coproduct and resp_state close the floor to
-/// fifty-one. The separately configured companion inventory has three
-/// checked-transparent constants keyed to the exact Pair identity. CLAIMED:
-/// type and binding membership are independent closed inventories rather
-/// than one compiler-global allow-list. THE GAP: source resolution through
+/// MEASURED: the configured floor matches the 55 names in `TYPE_FLOOR`.
+/// Traversing primitive declaration types yields eight signature identities.
+/// Their union with the 47 `INTERNAL_FLOOR` identities, including
+/// `DirectoryHandle` and `DirectoryProgress`, equals the configured floor by
+/// checked identity. The separate companion inventory has three checked
+/// transparent constants whose types name the exact `Pair` identity.
+/// CLAIMED: type and binding membership are independent closed inventories,
+/// not one compiler-global allow-list. THE GAP: source resolution through
 /// these inventories is pinned independently below.
 #[test]
 fn prelude_signature_inventory_is_executable_and_closed() {

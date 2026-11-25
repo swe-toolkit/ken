@@ -600,11 +600,17 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
     assert_b1a_g_erasure("px10_g_erasure_null", null);
 }
 
-/// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1389 and 1158 and live's relays 747 and 516 are relay members of
-/// their owners' returned-Vis protocols, numbered once per emitting copy
-/// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1389 and 747 resume at the rows
+/// Promise class: transition sentinel for PX10 B-closure AC-2. It pins the
+/// exact plan origins for the fixed argv/live fixtures so a moved origin
+/// forces review of the owner, member and resume correspondence. Retire the
+/// absolute pins at the next approved prelude or planner change that moves
+/// these origins; replace them with checks keyed on the corresponding
+/// producer roles. Review the sibling argv/live return-fold and settlement
+/// census at the same transition.
+/// MEASURED: argv's relays 1389 and 1158 and live's relays 747 and 516 are
+/// members of their owners' returned-Vis protocols. Each emitting copy is
+/// numbered with a distinct nonzero discriminant rather than a response
+/// row, and kept in the settled member set. Copies of 1389 and 747 resume at the rows
 /// whose Vis are 1614 and 991; copies of 1158 and 516 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
