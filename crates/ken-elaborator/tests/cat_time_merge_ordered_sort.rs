@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, KernelError, Term};
+use ken_kernel::{Decl, Term};
 
 const TRACE: &str = "Data.Time.EventTrace";
 const LAW: &str = "Data.Time.EventTrace.trace_merge_ordered_sort";
@@ -37,8 +37,6 @@ const e5 : Event Bool = MkEvent Bool (Suc (Suc (Suc (Suc (Suc Zero))))) True
 const unordered : List (Event Bool) = Cons (Event Bool) e5 left
 const ordered : List (Event Bool) = Cons (Event Bool) e1 (Cons (Event Bool) e5 (Nil (Event Bool)))
 const empty : List (Event Bool) = Nil (Event Bool)
-
-theorem empty_ordered : time_ordered Bool empty = Proved
 
 theorem tie_merge : Equal (List (Event Bool)) (trace_merge Bool left right) left_first = Refl
 
@@ -225,46 +223,36 @@ fn distinct_tied_payloads_keep_left_first_order() {
     );
 }
 
-/// Source: §22's two order premises. Promise class: durable invariant.
-/// MEASURED: with one side empty and the other descending, independent
-/// closed proofs show merge returns the descending trace and sort reverses
-/// it; applying the law refuses for either position of the descending trace.
-/// CLAIMED: neither ordering premise can be dropped at this fixture.
-/// THE GAP: the kernel may span the whole isolated theorem, not a token.
-/// Equivalent fixtures are compatible; a successful false application breaks.
-#[test]
-fn both_order_premises_are_necessary() {
-    for unordered_on_left in [true, false] {
-        let sides = |nonempty| {
-            if unordered_on_left {
-                (nonempty, "empty")
-            } else {
-                ("empty", nonempty)
-            }
-        };
-        let application = |first, second, nonempty, name| {
-            let witness = format!(
-                "(and_intro (Equal Bool (event_before Bool {first} {second}) True) (time_ordered Bool (Cons (Event Bool) {second} empty)) Proved Proved)"
-            );
-            let (left, right) = sides(nonempty);
-            let (ox, oy) = if unordered_on_left {
-                (witness.as_str(), "empty_ordered")
-            } else {
-                ("empty_ordered", witness.as_str())
-            };
-            format!(
-                r#"theorem {name}
+fn merge_sort_claim(name: &str, left: &str, right: &str) -> String {
+    format!(
+        r#"theorem {name}
     : Equal
         (List (Event Bool))
         (trace_merge Bool {left} {right})
         (sort (Event Bool) (event_before Bool) (list_append (Event Bool) {left} {right})) =
-  trace_merge_ordered_sort Bool {left} {right} {ox} {oy}"#
-            )
-        };
-        let (left, right) = sides("unordered");
+  Refl"#
+    )
+}
+
+/// Source: §22's counterexample with one unordered input.
+/// Promise class: durable invariant.
+/// MEASURED: with either side empty, merge returns the descending input and
+/// sort returns its ascending reordering. The direct equation checks with
+/// `Refl` for the ascending input and refuses at that `Refl` for the descending
+/// input. Neither row supplies an ordering proof or applies the law.
+/// CLAIMED: the equation fails with a descending trace in either position.
+/// THE GAP: these closed counterexamples do not check the generic signature;
+/// the open client checks that separately. Equivalent fixtures are compatible;
+/// identifying merge and sort on either descending fixture breaks the contract.
+#[test]
+fn descending_input_on_either_side_breaks_merge_sort_equation() {
+    for ((left, right), (ascending_left, ascending_right)) in [
+        (("unordered", "empty"), ("ordered", "empty")),
+        (("empty", "unordered"), ("empty", "ordered")),
+    ] {
         let mut env = seed_prefix();
         env.elaborate_file(TIE_AND_ORDER_CONTROLS)
-            .expect("descending and ordered traces, with checked empty order");
+            .expect("closed fixtures check");
         let controls = format!(
             r#"theorem descending_merge
     : Equal (List (Event Bool)) (trace_merge Bool {left} {right}) unordered = Refl
@@ -277,23 +265,11 @@ theorem ascending_sort
         );
         env.elaborate_file(&controls)
             .expect("merge and sort differ by value");
-        env.elaborate_file(&application("e1", "e5", "ordered", "true_order_premise"))
-            .expect("the same proof form checks for an ascending trace on this side");
-        let false_application = application("e5", "e1", "unordered", "false_order_premise");
-        let proof = false_application
-            .find("Proved")
-            .expect("only false witness");
-        match env.elaborate_file(&false_application) {
-            Err(ElabError::KernelRejected {
-                error: KernelError::TypeMismatch { .. },
-                span,
-            }) if span.start <= proof
-                && span.end >= proof + "Proved".len()
-                && span.end <= false_application.len() =>
-            {
-                eprintln!("descending {left}/{right}: kernel TypeMismatch at {span:?}");
-            }
-            other => panic!("{left}/{right} must refuse at its false order application: {other:?}"),
-        }
+        let accepted = merge_sort_claim("ascending_equation", ascending_left, ascending_right);
+        env.elaborate_file(&accepted)
+            .unwrap_or_else(|error| panic!("{ascending_left}/{ascending_right}: {error:?}"));
+        eprintln!("{ascending_left}/{ascending_right}: direct equation checks");
+        let refused = merge_sort_claim("descending_equation", left, right);
+        refuses_closing_refl(&mut env, &refused, &format!("{left}/{right} equation"));
     }
 }
