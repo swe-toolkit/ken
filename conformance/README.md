@@ -517,6 +517,10 @@ claim with no conformance case is a claim no one can rely on
   but have no executing native arm; all four native cells remain
   `BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE`
   ([[RT-COMPMATCH-TREE-SCRUTINEE]]).
+- `behavioral/file-io/seed-descriptor-operations.md` — DESCRIPTOR's
+  black-box `setLength` and `sync` behavior: retained-prefix truncation,
+  zero-filled extension, pre-dispatch refusals, host flush request/outcome,
+  and the explicit non-claim about machine-failure durability.
 - `behavioral/agentic/seed-agentic.md` — B4 the agentic boundary (WS-B capstone,
   `74`): assuring an embedded agent's outputs **reduces to the existing seam**
   aimed at a maximally-nondeterministic component (agent = maximal `P`) — **no

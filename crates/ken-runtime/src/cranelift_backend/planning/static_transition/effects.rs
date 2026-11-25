@@ -347,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 35] = [
+    [ken_host::HostOpV1; 37] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
@@ -375,6 +375,8 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::FsHandleMetadata,
     ken_host::HostOpV1::FsReadAt,
     ken_host::HostOpV1::FsReadDirectoryBatch,
+    ken_host::HostOpV1::FsSetLength,
+    ken_host::HostOpV1::FsSync,
     ken_host::HostOpV1::FsWriteAt,
     ken_host::HostOpV1::ResourceRelease,
     ken_host::HostOpV1::BufferAllocate,
@@ -438,7 +440,6 @@ fn host_effect_seat_contract(
                 | Op::FsHandleMetadata
                 | Op::FsReadAt
                 | Op::FsWriteAt
-                | Op::FsSeek
                 | Op::FsSetLength
                 | Op::FsSync
                 | Op::FsGetInheritance
@@ -554,13 +555,15 @@ fn host_effect_seat_contract(
         (Op::FsChangeMode, 1) => Some(exact_int),
         (Op::FsReadDirectoryBatch, 0)
         | (Op::FsHandleMetadata, 0)
+        | (Op::FsSetLength, 0)
+        | (Op::FsSync, 0)
         | (Op::ResourceRelease, 0)
         | (Op::MappingAcquireFile, 0) => Some(resource),
         // The file-backed differential reaches this exact ordinal carried:
         // "seat Argument(1) of MappingAcquireFile needs ExactIntU64, which it
         // cannot observe in CarriedWord". The existing fail-closed carried
         // Int decoder and bounds lane handle the widened seat.
-        (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
+        (Op::MappingAcquireFile, 1) | (Op::FsSetLength, 1) => Some(carried_exact_int),
         (Op::MappingAcquireFile, 2) => Some(tag),
         // PROVED carried, per seat (PX10 B2): narrowing only Open Argument(0)
         // to SPECIALIZED_ONLY makes F argv/null/live and R-NODES refuse
@@ -669,6 +672,8 @@ fn host_effect_seat_contract(
                 | Op::FsHandleMetadata
             | Op::FsReadAt
             | Op::FsWriteAt
+            | Op::FsSetLength
+            | Op::FsSync
             | Op::ResourceRelease
             | Op::BufferAllocate
             | Op::BufferFreeze
@@ -694,9 +699,6 @@ fn host_effect_seat_contract(
         (
             Op::ClockMonotonicNow
             | Op::ClockSleepUntil
-            | Op::FsSeek
-            | Op::FsSetLength
-            | Op::FsSync
             | Op::FsGetInheritance
             | Op::FsSetInheritance
             | Op::FsDuplicate

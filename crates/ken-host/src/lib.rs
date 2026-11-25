@@ -434,14 +434,6 @@ mod linux {
         File::from(handle.0.try_clone()?).write_at(bytes, offset)
     }
 
-    pub(super) fn resource_seek(handle: &ResourceHandle, from: FsSeekFromV1) -> io::Result<u64> {
-        File::from(handle.0.try_clone()?).seek(match from {
-            FsSeekFromV1::Start(offset) => SeekFrom::Start(offset),
-            FsSeekFromV1::Current(offset) => SeekFrom::Current(offset),
-            FsSeekFromV1::End(offset) => SeekFrom::End(offset),
-        })
-    }
-
     pub(super) fn resource_set_length(handle: &ResourceHandle, length: u64) -> io::Result<()> {
         File::from(handle.0.try_clone()?).set_len(length)
     }
@@ -452,6 +444,21 @@ mod linux {
             FsSyncModeV1::SyncFull => file.sync_all(),
             FsSyncModeV1::SyncData => file.sync_data(),
         }
+    }
+
+    /// Promise class: durable invariant. MEASURED: the SyncFull backend
+    /// returns EINVAL on a live Linux pipe. CLAIMED: it reaches the kernel
+    /// rather than succeeding without a call. THE GAP: it tests no guarantee
+    /// of durability after failure and no surface argument wiring.
+    #[test]
+    fn resource_sync_full_refuses_a_pipe() {
+        let (_read, write) = std::io::pipe().expect("create a live pipe");
+        let error = resource_sync(&ResourceHandle(write.into()), FsSyncModeV1::SyncFull)
+            .expect_err("fsync on a pipe must not report success");
+        assert_eq!(
+            error.raw_os_error(),
+            Some(rustix::io::Errno::INVAL.raw_os_error())
+        );
     }
 
     pub(super) fn resource_get_inheritance(
@@ -1056,19 +1063,6 @@ pub fn process_stream_write_v1(
     bytes: &[u8],
 ) -> std::io::Result<usize> {
     process_v1::stream_write_v1(fd, bytes)
-}
-
-pub fn resource_seek_v1(handle: &ResourceHandleV1, from: FsSeekFromV1) -> HostResult<u64> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_seek(&handle.inner, from).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, from);
-        unsupported()
-    }
 }
 
 pub fn resource_set_length_v1(handle: &ResourceHandleV1, length: u64) -> HostResult<()> {

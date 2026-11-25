@@ -453,6 +453,149 @@ impl CanonicalDifferentialRun {
         )
     }
 
+    pub(crate) fn matches_fs_set_length(
+        &self,
+        path: &str,
+        before: &[u8],
+        lengths: [u64; 2],
+    ) -> bool {
+        use ken_host::{
+            CanonicalOutcomeV1::Success,
+            CanonicalReplyV1, CanonicalRequestV1, HostOpV1,
+            ResourceBindingRole::{Buffer, File, Target},
+            ResourceKindV1,
+        };
+        let [Ok(short), Ok(long)] = lengths.map(usize::try_from) else {
+            return false;
+        };
+        if short >= before.len() || long <= before.len() {
+            return false;
+        }
+        for (lane, root) in [
+            (&self.interpreter, self.roots.interpreter()),
+            (&self.native, self.roots.native()),
+        ] {
+            let Ok(final_bytes) = std::fs::read(root.join(path)) else {
+                return false;
+            };
+            let prefix = &before[..short];
+            if final_bytes.len() != long
+                || !final_bytes.starts_with(prefix)
+                || final_bytes[short..].iter().any(|byte| *byte != 0)
+                || lane.exit_status != 0
+            {
+                return false;
+            }
+            let by_op = |op| lane.effect_trace.iter().filter(move |e| e.operation == op);
+            let acquisitions = |mode| {
+                by_op(HostOpV1::FsOpen).filter_map(move |e| match (&e.request, &e.outcome) {
+                    (
+                        CanonicalRequestV1::FsOpen {
+                            path: actual,
+                            mode: actual_mode,
+                        },
+                        Success(CanonicalReplyV1::ResourceAcquired {
+                            identity,
+                            resource_kind: ResourceKindV1::FsHandle,
+                            ..
+                        }),
+                    ) if *actual_mode == mode && actual == path.as_bytes() => {
+                        Some((e.sequence, *identity))
+                    }
+                    _ => None,
+                })
+            };
+            let writes: Vec<_> = acquisitions(ken_host::FsOpenModeV1::WriteCreate(
+                ken_host::CreatePolicyV1::CreateOrKeep,
+            ))
+            .collect();
+            let [(opened0, file0), (opened1, file1)] = writes.as_slice() else {
+                return false;
+            };
+            let changes: Vec<_> = by_op(HostOpV1::FsSetLength).collect();
+            let readers: Vec<_> = acquisitions(ken_host::FsOpenModeV1::Read).collect();
+            let reads: Vec<_> = by_op(HostOpV1::FsReadAt).collect();
+            let freezes: Vec<_> = by_op(HostOpV1::BufferFreeze).collect();
+            let (
+                [shrink, extend],
+                [(ro0, read0), (ro1, read1)],
+                [read_short, read_long],
+                [bytes_short, bytes_long],
+            ) = (
+                changes.as_slice(),
+                readers.as_slice(),
+                reads.as_slice(),
+                freezes.as_slice(),
+            )
+            else {
+                return false;
+            };
+            if !(*opened0 < shrink.sequence
+                && shrink.sequence < *ro0
+                && *ro0 < read_short.sequence
+                && read_short.sequence < bytes_short.sequence
+                && bytes_short.sequence < *opened1
+                && *opened1 < extend.sequence
+                && extend.sequence < *ro1
+                && *ro1 < read_long.sequence
+                && read_long.sequence < bytes_long.sequence)
+            {
+                return false;
+            }
+            for (event, length, file) in
+                [(*shrink, lengths[0], file0), (*extend, lengths[1], file1)]
+            {
+                if event.request != (CanonicalRequestV1::FsSetLength { length })
+                    || event.outcome != Success(CanonicalReplyV1::Unit)
+                    || event.resource_bindings != [(Target, *file)]
+                    || event.capability.is_some()
+                {
+                    return false;
+                }
+            }
+            for (read, frozen, id, window, bytes) in [
+                (
+                    *read_short,
+                    *bytes_short,
+                    *read0,
+                    before.len() as u64,
+                    prefix,
+                ),
+                (
+                    *read_long,
+                    *bytes_long,
+                    *read1,
+                    lengths[1],
+                    final_bytes.as_slice(),
+                ),
+            ] {
+                let [(File, read_file), (Buffer, buffer)] = read.resource_bindings.as_slice()
+                else {
+                    return false;
+                };
+                if *read_file != id
+                    || read.request
+                        != (CanonicalRequestV1::FsReadAt {
+                            file_offset: 0,
+                            buffer_start: 0,
+                            length: window,
+                        })
+                    || !matches!(read.outcome, Success(CanonicalReplyV1::ReadProgress(ken_host::ReadProgressV1::ReadSome { transferred, .. })) if transferred.get() == bytes.len() as u64)
+                    || frozen.resource_bindings != [(Target, *buffer)]
+                    || frozen.request
+                        != (CanonicalRequestV1::BufferFreeze {
+                            start: 0,
+                            length: bytes.len() as u64,
+                        })
+                    || !matches!(&frozen.outcome, Success(CanonicalReplyV1::Bytes(value)) if value == bytes)
+                {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// Bind every FsMetadata response independently to the file or directory
     /// that exists in that lane's real root, then compare the full canonical
     /// observations. No response field is erased or normalized.
@@ -3490,6 +3633,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
     }
 
     mod directory_stream;
+    mod fs_descriptor;
 
     /// Promise class: durable state-transition and failure-classification
     /// invariant (spec 38 §1.12, AC-0). MEASURED: both lanes report the

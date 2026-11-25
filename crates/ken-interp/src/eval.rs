@@ -5502,6 +5502,8 @@ pub struct FSIds {
     pub private_fs_open_id: GlobalId,
     pub private_fs_open_directory_id: GlobalId,
     pub private_fs_read_directory_batch_id: GlobalId,
+    pub private_fs_set_length_id: GlobalId,
+    pub private_fs_sync_id: GlobalId,
     pub private_fs_handle_metadata_id: GlobalId,
     pub private_buffer_allocate_id: GlobalId,
     pub private_fs_read_at_id: GlobalId,
@@ -5566,9 +5568,6 @@ pub struct FSIds {
     pub op_remove_directory_id: GlobalId,
     pub op_rename_id: GlobalId,
     pub op_change_mode_id: GlobalId,
-    pub op_seek_id: GlobalId,
-    pub op_set_length_id: GlobalId,
-    pub op_sync_id: GlobalId,
     pub op_get_inheritance_id: GlobalId,
     pub op_set_inheritance_id: GlobalId,
     pub op_duplicate_id: GlobalId,
@@ -5600,6 +5599,8 @@ impl FSIds {
             private_fs_open_id: prelude.private_fs_open_id,
             private_fs_open_directory_id: prelude.private_fs_open_directory_id,
             private_fs_read_directory_batch_id: prelude.private_fs_read_directory_batch_id,
+            private_fs_set_length_id: prelude.private_fs_set_length_id,
+            private_fs_sync_id: prelude.private_fs_sync_id,
             private_fs_handle_metadata_id: prelude.private_fs_handle_metadata_id,
             private_buffer_allocate_id: prelude.private_buffer_allocate_id,
             private_fs_read_at_id: prelude.private_fs_read_at_id,
@@ -5664,9 +5665,6 @@ impl FSIds {
             op_remove_directory_id: roles.file_operation_remove_directory,
             op_rename_id: roles.file_operation_rename,
             op_change_mode_id: roles.file_operation_change_mode,
-            op_seek_id: roles.file_operation_seek,
-            op_set_length_id: roles.file_operation_set_length,
-            op_sync_id: roles.file_operation_sync,
             op_get_inheritance_id: roles.file_operation_get_inheritance,
             op_set_inheritance_id: roles.file_operation_set_inheritance,
             op_duplicate_id: roles.file_operation_duplicate,
@@ -6021,7 +6019,6 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                         ken_host::FsCapabilityOperationV1::RenameDestination
                     }
                     FsOpKind::ChangeMode => ken_host::FsCapabilityOperationV1::ChangeMode,
-                    FsOpKind::Seek => ken_host::FsCapabilityOperationV1::Seek,
                     FsOpKind::SetLength => ken_host::FsCapabilityOperationV1::SetLength,
                     FsOpKind::Sync => ken_host::FsCapabilityOperationV1::Sync,
                     FsOpKind::GetInheritance => ken_host::FsCapabilityOperationV1::GetInheritance,
@@ -6059,7 +6056,6 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::RenameSource => FsOpKind::RenameSource,
                 ken_host::FsCapabilityOperationV1::RenameDestination => FsOpKind::RenameDestination,
                 ken_host::FsCapabilityOperationV1::ChangeMode => FsOpKind::ChangeMode,
-                ken_host::FsCapabilityOperationV1::Seek => FsOpKind::Seek,
                 ken_host::FsCapabilityOperationV1::SetLength => FsOpKind::SetLength,
                 ken_host::FsCapabilityOperationV1::Sync => FsOpKind::Sync,
                 ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
@@ -6739,6 +6735,25 @@ fn fs_dispatch<H: HostHandler>(
             },
             fs.op_metadata_id,
         )
+    } else if op_id == fs.private_fs_set_length_id {
+        let length = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+            Ok(length) => length,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
+            }
+        };
+        (
+            ken_host::HostOpV1::FsSetLength,
+            ken_host::CanonicalRequestV1::FsSetLength { length },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.private_fs_sync_id {
+        (
+            ken_host::HostOpV1::FsSync,
+            ken_host::CanonicalRequestV1::FsSync { mode: ken_host::FsSyncModeV1::SyncFull },
+            fs.op_metadata_id,
+        )
     } else if op_id == fs.private_fs_read_at_id {
         let file_offset =
             match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
@@ -6913,6 +6928,8 @@ fn fs_dispatch<H: HostHandler>(
         operation,
         ken_host::HostOpV1::FsHandleMetadata
             | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength
+            | ken_host::HostOpV1::FsSync
             | ken_host::HostOpV1::BufferAllocate
             | ken_host::HostOpV1::FsReadAt
             | ken_host::HostOpV1::FsWriteAt
@@ -6950,7 +6967,9 @@ fn fs_dispatch<H: HostHandler>(
     };
     let resource = if matches!(
         operation,
-        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::MappingAcquireFile
+        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength | ken_host::HostOpV1::FsSync
+            | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ProcessSignal
@@ -7290,9 +7309,6 @@ fn reify_host_reply_v1(
                 make_ctor(fs.read_some_id, vec![span, count], store)
             }
         },
-        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::FilePosition(
-            position,
-        )) => EvalVal::BigInt(BigInt::from(position)),
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::WriteProgress(
             ken_host::WriteProgressV1::Wrote(transferred),
         )) => {
@@ -8359,6 +8375,8 @@ mod px5b_effect_observation_tests {
             private_fs_open_id: id(),
             private_fs_open_directory_id: id(),
             private_fs_read_directory_batch_id: id(),
+            private_fs_set_length_id: id(),
+            private_fs_sync_id: id(),
             private_fs_handle_metadata_id: id(),
             private_buffer_allocate_id: id(),
             private_fs_read_at_id: id(),
@@ -8423,9 +8441,6 @@ mod px5b_effect_observation_tests {
             op_remove_directory_id: id(),
             op_rename_id: id(),
             op_change_mode_id: id(),
-            op_seek_id: id(),
-            op_set_length_id: id(),
-            op_sync_id: id(),
             op_get_inheritance_id: id(),
             op_set_inheritance_id: id(),
             op_duplicate_id: id(),

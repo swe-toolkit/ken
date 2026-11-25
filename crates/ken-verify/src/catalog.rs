@@ -118,6 +118,19 @@ impl NativeTestedEvidence {
         }
     }
 
+    /// Set-length evidence binds the requests to their WRITE acquisitions and
+    /// verifies the intermediate reads and final bytes in both real roots.
+    pub fn from_fs_set_length_run(
+        run: &CanonicalDifferentialRun,
+        path: &str,
+        before: &[u8],
+        lengths: [u64; 2],
+    ) -> Self {
+        let mut evidence = Self::from_run(HostOpV1::FsSetLength, run);
+        evidence.canonical_observation_equal &= run.matches_fs_set_length(path, before, lengths);
+        evidence
+    }
+
     /// FsMetadata evidence binds both response fields to the corresponding
     /// regular-file and directory artifacts before requiring exact parity.
     pub fn from_fs_metadata_run(

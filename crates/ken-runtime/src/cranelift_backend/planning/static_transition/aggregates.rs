@@ -4060,7 +4060,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         | Op::MappingAcquireFile => {
             (RESOURCE_SURFACE, N::Absent)
         }
-        Op::MappingWriteView => (RESOURCE_SURFACE, UNIT),
+        Op::MappingWriteView | Op::FsSetLength | Op::FsSync => (RESOURCE_SURFACE, UNIT),
         Op::FsHandleMetadata => (RESOURCE_SURFACE, FILE_METADATA),
         Op::ResourceRelease => (RESOURCE_SURFACE, UNIT),
         Op::FsReadAt => (RESOURCE_SURFACE, READ_PROGRESS),

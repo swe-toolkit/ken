@@ -6,7 +6,7 @@ mod catalog_roots;
 use std::mem::discriminant;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{GlobalId, Term};
+use ken_kernel::Term;
 
 #[derive(Clone, Copy, Debug)]
 enum Entry {
@@ -270,10 +270,12 @@ fn hidden_roster_sweeps_all_kernel_constructor_identities() {
         .inductive(env.globals["MappingHandle"])
         .expect("checked MappingHandle");
     assert_eq!(mapping.constructors.len(), 1);
-    let private: [GlobalId; 19] = [
+    let private = [
         p.private_fs_open_id,
         p.private_fs_open_directory_id,
         p.private_fs_read_directory_batch_id,
+        p.private_fs_set_length_id,
+        p.private_fs_sync_id,
         p.private_fs_handle_metadata_id,
         p.private_resource_release_id,
         p.private_bracket_release_id,
