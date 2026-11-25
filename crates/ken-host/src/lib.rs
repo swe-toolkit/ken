@@ -454,6 +454,21 @@ mod linux {
         }
     }
 
+    /// Promise class: durable invariant. MEASURED: the SyncFull backend
+    /// returns EINVAL on a live Linux pipe. CLAIMED: it reaches the kernel
+    /// rather than succeeding without a call. THE GAP: it tests no guarantee
+    /// of durability after failure and no surface argument wiring.
+    #[test]
+    fn resource_sync_full_refuses_a_pipe() {
+        let (_read, write) = std::io::pipe().expect("create a live pipe");
+        let error = resource_sync(&ResourceHandle(write.into()), FsSyncModeV1::SyncFull)
+            .expect_err("fsync on a pipe must not report success");
+        assert_eq!(
+            error.raw_os_error(),
+            Some(rustix::io::Errno::INVAL.raw_os_error())
+        );
+    }
+
     pub(super) fn resource_get_inheritance(
         handle: &ResourceHandle,
     ) -> io::Result<FdInheritancePolicyV1> {
