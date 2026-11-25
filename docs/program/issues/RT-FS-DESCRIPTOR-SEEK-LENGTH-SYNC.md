@@ -72,6 +72,13 @@ handle-open modes, or to the FS root confinement.
 - **AC-1 (retired).** The operation identity is absent from the catalog
   and from `HostOpV1`, and the build passes on every consumer AC-0
   swept.
+- **AC-1b (surfaced, amendment `evt_4xs626js5bk73`).** Black-box
+  conformance cases for the behavior spec 38 states for each surfaced
+  operation. For `setLength`: success with a retained prefix and zero
+  extension, `RightNotHeld` on a non-writable handle, and the
+  invalid-length boundary returning `InvalidOffset` with no host dispatch.
+  For `sync`: the host-outcome contract, with no durability claim. A
+  case that cannot be black-box is stated as a named gap.
 - **AC-2.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
