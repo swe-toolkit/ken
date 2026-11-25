@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-LEAST-K-MAP
 title: "Spec 72 selects the k least-cost candidates of a list (§4) and says how the selection behaves under a cost transform (§4.4), a larger bound (§4.5, §4.6) and an append (§4.7), but says nothing about selecting over mapped candidates: a client that ranks records by a projected key cannot move the selection across `map`. Rule from a checked D0 at zero trust that least_k over map f xs is map f of least_k over xs under the composed cost, and state it with a seed that separates the composed cost from the uncomposed one"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

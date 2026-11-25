@@ -1,7 +1,7 @@
 ---
 id: ABI-S2
 title: "read_directory returns a whole sorted List DirEntry, which the host builds by reopening the descriptor through /proc/self/fd and collecting every entry into one reply, so a large or concurrently changing directory is either held whole or truncated by an unstated bound. Rule from an AC-0 whether directory reading becomes a handle-based stream read in batches to an end, or keeps the whole-list shape with a stated bound and a typed refusal past it, and land the ruled result on both lanes"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
