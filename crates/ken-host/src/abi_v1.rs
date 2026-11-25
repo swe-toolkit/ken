@@ -3353,6 +3353,89 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Durable invariant (I-5, ADR 0017): `FsOpenDirectory` uses the scoped
+    /// path policy. One grant opens a nested directory by its direct path,
+    /// but not through a symlink to the same directory. This exercises the
+    /// real process host, not the Ken wrapper or concurrent path replacement.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_open_honors_the_no_follow_scope_policy() {
+        use crate::{CapabilityDeniedV1, FileErrorIdentityV1, ResourceInputsV1, SemanticErrorV1};
+
+        let root = std::env::temp_dir().join(format!(
+            "ken-abi-s2-directory-open-policy-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("inside/child")).unwrap();
+        std::os::unix::fs::symlink("inside", root.join("alias")).unwrap();
+        let initialized = context(&root);
+        let (direct, via_link, settlement) = {
+            let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+            let mut open = |path: &[u8]| {
+                dispatch_host_op_v1(
+                    &mut context.host,
+                    &context.capabilities,
+                    &context.revocation,
+                    &mut context.resources,
+                    HostOpV1::FsOpenDirectory,
+                    Some(context.capability),
+                    ResourceInputsV1::None,
+                    &CanonicalRequestV1::FsOpenDirectory {
+                        path: path.to_vec(),
+                    },
+                )
+                .expect("directory acquisition returns a typed reply")
+            };
+            let direct = open(b"inside/child");
+            let via_link = open(b"alias/child");
+            let settlement = direct.resource_token.map(|token| {
+                dispatch_host_op_v1(
+                    &mut context.host,
+                    &context.capabilities,
+                    &context.revocation,
+                    &mut context.resources,
+                    HostOpV1::ResourceRelease,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &CanonicalRequestV1::ResourceRelease,
+                )
+                .expect("release returns a typed reply")
+                .outcome
+            });
+            (direct, via_link, settlement)
+        };
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(root).unwrap();
+
+        assert!(
+            matches!(
+                direct.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
+                    resource_kind: crate::ResourceKindV1::FsHandle,
+                    ..
+                })
+            ),
+            "in-root directory acquisition: {:?}",
+            direct.outcome
+        );
+        assert!(matches!(
+            settlement,
+            Some(CanonicalOutcomeV1::Success(
+                CanonicalReplyV1::ResourceSettlement(_)
+            ))
+        ));
+        assert_eq!(
+            via_link.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsOpenDirectory,
+                relative_path: b"alias/child".to_vec(),
+                cause: FileErrorCauseV1::Capability(CapabilityDeniedV1::SymlinkDenied),
+            }))
+        );
+        assert_eq!(via_link.resource_token, None);
+    }
+
     /// Promise class: normative compatibility vector (ADR 0018). MEASURED:
     /// raw requests dispatch through the ABI to distinct typed trace events;
     /// both valid Bool values in the old create record and a malformed
