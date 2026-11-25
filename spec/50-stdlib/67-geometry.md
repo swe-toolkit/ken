@@ -20,7 +20,8 @@
 > SPEC-GEOMETRY-NAT-ORIENTATION §18;
 > SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19;
 > SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20;
-> SPEC-GEOMETRY-ORIENT-TRANSLATE §21).** Sections 1–4,
+> SPEC-GEOMETRY-ORIENT-TRANSLATE §21;
+> SPEC-GEOMETRY-ORIENT-SCALE §22).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1749,3 +1750,74 @@ the first point gives `(2,3), (1,0), (0,1)` and flips the result to
 `Lt`; the same-form equality with the original turn must refuse.
 These closed cases distinguish a shared translation from arbitrary
 per-point movement; they do not prove the generic law.
+
+## 22. A shared positive scaling preserves orientation
+
+> **Section 22 status: DRAFT v0 (SPEC-GEOMETRY-ORIENT-SCALE).**
+> Architect AC-0 `evt_2zvkaccjkdjff` on `80c900f10` reports that both
+> modified packages passed `ken check` and `ken fmt --check` in scratch,
+> using a checker built from that base. Open clients and the positive
+> scaling and zero-value controls checked; both false zero-factor claims
+> and a swapped-coordinate proof mutation refused with `TypeMismatch`.
+> Removing the Order law gave `UnboundName` for
+> `Data.Numeric.Nat.Order.compare::mul_cancel_r`. The existing package
+> target passed 10/10 in scratch, measuring equal exact trusted
+> `GlobalId` sets at both package boundaries (114 → 114 at each).
+> No `Axiom`, foreign declaration or primitive was added. These results
+> do not establish assembled AC-T, official conformance, CI, publication
+> or landing.
+
+`Data.Numeric.Nat.Order` must export this public Transparent checked
+proof selector immediately after `add_cancel_r for compare`:
+
+```ken
+pub proof mul_cancel_r for compare
+      (a : Nat) (b : Nat) (k : Nat)
+    : Equal OrdResult (compare (mul a (Suc k)) (mul b (Suc k))) (compare a b)
+```
+
+Multiplying both arguments by the same positive right factor leaves their
+comparison unchanged. The proof uses the existing private
+`leq_nat_mul_right_equiv` in each argument order, lifting both Boolean
+equalities through the private `compare_bits` immediately after the new
+law and before `from_lt for compare`. The definition of `compare` is
+unchanged.
+
+`Algorithm.Geometry.NatOrientation` must export this public Transparent
+checked theorem after `orient_rotate_sum`. Its four private helpers follow
+it, before `orient_reorder`, which stays last:
+
+```ken
+pub theorem orient_scale
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (k : Nat)
+    : Equal OrdResult
+        (orient
+          (MkPoint (mul xa (Suc k)) (mul ya (Suc k)))
+          (MkPoint (mul xb (Suc k)) (mul yb (Suc k)))
+          (MkPoint (mul xc (Suc k)) (mul yc (Suc k))))
+        (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+```
+
+Each coordinate is multiplied on the right by the same `Suc k`.
+The successor form supplies positivity without a separate premise.
+The equation compares turn results, not the points. It introduces no
+scaling operation and changes no §§1–21 operation or law type. The
+NatOrientation public law roster grows from seven to eight.
+
+Writing `s = Suc k`, associativity and commutativity put each scaled
+product in the form `mul (mul (mul x y) s) s`. Factoring the common
+right factor out of each cross sum twice uses `mul_add_distrib_l`
+backwards. Congruence lifts the two factored sums through `compare`,
+and `compare::mul_cancel_r` cancels `s` twice. No induction,
+normalization procedure or new import is needed. The four private
+helpers, in order, are `orient_compare_congr`, `orient_scale_sum`,
+`orient_factor_sum` and `orient_scale_product`.
+
+The triple `(0,0), (1,0), (0,1)` has turn `Gt`, and doubling it gives
+`(0,0), (2,0), (0,2)`, also `Gt` by the law. Scaling by `Zero` collapses
+all three points to the origin and gives `Eq`. D0 reports that applying
+the positive-factor instance to the zero-factor claim refuses. The
+stronger test compares the law's equation at the two factors directly:
+`Proved` checks the doubled equation but refuses the zero-factor equation,
+which compares `Eq` with `Gt`. These closed outcomes distinguish the
+factor restriction from a mismatch in the application alone.
