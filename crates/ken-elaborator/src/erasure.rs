@@ -10062,6 +10062,7 @@ mod px7l_tests {
                 && !matches!(
                     operation,
                     ken_host::HostOpV1::FsHandleMetadata
+                        | ken_host::HostOpV1::FsReadDirectoryBatch
                         | ken_host::HostOpV1::BufferAllocate
                         | ken_host::HostOpV1::FsReadAt
                         | ken_host::HostOpV1::FsWriteAt

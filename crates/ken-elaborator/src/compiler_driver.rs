@@ -4699,8 +4699,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_remove_file,
         &spine.file_operation_remove_directory,
         &spine.dir_entry,
-        &spine.directory_entries,
-        &spine.directory_end,
         // ABI-S1 appends without changing established positional identities.
         &spine.file_operation_seek,
         &spine.file_operation_set_length,
@@ -4719,6 +4717,9 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.px10_exit_symbols[0],
         &spine.px10_exit_symbols[1],
         &spine.option_none,
+        // ABI-S2 appends in the same order as the runtime role decoder.
+        &spine.directory_entries,
+        &spine.directory_end,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());

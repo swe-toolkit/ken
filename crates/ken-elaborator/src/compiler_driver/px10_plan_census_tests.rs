@@ -601,11 +601,11 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 }
 
 /// Promise class: durable invariant (PX10 B-closure AC-2). MEASURED: argv's
-/// relays 1373 and 1142 and live's relays 739 and 508 are relay members of
+/// relays 1389 and 1158 and live's relays 747 and 516 are relay members of
 /// their owners' returned-Vis protocols, numbered once per emitting copy
 /// with distinct nonzero discriminants rather than by a response row, and
-/// kept in the settled member set. Copies of 1373 and 739 resume at the rows
-/// whose Vis are 1598 and 983; copies of 1142 and 508 resume by their planned
+/// kept in the settled member set. Copies of 1389 and 747 resume at the rows
+/// whose Vis are 1614 and 991; copies of 1158 and 516 resume by their planned
 /// named trap. CLAIMED: each named relay has a numbered copy with the
 /// expected resume, and copies retain separate discriminants. THE GAP: this
 /// census does not prove that every emitting owner minted a copy or that
@@ -622,19 +622,21 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
 /// checked Net prelude shifts argv's relay, owner and resume origins by 132
 /// and live's by 66. Retiring the checked `create_directory` operand then
 /// moves argv's pins back by two and live's by one. Comparing both plans
-/// preserved member order, discriminants and trap/resume roles.
+/// preserved member order, discriminants and trap/resume roles. ABI-S2 adds
+/// eight nodes per preceding FS dispatch: two copies precede argv's pins,
+/// one precedes live's. Numbering and trap/resume roles do not move.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
     for (name, source, relays) in [
         (
             "px10_census_relay_argv_env_pipe",
             ARGV_ENV_PIPE,
-            [(1373, 1837, Some(1598)), (1142, 1933, None)],
+            [(1389, 1853, Some(1614)), (1158, 1949, None)],
         ),
         (
             "px10_census_relay_live_child",
             LIVE_CHILD,
-            [(739, 1279, Some(983)), (508, 1375, None)],
+            [(747, 1287, Some(991)), (516, 1383, None)],
         ),
     ] {
         in_census_thread(name, move || {
