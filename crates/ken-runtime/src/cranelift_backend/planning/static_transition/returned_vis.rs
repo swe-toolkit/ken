@@ -465,7 +465,8 @@ impl StaticTransitionPlan<'_> {
         units: &[EmittableUnit<'_>],
         edges: &[EmittableCallEdge],
         binders: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
-    ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<PredeclaredFunctionId>), CraneliftBackendError> {
+    ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<PredeclaredFunctionId>), CraneliftBackendError>
+    {
         let mut pending = vec![body];
         let mut seen = BTreeSet::new();
         let mut returned = BTreeSet::new();
@@ -497,7 +498,9 @@ impl StaticTransitionPlan<'_> {
                         RuntimeExpr::Call { .. } => binders
                             .get(&self.child_static_origin(call, 0)?)
                             .and_then(|resolution| match resolution.provenance {
-                                CheckedBinderProvenance::InductionHypothesis(binding) => Some(binding),
+                                CheckedBinderProvenance::InductionHypothesis(binding) => {
+                                    Some(binding)
+                                }
                                 _ => None,
                             }),
                         _ => None,
@@ -507,7 +510,9 @@ impl StaticTransitionPlan<'_> {
                         continue;
                     };
                     let frame = binding.frame_origin();
-                    let RuntimeExpr::ComputationalMatch { cases, .. } = self.source_occurrence(frame)? else {
+                    let RuntimeExpr::ComputationalMatch { cases, .. } =
+                        self.source_occurrence(frame)?
+                    else {
                         return Err(planner_error(format!(
                             "returned-Vis IH invocation at {origin:?} names a non-computational eliminator",
                         )));
@@ -665,8 +670,12 @@ impl StaticTransitionPlan<'_> {
                 .ok_or_else(|| {
                     planner_error("returned-Vis successor has no generated K context")
                 })?;
-            let (origins, returning_units) =
-                self.returned_vis_in_context(context.worker_body_origin(), &units, &edges, &binders)?;
+            let (origins, returning_units) = self.returned_vis_in_context(
+                context.worker_body_origin(),
+                &units,
+                &edges,
+                &binders,
+            )?;
             let mut members = Vec::new();
             for origin in origins {
                 let RuntimeExpr::Construct { args, .. } = self.source_occurrence(origin)? else {
@@ -861,7 +870,10 @@ mod tests {
             "pending-Vis frame offset exceeds addressable range");
     }
 
-    fn with_returned_vis_ih_fixture(callee_index: u32, check: impl FnOnce(&StaticTransitionPlan<'_>)) {
+    fn with_returned_vis_ih_fixture(
+        callee_index: u32,
+        check: impl FnOnce(&StaticTransitionPlan<'_>),
+    ) {
         let mut symbols = NativeProcessSymbols::legacy_prelude();
         symbols.itree_vis = "ctor:fixture::ITree::Vis".to_string();
         let zero = "ctor:fixture::Nat::Zero";
@@ -869,7 +881,10 @@ mod tests {
         let entry = RuntimeExpr::ComputationalMatch {
             scrutinee: Box::new(RuntimeExpr::Construct {
                 constructor: suc.into(),
-                args: vec![RuntimeExpr::Construct { constructor: zero.into(), args: vec![] }],
+                args: vec![RuntimeExpr::Construct {
+                    constructor: zero.into(),
+                    args: vec![],
+                }],
             }),
             cases: vec![
                 RuntimeComputationalMatchCase {
@@ -942,7 +957,10 @@ mod tests {
                 .returned_vis_in_context(root, &units, &edges, &binders)
                 .expect("the checked IH returns the base case's Vis");
             assert_eq!(returned, BTreeSet::from([vis]));
-            assert!(returning_units.is_empty(), "an IH is not an emitted unit call");
+            assert!(
+                returning_units.is_empty(),
+                "an IH is not an emitted unit call"
+            );
         });
     }
 
@@ -952,19 +970,29 @@ mod tests {
         with_returned_vis_ih_fixture(0, |plan| {
             let root = plan.root_static_origin().expect("match origin");
             let recursive_case = plan.child_static_origin(root, 2).expect("recursive case");
-            let invocation = plan.child_static_origin(recursive_case, 1).expect("invocation");
-            let call = plan.child_static_origin(invocation, 0).expect("wrapped call");
+            let invocation = plan
+                .child_static_origin(recursive_case, 1)
+                .expect("invocation");
+            let call = plan
+                .child_static_origin(invocation, 0)
+                .expect("wrapped call");
             let callee = plan.child_static_origin(call, 0).expect("callee");
             let units = plan.emittable_units().expect("units");
             let edges = plan.emittable_call_edges().expect("edges");
             let binders = build_checked_binder_provenance(plan).expect("binder provenance");
-            assert!(matches!(binders[&callee].provenance, CheckedBinderProvenance::Ordinary));
+            assert!(matches!(
+                binders[&callee].provenance,
+                CheckedBinderProvenance::Ordinary
+            ));
             let error = plan
                 .returned_vis_in_context(root, &units, &edges, &binders)
                 .expect_err("the ordinary binder must not acquire an IH endpoint");
-            assert!(error.to_string().contains(&format!(
-                "returned-Vis generated Call at {call:?} has an unknown endpoint"
-            )), "unexpected refusal: {error}");
+            assert!(
+                error.to_string().contains(&format!(
+                    "returned-Vis generated Call at {call:?} has an unknown endpoint"
+                )),
+                "unexpected refusal: {error}"
+            );
         });
     }
 
@@ -1013,12 +1041,26 @@ mod tests {
             .expect("the callee has a distinct source body")
             .body_occurrence();
         let observed = plan
-            .returned_vis_in_context(root, &units, &edges, &build_checked_binder_provenance(&plan).expect("binder provenance"))
+            .returned_vis_in_context(
+                root,
+                &units,
+                &edges,
+                &build_checked_binder_provenance(&plan).expect("binder provenance"),
+            )
             .expect("the generated result is forwarded");
         assert_eq!(observed.0, BTreeSet::from([callee_body]));
-        assert_eq!(observed.1.len(), 1, "the returned unit call is on the chain");
+        assert_eq!(
+            observed.1.len(),
+            1,
+            "the returned unit call is on the chain"
+        );
         assert!(plan
-            .returned_vis_in_context(root, &units, &[], &build_checked_binder_provenance(&plan).expect("binder provenance"))
+            .returned_vis_in_context(
+                root,
+                &units,
+                &[],
+                &build_checked_binder_provenance(&plan).expect("binder provenance")
+            )
             .expect_err("a missing generated edge must refuse")
             .to_string()
             .contains("unknown endpoint"));
