@@ -21,7 +21,8 @@
 > SPEC-LINEAR-ALGEBRA-TRACE-PRODUCT-COMM §19;
 > SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20;
 > SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21;
-> SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO §22).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO §22;
+> SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS §23).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -1947,3 +1948,83 @@ the input differs from its transpose but its Gram product is
 `[[5,2],[2,1]]`, to which the second law applies. These finite observations
 distinguish the premises and the product from its input; the checked
 public laws establish the generic claims.
+
+## 23. A zero sum forces each summand to be zero
+
+> **Section 23 status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS).**
+> Architect AC-0 `evt_218ra2xfqjyj5` reports that on scratch base
+> `da3f45295`, checking and formatting passed, the four open clients
+> checked, and the three false-premise clients refused at the premise
+> `Refl`. No `Axiom` was added. The scratch package test passed its
+> trusted identity-set assertion before refusing on the old roster,
+> which lacked exactly the four new names. The exact trusted identities
+> of the assembled candidate remain to be checked by AC-T. These results
+> do not establish official conformance, CI or landing.
+
+`Algorithm.LinearAlgebra.NatMatrix` must export four public Transparent
+checked theorems. The vector pair goes immediately after
+`vector_add_cancel_right` and before `vector_scale_cancel`, in this order:
+
+```ken
+pub theorem vector_add_eq_zero_left
+      (n : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n)
+      → Equal (Vec Nat n) xs (vector_zero n)
+
+pub theorem vector_add_eq_zero_right
+      (n : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n)
+      → Equal (Vec Nat n) ys (vector_zero n)
+```
+
+The matrix pair goes immediately after `matrix_add_cancel_right` and
+before `matrix_scale_cancel`, in this order:
+
+```ken
+pub theorem matrix_add_eq_zero_left
+      (m : Nat) (n : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n)
+      → Equal (Vec (Vec Nat n) m) a (matrix_zero m n)
+
+pub theorem matrix_add_eq_zero_right
+      (m : Nat) (n : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n)
+      → Equal (Vec (Vec Nat n) m) b (matrix_zero m n)
+```
+
+Each law has one premise: the sum is structurally equal to the zero
+vector or matrix at the stated dimensions. It concludes structural
+`Equal` for the designated summand, not a conjunction or pointwise
+predicate. All dimensions are allowed, including zero. The dimensions
+precede the colon so the left proofs can split on the vector length or
+matrix row count before taking the operands and premise.
+
+The left proofs reuse §20's cons views and empty-length equality. In a
+vector successor case, `add::eq_zero_l` gives the zero head and the
+induction hypothesis gives the zero tail. The matrix proof uses the
+vector law on its head row and recurses on the remaining rows. The right
+proofs commute the operands, then use the corresponding left law without
+another induction. The private `vector_add_eq_zero_cons` and
+`matrix_add_eq_zero_cons`, in that order, go immediately after
+`matrix_add_cancel_cons` and before `vec_zero_length_eq`.
+
+No §§1–22 operation or law type changes. The roster grows to twelve
+operations, sixty-six laws and seventy-eight public names. No new import,
+kernel rule or surface form is required.
+
+Open clients supply the premise explicitly and conclude equality for the
+specified summand, distinguishing the four types even when closed zero
+sums compute. In the closed controls, two zero vectors of length two
+satisfy the premise. Changing only the right vector to `[1,0]` leaves
+the left conclusion true but makes the sum `[1,0]`, so `Refl` refuses
+at the premise. The scratch clients also measured that refusal when
+changing only the left vector and when changing one entry of the left
+2 × 2 matrix.
