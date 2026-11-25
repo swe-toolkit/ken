@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN]
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN, RT-RETURNED-VIS-IH-ENDPOINT, RT-CHECKED-IH-FRESH-RESULT-CAPTURE-POPULATION]
 blocks: [PX11]
 github: null
 origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
@@ -167,3 +167,30 @@ AC-2's mutant reddens a parity row, which a lookup that silently
 falls back to the interpreter could not pass. 2 fired. The native
 refusal has two planes, the plan gate and the wire layout, and the frame
 removes the first and requires the second to lower.
+
+## Inc2 symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. A constructor field's byte span, Int and resource scalar had no planner-issued authority: the seat record is keyed on (occurrence, argument slot) with one need, and a field is not a seat — keyed on field position under a matched constructor root. (evt_2x1vqnv352kxa)
+2. The native bracket collector's acquisition inventory and the native synthesized ResourceKind set enumerated only pre-PX11 members — keyed on checked acquisition operation identity and ResourceKind wire tag. (evt_6xzjree7s64wy)
+3. The native resource-error reply validator admitted only the FsHandle, Buffer and Mapping kind tags in ReleaseFailed.kind and in both ResourceKindMismatch kinds — keyed on ResourceKind wire tag. (evt_42ncdsdxj34kk)
+4. The two erasure capability-operand classifiers treated every non-ambient operation as carrying an explicit Capability operand, except a resource-only list frozen at PX10 — keyed on HostOpV1 membership. (evt_5kc14zehcdrkj)
+5. The prelude's socket_unix_path could not lower natively: bytes_to_list is outside the native primitive set, and uint8_to_int refuses a List UInt8 element — keyed on the primitive symbol and the operand's lowered representation. (evt_773gmfx4vmmab)
+6. The exchange's native preparation ran past 450 s after the closure-index repair, in the normalized-declaration loop (kernel subst::shift, recursive Term drop, infer_elim/check under check_app_spine) — keyed on the size of each executable declaration's normalized body. (evt_7s7gc8j8vnamx)
+7. Oriented frame composition refused exchange main once indexed families reached lowering, because post-order adjacency within a segment stood in for the parent edge — keyed on post-order adjacency of frames within a segment. (asked evt_5art9xrpx28s9; confirmed evt_5z0179ybnz8bd)
+8. The static positional capture model refused a 79-capture environment in exchange main, because a fixed-length &'static positional run bounded capture arity at 64 — keyed on captured-environment arity. (asked evt_3ja9x7a1mxxyk; confirmed evt_1552vcx50h6qt)
+9. The returned-Vis settlement could not derive response owner 9's returned set: the Call at StaticOriginId(33) has no emitted call edge — keyed on the callee having a static call edge (provisional, pending P-RV). (evt_12a6ccjxmfnjw)
+9. The returned-Vis walker resolved callees only through emitted call edges, and a computational IH callee, which lowers in its owning unit, has none — keyed on callee class (an IH binder resolved by checked binder provenance). (asked evt_12a6ccjxmfnjw; confirmed evt_427vemb7ks8fd)
+10. checked-IH continuation inheritance: the fresh-result destination record held exactly one capturing closure, but the active frame's Ret constructor child is captured and read by two sibling closures in main — keyed on the cardinality of the record, over a checked relation that is one binder to many captures. (evt_66ga05tmvxvdw)
+
+§1b classifications:
+- At entry 3 (evt_42ncdsdxj34kk): entries 2, in its ResourceKind half, and 3 share a predicate. The native lane holds hand-enumerated copies of a closed population the host owns, each frozen at the wave that wrote it. The closure was ruled. Entry 1 is independent: it was a missing authority record, not a stale enumeration.
+- Entry 4 (evt_5kc14zehcdrkj) falls under the entry-3 predicate, widened to host-owned closed classifications.
+- Entry 5 (evt_773gmfx4vmmab) is independent of it: a lowering that was never written, not a copy.
+- At entry 6 (evt_7s7gc8j8vnamx): No. Entry 6 copies nothing, and entries 1 and 5 are not keyed on term size. A narrower shared property was left unnamed pending measurement.
+- At entry 9 (evt_12a6ccjxmfnjw): pending P-RV. The candidate predicate X, expansion, covers entry 6 and possibly 8 and 9. Its closure is the M-a deforestation carry (evt_3fx24w31wxxps). P-RV's V-inline arm confirms X, and its other arms answer No for entry 9.
+- The next §1b check is at the 12th entry.
+- At entry 9: No for X. The refusal recurs in bind's own body without inlining. Entries 7 and 9 share a narrower property, a proxy relation used where a checked witness existed; it is recorded, with no class closure at two members. (evt_427vemb7ks8fd)
+- At entry 10 (evt_66ga05tmvxvdw): No for the 7/9 property; entry 10 uses the checked relation and holds it in a record of the wrong cardinality. Entries 8 and 10 share "a population carried in a fixed-cardinality representation"; recorded with two members and no closure. The next §1b check is at the 12th entry.
+```
