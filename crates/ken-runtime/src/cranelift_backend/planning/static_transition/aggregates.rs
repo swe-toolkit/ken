@@ -5188,50 +5188,47 @@ impl StaticTransitionPlan<'_> {
     }
 }
 
-/// The largest capture arity the positional child model can state.
-///
-/// ⛔ This is a REFUSAL bound, not a truncation bound. The const run below is
-/// what makes a per-unit arity expressible in a `&'static` slice at all -- the
-/// content at position `i` is fully determined by `i`, so one run serves every
-/// unit and each takes the prefix its arity names. That trick is sound exactly
-/// as long as an arity ABOVE the run REFUSES: silently handing back a shorter
-/// prefix would give the emitter a child model describing fewer captures than
-/// the record holds, and every count downstream would agree with itself while
-/// describing the wrong aggregate.
-const CHECKED_IH_CAPTURE_OPERAND_LIMIT: usize = 64;
-
-/// The positional child model, DERIVED rather than hand-listed.
-///
-/// A hand-written run of 64 entries is a roster that can drift from its own
-/// index; this states the rule (`position i names capture word i`) once and
-/// lets the compiler produce the members, so the table cannot disagree with
-/// itself. `static` rather than `const` on purpose: the slice handed to
-/// `declared_children` must be `&'static`, which a `static` item's address
-/// gives and a `const`'s per-use temporary does not.
-static CHECKED_IH_CAPTURE_OPERANDS: [SynthesizedAggregateNode;
-    CHECKED_IH_CAPTURE_OPERAND_LIMIT] = {
-    let mut operands =
-        [SynthesizedAggregateNode::WorkerCaptureOperand(0); CHECKED_IH_CAPTURE_OPERAND_LIMIT];
-    let mut position = 0usize;
-    while position < CHECKED_IH_CAPTURE_OPERAND_LIMIT {
-        operands[position] = SynthesizedAggregateNode::WorkerCaptureOperand(position as u32);
-        position += 1;
-    }
-    operands
-};
-
 /// The declared positional child model for one unit's capture arity.
+///
+/// The content at position `i` is fully determined by `i` (`position i names
+/// capture word i`), so every unit takes the prefix its arity names of one
+/// process-wide run. The run grows by doubling when a unit needs a longer
+/// prefix. A run once handed out is never freed or mutated, so every
+/// `&'static` prefix already issued stays valid and keeps its content.
+///
+/// The function never returns a prefix shorter than `arity`: a child model
+/// describing fewer captures than the record holds would let every count
+/// downstream agree with itself while describing the wrong aggregate. The only
+/// arity it refuses is one the `u32` ordinal of `WorkerCaptureOperand` cannot
+/// name.
 fn positional_capture_declared_children(
     arity: usize,
 ) -> Result<&'static [SynthesizedAggregateNode], CraneliftBackendError> {
-    if arity > CHECKED_IH_CAPTURE_OPERAND_LIMIT {
+    static RUN: std::sync::Mutex<&'static [SynthesizedAggregateNode]> =
+        std::sync::Mutex::new(&[] as &[SynthesizedAggregateNode]);
+    if u32::try_from(arity).is_err() {
         return Err(planner_capacity_error(format!(
-            "a captured environment has {arity} captures, more than the \
-             {CHECKED_IH_CAPTURE_OPERAND_LIMIT} its positional child model can state -- \
-             refusing rather than declaring a shorter run than the record carries"
+            "a captured environment has {arity} captures, more than the u32 \
+             ordinal space of its positional child model can name"
         )));
     }
-    Ok(&CHECKED_IH_CAPTURE_OPERANDS[..arity])
+    let mut run = RUN
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if run.len() < arity {
+        let length = arity
+            .max(run.len().saturating_mul(2))
+            .max(64)
+            .min(u32::MAX as usize);
+        let grown = (0..length)
+            .map(|position| SynthesizedAggregateNode::WorkerCaptureOperand(position as u32))
+            .collect::<Vec<_>>();
+        *run = Box::leak(grown.into_boxed_slice());
+    }
+    // Copy the `&'static` slice out of the guard; indexing through the guard
+    // would tie the prefix's lifetime to the lock.
+    let issued: &'static [SynthesizedAggregateNode] = *run;
+    Ok(&issued[..arity])
 }
 
 /// Match the verdict row's entry coordinates against this exact force owner.
@@ -14368,28 +14365,32 @@ mod checked_ih_captured_env_schema {
         }
     }
 
-    /// **The arity bound REFUSES; it never truncates.**
-    ///
-    /// The const-run-sliced-by-arity trick is what makes a per-unit arity
-    /// expressible in a `&'static` slice, and it is sound only while an arity
-    /// above the run refuses. Silently returning a shorter prefix would hand
-    /// the emitter a child model describing fewer captures than the record
-    /// holds, and every length check downstream would agree with itself.
-    ///
-    /// Both sides of the boundary are asserted: at the limit it must still
-    /// serve, one past it must refuse.
+    /// Each served arity gets its exact positional model, and a prefix
+    /// already issued remains valid after growth. Unnameable arities refuse.
     #[test]
-    fn an_arity_above_the_positional_run_refuses_rather_than_truncating() {
-        let at_limit = positional_capture_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT)
-            .expect("an arity exactly at the limit is still expressible");
-        assert_eq!(at_limit.len(), CHECKED_IH_CAPTURE_OPERAND_LIMIT);
-
-        let over = positional_capture_declared_children(CHECKED_IH_CAPTURE_OPERAND_LIMIT + 1);
+    fn the_positional_run_serves_every_ordinal_arity_and_never_truncates() {
+        let short = positional_capture_declared_children(3).expect("arity 3 is expressible");
+        for arity in [0usize, 2, 64, 65, 79, 1000] {
+            let run = positional_capture_declared_children(arity)
+                .expect("an arity in the u32 ordinal space is expressible");
+            assert_eq!(
+                run.len(),
+                arity,
+                "the run is exactly the arity, never shorter"
+            );
+            assert!(run.iter().enumerate().all(|(position, node)| {
+                *node == SynthesizedAggregateNode::WorkerCaptureOperand(position as u32)
+            }));
+        }
+        assert_eq!(
+            short,
+            &[0u32, 1, 2].map(SynthesizedAggregateNode::WorkerCaptureOperand)[..],
+            "a prefix issued before the run grew keeps its content"
+        );
+        #[cfg(target_pointer_width = "64")]
         assert!(
-            over.is_err(),
-            "one capture past the run must REFUSE; returning a {}-long prefix for a longer \
-             run is the silent truncation this bound exists to prevent",
-            CHECKED_IH_CAPTURE_OPERAND_LIMIT
+            positional_capture_declared_children(u32::MAX as usize + 1).is_err(),
+            "an arity the u32 ordinal cannot name refuses rather than truncating"
         );
     }
 
