@@ -182,13 +182,14 @@ fn ruled_internal_prelude_names_are_registered_but_not_strictly_nameable() {
         "ambient_resp",
         // G4: the source-facing exit route is host_pure, not host_exit.
         "host_exit",
-        // G5: FS operations are representation beneath the homed FS/HostIO.
+        // G5: This bootstrap roster only lists retained global bindings.
+        // Private directory constructors are removed even from bootstrap
+        // names and exercised by the qualified-constructor privacy tests.
         "FSOp",
         "ReadFile",
         "WriteFile",
         "AppendFile",
         "Metadata",
-        "ReadDirectory",
         "CreateDirectory",
         "RemoveFile",
         "RemoveDirectory",

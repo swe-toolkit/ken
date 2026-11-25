@@ -669,6 +669,8 @@ fn native_process_symbols_from_record(
         file_operation_remove_file: spine.file_operation_remove_file.clone(),
         file_operation_remove_directory: spine.file_operation_remove_directory.clone(),
         dir_entry: spine.dir_entry.clone(),
+        directory_entries: spine.directory_entries.clone(),
+        directory_end: spine.directory_end.clone(),
         file_operation_seek: spine.file_operation_seek.clone(),
         file_operation_set_length: spine.file_operation_set_length.clone(),
         file_operation_sync: spine.file_operation_sync.clone(),

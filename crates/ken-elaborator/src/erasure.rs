@@ -1005,6 +1005,8 @@ pub(crate) struct CheckedHostSpineV1 {
     pub file_operation_remove_file: StableSymbol,
     pub file_operation_remove_directory: StableSymbol,
     pub dir_entry: StableSymbol,
+    pub directory_entries: StableSymbol,
+    pub directory_end: StableSymbol,
     /// ABI-S1 appends descriptor-operation identities without moving prior roles.
     pub file_operation_seek: StableSymbol,
     pub file_operation_set_length: StableSymbol,
@@ -4995,6 +4997,7 @@ const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1
         && !matches!(
             operation,
             ken_host::HostOpV1::FsHandleMetadata
+                | ken_host::HostOpV1::FsReadDirectoryBatch
                 | ken_host::HostOpV1::BufferAllocate
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
@@ -5021,6 +5024,7 @@ const fn runtime_selected_host_operation_requires_capability(
         && !matches!(
             operation,
             ken_host::HostOpV1::FsHandleMetadata
+                | ken_host::HostOpV1::FsReadDirectoryBatch
                 | ken_host::HostOpV1::BufferAllocate
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
@@ -9626,6 +9630,8 @@ mod px7l_tests {
                 "RemoveDirectory",
             ),
             dir_entry: StableSymbol::constructor(&family("DirEntry"), "MkDirEntry"),
+            directory_entries: StableSymbol::constructor(&family("DirectoryProgress"), "DirectoryEntries"),
+            directory_end: StableSymbol::constructor(&family("DirectoryProgress"), "DirectoryEnd"),
             file_operation_seek: StableSymbol::constructor(&family("FileOperation"), "OpSeek"),
             file_operation_set_length: StableSymbol::constructor(
                 &family("FileOperation"),
@@ -9994,6 +10000,7 @@ mod px7l_tests {
                 && !matches!(
                     operation,
                     ken_host::HostOpV1::FsHandleMetadata
+                        | ken_host::HostOpV1::FsReadDirectoryBatch
                         | ken_host::HostOpV1::BufferAllocate
                         | ken_host::HostOpV1::FsReadAt
                         | ken_host::HostOpV1::FsWriteAt
@@ -10113,6 +10120,8 @@ mod d1b_role_b_decoder_alignment {
             file_operation_remove_file: sentinel("file_operation_remove_file"),
             file_operation_remove_directory: sentinel("file_operation_remove_directory"),
             dir_entry: sentinel("dir_entry"),
+            directory_entries: sentinel("directory_entries"),
+            directory_end: sentinel("directory_end"),
             file_operation_seek: sentinel("file_operation_seek"),
             file_operation_set_length: sentinel("file_operation_set_length"),
             file_operation_sync: sentinel("file_operation_sync"),

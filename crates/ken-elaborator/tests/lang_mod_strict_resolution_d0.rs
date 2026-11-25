@@ -61,6 +61,8 @@ fn closed_floor_and_kernel_vocabulary_are_buildable_from_roots() {
             "Coproduct",
             "CreatePolicy",
             "DirEntry",
+            "DirectoryHandle",
+            "DirectoryProgress",
             "Equal",
             "ExitCode",
             "FileError",

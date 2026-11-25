@@ -82,6 +82,8 @@ pub struct NativeProcessSymbols {
     pub file_operation_remove_file: RuntimeSymbol,
     pub file_operation_remove_directory: RuntimeSymbol,
     pub dir_entry: RuntimeSymbol,
+    pub directory_entries: RuntimeSymbol,
+    pub directory_end: RuntimeSymbol,
     pub file_operation_seek: RuntimeSymbol,
     pub file_operation_set_length: RuntimeSymbol,
     pub file_operation_sync: RuntimeSymbol,
@@ -187,6 +189,8 @@ impl NativeProcessSymbols {
             file_operation_remove_directory:
                 "ctor:prelude::FileOperation::OpRemoveDirectory".to_string(),
             dir_entry: "ctor:prelude::DirEntry::MkDirEntry".to_string(),
+            directory_entries: "ctor:prelude::DirectoryProgress::DirectoryEntries".to_string(),
+            directory_end: "ctor:prelude::DirectoryProgress::DirectoryEnd".to_string(),
             file_operation_seek: "ctor:prelude::FileOperation::OpSeek".to_string(),
             file_operation_set_length: "ctor:prelude::FileOperation::OpSetLength".to_string(),
             file_operation_sync: "ctor:prelude::FileOperation::OpSync".to_string(),

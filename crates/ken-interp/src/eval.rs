@@ -3864,12 +3864,6 @@ pub enum HostFileKind {
 
 pub type HostFileMetadata = ken_host::FileMetadataV1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HostDirEntry {
-    pub name: Vec<u8>,
-    pub kind: HostFileKind,
-}
-
 /// Exact FS operations observed at the injectable host seam.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FsTrace {
@@ -3886,9 +3880,6 @@ pub enum FsTrace {
         bytes: Vec<u8>,
     },
     Metadata {
-        path: Vec<u8>,
-    },
-    ReadDirectory {
         path: Vec<u8>,
     },
     CreateDirectory {
@@ -4034,7 +4025,6 @@ pub trait HostHandler {
         bytes: &[u8],
     ) -> io::Result<()>;
     fn fs_metadata_at(&mut self, handle: &Self::Handle) -> io::Result<HostFileMetadata>;
-    fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>>;
     fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()>;
     fn fs_remove_file_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()>;
     fn fs_remove_directory_at(
@@ -4560,29 +4550,6 @@ impl HostHandler for PosixHost {
         #[cfg(target_os = "linux")]
         {
             ken_host::file_metadata_v1(handle).map_err(ken_host::HostError::into_io_error)
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = handle;
-            Err(host_abi_unsupported())
-        }
-    }
-
-    fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>> {
-        #[cfg(target_os = "linux")]
-        {
-            Ok(ken_host::read_directory(handle)?
-                .into_iter()
-                .map(|entry| HostDirEntry {
-                    name: entry.name,
-                    kind: match entry.kind {
-                        ken_host::FileKind::File => HostFileKind::File,
-                        ken_host::FileKind::Directory => HostFileKind::Directory,
-                        ken_host::FileKind::Symlink => HostFileKind::Symlink,
-                        ken_host::FileKind::Other => HostFileKind::Other,
-                    },
-                })
-                .collect())
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -5347,25 +5314,6 @@ impl HostHandler for CaptureHost {
         Ok(metadata)
     }
 
-    fn fs_read_directory_at(&mut self, handle: &Self::Handle) -> io::Result<Vec<HostDirEntry>> {
-        self.fs_trace.push(FsTrace::ReadDirectory {
-            path: self.virtual_path(*handle),
-        });
-        if !matches!(self.fs_nodes.get(handle), Some(VirtualFsNode::Directory)) {
-            return Err(io::Error::from(io::ErrorKind::NotADirectory));
-        }
-        Ok(self
-            .fs_entries
-            .iter()
-            .filter_map(|((parent, name), id)| {
-                (*parent == *handle).then(|| HostDirEntry {
-                    name: name.clone(),
-                    kind: virtual_kind(self.fs_nodes.get(id).expect("entry node")),
-                })
-            })
-            .collect())
-    }
-
     fn fs_create_directory_at(&mut self, parent: &Self::Handle, leaf: &[u8]) -> io::Result<()> {
         let mut path = self.virtual_path(*parent);
         if !path.is_empty() {
@@ -5484,13 +5432,6 @@ impl HostHandler for CaptureHost {
     }
 }
 
-fn virtual_kind(node: &VirtualFsNode) -> HostFileKind {
-    match node {
-        VirtualFsNode::File(_) => HostFileKind::File,
-        VirtualFsNode::Directory => HostFileKind::Directory,
-        VirtualFsNode::Symlink(_) => HostFileKind::Symlink,
-    }
-}
 
 fn stream_index(stream: ConsoleStream) -> usize {
     match stream {
@@ -5553,13 +5494,14 @@ pub struct FSIds {
     pub writefile_id: GlobalId,
     pub appendfile_id: GlobalId,
     pub metadata_id: GlobalId,
-    pub readdirectory_id: GlobalId,
     pub createdirectory_id: GlobalId,
     pub removefile_id: GlobalId,
     pub removedirectory_id: GlobalId,
     pub rename_id: GlobalId,
     pub change_mode_id: GlobalId,
     pub private_fs_open_id: GlobalId,
+    pub private_fs_open_directory_id: GlobalId,
+    pub private_fs_read_directory_batch_id: GlobalId,
     pub private_fs_handle_metadata_id: GlobalId,
     pub private_buffer_allocate_id: GlobalId,
     pub private_fs_read_at_id: GlobalId,
@@ -5632,6 +5574,8 @@ pub struct FSIds {
     pub op_duplicate_id: GlobalId,
     pub mk_file_metadata_id: GlobalId,
     pub mk_dir_entry_id: GlobalId,
+    pub directory_entries_id: GlobalId,
+    pub directory_end_id: GlobalId,
     pub k_file_id: GlobalId,
     pub k_directory_id: GlobalId,
     pub k_symlink_id: GlobalId,
@@ -5648,13 +5592,14 @@ impl FSIds {
             writefile_id: roles.op_fs_write_file,
             appendfile_id: roles.op_fs_append_file,
             metadata_id: roles.op_fs_metadata,
-            readdirectory_id: roles.op_fs_read_directory,
             createdirectory_id: roles.op_fs_create_directory,
             removefile_id: roles.op_fs_remove_file,
             removedirectory_id: roles.op_fs_remove_directory,
             rename_id: roles.op_fs_rename,
             change_mode_id: roles.op_fs_change_mode,
             private_fs_open_id: prelude.private_fs_open_id,
+            private_fs_open_directory_id: prelude.private_fs_open_directory_id,
+            private_fs_read_directory_batch_id: prelude.private_fs_read_directory_batch_id,
             private_fs_handle_metadata_id: prelude.private_fs_handle_metadata_id,
             private_buffer_allocate_id: prelude.private_buffer_allocate_id,
             private_fs_read_at_id: prelude.private_fs_read_at_id,
@@ -5727,6 +5672,8 @@ impl FSIds {
             op_duplicate_id: roles.file_operation_duplicate,
             mk_file_metadata_id: roles.file_metadata,
             mk_dir_entry_id: roles.dir_entry,
+            directory_entries_id: roles.directory_entries,
+            directory_end_id: roles.directory_end,
             k_file_id: roles.file_kind_file,
             k_directory_id: roles.file_kind_directory,
             k_symlink_id: roles.file_kind_symlink,
@@ -5992,6 +5939,45 @@ struct InterpreterHostBackend<'a, H: HostHandler> {
 }
 
 impl<H: HostHandler> InterpreterHostBackend<'_, H> {
+    fn open_resource_at(
+        &self,
+        grant: &ken_host::CapabilityGrantV1,
+        path: &[u8],
+        request: ken_host::OpenRequest,
+    ) -> Result<ken_host::ResourceHandleV1, ken_host::FileErrorCauseV1> {
+        let components = fs_target_components(path)
+            .map_err(|error| ken_host::FileErrorCauseV1::Capability(map_denial_v1(error)))?;
+        let (leaf, parents) = components.split_last().ok_or_else(|| {
+            ken_host::FileErrorCauseV1::Io(ken_host::IoErrorIdentityV1::InvalidInput)
+        })?;
+        let capabilities::FsHandle::Posix(mut parent) = grant.capability.scope().root.clone()
+        else {
+            return Err(ken_host::FileErrorCauseV1::Capability(
+                ken_host::CapabilityDeniedV1::ScopeEscape,
+            ));
+        };
+        for component in parents {
+            let component = ken_host::PathComponent::new(component)
+                .map_err(|error| host_error_v1(error.into_io_error()))?;
+            if ken_host::readlink_at(&parent, &component).is_ok() {
+                return Err(ken_host::FileErrorCauseV1::Capability(
+                    ken_host::CapabilityDeniedV1::SymlinkDenied,
+                ));
+            }
+            parent = ken_host::open_at(&parent, &component, ken_host::OpenRequest::ReadDirectory)
+                .map_err(|error| host_error_v1(error.into_io_error()))?;
+        }
+        let leaf = ken_host::PathComponent::new(leaf)
+            .map_err(|error| host_error_v1(error.into_io_error()))?;
+        if ken_host::readlink_at(&parent, &leaf).is_ok() {
+            return Err(ken_host::FileErrorCauseV1::Capability(
+                ken_host::CapabilityDeniedV1::SymlinkDenied,
+            ));
+        }
+        ken_host::open_resource_at_v1(&parent, &leaf, request)
+            .map_err(|error| host_error_v1(error.into_io_error()))
+    }
+
     fn resolve(
         &mut self,
         grant: &ken_host::CapabilityGrantV1,
@@ -6218,30 +6204,6 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
             .map_err(host_error_v1)
     }
 
-    fn fs_read_directory(
-        &mut self,
-        grant: &ken_host::CapabilityGrantV1,
-        path: &[u8],
-    ) -> Result<Vec<ken_host::DirEntryV1>, ken_host::FileErrorCauseV1> {
-        let Resolution::Existing(handle) = self.resolve(grant, path, FsOpKind::Enumerate)? else {
-            return Err(ken_host::FileErrorCauseV1::Io(
-                ken_host::IoErrorIdentityV1::InvalidInput,
-            ));
-        };
-        self.handler
-            .fs_read_directory_at(&handle)
-            .map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|entry| ken_host::DirEntryV1 {
-                        name: entry.name,
-                        kind: host_kind_v1(entry.kind),
-                    })
-                    .collect()
-            })
-            .map_err(host_error_v1)
-    }
-
     fn fs_create_directory(
         &mut self,
         grant: &ken_host::CapabilityGrantV1,
@@ -6340,35 +6302,6 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
         path: &[u8],
         mode: ken_host::FsOpenModeV1,
     ) -> Result<ken_host::ResourceHandleV1, ken_host::FileErrorCauseV1> {
-        let components = fs_target_components(path)
-            .map_err(|error| ken_host::FileErrorCauseV1::Capability(map_denial_v1(error)))?;
-        let (leaf, parents) = components.split_last().ok_or_else(|| {
-            ken_host::FileErrorCauseV1::Io(ken_host::IoErrorIdentityV1::InvalidInput)
-        })?;
-        let capabilities::FsHandle::Posix(mut parent) = grant.capability.scope().root.clone()
-        else {
-            return Err(ken_host::FileErrorCauseV1::Capability(
-                ken_host::CapabilityDeniedV1::ScopeEscape,
-            ));
-        };
-        for component in parents {
-            let component = ken_host::PathComponent::new(component)
-                .map_err(|error| host_error_v1(error.into_io_error()))?;
-            if ken_host::readlink_at(&parent, &component).is_ok() {
-                return Err(ken_host::FileErrorCauseV1::Capability(
-                    ken_host::CapabilityDeniedV1::SymlinkDenied,
-                ));
-            }
-            parent = ken_host::open_at(&parent, &component, ken_host::OpenRequest::ReadDirectory)
-                .map_err(|error| host_error_v1(error.into_io_error()))?;
-        }
-        let leaf = ken_host::PathComponent::new(leaf)
-            .map_err(|error| host_error_v1(error.into_io_error()))?;
-        if ken_host::readlink_at(&parent, &leaf).is_ok() {
-            return Err(ken_host::FileErrorCauseV1::Capability(
-                ken_host::CapabilityDeniedV1::SymlinkDenied,
-            ));
-        }
         let request = match mode {
             ken_host::FsOpenModeV1::Read | ken_host::FsOpenModeV1::Metadata => {
                 ken_host::OpenRequest::Read
@@ -6383,8 +6316,15 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
                 ken_host::OpenRequest::CreateOrKeep
             }
         };
-        ken_host::open_resource_at_v1(&parent, &leaf, request)
-            .map_err(|error| host_error_v1(error.into_io_error()))
+        self.open_resource_at(grant, path, request)
+    }
+
+    fn fs_open_directory(
+        &mut self,
+        grant: &ken_host::CapabilityGrantV1,
+        path: &[u8],
+    ) -> Result<ken_host::ResourceHandleV1, ken_host::FileErrorCauseV1> {
+        self.open_resource_at(grant, path, ken_host::OpenRequest::ReadDirectory)
     }
 
     fn resource_map_anonymous(
@@ -6420,14 +6360,6 @@ fn to_console_stream_v1(stream: ConsoleStream) -> ken_host::ConsoleStreamV1 {
     }
 }
 
-fn host_kind_v1(kind: HostFileKind) -> ken_host::FsNodeKindV1 {
-    match kind {
-        HostFileKind::File => ken_host::FsNodeKindV1::File,
-        HostFileKind::Directory => ken_host::FsNodeKindV1::Directory,
-        HostFileKind::Symlink => ken_host::FsNodeKindV1::Symlink,
-        HostFileKind::Other => ken_host::FsNodeKindV1::Other,
-    }
-}
 
 fn narrow_host_u64(
     value: &EvalVal,
@@ -6614,12 +6546,6 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::CanonicalRequestV1::FsMetadata { path: bytes_at(2)? },
             fs.op_metadata_id,
         )
-    } else if op_id == fs.readdirectory_id {
-        (
-            ken_host::HostOpV1::FsReadDirectory,
-            ken_host::CanonicalRequestV1::FsReadDirectory { path: bytes_at(2)? },
-            fs.op_read_directory_id,
-        )
     } else if op_id == fs.createdirectory_id {
         (
             ken_host::HostOpV1::FsCreateDirectory,
@@ -6667,6 +6593,18 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::HostOpV1::FsChangeMode,
             ken_host::CanonicalRequestV1::FsChangeMode { path, mode },
             fs.op_change_mode_id,
+        )
+    } else if op_id == fs.private_fs_open_directory_id {
+        (
+            ken_host::HostOpV1::FsOpenDirectory,
+            ken_host::CanonicalRequestV1::FsOpenDirectory { path: bytes_at(2)? },
+            fs.op_read_directory_id,
+        )
+    } else if op_id == fs.private_fs_read_directory_batch_id {
+        (
+            ken_host::HostOpV1::FsReadDirectoryBatch,
+            ken_host::CanonicalRequestV1::FsReadDirectoryBatch,
+            fs.op_read_directory_id,
         )
     } else if op_id == fs.private_fs_open_id {
         let mode = match args.get(3) {
@@ -6974,6 +6912,7 @@ fn fs_dispatch<H: HostHandler>(
     let token = if matches!(
         operation,
         ken_host::HostOpV1::FsHandleMetadata
+            | ken_host::HostOpV1::FsReadDirectoryBatch
             | ken_host::HostOpV1::BufferAllocate
             | ken_host::HostOpV1::FsReadAt
             | ken_host::HostOpV1::FsWriteAt
@@ -7011,7 +6950,7 @@ fn fs_dispatch<H: HostHandler>(
     };
     let resource = if matches!(
         operation,
-        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::MappingAcquireFile
+        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ProcessSignal
@@ -7272,7 +7211,7 @@ fn reify_host_reply_v1(
                 .and_then(|(decl, index)| decl.constructors.get(index))
                 .map(|ctor| checked_type_value(checked_codomain(&ctor.type_), globals, store))
                 .unwrap_or(EvalVal::Unknown);
-            entries.into_iter().rev().fold(
+            let list = entries.into_iter().rev().fold(
                 make_ctor(fs.nil_id, vec![elem.clone()], store),
                 |tail, entry| {
                     let kind = match entry.kind {
@@ -7289,7 +7228,11 @@ fn reify_host_reply_v1(
                     );
                     make_ctor(fs.cons_id, vec![elem.clone(), value, tail], store)
                 },
-            )
+            );
+            make_ctor(fs.directory_entries_id, vec![list], store)
+        }
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::DirectoryEnd) => {
+            make_ctor(fs.directory_end_id, vec![], store)
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceAcquired {
             ..
@@ -8122,7 +8065,6 @@ mod px0_target_classification_tests {
         assert_unsupported(host.fs_append_at(&handle, b"bytes"));
         assert_unsupported(host.fs_create_append_at(&handle, b"file", b"bytes"));
         assert_unsupported(host.fs_metadata_at(&handle));
-        assert_unsupported(host.fs_read_directory_at(&handle));
         assert_unsupported(host.fs_create_directory_at(&handle, b"dir"));
         assert_unsupported(host.fs_remove_file_at(&handle, b"file"));
         assert_unsupported(host.fs_remove_directory_at(&handle, b"dir", false));
@@ -8409,13 +8351,14 @@ mod px5b_effect_observation_tests {
             writefile_id: id(),
             appendfile_id: id(),
             metadata_id: id(),
-            readdirectory_id: id(),
             createdirectory_id: id(),
             removefile_id: id(),
             removedirectory_id: id(),
             rename_id: id(),
             change_mode_id: id(),
             private_fs_open_id: id(),
+            private_fs_open_directory_id: id(),
+            private_fs_read_directory_batch_id: id(),
             private_fs_handle_metadata_id: id(),
             private_buffer_allocate_id: id(),
             private_fs_read_at_id: id(),
@@ -8490,6 +8433,8 @@ mod px5b_effect_observation_tests {
             cons_id: id(),
             mk_file_metadata_id: id(),
             mk_dir_entry_id: id(),
+            directory_entries_id: id(),
+            directory_end_id: id(),
             k_file_id: id(),
             k_directory_id: id(),
             k_symlink_id: id(),

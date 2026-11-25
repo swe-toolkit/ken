@@ -119,7 +119,6 @@ fn surface_and_render_package_add_zero_trusted_base_entries() {
         "WriteFile",
         "AppendFile",
         "Metadata",
-        "ReadDirectory",
         "CreateDirectory",
         "RemoveFile",
         "RemoveDirectory",
@@ -148,7 +147,7 @@ fn surface_and_render_package_add_zero_trusted_base_entries() {
 }
 
 #[test]
-fn full_authority_drives_every_fs_arm_with_exact_state_and_trace() {
+fn full_authority_drives_virtual_fs_path_arms_with_exact_state_and_trace() {
     let env = setup();
     let mut host = CaptureHost::new(Vec::new());
     host.insert_directory(b"root".to_vec());
@@ -198,13 +197,6 @@ fn full_authority_drives_every_fs_arm_with_exact_state_and_trace() {
         "file_metadata",
         AUTH_FULL,
         vec![bytes(b"root/sub/a\xff")],
-    ));
-    ok(&drive(
-        &env,
-        &mut host,
-        "read_directory",
-        AUTH_FULL,
-        vec![bytes(b"root/sub")],
     ));
     ok(&drive(
         &env,
@@ -261,9 +253,6 @@ fn full_authority_drives_every_fs_arm_with_exact_state_and_trace() {
             },
             FsTrace::Metadata {
                 path: b"root/sub/a\xff".to_vec()
-            },
-            FsTrace::ReadDirectory {
-                path: b"root/sub".to_vec()
             },
             FsTrace::Rename {
                 from: b"root/sub/a\xff".to_vec(),

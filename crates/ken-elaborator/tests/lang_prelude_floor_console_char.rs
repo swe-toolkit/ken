@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 108] = [
+const PACKAGED: [(&str, &str); 109] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -38,7 +38,8 @@ const PACKAGED: [(&str, &str); 108] = [
     ("Capability.Filesystem.Authority", "append_file"),
     ("Capability.Filesystem.Authority", "change_mode"),
     ("Capability.Filesystem.Authority", "create_directory"),
-    ("Capability.Filesystem.Authority", "read_directory"),
+    ("Capability.Filesystem.Authority", "withDirectory"),
+    ("Capability.System.IO", "readDirectoryBatch"),
     ("Capability.Filesystem.Authority", "remove_directory"),
     ("Capability.Filesystem.Authority", "remove_file"),
     ("Capability.Filesystem.Authority", "rename_file"),

@@ -158,6 +158,8 @@ canonical_runtime_roles! {
     file_operation_remove_file => "OpRemoveFile",
     file_operation_remove_directory => "OpRemoveDirectory",
     dir_entry => "MkDirEntry",
+    directory_entries => "DirectoryEntries",
+    directory_end => "DirectoryEnd",
     // ABI-S1 appends without changing established role indices.
     file_operation_seek => "OpSeek",
     file_operation_set_length => "OpSetLength",
@@ -212,7 +214,6 @@ canonical_runtime_roles! {
     op_fs_write_file => "WriteFile",
     op_fs_append_file => "AppendFile",
     op_fs_metadata => "Metadata",
-    op_fs_read_directory => "ReadDirectory",
     op_fs_create_directory => "CreateDirectory",
     op_fs_remove_file => "RemoveFile",
     op_fs_remove_directory => "RemoveDirectory",
@@ -326,6 +327,8 @@ pub fn empty_prelude_env() -> PreludeEnv {
         inject_l_id: z,
         inject_r_id: z,
         private_fs_open_id: z,
+        private_fs_open_directory_id: z,
+        private_fs_read_directory_batch_id: z,
         private_fs_handle_metadata_id: z,
         private_buffer_allocate_id: z,
         private_fs_read_at_id: z,
@@ -503,6 +506,8 @@ pub struct PreludeEnv {
     /// from `globals` after the checked public bracket is installed; drivers
     /// resolve them through this immutable prelude record.
     pub private_fs_open_id: GlobalId,
+    pub private_fs_open_directory_id: GlobalId,
+    pub private_fs_read_directory_batch_id: GlobalId,
     pub private_fs_handle_metadata_id: GlobalId,
     pub private_buffer_allocate_id: GlobalId,
     pub private_fs_read_at_id: GlobalId,
@@ -894,6 +899,8 @@ struct PreludeBufferIds {
 
 struct PreludeOperationIds {
     private_fs_open_id: GlobalId,
+    private_fs_open_directory_id: GlobalId,
+    private_fs_read_directory_batch_id: GlobalId,
     private_fs_handle_metadata_id: GlobalId,
     private_resource_release_id: GlobalId,
     private_bracket_release_id: GlobalId,
@@ -913,6 +920,8 @@ struct PreludeResourceIds {
     auth_t: Term,
     cap_id: GlobalId,
     private_fs_open_id: GlobalId,
+    private_fs_open_directory_id: GlobalId,
+    private_fs_read_directory_batch_id: GlobalId,
     private_fs_handle_metadata_id: GlobalId,
     private_buffer_allocate_id: GlobalId,
     private_fs_read_at_id: GlobalId,
@@ -2273,6 +2282,12 @@ fn register_prelude_buffer_views(elab: &mut ElabEnv) -> Result<PreludeBufferIds,
     .map_err(|e| ElabError::Internal(format!("prelude MappingHandle failed: {e}")))?;
     elab.elaborate_decl("data TransferCount = PrivateTransferCount Nat Nat")
         .map_err(|e| ElabError::Internal(format!("prelude TransferCount failed: {e}")))?;
+    elab.elaborate_decl("data DirectoryProgress = DirectoryEntries (List DirEntry) | DirectoryEnd")
+        .map_err(|e| ElabError::Internal(format!("prelude DirectoryProgress failed: {e}")))?;
+    elab.elaborate_decl("data DirectoryHandle = PrivateDirectoryHandle (Resource ResourceKind.FsHandle)")
+        .map_err(|e| ElabError::Internal(format!("prelude DirectoryHandle failed: {e}")))?;
+    elab.elaborate_decl("fn directory_handle_resource (dir : DirectoryHandle) : Resource ResourceKind.FsHandle = match dir { PrivateDirectoryHandle resource |-> resource }")
+        .map_err(|e| ElabError::Internal(format!("prelude directory_handle_resource failed: {e}")))?;
     elab.elaborate_decl("data ReadProgress = ReadSome BufferSpan TransferCount | ReadEof")
         .map_err(|e| ElabError::Internal(format!("prelude ReadProgress failed: {e}")))?;
     elab.elaborate_decl("data WriteProgress = Wrote TransferCount")
@@ -2480,11 +2495,12 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
-                named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bool_t, bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), int_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), resource_open_mode_t]),
+                named(vec![cap_a(), bytes_t.clone()]),
+                named(vec![resource_fs_handle_t.clone()]),
                 named(vec![resource_fs_handle_t.clone()]),
                 named(vec![resource_kind_t.clone(), resource_of_latest_kind_t.clone()]),
                 named(vec![resource_kind_t, resource_of_latest_kind_t]),
@@ -2560,13 +2576,14 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "WriteFile",
         "AppendFile",
         "Metadata",
-        "ReadDirectory",
         "CreateDirectory",
         "RemoveFile",
         "RemoveDirectory",
         "Rename",
         "ChangeMode",
         "PrivateFsOpen",
+        "PrivateFsOpenDirectory",
+        "PrivateFsReadDirectoryBatch",
         "PrivateFsHandleMetadata",
         "PrivateResourceRelease",
         "PrivateBracketRelease",
@@ -2601,6 +2618,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         elab.globals.insert(name.to_string(), id);
     }
     let private_fs_open_id = elab.globals["PrivateFsOpen"];
+    let private_fs_open_directory_id = elab.globals["PrivateFsOpenDirectory"];
+    let private_fs_read_directory_batch_id = elab.globals["PrivateFsReadDirectoryBatch"];
     let private_fs_handle_metadata_id = elab.globals["PrivateFsHandleMetadata"];
     let private_resource_release_id = elab.globals["PrivateResourceRelease"];
     let private_bracket_release_id = elab.globals["PrivateBracketRelease"];
@@ -2624,6 +2643,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     ].map(|name| elab.globals[name]);
     Ok(PreludeOperationIds {
         private_fs_open_id,
+        private_fs_open_directory_id,
+        private_fs_read_directory_batch_id,
         private_fs_handle_metadata_id,
         private_resource_release_id,
         private_bracket_release_id,
@@ -2652,6 +2673,8 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
         auth_t: seed.auth_t,
         cap_id: seed.cap_id,
         private_fs_open_id: op.private_fs_open_id,
+        private_fs_open_directory_id: op.private_fs_open_directory_id,
+        private_fs_read_directory_batch_id: op.private_fs_read_directory_batch_id,
         private_fs_handle_metadata_id: op.private_fs_handle_metadata_id,
         private_buffer_allocate_id: op.private_buffer_allocate_id,
         private_fs_read_at_id: op.private_fs_read_at_id,
@@ -2701,13 +2724,14 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            WriteFile cap path policy contents |-> Result FileError Unit; \
            AppendFile cap path contents |-> Result FileError Unit; \
            Metadata cap path |-> Result FileError FileMetadata; \
-           ReadDirectory cap path |-> Result FileError (List DirEntry); \
            CreateDirectory cap path |-> Result FileError Unit; \
            RemoveFile cap path |-> Result FileError Unit; \
            RemoveDirectory cap recursive path |-> Result FileError Unit; \
            Rename cap from to |-> Result FileError Unit; \
            ChangeMode cap path mode |-> Result FileError Unit; \
            PrivateFsOpen cap path mode |-> Result FileError (Resource ResourceKind.FsHandle); \
+           PrivateFsOpenDirectory cap path |-> Result FileError (Resource ResourceKind.FsHandle); \
+           PrivateFsReadDirectoryBatch file |-> Result ResourceError DirectoryProgress; \
            PrivateFsHandleMetadata resource |-> Result ResourceError FileMetadata; \
            PrivateResourceRelease kind resource |-> Result ResourceError Unit; \
            PrivateBracketRelease kind resource |-> Result ResourceError Unit; \
@@ -2791,12 +2815,6 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            (\\r. Ret (FSOp a) (fs_resp a) (Result FileError FileMetadata) r)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude file_metadata failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc read_directory (a : Auth) (cap : Cap a) (path : Bytes) : FS a (Result FileError (List DirEntry)) visits [FS] = \
-         Vis (FSOp a) (fs_resp a) (Result FileError (List DirEntry)) (ReadDirectory a cap path) \
-           (\\r. Ret (FSOp a) (fs_resp a) (Result FileError (List DirEntry)) r)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude read_directory failed: {}", e)))?;
     elab.elaborate_decl(
         "proc create_directory (a : Auth) (cap : Cap a) (path : Bytes) : FS a (Result FileError Unit) visits [FS] = \
          Vis (FSOp a) (fs_resp a) (Result FileError Unit) (CreateDirectory a cap path) \
@@ -3085,6 +3103,41 @@ fn register_prelude_brackets(elab: &mut ElabEnv) -> Result<(), ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude withResource failed: {e}")))?;
     elab.elaborate_decl(
+        "proc private_with_directory_after_open (a : Auth) (e : Type) (r : Type) \
+           (body : DirectoryHandle -> HostIO a (ResourceBodyResult e r)) \
+           (acquired : Result FileError (Resource ResourceKind.FsHandle)) \
+           : HostIO a (Result FileError (ResourceBracketResult e r)) visits [FS] = \
+         match acquired { \
+           Err open_error |-> Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result FileError (ResourceBracketResult e r)) \
+             (Err FileError (ResourceBracketResult e r) open_error); \
+           Ok resource |-> bind (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (ResourceBodyResult e r) \
+             (Result FileError (ResourceBracketResult e r)) \
+             (body (PrivateDirectoryHandle resource)) \
+             (\\body_result. release_if_live a FileError e r ResourceKind.FsHandle resource body_result) \
+         }",
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude private_with_directory_after_open failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "proc withDirectory (a : Auth) (e : Type) (r : Type) \
+           (cap : Cap a) (path : Bytes) \
+           (body : DirectoryHandle -> HostIO a (ResourceBodyResult e r)) \
+           : HostIO a (Result FileError (ResourceBracketResult e r)) visits [FS] = \
+         Vis (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+           (Result FileError (ResourceBracketResult e r)) \
+           (InL (FSOp a) AmbientOp (PrivateFsOpenDirectory a cap path)) \
+           (\\acquired. private_with_directory_after_open a e r body acquired)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude withDirectory failed: {e}")))?;
+    elab.elaborate_decl(
         "proc private_with_buffer_after_allocate (a : Auth) (e : Type) (r : Type) \
            (capacity : Int) \
            (body : BufferHandle -> HostIO a (ResourceBodyResult e r)) \
@@ -3178,7 +3231,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     // used their original bare bindings, but before their IDs are hidden.
     // The hide step below must select their qualified bindings so even a
     // qualified source path cannot construct or project these private values.
-    for name in ["BufferSpan", "TransferCount"] {
+    for name in ["BufferSpan", "TransferCount", "DirectoryHandle"] {
         let parent_id = elab.globals[name];
         elab.module_state.scope_constructor_family(
             &elab.env,
@@ -3198,6 +3251,8 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     // above and the immutable `PreludeEnv` driver record.
     let private_names = [
         "PrivateFsOpen",
+        "PrivateFsOpenDirectory",
+        "PrivateFsReadDirectoryBatch",
         "PrivateFsHandleMetadata",
         "PrivateBufferAllocate",
         "PrivateFsReadAt",
@@ -3243,6 +3298,9 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "mapping_window_start",
         "mapping_window_length",
         "PrivateBufferHandle",
+        "DirectoryHandle.PrivateDirectoryHandle",
+        "directory_handle_resource",
+        "private_with_directory_after_open",
         "BufferSpan.PrivateBufferSpan",
         "TransferCount.PrivateTransferCount",
         "buffer_handle_resource",
@@ -3653,6 +3711,8 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         inject_l_id: core.inject_l_id,
         inject_r_id: core.inject_r_id,
         private_fs_open_id: fs_ids.private_fs_open_id,
+        private_fs_open_directory_id: fs_ids.private_fs_open_directory_id,
+        private_fs_read_directory_batch_id: fs_ids.private_fs_read_directory_batch_id,
         private_fs_handle_metadata_id: fs_ids.private_fs_handle_metadata_id,
         private_buffer_allocate_id: fs_ids.private_buffer_allocate_id,
         private_fs_read_at_id: fs_ids.private_fs_read_at_id,
@@ -3741,6 +3801,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     for name in [
         "ConsoleOp",
         "DirEntry",
+        "DirectoryProgress",
         "FileKind",
         "FileMetadata",
         "FileOperation",
@@ -3825,6 +3886,19 @@ fn register_post_bracket_io(elab: &mut ElabEnv) -> Result<(), ElabError> {
              (Result ResourceError Unit) r)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude mapWrite failed: {e}")))?;
+
+    elab.elaborate_decl(
+        "proc readDirectoryBatch (a : Auth) (dir : DirectoryHandle) \
+           : HostIO a (Result ResourceError DirectoryProgress) visits [FS] = \
+         Vis (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+           (Result ResourceError DirectoryProgress) \
+           (InL (FSOp a) AmbientOp (PrivateFsReadDirectoryBatch a (directory_handle_resource dir))) \
+           (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError DirectoryProgress) r)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude readDirectoryBatch failed: {e}")))?;
 
     // Positioned buffer I/O. Public zero-length reads are discharged without a
     // host visit; positive transfers and freezes use the constructor-private

@@ -184,6 +184,8 @@ fn selected_host_fixture() -> SelectedHostFixture {
         file_operation_remove_file: unused.clone(),
         file_operation_remove_directory: unused.clone(),
         dir_entry: unused.clone(),
+        directory_entries: unused.clone(),
+        directory_end: unused.clone(),
         file_operation_seek: unused.clone(),
         file_operation_set_length: unused.clone(),
         file_operation_sync: unused.clone(),

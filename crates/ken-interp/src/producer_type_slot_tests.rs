@@ -193,16 +193,14 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
 #[test]
 fn fs_directory_and_file_error_path_slots_agree_with_source() {
     let (elab, mut store) = fixture(&[
-        "const dirSource : List DirEntry = Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"a\") FileKind.KFile) (Nil DirEntry)",
-        "const dirDifferent : List DirEntry = Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"b\") FileKind.KFile) (Nil DirEntry)",
+        "const dirSource : DirectoryProgress = DirectoryProgress.DirectoryEntries (Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"a\") FileKind.KFile) (Nil DirEntry))",
+        "const dirDifferent : DirectoryProgress = DirectoryProgress.DirectoryEntries (Cons DirEntry (DirEntry.MkDirEntry (bytes_encode \"b\") FileKind.KFile) (Nil DirEntry))",
         "const pathSource : Option Bytes = Some Bytes (bytes_encode \"a\")",
         "const pathDifferent : Option Bytes = Some Bytes (bytes_encode \"b\")",
     ]);
     let fs = FSIds::from_elab(&elab.prelude_env).expect("FS roles");
     let ids = ConsoleIds::from_elab(&elab.prelude_env).expect("host result roles");
-    let request = ken_host::CanonicalRequestV1::FsReadDirectory {
-        path: b".".to_vec(),
-    };
+    let request = ken_host::CanonicalRequestV1::FsReadDirectoryBatch;
     let reply = reify_host_reply_v1(
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::DirectoryEntries(vec![
             ken_host::DirEntryV1 {

@@ -390,6 +390,8 @@ fn primitive_signature_inventory_is_executable_and_closed() {
             "ConsoleOp",
             "console_resp",
             "DirEntry",
+            "DirectoryHandle",
+            "DirectoryProgress",
             "FileKind",
             "FileMetadata",
             "FileOperation",

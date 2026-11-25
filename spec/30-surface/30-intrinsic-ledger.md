@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative fifty-three-identity prelude and its exact
+> normative fifty-five-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -45,7 +45,8 @@ Apart from internal-only `Empty`, the original fifteen floor identities
 earlier FS/resource families, the five scoped
 progress/acquisition/mapping/child-result families, the five
 Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
-`DirEntry`, `FileOperation`), scoped `StateOp` and checked `resp_state`,
+`DirEntry`, `FileOperation`), the two scoped ABI-S2 directory families,
+scoped `StateOp` and checked `resp_state`,
 the four direct-ITree floor identities (`ConsoleOp`, `console_resp`,
 `itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, `Decimal`,
 and the three earlier State operations below, the other names in this table are
@@ -88,6 +89,8 @@ constructor still has the same checked parent and `GlobalId`.
 | `ExitCode` (floor) | Yes | `ExitCode.Success`/`ExitCode.Failure` state their exit-code meaning; the bare names are not reserved. |
 | `ResourceError` (floor) | Yes | All twelve current error causes use `ResourceError.C`; no bare error name is reserved. The successor `ResourceError.Revoked` (§38 §1.3.1) is not a current checked constructor. |
 | `ReadProgress` (floor) | Yes | `ReadProgress.ReadSome` and `ReadProgress.ReadEof` are the complete checked read-result family; neither leaf is bare-reserved. |
+| `DirectoryHandle` (floor) | Yes | `PrivateDirectoryHandle` and its raw resource projection are private; no bare leaf is reserved. |
+| `DirectoryProgress` (floor) | Yes | `DirectoryProgress.DirectoryEntries` and `DirectoryProgress.DirectoryEnd` are the complete checked batch-result family; neither leaf is bare-reserved. |
 | `WriteProgress` (floor) | Yes | `WriteProgress.Wrote` is the checked write-result case; `Wrote` is not bare-reserved. |
 | `ResourceOpenMode` (floor) | Yes | `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata` and `ResourceOpenMode.ResourceWriteCreate` select FS acquisition modes; their leaves are not bare-reserved. |
 | `MappingProt` (floor) | Yes | `MappingProt.ReadOnly` and `MappingProt.ReadWrite` select mapping protection; neither leaf is bare-reserved. |
@@ -206,6 +209,8 @@ alone reserves a name.
 | `release` (package) | The same Resource package exports the checked explicit settlement operation, not a floor member. |
 | `BufferHandle` (package, abstract) | `Capability.System.Buffer` homes this checked type alone; its `PrivateBufferHandle` constructor is not public or a floor identity. |
 | `readAt` (package) | `Capability.System.IO` exports the checked bounded read wrapper; it returns floor `ReadProgress`. |
+| `withDirectory` (package) | `Capability.Filesystem.Authority` exports the checked bracket for private directory acquisition (`38 §1.14`). |
+| `readDirectoryBatch` (package) | `Capability.System.IO` exports the checked batch wrapper; it accepts floor `DirectoryHandle` and returns a result over floor `DirectoryProgress` (`38 §1.14`). |
 | `spanBytes` (package) | The same IO package exports the checked bounded span-to-bytes wrapper. |
 | `write` (package) | Checked Console wrapper; native code selects the emitted `ITree.Vis` and floor `ConsoleOp.Write` IDs, not this wrapper. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
 | `print_line` (package) | Checked Console helper promised by §38 and existing programs, with no native exact-ID reader. `Capability.Console.Text` exports its captured pre-source ID for explicit import. |
@@ -254,6 +259,10 @@ alone reserves a name.
 | `ReadProgress` (floor, scoped) | Native read results carry this exact checked family (`38 §1.7.2`, §1.11); source must name its cases to handle data and EOF. |
 | `ReadSome` (qualified floor constructor) | Checked span-and-count result, source `ReadProgress.ReadSome`, not bare. |
 | `ReadEof` (qualified floor constructor) | Checked zero-progress result, source `ReadProgress.ReadEof`, not bare. |
+| `DirectoryHandle` (floor, scoped, constructor-private) | The checked wrappers use this exact pre-source family. Source needs the bracket body type; it cannot construct the handle or project its raw `FsHandle` (`38 §1.14`). |
+| `DirectoryProgress` (floor, scoped) | Native batch replies use its exact checked constructors, which source matches to distinguish entries from end (`38 §1.14`). |
+| `DirectoryEntries` (qualified floor constructor) | Nonempty batch, source `DirectoryProgress.DirectoryEntries`, not bare. |
+| `DirectoryEnd` (qualified floor constructor) | Explicit sticky end, source `DirectoryProgress.DirectoryEnd`, not bare. |
 | `WriteProgress` (floor, scoped) | Native write results carry this exact checked family (`38 §1.7.2`, §1.11); source must name its positive-count case. |
 | `Wrote` (qualified floor constructor) | Checked count result, source `WriteProgress.Wrote`, not bare. |
 | `ResourceOpenMode` (floor, scoped) | The exact checked FS acquisition mode is selected by native open operations (`38 §1.3.1`); source names it for `withResource`. |
@@ -283,7 +292,7 @@ alone reserves a name.
 | `OpWriteFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpWriteFile`. |
 | `OpAppendFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpAppendFile`. |
 | `OpMetadata` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpMetadata`. |
-| `OpReadDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpReadDirectory`. |
+| `OpReadDirectory` (qualified floor constructor) | Exact FileError operation ID for directory acquisition; source `FileOperation.OpReadDirectory`. |
 | `OpCreateDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpCreateDirectory`. |
 | `OpRemoveFile` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveFile`. |
 | `OpRemoveDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveDirectory`. |
@@ -312,7 +321,8 @@ result/FS scoped families, and `ConsoleOp`, `console_resp`, `itree_bind`
 and `resp_coproduct` marked floor above join B alongside the original
 fifteen; the checked transparent `Decimal` joins that earlier
 fifty-one, giving fifty-two counted identities; PX11's `SocketAddress`
-(`38 §1.13`) then gives fifty-three. Their floor spellings
+(`38 §1.13`) then gives fifty-three. ABI-S2's `DirectoryHandle` and
+`DirectoryProgress` (`38 §1.14`) give fifty-five. Their floor spellings
 are protected; scoped case leaves and bare `get`, `put` and `bind` do not
 enter B through the checked operations. The package-home roster's
 Increment 3a target has ninety-six rows: the eighty-one at its base,

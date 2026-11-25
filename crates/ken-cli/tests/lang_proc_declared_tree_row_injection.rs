@@ -147,7 +147,7 @@ fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
         }
         ClockWallNow | ClockMonotonicNow | ClockSleepUntil => (HostTree::Clock, HostTree::Console),
         EntropyRandomBytes => (HostTree::Entropy, HostTree::Console),
-        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsReadDirectory
+        FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsOpenDirectory | FsReadDirectoryBatch
         | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
         | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
         | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease | BufferAllocate

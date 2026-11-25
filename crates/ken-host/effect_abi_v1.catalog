@@ -93,7 +93,6 @@ operation|FsReadFile|0301|native|FsReadFileRequestV1|2|HostReplyV1|1
 operation|FsWriteFile|0302|native|FsWriteFileRequestV1|4|HostReplyV1|1
 operation|FsAppendFile|0303|native|FsAppendFileRequestV1|3|HostReplyV1|1
 operation|FsMetadata|0304|native|FsPathRequestV1|2|HostReplyV1|1
-operation|FsReadDirectory|0305|native|FsPathRequestV1|2|HostReplyV1|1
 operation|FsCreateDirectory|0306|native|FsPathRequestV1|2|HostReplyV1|1
 operation|FsRemoveFile|0307|native|FsPathRequestV1|2|HostReplyV1|1
 operation|FsRemoveDirectory|0308|native|FsRecursivePathRequestV1|3|HostReplyV1|1
@@ -109,6 +108,8 @@ operation|FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1
 operation|FsGetInheritance|0312|unavailable|FsGetInheritanceRequestV1|1|HostReplyV1|1
 operation|FsSetInheritance|0313|unavailable|FsSetInheritanceRequestV1|2|HostReplyV1|1
 operation|FsDuplicate|0314|unavailable|FsDuplicateRequestV1|2|HostReplyV1|1
+operation|FsOpenDirectory|0315|native|FsPathRequestV1|2|HostReplyV1|1
+operation|FsReadDirectoryBatch|0316|native|ResourceRequestV1|1|HostReplyV1|1
 operation|ResourceRelease|0401|native|ResourceRequestV1|1|HostReplyV1|1
 operation|BufferAllocate|0402|native|BufferAllocateRequestV1|1|HostReplyV1|1
 operation|BufferFreeze|0403|native|BufferFreezeRequestV1|4|HostReplyV1|1

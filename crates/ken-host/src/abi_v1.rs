@@ -737,30 +737,13 @@ impl HostEffectBackendV1 for ProcessHost {
         crate::file_metadata_v1(&handle).map_err(host_error)
     }
 
-    fn fs_read_directory(
+    fn fs_open_directory(
         &mut self,
         grant: &CapabilityGrantV1,
         path: &[u8],
-    ) -> Result<Vec<crate::DirEntryV1>, FileErrorCauseV1> {
+    ) -> Result<crate::ResourceHandleV1, FileErrorCauseV1> {
         let (parent, leaf) = Self::parent(grant, path)?;
-        let handle =
-            crate::open_at(&parent, &leaf, OpenRequest::ReadDirectory).map_err(host_error)?;
-        crate::read_directory(&handle)
-            .map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|entry| crate::DirEntryV1 {
-                        name: entry.name,
-                        kind: match entry.kind {
-                            crate::FileKind::File => crate::FsNodeKindV1::File,
-                            crate::FileKind::Directory => crate::FsNodeKindV1::Directory,
-                            crate::FileKind::Symlink => crate::FsNodeKindV1::Symlink,
-                            crate::FileKind::Other => crate::FsNodeKindV1::Other,
-                        },
-                    })
-                    .collect()
-            })
-            .map_err(host_error)
+        crate::open_resource_at_v1(&parent, &leaf, OpenRequest::ReadDirectory).map_err(host_error)
     }
 
     fn fs_create_directory(
@@ -1557,10 +1540,15 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 .last()
                 .expect("directory response was appended");
             reply.tag = REPLY_BYTES;
+            reply.detail = crate::DIRECTORY_BATCH_ENTRIES_V1;
             reply.bytes = SliceV1 {
                 data: bytes.as_ptr(),
                 len: bytes.len(),
             };
+        }
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEnd) => {
+            reply.tag = REPLY_BYTES;
+            reply.detail = crate::DIRECTORY_BATCH_END_V1;
         }
         CanonicalOutcomeV1::Success(CanonicalReplyV1::SocketAddress(address)) => {
             let (family, port, bytes) = match address {
@@ -1952,7 +1940,7 @@ unsafe fn decode_native_request_v1(
                 },
             )
         }
-        HostOpV1::FsReadDirectory | HostOpV1::FsCreateDirectory
+        HostOpV1::FsOpenDirectory | HostOpV1::FsCreateDirectory
             if request_size == std::mem::size_of::<FsPathRequestV1>() =>
         {
             if !request.cast::<FsPathRequestV1>().is_aligned() {
@@ -1966,7 +1954,7 @@ unsafe fn decode_native_request_v1(
             let request = if op == HostOpV1::FsCreateDirectory {
                 CanonicalRequestV1::FsCreateDirectory { path }
             } else {
-                CanonicalRequestV1::FsReadDirectory { path }
+                CanonicalRequestV1::FsOpenDirectory { path }
             };
             (
                 Some(CapabilityTokenV1::from_erased_identity(wire.capability)),
@@ -2078,17 +2066,17 @@ unsafe fn decode_native_request_v1(
                 },
             )
         }
-        HostOpV1::FsHandleMetadata | HostOpV1::ResourceRelease
+        HostOpV1::FsHandleMetadata | HostOpV1::FsReadDirectoryBatch | HostOpV1::ResourceRelease
             if request_size == std::mem::size_of::<ResourceRequestV1>() =>
         {
             if !request.cast::<ResourceRequestV1>().is_aligned() {
                 return Err(-1);
             }
             let wire = unsafe { &*(request.cast::<ResourceRequestV1>()) };
-            let request = if op == HostOpV1::FsHandleMetadata {
-                CanonicalRequestV1::FsHandleMetadata
-            } else {
-                CanonicalRequestV1::ResourceRelease
+            let request = match op {
+                HostOpV1::FsHandleMetadata => CanonicalRequestV1::FsHandleMetadata,
+                HostOpV1::FsReadDirectoryBatch => CanonicalRequestV1::FsReadDirectoryBatch,
+                _ => CanonicalRequestV1::ResourceRelease,
             };
             (
                 None,
@@ -3330,7 +3318,7 @@ mod tests {
             context,
         );
         assert_eq!(reply.tag, REPLY_BYTES);
-        assert_eq!(reply.detail, 0);
+        assert_eq!(reply.detail, crate::DIRECTORY_BATCH_ENTRIES_V1);
         assert_eq!(reply.effective_request, 0);
         assert!(!reply.bytes.data.is_null());
         let encoded = unsafe { std::slice::from_raw_parts(reply.bytes.data, reply.bytes.len) };
@@ -3365,6 +3353,89 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Durable invariant (I-5, ADR 0017): `FsOpenDirectory` uses the scoped
+    /// path policy. One grant opens a nested directory by its direct path,
+    /// but not through a symlink to the same directory. This exercises the
+    /// real process host, not the Ken wrapper or concurrent path replacement.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn directory_open_honors_the_no_follow_scope_policy() {
+        use crate::{CapabilityDeniedV1, FileErrorIdentityV1, ResourceInputsV1, SemanticErrorV1};
+
+        let root = std::env::temp_dir().join(format!(
+            "ken-abi-s2-directory-open-policy-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("inside/child")).unwrap();
+        std::os::unix::fs::symlink("inside", root.join("alias")).unwrap();
+        let initialized = context(&root);
+        let (direct, via_link, settlement) = {
+            let context = unsafe { &mut *initialized.context.cast::<ProcessContext>() };
+            let mut open = |path: &[u8]| {
+                dispatch_host_op_v1(
+                    &mut context.host,
+                    &context.capabilities,
+                    &context.revocation,
+                    &mut context.resources,
+                    HostOpV1::FsOpenDirectory,
+                    Some(context.capability),
+                    ResourceInputsV1::None,
+                    &CanonicalRequestV1::FsOpenDirectory {
+                        path: path.to_vec(),
+                    },
+                )
+                .expect("directory acquisition returns a typed reply")
+            };
+            let direct = open(b"inside/child");
+            let via_link = open(b"alias/child");
+            let settlement = direct.resource_token.map(|token| {
+                dispatch_host_op_v1(
+                    &mut context.host,
+                    &context.capabilities,
+                    &context.revocation,
+                    &mut context.resources,
+                    HostOpV1::ResourceRelease,
+                    None,
+                    ResourceInputsV1::Target(token),
+                    &CanonicalRequestV1::ResourceRelease,
+                )
+                .expect("release returns a typed reply")
+                .outcome
+            });
+            (direct, via_link, settlement)
+        };
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(root).unwrap();
+
+        assert!(
+            matches!(
+                direct.outcome,
+                CanonicalOutcomeV1::Success(CanonicalReplyV1::ResourceAcquired {
+                    resource_kind: crate::ResourceKindV1::FsHandle,
+                    ..
+                })
+            ),
+            "in-root directory acquisition: {:?}",
+            direct.outcome
+        );
+        assert!(matches!(
+            settlement,
+            Some(CanonicalOutcomeV1::Success(
+                CanonicalReplyV1::ResourceSettlement(_)
+            ))
+        ));
+        assert_eq!(
+            via_link.outcome,
+            CanonicalOutcomeV1::Error(SemanticErrorV1::File(FileErrorIdentityV1 {
+                operation: HostOpV1::FsOpenDirectory,
+                relative_path: b"alias/child".to_vec(),
+                cause: FileErrorCauseV1::Capability(CapabilityDeniedV1::SymlinkDenied),
+            }))
+        );
+        assert_eq!(via_link.resource_token, None);
+    }
+
     /// Promise class: normative compatibility vector (ADR 0018). MEASURED:
     /// raw requests dispatch through the ABI to distinct typed trace events;
     /// both valid Bool values in the old create record and a malformed
@@ -3373,7 +3444,7 @@ mod tests {
     /// THE GAP: this measures the raw decoder, not native argument emission.
     #[cfg(target_os = "linux")]
     #[test]
-    fn abi_a3_raw_dispatch_executes_all_four_directory_operations() {
+    fn directory_batch_and_path_operations_have_exact_raw_replies() {
         let directory =
             std::env::temp_dir().join(format!("ken-abi-a3-raw-directory-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
@@ -3403,18 +3474,34 @@ mod tests {
                 len: path.len(),
             },
         };
-        let mut listing_reply = reply();
+        let mut opened = reply();
         let status = unsafe {
             ken_host_dispatch_v1(
                 initialized.context,
-                u64::from(HostOpV1::FsReadDirectory as u16),
+                u64::from(HostOpV1::FsOpenDirectory as u16),
                 std::ptr::from_ref(&request).cast(),
                 std::mem::size_of::<FsPathRequestV1>(),
-                std::ptr::from_mut(&mut listing_reply).cast(),
+                std::ptr::from_mut(&mut opened).cast(),
             )
         };
         assert_eq!(status, 0);
+        assert_eq!(opened.tag, REPLY_RESOURCE);
+        let batch = ResourceRequestV1 { resource: opened.detail };
+        let dispatch_resource = |op: HostOpV1| {
+            let mut output = reply();
+            let status = unsafe {
+                ken_host_dispatch_v1(
+                    initialized.context, u64::from(op as u16),
+                    std::ptr::from_ref(&batch).cast(), std::mem::size_of::<ResourceRequestV1>(),
+                    std::ptr::from_mut(&mut output).cast(),
+                )
+            };
+            assert_eq!(status, 0);
+            output
+        };
+        let listing_reply = dispatch_resource(HostOpV1::FsReadDirectoryBatch);
         assert_eq!(listing_reply.tag, REPLY_BYTES);
+        assert_eq!(listing_reply.detail, crate::DIRECTORY_BATCH_ENTRIES_V1);
         assert!(!listing_reply.bytes.data.is_null());
         let encoded = unsafe {
             std::slice::from_raw_parts(listing_reply.bytes.data, listing_reply.bytes.len)
@@ -3439,6 +3526,12 @@ mod tests {
                 },
             ]
         );
+
+        let end = dispatch_resource(HostOpV1::FsReadDirectoryBatch);
+        assert_eq!((end.tag, end.detail), (REPLY_BYTES, crate::DIRECTORY_BATCH_END_V1));
+        assert!(end.bytes.data.is_null());
+        assert_eq!(end.bytes.len, 0);
+        assert_eq!(dispatch_resource(HostOpV1::ResourceRelease).tag, REPLY_UNIT);
 
         let create_path = b"created";
         let create = FsPathRequestV1 {
@@ -3554,26 +3647,29 @@ mod tests {
                 .map(|event| event.operation)
                 .collect::<Vec<_>>(),
             vec![
-                HostOpV1::FsReadDirectory,
+                HostOpV1::FsOpenDirectory,
+                HostOpV1::FsReadDirectoryBatch,
+                HostOpV1::FsReadDirectoryBatch,
+                HostOpV1::ResourceRelease,
                 HostOpV1::FsCreateDirectory,
                 HostOpV1::FsRemoveFile,
                 HostOpV1::FsRemoveDirectory,
             ]
         );
         assert_eq!(
-            context.effect_trace[1].request,
+            context.effect_trace[4].request,
             CanonicalRequestV1::FsCreateDirectory {
                 path: create_path.to_vec(),
             }
         );
         assert_eq!(
-            context.effect_trace[2].request,
+            context.effect_trace[5].request,
             CanonicalRequestV1::FsRemoveFile {
                 path: remove_path.to_vec(),
             }
         );
         assert_eq!(
-            context.effect_trace[3].request,
+            context.effect_trace[6].request,
             CanonicalRequestV1::FsRemoveDirectory {
                 recursive: false,
                 path: remove_directory_path.to_vec(),

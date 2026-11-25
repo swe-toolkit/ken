@@ -430,18 +430,21 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
   BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream, Coproduct,
-  CreatePolicy, Decimal, DirEntry, Equal, ExitCode, FileError, FileKind,
-  FileMetadata, FileOperation, HostIO, IOError, ITree, Instant, List,
+  CreatePolicy, Decimal, DirEntry, DirectoryHandle, DirectoryProgress, Equal,
+  ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError,
+  ITree, Instant, List,
   MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
   Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
   ResourceOpenMode, Result, SocketAddress, StateOp, Top, TransferCount, Unit,
   Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
   resp_coproduct, resp_state, run_state, state_get, state_put}`.
-  This floor subset contains fifty-three exact identities: the historical
+  This floor subset contains fifty-five exact identities: the historical
   Increment 3a fifty-one (the prior forty-seven plus `ConsoleOp`,
-  `console_resp`, `itree_bind` and `resp_coproduct`), `Decimal`, and
-  `SocketAddress` (`30-taxonomy §4`). It is the ambiently nameable checked-identity
-  roster, not a roster of fifty-three types. `Top`
+  `console_resp`, `itree_bind` and `resp_coproduct`), `Decimal`, `SocketAddress`,
+  and the two scoped directory types (`30-taxonomy §4`). `DirectoryHandle`
+  keeps its constructor private; `DirectoryProgress` exposes only qualified
+  cases (§38 §1.14). This is the ambiently nameable checked-identity roster,
+  not a roster of types. `Top`
   and `Bottom` are proposition constants, `Proved` is a proof binding,
   `HostIO` is a type-level function, and `console_resp`, `eqChar`,
   `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`

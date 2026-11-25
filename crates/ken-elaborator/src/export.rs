@@ -607,7 +607,8 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::FsWriteFile
         | ken_host::HostOpV1::FsAppendFile
         | ken_host::HostOpV1::FsMetadata
-        | ken_host::HostOpV1::FsReadDirectory
+        | ken_host::HostOpV1::FsOpenDirectory
+        | ken_host::HostOpV1::FsReadDirectoryBatch
         | ken_host::HostOpV1::FsCreateDirectory
         | ken_host::HostOpV1::FsRemoveFile
         | ken_host::HostOpV1::FsRemoveDirectory
@@ -712,7 +713,8 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::FsWriteFile => "FsWriteFile",
         ken_host::HostOpV1::FsAppendFile => "FsAppendFile",
         ken_host::HostOpV1::FsMetadata => "FsMetadata",
-        ken_host::HostOpV1::FsReadDirectory => "FsReadDirectory",
+        ken_host::HostOpV1::FsOpenDirectory => "FsOpenDirectory",
+        ken_host::HostOpV1::FsReadDirectoryBatch => "FsReadDirectoryBatch",
         ken_host::HostOpV1::FsCreateDirectory => "FsCreateDirectory",
         ken_host::HostOpV1::FsRemoveFile => "FsRemoveFile",
         ken_host::HostOpV1::FsRemoveDirectory => "FsRemoveDirectory",
@@ -2057,11 +2059,8 @@ proc second (_value : Unit)
             (ken_host::HostOpV1::FsWriteFile, 0x0302, "FsWriteFile"),
             (ken_host::HostOpV1::FsAppendFile, 0x0303, "FsAppendFile"),
             (ken_host::HostOpV1::FsMetadata, 0x0304, "FsMetadata"),
-            (
-                ken_host::HostOpV1::FsReadDirectory,
-                0x0305,
-                "FsReadDirectory",
-            ),
+            (ken_host::HostOpV1::FsOpenDirectory, 0x0315, "FsOpenDirectory"),
+            (ken_host::HostOpV1::FsReadDirectoryBatch, 0x0316, "FsReadDirectoryBatch"),
             (
                 ken_host::HostOpV1::FsCreateDirectory,
                 0x0306,
@@ -2087,6 +2086,7 @@ proc second (_value : Unit)
                 "ResourceRelease",
             ),
         ];
+        assert!(ken_host::HostOpV1::try_from(0x0305_u16).is_err());
         for (operation, discriminant, spelling) in legacy {
             assert_eq!(operation as u16, discriminant);
             assert_eq!(canonical_host_perform_signature_v1(operation), spelling);

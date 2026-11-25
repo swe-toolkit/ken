@@ -354,11 +354,12 @@ These four admissions allocate no new checked identity and add no
 checked `host_bind` and related wrappers without admitting their
 `FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
 
-Thus the closed **floor-identity roster** has fifty-three names: the exact
+Thus the closed **floor-identity roster** has fifty-five names: the exact
 checked identities source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
-ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal,
-ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO,
+ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry,
+DirectoryHandle, DirectoryProgress, Equal, ExitCode, FileError, FileKind,
+FileMetadata, FileOperation, HostIO,
 IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
 ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
 ReadResult, ResourceError, ResourceKind, ResourceOpenMode, Result,
@@ -368,7 +369,7 @@ run_state, state_get, state_put}`**. The prior forty-seven identities,
 `ConsoleOp`, `console_resp`, `itree_bind` and `resp_coproduct` are
 re-checked; floor admission alone adds no postulate or `trusted_base()`
 entry. Their qualified constructors and the Pair companions are
-separate from this 53-name count. These identities are not all types:
+separate from this 55-name count. These identities are not all types:
 `Top` and `Bottom` are proposition constants, `Proved` is a proof
 binding, `HostIO` a type-level function, and `console_resp`, `eqChar`,
 `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -476,7 +477,16 @@ exact-ID keying and independent `38` source needs. Increment 3a adds
 `FileOperation`: the interpreter and native lowering construct or read
 their exact checked constructor identities, and §38 §1.12 or §33 §3.3
 independently requires source to name each family. A package home
-cannot substitute for these five floor admissions. The space desugarer
+cannot substitute for these five floor admissions. ABI-S2 admits
+`DirectoryHandle` and `DirectoryProgress` by the same two-witness rule
+(§38 §1.14). The checked directory batch operation consumes the exact handle
+family, and the native reply selects the exact progress constructors. Source
+independently needs those types to name the bracket body argument and to
+match a batch or end. Both families are scoped: `PrivateDirectoryHandle`
+and its projection stay private, and only
+`DirectoryProgress.DirectoryEntries` and `DirectoryProgress.DirectoryEnd`
+resolve as public cases. Neither a constructor leaf nor a directory
+procedure enters the floor. The space desugarer
 also builds `StateOp s` and `resp_state s` using
 their exact checked pre-source IDs (`elab.rs:22321–22336`), while
 §36 §4.2's `run_state` signature independently requires a program to
@@ -519,10 +529,10 @@ information, not submitted for per-name permission. No compiler-provided
 intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
-With the two witnesses of `Decimal` and then of `SocketAddress`
-established, the floor is the fifty-three-identity set above. Until D0
-proves both witness clauses for
-another candidate, that candidate has no new ambient availability.
+With both witnesses established for `Decimal`, `SocketAddress` and the
+two directory families, the floor is the fifty-five-identity set above.
+Until D0 proves both witness clauses for another candidate, that candidate
+has no new ambient availability.
 `BufferWindow`, `ResourceBodyResult`, `ResourceBracketResult`, the `FS`
 source alias, `read_bytes` and `write_file` are source-promised but
 unkeyed: they remain outside B as package material, not internal-only
@@ -627,6 +637,8 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `write_all_advance_start` | H | `Capability.System.IO`; import and apply its checked proof to that proposition at generic span and count. |
 | `Chunk` | B | `ReadResult.Chunk`, not bare. |
 | `DirEntry` | B | `DirEntry.MkDirEntry`, no H row. |
+| `DirectoryHandle` | B | Scoped type; constructor and projection private, no H row. |
+| `DirectoryProgress` | B | `DirectoryProgress.DirectoryEntries` and `DirectoryProgress.DirectoryEnd`, no H row. |
 | `Eof` | B | `ReadResult.Eof`, not bare. |
 | `KDirectory` | B | `FileKind.KDirectory`, not bare. |
 | `KFile` | B | `FileKind.KFile`, not bare. |
@@ -640,7 +652,8 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `create_directory` | H | `Capability.Filesystem.Authority`. |
 | `inject_r` | H: `Core.Effect.Coproduct`; exact HostIO uses may still rewrite to `host_console a R act` | Import the checked generic injection for direct coproduct trees; HostIO rewrite imports `Capability.Process.Exit`. |
 | `intToInt8` | H | The same eight-name `Data.Numeric.FixedWidth` home; not a separate two-name route. |
-| `read_directory` | H | `Capability.Filesystem.Authority`. |
+| `withDirectory` | H | `Capability.Filesystem.Authority`; checked directory bracket (§38 §1.14). |
+| `readDirectoryBatch` | H | `Capability.System.IO` beside `readAt` (§38 §1.14). |
 | `remove_directory` | H | `Capability.Filesystem.Authority`. |
 | `remove_file` | H | `Capability.Filesystem.Authority`. |
 | `rename_file` | H | `Capability.Filesystem.Authority`. |
@@ -706,9 +719,10 @@ the same source without its `Capability.Process.Child` import refuses
 | `take_stdin` | H: `Capability.Process.Child` | Take the selected pipe write end under its import. |
 | `take_stderr` | H: `Capability.Process.Child` | Take the selected pipe read end under its import. |
 
-The H roster changes from eighty-one existing rows to ninety-six:
-remove seventeen `FileOperation`-family rows, then add eight FS
-Authority wrappers, `writeAt` and `writeAll` in System.IO, `freeze` in System.Buffer,
+Increment 3a's H roster changed from eighty-one existing rows to ninety-six:
+it removed seventeen `FileOperation`-family rows and added eight FS
+Authority wrappers, `writeAt` and `writeAll` in System.IO, `freeze` in
+System.Buffer,
 `resourceMetadata` in System.Resource, `flush` and `is_terminal` in
 Console.Text, `intToChar` in LawfulClasses, the four Child rows, and
 `read`, `wall_now` and `host_clock` as above, plus the complete eight-name
@@ -751,6 +765,8 @@ signatures, so its name needs an import; its `ClockOp` and
 The family of a public inductive is exported whole, not just its
 name: `RangeError.MkRangeError` resolves under its package import.
 None of these homes joins the ambient floor or allocates a new ID.
+ABI-S2 later removes the whole-list directory read's H row and adds
+`withDirectory` and `readDirectoryBatch`, a net gain of one H row.
 
 `Ordering` is **not** prelude — no built-in primitive returns it (comparisons
 return `Bool`, and 3-way `compare` is an `Ord` **class method**, a package, F2),
@@ -764,6 +780,7 @@ closed inventories and flags any over-inclusion as bloat (§6, `OrdResult`).
 fifty-one-identity floor and Pair's three checked companions. This
 later node adds `Decimal` to the floor, yielding fifty-two identities.
 PX11 then adds `SocketAddress` (`38 §1.13`), yielding fifty-three.
+ABI-S2 adds the two directory families (`38 §1.14`), yielding fifty-five.
 The prior forty were delivered before Increment 3a; `ReadResult`,
 `FileMetadata`, `FileKind`, `DirEntry`, `FileOperation`, `StateOp` and
 `ConsoleOp` require complete scoped constructor families and source-path

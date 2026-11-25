@@ -194,6 +194,7 @@ fn normalize_outcome(
                 | CanonicalReplyV1::Instant(_)
                 | CanonicalReplyV1::FileMetadata(_)
                 | CanonicalReplyV1::DirectoryEntries(_)
+                | CanonicalReplyV1::DirectoryEnd
                 | CanonicalReplyV1::ReadProgress(_)
                 | CanonicalReplyV1::WriteProgress(_)
                 | CanonicalReplyV1::MonotonicInstant(_)

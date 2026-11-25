@@ -424,7 +424,7 @@ fn request_path_mut(request: &mut CanonicalRequestV1) -> Option<&mut Vec<u8>> {
         | CanonicalRequestV1::FsWriteFile { path, .. }
         | CanonicalRequestV1::FsAppendFile { path, .. }
         | CanonicalRequestV1::FsMetadata { path }
-        | CanonicalRequestV1::FsReadDirectory { path }
+        | CanonicalRequestV1::FsOpenDirectory { path }
         | CanonicalRequestV1::FsCreateDirectory { path }
         | CanonicalRequestV1::FsRemoveFile { path }
         | CanonicalRequestV1::FsRemoveDirectory { path, .. }
@@ -472,7 +472,8 @@ fn is_fs_operation(operation: HostOpV1) -> bool {
             | HostOpV1::FsWriteFile
             | HostOpV1::FsAppendFile
             | HostOpV1::FsMetadata
-            | HostOpV1::FsReadDirectory
+            | HostOpV1::FsOpenDirectory
+            | HostOpV1::FsReadDirectoryBatch
             | HostOpV1::FsCreateDirectory
             | HostOpV1::FsRemoveFile
             | HostOpV1::FsRemoveDirectory
@@ -577,11 +578,9 @@ mod tests {
                 ),
                 event(
                     2,
-                    HostOpV1::FsReadDirectory,
-                    true,
-                    CanonicalRequestV1::FsReadDirectory {
-                        path: b"directory".to_vec(),
-                    },
+                    HostOpV1::FsReadDirectoryBatch,
+                    false,
+                    CanonicalRequestV1::FsReadDirectoryBatch,
                     CanonicalOutcomeV1::Success(CanonicalReplyV1::DirectoryEntries(vec![
                         DirEntryV1 {
                             name: vec![b'f', 0xff],

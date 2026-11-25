@@ -112,7 +112,7 @@ fn handle_check(row: &str, field: Field, expected_exit: i32) {
         )
     };
     let scenario = abi_s4_both_metadata_scenario(row, "True", &check);
-    let run = execute_scenario_with_roots(&scenario, Some(SharedMetadataRoot::Existing(&root.0)))
+    let run = execute_scenario_with_roots(&scenario, Some(SharedScenarioRoot::Existing(&root.0)))
         .unwrap_or_else(|error| panic!("{row}: handle consumer failed: {error:?}"));
     assert_eq!(
         run.interpreter.exit_status, expected_exit,

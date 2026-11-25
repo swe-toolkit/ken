@@ -277,7 +277,7 @@ impl ModuleState {
 /// identity inventory has one source of truth. Its signature arm is independently
 /// derived from every primitive declaration type by the realization controls;
 /// Internally provisioned members have separate exact-ID witnesses.
-pub const PRELUDE_FLOOR_NAMES: [&str; 53] = [
+pub const PRELUDE_FLOOR_NAMES: [&str; 55] = [
     "Auth",
     "Bool",
     "Bottom",
@@ -290,6 +290,8 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 53] = [
     "Coproduct",
     "CreatePolicy",
     "DirEntry",
+    "DirectoryHandle",
+    "DirectoryProgress",
     "Equal",
     "ExitCode",
     "FileError",
@@ -336,7 +338,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 53] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 183] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 184] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -417,7 +419,7 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 183] = [
     ("Capability.Filesystem.Authority", "append_file"),
     ("Capability.Filesystem.Authority", "change_mode"),
     ("Capability.Filesystem.Authority", "create_directory"),
-    ("Capability.Filesystem.Authority", "read_directory"),
+    ("Capability.Filesystem.Authority", "withDirectory"),
     ("Capability.Filesystem.Authority", "remove_directory"),
     ("Capability.Filesystem.Authority", "remove_file"),
     ("Capability.Filesystem.Authority", "rename_file"),
@@ -457,6 +459,7 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 183] = [
     ("Capability.System.Resource", "withMapping"),
     ("Capability.System.Resource", "release"),
     ("Capability.System.IO", "readAt"),
+    ("Capability.System.IO", "readDirectoryBatch"),
     ("Capability.System.IO", "spanBytes"),
     ("Capability.Filesystem.Authority", "readFile"),
     ("Capability.Filesystem.Authority", "writeFile"),

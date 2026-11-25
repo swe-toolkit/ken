@@ -104,6 +104,7 @@ impl<'a> Collector<'a> {
         };
         if ![
             self.prelude.private_fs_open_id,
+            self.prelude.private_fs_open_directory_id,
             self.prelude.private_buffer_allocate_id,
             self.prelude.private_mapping_allocate_id,
             self.prelude.private_mapping_acquire_file_id,

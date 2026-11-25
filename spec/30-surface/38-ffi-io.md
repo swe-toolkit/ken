@@ -1486,9 +1486,8 @@ returns a `FileError` with `FileOperation.OpMetadata`, `Some path`, and
 `IOError.Unsupported`; `resourceMetadata` returns
 `ResourceHostIO IOError.Unsupported`.
 
-Eight further checked FS wrappers (`append_file`, `change_mode`,
-`create_directory`, `read_directory`, `remove_directory`,
-`remove_file`, `rename_file` and `file_metadata`) are homed in
+Seven checked FS wrappers (`append_file`, `change_mode`, `create_directory`,
+`remove_directory`, `remove_file`, `rename_file` and `file_metadata`) are homed in
 `Capability.Filesystem.Authority`; `writeAt` and `writeAll` in
 `Capability.System.IO`; `freeze` in `Capability.System.Buffer`;
 `resourceMetadata` in `Capability.System.Resource`; `flush` and
@@ -1716,6 +1715,110 @@ families, an injected resolver and DNS boundary, nonblocking/readiness
 and abstract Unix names remain subsequent work. No new kernel rule or
 trusted postulate is authorized. Any required trust growth is an
 operator stop.
+
+### 1.14 Bracketed directory batches (ABI-S2)
+
+> **ABI-S2 status: contract specified.** Architect AC-0 `evt_1d1tqakxsz753`
+> and its amendment `evt_1gs7gppsm39mj` are based on `5bc385c1c`.
+> The Architect reported the exact-base retirement sweep and found that
+> public `withResource` forwards its mode to `PrivateFsOpen` and passes a
+> raw `FsHandle` to its body. The amendment therefore replaces the proposed
+> mode extension with a private acquisition and uses the existing host
+> rights check as a second boundary. This is design evidence, not an
+> assembled run, official conformance, CI or landing.
+
+#### 1.14.1 Acquisition and isolation
+
+`withDirectory` is an explicit import from `Capability.Filesystem.Authority`.
+`readDirectoryBatch` is an explicit import from `Capability.System.IO` beside
+`readAt`. Their checked signatures are:
+
+```text
+proc withDirectory (a : Auth) (e : Type) (r : Type) (cap : Cap a) (path : Bytes)
+  (body : DirectoryHandle -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result FileError (ResourceBracketResult e r)) visits [FS]
+
+proc readDirectoryBatch (a : Auth) (dir : DirectoryHandle)
+  : HostIO a (Result ResourceError DirectoryProgress) visits [FS]
+```
+
+`DirectoryHandle` is a scoped floor type wrapping
+`Resource ResourceKind.FsHandle`. Its `PrivateDirectoryHandle` constructor
+and raw-resource projection are private under both bare and qualified paths.
+`withDirectory` is the only source acquisition route. It uses the private
+`PrivateFsOpenDirectory` checked operation with the capability and path,
+not `withResource`. The after-open step is also private. Acquisition failure
+skips the body; success passes the wrapped handle to the body and uses the
+existing resource bracket settlement and release rules. Copies refer to the
+same acquisition and do not survive settlement as live handles.
+
+`ResourceOpenMode`, its three constructors and the ordinary `FsOpen` ABI
+are unchanged. No public mode or other public selector opens a directory
+through generic `withResource`. There is no new `ResourceKind`.
+
+The distinct `FsOpenDirectory` host operation requires `Enumerate` at
+`AUTH_PARTIAL`, and opens the directory under the existing path resolution
+and confinement rules. Directory open errors carry
+`FileOperation.OpReadDirectory` and `Some path`. In both the interpreter
+and native lanes, opening a regular file this way returns
+`MkFileError FileOperation.OpReadDirectory (Some path) IOError.NotDirectory`.
+The tag comes from the operation, not an open-mode value.
+
+The host grants exactly `ENUMERATE` to the directory `FsHandle`. Batch reads
+require that right on the held handle; they take no new capability argument.
+Independently of source typing, only `FsReadDirectoryBatch` and
+`ResourceRelease` may accept `ENUMERATE` alone. The host refuses other
+`FsHandle` operations on a directory handle with `ResourceError.RightNotHeld`.
+A batch read on any other `FsHandle` refuses with that same error. The
+host reports both the required and held rights:
+
+| Operation and handle | Exact host error |
+|---|---|
+| `FsReadAt` on a directory handle holding only `ENUMERATE` | `RightNotHeld { required: READ, held: ENUMERATE }` |
+| `FsReadDirectoryBatch` (the host operation behind `readDirectoryBatch`) on an ordinary `Read` handle holding only `READ` | `RightNotHeld { required: ENUMERATE, held: READ }` |
+
+No other source operation can advance or reset the directory stream position.
+
+#### 1.14.2 Batches and end
+
+`DirectoryProgress` is a scoped floor family with precisely two public
+cases: `DirectoryProgress.DirectoryEntries (List DirEntry)` and
+`DirectoryProgress.DirectoryEnd`. `PrivateFsReadDirectoryBatch` is a private
+operation on the wrapped raw handle. Its response is
+`Result ResourceError DirectoryProgress`.
+
+Both lanes use the same host primitive on the held descriptor. Each
+`DirectoryEntries` batch contains the filtered entries from exactly one
+kernel `getdents64` fill, of at most 32768 bytes of kernel records. The bound
+is on the records in a fill, not the directory's size or an entry count.
+The operation omits `.` and `..` and skips fills with no entries left after
+filtering. Thus a batch has at least one entry. A zero-byte fill yields
+`DirectoryEnd`, not an empty entries batch. End is sticky: once
+`readDirectoryBatch` returns `DirectoryEnd`, every later admitted call on
+that live handle returns `DirectoryEnd` without consulting the filesystem.
+An error is not sticky: it does not mark the stream ended, and a later
+admitted call may return entries, `DirectoryEnd`, or an error. Before End,
+reading continues at the descriptor's position rather than reopening the
+path.
+
+Order is unspecified. If a traversal of an unmodified directory reaches
+`DirectoryEnd` without any batch-call errors, its concatenated batches
+contain every entry other than `.` and `..` exactly once. After an error,
+a retry need not recover entries consumed before the failed call returned.
+Entries created or removed during reading may or may not appear.
+
+At the host boundary the batch reply discriminates entries from end
+explicitly; a zero count in the entries case or any entries in the end case
+is invalid. Native results retain `DIRECTORY_LIST` for the list inside
+`DirectoryEntries`, reusing the existing `DirEntry` and `FileKind` carriers.
+The end case is nullary. Host failures use the existing `ResourceError`
+family, not an end marker.
+
+The whole-list `read_directory` source operation, its `FSOp` constructor
+`ReadDirectory`, and the host operation `FsReadDirectory` (`0x0305`) are
+retired in this same change. Neither new host operation reuses `0x0305`.
+There is no compatibility alias or bounded whole-list replacement.
+`FileOperation.OpReadDirectory` remains as the directory-open error tag.
 
 ## 2. The FFI surface — the `foreign` declaration
 

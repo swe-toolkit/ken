@@ -1,0 +1,141 @@
+program capabilities FS AFull
+
+import Capability.Filesystem.Authority (withDirectory)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.IO (readDirectoryBatch)
+
+import Capability.System.Resource
+  (ResourceBodyOk,
+    ResourceBodyResult,
+    ResourceBracketBodyAndReleaseError,
+    ResourceBracketBodyError,
+    ResourceBracketOk,
+    ResourceBracketReleaseError,
+    ResourceBracketResult)
+
+fn entry_count (xs : List DirEntry) : Int =
+  match xs {
+    Nil ↦ 0;
+    Cons entry tail ↦ add_int (entry_count tail) 1
+  }
+
+fn name_bytes (xs : List DirEntry) : Int =
+  match xs {
+    Nil ↦ 0;
+    Cons entry tail ↦
+      match entry {
+        DirEntry.MkDirEntry name kind ↦ add_int (bytes_length name) (name_bytes tail)
+      }
+  }
+
+fn listing_exit (count : Int) (bytes : Int) : ExitCode =
+  match eq_int count 0 {
+    True ↦
+      match eq_int bytes 0 {
+        True ↦ ExitCode.Success;
+        False ↦ ExitCode.Failure 77
+      };
+    False ↦
+      match eq_int count 400 {
+        True ↦
+          match eq_int bytes 80000 {
+            True ↦ ExitCode.Success;
+            False ↦ ExitCode.Failure 78
+          };
+        False ↦ ExitCode.Failure 79
+      }
+  }
+
+const twenty : Nat =
+  Suc
+    (Suc
+      (Suc
+        (Suc
+          (Suc
+            (Suc
+              (Suc
+                (Suc
+                  (Suc
+                    (Suc
+                      (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))))))))))))))
+
+-- Each non-End batch contains at least one entry. Two reads plus twenty
+-- blocks of twenty cover 400 entries, End, and one spare read.
+proc walk
+      (blocks : Nat) (fuel : Nat) (dir : DirectoryHandle) (count : Int) (bytes : Int)
+    : HostIO AFull (ResourceBodyResult Unit ExitCode)
+    visits [FS] =
+  match fuel {
+    Zero ↦
+      match blocks {
+        Zero ↦
+          host_pure
+            AFull
+            (ResourceBodyResult Unit ExitCode)
+            (ResourceBodyOk Unit ExitCode (ExitCode.Failure 71));
+        Suc remaining ↦ walk remaining twenty dir count bytes
+      };
+    Suc rest ↦
+      host_bind
+        AFull
+        (Result ResourceError DirectoryProgress)
+        (ResourceBodyResult Unit ExitCode)
+        (readDirectoryBatch AFull dir)
+        (λbatch.
+          match batch {
+            Err error ↦
+              host_pure
+                AFull
+                (ResourceBodyResult Unit ExitCode)
+                (ResourceBodyOk Unit ExitCode (ExitCode.Failure 72));
+            Ok progress ↦
+              match progress {
+                DirectoryProgress.DirectoryEntries entries ↦
+                  walk
+                    blocks
+                    rest
+                    dir
+                    (add_int count (entry_count entries))
+                    (add_int bytes (name_bytes entries));
+                DirectoryProgress.DirectoryEnd ↦
+                  host_pure
+                    AFull
+                    (ResourceBodyResult Unit ExitCode)
+                    (ResourceBodyOk Unit ExitCode (listing_exit count bytes))
+              }
+          })
+  }
+
+proc main
+      (_input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      host_bind
+        AFull
+        (Result FileError (ResourceBracketResult Unit ExitCode))
+        ExitCode
+        (withDirectory
+          AFull
+          Unit
+          ExitCode
+          cap
+          (bytes_encode "subject")
+          (λdir. walk twenty (Suc (Suc Zero)) dir 0 0))
+        (λoutcome.
+          match outcome {
+            Err error ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+            Ok bracket ↦
+              match bracket {
+                ResourceBracketOk code ↦ host_pure AFull ExitCode code;
+                ResourceBracketBodyError error ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+                ResourceBracketReleaseError error ↦
+                  host_pure AFull ExitCode (ExitCode.Failure 75);
+                ResourceBracketBodyAndReleaseError body_error release_error ↦
+                  host_pure AFull ExitCode (ExitCode.Failure 76)
+              }
+          })
+  }

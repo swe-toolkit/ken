@@ -24,6 +24,11 @@ fn system_resource_is_opaque_and_only_the_bracket_mints_it() {
     ));
     for private in [
         "PrivateFsOpen",
+        "PrivateFsOpenDirectory",
+        "PrivateFsReadDirectoryBatch",
+        "PrivateDirectoryHandle",
+        "private_with_directory_after_open",
+        "directory_handle_resource",
         "PrivateFsHandleMetadata",
         "PrivateBufferAllocate",
         "PrivateResourceRelease",
