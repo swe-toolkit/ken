@@ -1887,6 +1887,12 @@ impl ComputationalIHTemplateCollector<'_> {
         bindings: &mut Vec<Option<ComputationalIHBinding>>,
         is_application_function: bool,
     ) -> Result<(), CompilerDriverError> {
+        // The checked body view drops index-refinement casts. Compare its
+        // decoded value to the same raw node, not to the enclosing cast.
+        let mut term = term;
+        while let Term::Cast(_, _, _, value) = term {
+            term = value;
+        }
         if !is_application_function
             && matches!(
                 runtime_term,
@@ -1894,6 +1900,25 @@ impl ComputationalIHTemplateCollector<'_> {
             )
         {
             let (head, arguments) = term_application_spine_exact(term);
+            if let Term::Cast(..) = head {
+                let mut peeled = head;
+                while let Term::Cast(_, _, _, value) = peeled {
+                    peeled = value;
+                }
+                if let Term::Var(index) = peeled {
+                    let cast_ih = bindings
+                        .len()
+                        .checked_sub(index + 1)
+                        .and_then(|position| bindings.get(position))
+                        .is_some_and(|binding| binding.is_some());
+                    if cast_ih {
+                        return Err(Self::runtime_shape_mismatch(
+                            owner,
+                            "checked computational IH call under a dropped cast",
+                        ));
+                    }
+                }
+            }
             if let Term::Var(index) = head {
                 let binding = bindings
                     .len()
@@ -2182,6 +2207,7 @@ impl ComputationalIHTemplateCollector<'_> {
                 | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
                 | CheckedCoreBodyTerm::ErasedOmegaSubterm,
             ) => {}
+            (Term::Absurd(..), CheckedCoreBodyTerm::Unreachable) => {}
             _ => {
                 return Err(Self::runtime_shape_mismatch(
                     owner,
@@ -3728,7 +3754,8 @@ fn collect_runtime_support_from_term(
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
         | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm
+        | CheckedCoreBodyTerm::Unreachable => {}
         CheckedCoreBodyTerm::RecursiveDeclarationCall(_) => {
             support.insert(ExecutableRuntimeSupport::Recursion);
         }
@@ -5883,7 +5910,8 @@ fn collect_runtime_declaration_dependencies(
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
         | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
-        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm
+        | CheckedCoreBodyTerm::Unreachable => {}
     }
 }
 
@@ -7653,6 +7681,271 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             leaf_value,
             "the genuine ordinal-zero match executes after the erased type match"
         );
+    }
+
+    #[test]
+    fn recursive_vec_method_under_dropped_cast_seeds_its_ih_call() {
+        use ken_kernel::{declare_inductive, CtorSpec, InductiveSpec, Level};
+
+        let mut env = GlobalEnv::new();
+        let nat = declare_inductive(&mut env, |id| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::zero(),
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![Term::indformer(id, vec![])],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .unwrap();
+        let nat_ty = Term::indformer(nat, vec![]);
+        let zero = env.inductive(nat).unwrap().constructors[0].id;
+        let suc = env.inductive(nat).unwrap().constructors[1].id;
+        let succ = |term| Term::app(Term::constructor(suc, vec![]), term);
+        let zero_value = Term::constructor(zero, vec![]);
+        let vec = declare_inductive(&mut env, |id| InductiveSpec {
+            level_params: vec![],
+            params: vec![Term::ty(Level::zero())],
+            indices: vec![nat_ty.clone()],
+            level: Level::zero(),
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![zero_value.clone()],
+                },
+                CtorSpec {
+                    args: vec![
+                        nat_ty.clone(),
+                        Term::var(1),
+                        Term::app(
+                            Term::app(Term::indformer(id, vec![]), Term::var(2)),
+                            Term::var(1),
+                        ),
+                    ],
+                    target_indices: vec![succ(Term::var(2))],
+                },
+            ],
+        })
+        .unwrap();
+        let nil = env.inductive(vec).unwrap().constructors[0].id;
+        let cons = env.inductive(vec).unwrap().constructors[1].id;
+        let vec_nat = |index| {
+            Term::app(
+                Term::app(Term::indformer(vec, vec![]), nat_ty.clone()),
+                index,
+            )
+        };
+        let vnil = Term::app(Term::constructor(nil, vec![]), nat_ty.clone());
+        let vcons = |length, head, tail| {
+            [nat_ty.clone(), length, head, tail]
+                .into_iter()
+                .fold(Term::constructor(cons, vec![]), Term::app)
+        };
+        let cons_result_type = vec_nat(succ(Term::var(3)));
+        let result = vcons(Term::var(3), Term::var(2), Term::var(0));
+        // Use a reflexive type cast: it is legal even for the open method,
+        // and isolates the collector's alignment from the cast predicate.
+        let cast = Term::Cast(
+            Box::new(cons_result_type.clone()),
+            Box::new(cons_result_type.clone()),
+            Box::new(Term::Refl(Box::new(cons_result_type))),
+            Box::new(result),
+        );
+        let domains = [
+            nat_ty.clone(),
+            nat_ty.clone(),
+            vec_nat(Term::var(1)),
+            vec_nat(Term::var(2)),
+        ];
+        let cons_method = domains
+            .iter()
+            .rev()
+            .cloned()
+            .fold(cast, |body, domain| Term::lam(domain, body));
+        let raw = Term::Elim {
+            fam: vec,
+            level_args: vec![],
+            params: vec![nat_ty.clone()],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(
+                    nat_ty.clone(),
+                    Term::lam(vec_nat(Term::var(0)), vec_nat(Term::var(1))),
+                )),
+                Box::new(Term::pi(
+                    nat_ty.clone(),
+                    Term::pi(vec_nat(Term::var(0)), Term::ty(Level::zero())),
+                )),
+            )),
+            methods: vec![vnil.clone(), cons_method],
+            indices: vec![succ(zero_value.clone())],
+            scrut: Box::new(vcons(zero_value.clone(), zero_value, vnil)),
+        };
+        ken_kernel::infer(&env, &Context::new(), &raw)
+            .expect("kernel-checked Vec recursor with a cast in its VCons method");
+
+        let declaration = |name| StableSymbol::declaration("indexed-cast-census", &[], name);
+        let owner = declaration("copy");
+        let nat_family = declaration("Nat");
+        let family = declaration("Vec");
+        let symbol_map = BTreeMap::from([
+            (nat, nat_family.clone()),
+            (zero, StableSymbol::constructor(&nat_family, "Zero")),
+            (suc, StableSymbol::constructor(&nat_family, "Suc")),
+            (vec, family.clone()),
+            (nil, StableSymbol::constructor(&family, "VNil")),
+            (cons, StableSymbol::constructor(&family, "VCons")),
+        ]);
+        let mut symbol_table = StableSymbolTable::new();
+        for (id, symbol) in &symbol_map {
+            symbol_table.insert_global(*id, symbol.clone());
+        }
+        let encode = |term| canonical_term_bytes(term, &symbol_table).unwrap();
+        let constructor = |id, argument_count, recursive_positions| {
+            crate::checked_core::CheckedCoreConstructorView {
+                checked_node_id: None,
+                symbol: symbol_map[&id].clone(),
+                family_symbol: family.clone(),
+                level_args: vec![],
+                family_parameter_count: 1,
+                family_index_count: 1,
+                argument_count,
+                target_index_count: 1,
+                recursive_positions,
+                constructor_lowerability: LowerabilityStatus::Supported,
+                family_lowerability: LowerabilityStatus::Supported,
+            }
+        };
+        let vnil = constructor(nil, 0, vec![]);
+        let vcons = constructor(cons, 3, vec![2]);
+        let apply = |function, argument| CheckedCoreBodyTerm::Application {
+            function: Box::new(function),
+            argument: Box::new(argument),
+        };
+        let var = |de_bruijn_index| CheckedCoreBodyTerm::Variable { de_bruijn_index };
+        let instantiate = |ctor| {
+            apply(
+                CheckedCoreBodyTerm::ConstructorReference(ctor),
+                CheckedCoreBodyTerm::ErasedConstructorArgument {
+                    term: encode(&nat_ty),
+                },
+            )
+        };
+        let runtime_value = [var(3), var(2), var(0)]
+            .into_iter()
+            .fold(instantiate(vcons.clone()), apply);
+        let runtime_method =
+            domains
+                .iter()
+                .rev()
+                .fold(runtime_value, |body, domain| CheckedCoreBodyTerm::Lambda {
+                    parameter_type: encode(domain),
+                    erased_parameter: false,
+                    body: Box::new(body),
+                });
+        let Term::Elim {
+            motive, indices, ..
+        } = &raw
+        else {
+            unreachable!()
+        };
+        let nat_zero = CheckedCoreBodyTerm::ConstructorReference(
+            crate::checked_core::CheckedCoreConstructorView {
+                checked_node_id: None,
+                symbol: symbol_map[&zero].clone(),
+                family_symbol: nat_family,
+                level_args: vec![],
+                family_parameter_count: 0,
+                family_index_count: 0,
+                argument_count: 0,
+                target_index_count: 0,
+                recursive_positions: vec![],
+                constructor_lowerability: LowerabilityStatus::Supported,
+                family_lowerability: LowerabilityStatus::Supported,
+            },
+        );
+        let checked_scrutinee = [nat_zero.clone(), nat_zero, instantiate(vnil.clone())]
+            .into_iter()
+            .fold(instantiate(vcons.clone()), apply);
+        let runtime = CheckedCoreBodyTerm::Match(crate::checked_core::CheckedCoreMatchView {
+            family_symbol: family,
+            level_args: vec![],
+            parameters: vec![encode(&nat_ty)],
+            motive: encode(motive),
+            indices: indices.iter().map(encode).collect(),
+            scrutinee: Box::new(checked_scrutinee),
+            branches: vec![
+                crate::checked_core::CheckedCoreMatchBranchView {
+                    constructor: vnil.clone(),
+                    method: instantiate(vnil),
+                },
+                crate::checked_core::CheckedCoreMatchBranchView {
+                    constructor: vcons,
+                    method: runtime_method,
+                },
+            ],
+            computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
+        });
+        let census = crate::checked_core::checked_runtime_match_census(&runtime).unwrap();
+        let mut collector = ComputationalIHTemplateCollector {
+            env: &env,
+            symbols: &symbol_map,
+            symbol_table: &symbol_table,
+            next_slot_template_id: 0,
+            next_call_template_id: 0,
+            runtime_match_census: BTreeMap::from([(owner.clone(), census)]),
+            next_runtime_match_index: BTreeMap::new(),
+            next_call_ordinal: BTreeMap::new(),
+            slots: Vec::new(),
+            calls: Vec::new(),
+        };
+        collector
+            .visit(
+                &owner,
+                &raw,
+                &runtime,
+                &mut Context::new(),
+                &mut Vec::new(),
+                false,
+            )
+            .expect("the raw cast aligns with its decoded application");
+        let [slot] = collector.slots.as_slice() else {
+            panic!("expected one Vec IH slot")
+        };
+        assert_eq!(
+            (
+                slot.match_ordinal,
+                slot.branch_ordinal,
+                slot.recursive_position
+            ),
+            (0, 1, 2)
+        );
+        let [call] = collector.calls.as_slice() else {
+            panic!("expected one call under VCons")
+        };
+        assert_eq!(
+            (call.slot_template_id, call.occurrence_ordinal, call.arity),
+            (slot.slot_template_id, 0, 0)
+        );
+        // The slot type is scoped before the IH binder; the result type
+        // is scoped under it. Both encode Vec Nat at the same outer index.
+        let answer = |index| {
+            checked_answer_interface_from_term(
+                b"computational-ih-type",
+                &vec_nat(Term::var(index)),
+                &symbol_table,
+            )
+            .unwrap()
+        };
+        assert_eq!(slot.ih_interface, answer(2));
+        assert_eq!(call.result_interface, answer(3));
     }
 
     #[test]

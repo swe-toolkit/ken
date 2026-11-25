@@ -1,0 +1,24 @@
+program capabilities FS APartial
+import Capability.Console.Text (print_line)
+import Capability.Process.Exit (host_program)
+
+data Vec (A : Type) : Nat -> Type where {
+  VNil : Vec A 0;
+  VCons : (n : Nat) -> A -> Vec A n -> Vec A (n+1)
+}
+
+fn zipPrimitive (n : Nat) (v : Vec String n) (w : Vec String n) : Vec String n =
+  match v {
+    VNil |-> VNil String;
+    VCons m a xs |-> match w {
+      VCons _ b ys |-> VCons String m a (zipPrimitive m xs ys)
+    }
+  }
+
+proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode visits [Console] =
+  host_program APartial (print_line (match zipPrimitive (Suc Zero)
+    (VCons String Zero "seven" (VNil String))
+    (VCons String Zero "eight" (VNil String)) {
+    VCons _ head _ |-> head
+  }))
