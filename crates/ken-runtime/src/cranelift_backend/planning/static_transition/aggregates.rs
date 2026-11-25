@@ -5212,7 +5212,9 @@ fn positional_capture_declared_children(
              ordinal space of its positional child model can name"
         )));
     }
-    let mut run = RUN.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut run = RUN
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if run.len() < arity {
         let length = arity
             .max(run.len().saturating_mul(2))
@@ -14371,7 +14373,11 @@ mod checked_ih_captured_env_schema {
         for arity in [0usize, 2, 64, 65, 79, 1000] {
             let run = positional_capture_declared_children(arity)
                 .expect("an arity in the u32 ordinal space is expressible");
-            assert_eq!(run.len(), arity, "the run is exactly the arity, never shorter");
+            assert_eq!(
+                run.len(),
+                arity,
+                "the run is exactly the arity, never shorter"
+            );
             assert!(run.iter().enumerate().all(|(position, node)| {
                 *node == SynthesizedAggregateNode::WorkerCaptureOperand(position as u32)
             }));
