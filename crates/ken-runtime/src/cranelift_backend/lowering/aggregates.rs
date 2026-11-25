@@ -2330,7 +2330,7 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-        fn carrier_handle_disposition(
+        pub(super) fn carrier_handle_disposition(
             value: &Lowered,
         ) -> Result<(BoundaryTag, BoundaryClass), CraneliftBackendError> {
             match value.boundary_disposition() {
@@ -3155,6 +3155,21 @@ impl<'a> Lowering<'a> {
             pointer: cranelift_codegen::ir::Value,
             len: cranelift_codegen::ir::Value,
         ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            let word = self.emit_carrier_bytes_claim(builder, tag, class, len)?;
+            self.emit_carrier_bytes_copy(builder, word, pointer, len, None)?;
+            Ok(word)
+        }
+
+        /// Allocate a byte-bodied node of `class` and claim `len` bytes of its
+        /// span. Claim-then-fill: a length the region cannot satisfy fails here,
+        /// before any byte is written.
+        pub(super) fn emit_carrier_bytes_claim(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            tag: BoundaryTag,
+            class: BoundaryClass,
+            len: cranelift_codegen::ir::Value,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
             let refs = self.carrier_refs()?;
             let arena = self.carrier_arena()?;
             let pointer_type = builder.func.dfg.value_type(arena);
@@ -3179,7 +3194,21 @@ impl<'a> Lowering<'a> {
                 crate::activation_abi::KEN_REGION_CAPACITY_BYTES,
                 len,
             )?;
+            Ok(word)
+        }
 
+        /// Copy `len` bytes from `pointer` into `word`'s claimed span, starting at
+        /// `offset` (index 0 when `None`).
+        pub(super) fn emit_carrier_bytes_copy(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            word: CarriedBoundaryWord,
+            pointer: cranelift_codegen::ir::Value,
+            len: cranelift_codegen::ir::Value,
+            offset: Option<cranelift_codegen::ir::Value>,
+        ) -> Result<(), CraneliftBackendError> {
+            let refs = self.carrier_refs()?;
+            let arena = self.carrier_arena()?;
             let head = builder.create_block();
             builder.append_block_param(head, types::I64);
             let body = builder.create_block();
@@ -3202,9 +3231,13 @@ impl<'a> Lowering<'a> {
                 .ins()
                 .load(types::I8, MemFlags::trusted(), address, 0);
             let widened = builder.ins().uextend(types::I64, byte);
+            let position = match offset {
+                Some(offset) => builder.ins().iadd(offset, index),
+                None => index,
+            };
             let write = builder
                 .ins()
-                .call(refs.store_byte, &[arena, word.word, index, widened]);
+                .call(refs.store_byte, &[arena, word.word, position, widened]);
             Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
             // ⚠ `require_i64` split the block, so the back edge is emitted from the
             // block the builder is in NOW, not from `body`.
@@ -3212,7 +3245,7 @@ impl<'a> Lowering<'a> {
             builder.ins().jump(head, &[next.into()]);
 
             builder.switch_to_block(done);
-            Ok(word)
+            Ok(())
         }
 }
 

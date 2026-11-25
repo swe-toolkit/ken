@@ -10247,6 +10247,202 @@ fn d4_seat(need: EffectSeatNeed) -> PlannedEffectSeat {
     PlannedEffectSeat::for_observer_control(need)
 }
 
+fn composed_borrowed_option_result(present: bool, has_suffix: bool) -> i64 {
+    let default = RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "composed borrowed option fixture".into(),
+    };
+    let int = |value: i64| RuntimeExpr::Value(RuntimeValue::Int(value.into()));
+    let construct = |constructor: &str, args| RuntimeExpr::Construct {
+        constructor: constructor.into(),
+        args,
+    };
+    let case = |constructor: &str, binders, body| crate::RuntimeMatchCase {
+        constructor: constructor.into(),
+        binders,
+        body,
+    };
+    let (none, some) = ("fixture::Option::None", "fixture::Option::Some");
+    let inner = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases: vec![
+            case(none, 0, if has_suffix { construct("fixture::Missing", vec![]) } else { int(23) }),
+            case(some, 1, if has_suffix { construct("fixture::Found", vec![RuntimeExpr::Var(0)]) } else { RuntimeExpr::Var(0) }),
+        ],
+        default: default.clone(),
+    };
+    let fixture = if has_suffix {
+        RuntimeExpr::Match {
+            scrutinee: Box::new(inner),
+            cases: vec![
+                case("fixture::Missing", 0, int(23)),
+                case("fixture::Found", 1, RuntimeExpr::Var(0)),
+            ],
+            default: default.clone(),
+        }
+    } else {
+        inner
+    };
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let RuntimeExpr::Match { cases, default, scrutinee } = &fixture else { unreachable!() };
+    let (head_cases, head_default, head_origin) = if has_suffix {
+        let RuntimeExpr::Match { cases, default, .. } = scrutinee.as_ref() else { unreachable!() };
+        (cases, default, plan.child_static_origin(root, 0).expect("planned inner match"))
+    } else {
+        (cases, default, root)
+    };
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    COMPOSED_BORROWED_OPTION_SUFFIXES.with(|seen| seen.borrow_mut().clear());
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let present = builder.ins().iconst(types::I8, i64::from(present));
+        let value = builder.ins().iconst(types::I64, 71);
+        // Establish lower_bytes_at's postcondition: a BorrowedOption payload carries its Int tag.
+        let tag = builder
+            .ins()
+            .iconst(types::I64, crate::NATIVE_INT_SMALL_TAG_V1 as i64);
+        compiler.function_local.native_int_tags.insert(value, tag);
+        let option = LoweringOperand::Specialized(Lowered::BorrowedOption {
+            present, value, none: none.into(), some: some.into(),
+        });
+        let frames = [
+            EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                cases: head_cases, default: head_default, env: &[], static_origin: head_origin,
+                retained_scrutinee_index: None, deferred_constructor_case: None,
+            }),
+            EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                cases, default, env: &[], static_origin: root,
+                retained_scrutinee_index: None, deferred_constructor_case: None,
+            }),
+        ];
+        let result = compiler.lower_computational_match_value_composed(
+            builder, RoutedAnswer::direct(option), &frames[..1 + usize::from(has_suffix)],
+        )?;
+        let LoweringOperand::Specialized(Lowered::Int { value, .. }) = result else {
+            panic!("borrowed option cases must finish as the Int selected by the suffix");
+        };
+        Ok(value)
+    });
+    COMPOSED_BORROWED_OPTION_SUFFIXES.with(|seen| {
+        assert_eq!(seen.take(), [usize::from(has_suffix)], "the case must reach C");
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    ac_c7_run(code, base)
+}
+
+/// Durable invariant: C's Some arm binds its payload through a pending match.
+#[test]
+fn composed_borrowed_option_some_continues_through_pending_match() {
+    assert_eq!(composed_borrowed_option_result(true, true), 71);
+}
+
+/// Durable invariant: C's None arm also continues through a pending match.
+#[test]
+fn composed_borrowed_option_none_continues_through_pending_match() {
+    assert_eq!(composed_borrowed_option_result(false, true), 23);
+}
+
+/// Durable invariant: with no suffix, C returns the selected local arm value.
+#[test]
+fn composed_borrowed_option_with_empty_suffix_returns_the_arm_value() {
+    assert_eq!(composed_borrowed_option_result(true, false), 71);
+}
+
+fn bytes_concat_fixture(args: Vec<RuntimeExpr>) -> RuntimeExpr {
+    RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "bytes_concat".into(),
+            partiality: RuntimePartiality::Total,
+        },
+        args,
+    }
+}
+
+/// Durable invariant: the emitted primitive copies a persistent lhs and a
+/// response span rhs in argument order. This witnesses that pair only, not
+/// address invalidation on reservation in the current backing store.
+#[test]
+fn bytes_concat_copies_carried_lhs_then_response_span() {
+    let fixture = bytes_concat_fixture(vec![RuntimeExpr::Var(0), RuntimeExpr::Var(1)]);
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let chunk = [3_u8];
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let lhs = compiler.transfer_into_carrier(builder, root, &Lowered::Bytes(vec![1, 2]))?;
+        let pointer = builder.ins().iconst(types::I64, chunk.as_ptr() as i64);
+        let length = builder.ins().iconst(types::I64, chunk.len() as i64);
+        let rhs = Lowered::ResponseBytes(SafeByteSpan::for_control(pointer, length));
+        let result = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: &fixture,
+                static_origin: root,
+            },
+            &[
+                LoweringEnvironmentBinding::Value(LoweringOperand::Carried(lhs)),
+                LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(rhs)),
+            ],
+        )?;
+        let LoweringOperand::Carried(word) = result else {
+            panic!("runtime concat must produce a carried word");
+        };
+        let (pointer, length, outcome) = compiler.observe_carried_bytes_span(
+            builder,
+            d4_seat(EffectSeatNeed::BytesPointerLength).into(),
+            word,
+        )?;
+        Lowering::require_i64(builder, outcome, 0);
+        Lowering::require_i64(builder, length, 3);
+        Ok(pointer)
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    let pointer = ac_c7_run(code, base);
+    assert!(pointer > 0, "expected a three-byte view, got {pointer}");
+    // The emitted observation checked the length; the store is still alive,
+    // and no reservation intervenes between observing and reading the view.
+    let bytes = unsafe { std::slice::from_raw_parts(pointer as *const u8, 3) };
+    assert_eq!(bytes, &[1, 2, 3]);
+}
+
+/// Durable invariant: two literal operands fold to a specialized byte value
+/// without allocating an arena node in the emitted function.
+#[test]
+fn bytes_concat_two_literals_fold_without_allocating() {
+    let fixture = bytes_concat_fixture(vec![
+        RuntimeExpr::Value(RuntimeValue::Bytes(vec![1, 2])),
+        RuntimeExpr::Value(RuntimeValue::Bytes(vec![3])),
+    ]);
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = ac_c7_compile_edge(&seed_env, plan, |compiler, builder| {
+        let result = compiler.lower_expr(
+            builder,
+            SourceOccurrence {
+                expr: &fixture,
+                static_origin: root,
+            },
+            &[],
+        )?;
+        let LoweringOperand::Specialized(Lowered::Bytes(bytes)) = result else {
+            panic!("literal concat must fold to specialized Bytes");
+        };
+        assert_eq!(bytes, [1, 2, 3]);
+        Ok(builder.ins().iconst(types::I64, 0))
+    });
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let before = store.image().0.node_count();
+    let (_arena, base) = ac_c7_bind_arena(&mut store);
+    assert_eq!(ac_c7_run(code, base), 0);
+    assert_eq!(store.image().0.node_count(), before);
+}
+
 /// Transfer `literal` into the carrier, observe it through the `D4` observer,
 /// and return the SSA value at `field` (0 pointer, 1 length, 2 outcome).
 fn d4_observe(

@@ -11,6 +11,198 @@ use crate::cranelift_backend::planning::{
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum NativePrimitive {
+    AddInt,
+    SubInt,
+    MulInt,
+    EqInt,
+    LeqInt,
+    Uint8ToInt,
+    IntToUint8Raw,
+    IntToUint64Raw,
+    NotBool,
+    AndBool,
+    OrBool,
+    BytesLength,
+    BytesAt,
+    BytesSlice,
+    BytesConcat,
+    BytesEncode,
+    BytesDecode,
+    BytesToList,
+    ListCharToString,
+    ByteLength,
+    CharLength,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ScalarOperand { Int, Bool }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum OperandRoute {
+    /// The symbol consumes the raw operand list itself.
+    Emitted,
+    /// A carried scalar is projected; a borrowed native leaf aborts.
+    Scalar(ScalarOperand),
+    /// One bytes operand; a carried one is viewed as a span.
+    CarriedBytes,
+    /// A bytes operand, then an ImmediateInt index.
+    BytesAndIndex,
+    /// A carried operand refuses at specialized_operands_at.
+    SpecializedOnly,
+}
+
+impl NativePrimitive {
+    pub(super) const ALL: [Self; 21] = [
+        Self::AddInt,
+        Self::SubInt,
+        Self::MulInt,
+        Self::EqInt,
+        Self::LeqInt,
+        Self::Uint8ToInt,
+        Self::IntToUint8Raw,
+        Self::IntToUint64Raw,
+        Self::NotBool,
+        Self::AndBool,
+        Self::OrBool,
+        Self::BytesLength,
+        Self::BytesAt,
+        Self::BytesSlice,
+        Self::BytesConcat,
+        Self::BytesEncode,
+        Self::BytesDecode,
+        Self::BytesToList,
+        Self::ListCharToString,
+        Self::ByteLength,
+        Self::CharLength,
+    ];
+
+    #[deny(unreachable_patterns)]
+    pub(super) fn symbol(self) -> &'static str {
+        match self {
+            Self::AddInt => "add_int",
+            Self::SubInt => "sub_int",
+            Self::MulInt => "mul_int",
+            Self::EqInt => "eq_int",
+            Self::LeqInt => "leq_int",
+            Self::Uint8ToInt => "uint8_to_int",
+            Self::IntToUint8Raw => "int_to_uint8_raw",
+            Self::IntToUint64Raw => "int_to_uint64_raw",
+            Self::NotBool => "not_bool",
+            Self::AndBool => "and_bool",
+            Self::OrBool => "or_bool",
+            Self::BytesLength => "bytes_length",
+            Self::BytesAt => "bytes_at",
+            Self::BytesSlice => "bytes_slice",
+            Self::BytesConcat => "bytes_concat",
+            Self::BytesEncode => "bytes_encode",
+            Self::BytesDecode => "bytes_decode",
+            Self::BytesToList => "bytes_to_list",
+            Self::ListCharToString => "list_char_to_string",
+            Self::ByteLength => "byte_length",
+            Self::CharLength => "char_length",
+        }
+    }
+
+    pub(super) fn from_symbol(symbol: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|p| p.symbol() == symbol)
+    }
+
+    #[deny(unreachable_patterns)]
+    pub(super) fn operand_route(self) -> OperandRoute {
+        match self {
+            Self::AddInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::SubInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::MulInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::EqInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::LeqInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::Uint8ToInt => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::IntToUint8Raw => OperandRoute::Scalar(ScalarOperand::Int),
+            Self::IntToUint64Raw => OperandRoute::SpecializedOnly,
+            Self::NotBool => OperandRoute::Scalar(ScalarOperand::Bool),
+            Self::AndBool => OperandRoute::Scalar(ScalarOperand::Bool),
+            Self::OrBool => OperandRoute::Scalar(ScalarOperand::Bool),
+            Self::BytesLength => OperandRoute::CarriedBytes,
+            Self::BytesAt => OperandRoute::BytesAndIndex,
+            Self::BytesSlice => OperandRoute::SpecializedOnly,
+            Self::BytesConcat => OperandRoute::Emitted,
+            Self::BytesEncode => OperandRoute::SpecializedOnly,
+            Self::BytesDecode => OperandRoute::SpecializedOnly,
+            Self::BytesToList => OperandRoute::Emitted,
+            Self::ListCharToString => OperandRoute::SpecializedOnly,
+            Self::ByteLength => OperandRoute::SpecializedOnly,
+            Self::CharLength => OperandRoute::SpecializedOnly,
+        }
+    }
+}
+
+#[cfg(test)]
+mod operand_table_tests {
+    use super::*;
+
+    #[test]
+    fn native_primitive_spellings_round_trip() {
+        let expected = [
+            "add_int",
+            "sub_int",
+            "mul_int",
+            "eq_int",
+            "leq_int",
+            "uint8_to_int",
+            "int_to_uint8_raw",
+            "int_to_uint64_raw",
+            "not_bool",
+            "and_bool",
+            "or_bool",
+            "bytes_length",
+            "bytes_at",
+            "bytes_slice",
+            "bytes_concat",
+            "bytes_encode",
+            "bytes_decode",
+            "bytes_to_list",
+            "list_char_to_string",
+            "byte_length",
+            "char_length",
+        ];
+        for symbol in expected {
+            assert_eq!(NativePrimitive::from_symbol(symbol).map(NativePrimitive::symbol), Some(symbol));
+        }
+        assert_eq!(NativePrimitive::ALL.into_iter().collect::<BTreeSet<_>>().len(), expected.len());
+    }
+
+    #[test]
+    fn native_primitive_operand_routes_match_the_closed_table() {
+        let expected = [
+            (NativePrimitive::AddInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::SubInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::MulInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::EqInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::LeqInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::Uint8ToInt, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::IntToUint8Raw, OperandRoute::Scalar(ScalarOperand::Int)),
+            (NativePrimitive::IntToUint64Raw, OperandRoute::SpecializedOnly),
+            (NativePrimitive::NotBool, OperandRoute::Scalar(ScalarOperand::Bool)),
+            (NativePrimitive::AndBool, OperandRoute::Scalar(ScalarOperand::Bool)),
+            (NativePrimitive::OrBool, OperandRoute::Scalar(ScalarOperand::Bool)),
+            (NativePrimitive::BytesLength, OperandRoute::CarriedBytes),
+            (NativePrimitive::BytesAt, OperandRoute::BytesAndIndex),
+            (NativePrimitive::BytesSlice, OperandRoute::SpecializedOnly),
+            (NativePrimitive::BytesConcat, OperandRoute::Emitted),
+            (NativePrimitive::BytesEncode, OperandRoute::SpecializedOnly),
+            (NativePrimitive::BytesDecode, OperandRoute::SpecializedOnly),
+            (NativePrimitive::BytesToList, OperandRoute::Emitted),
+            (NativePrimitive::ListCharToString, OperandRoute::SpecializedOnly),
+            (NativePrimitive::ByteLength, OperandRoute::SpecializedOnly),
+            (NativePrimitive::CharLength, OperandRoute::SpecializedOnly),
+        ];
+        for (primitive, route) in expected {
+            assert_eq!(primitive.operand_route(), route, "{}", primitive.symbol());
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct BytesListConstructors {
     nil: (AggregateOccurrenceId, u64),
@@ -98,29 +290,31 @@ impl<'a> Lowering<'a> {
             }
         }
 
-        if primitive.symbol == "bytes_to_list" {
-            let [operand] = lowered_args.as_slice() else {
-                return Err(unsupported(
-                    LoweringCause::PlannerInvariant,
-                    "PrimitiveCall",
-                    "bytes_to_list requires exactly one bytes operand",
-                ));
-            };
-            return self.lower_bytes_to_list(builder, static_origin, operand)
-                .map(LoweringOperand::Carried);
+        let native = NativePrimitive::from_symbol(&primitive.symbol);
+        let route = native.map(NativePrimitive::operand_route);
+        if let Some(OperandRoute::Emitted) = route {
+            if native == Some(NativePrimitive::BytesToList) {
+                let [operand] = lowered_args.as_slice() else {
+                    return Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "bytes_to_list requires exactly one bytes operand",
+                    ));
+                };
+                return self.lower_bytes_to_list(builder, static_origin, operand)
+                    .map(LoweringOperand::Carried);
+            }
+            debug_assert_eq!(native, Some(NativePrimitive::BytesConcat));
+            // Two literals still use the specialized fold below.
+            if !matches!(
+                lowered_args.as_slice(),
+                [LoweringOperand::Specialized(Lowered::Bytes(_)), LoweringOperand::Specialized(Lowered::Bytes(_))],
+            ) {
+                return self.lower_dynamic_bytes_concat(builder, &lowered_args).map(LoweringOperand::Carried);
+            }
         }
-
-        // A primitive's static symbol determines whether its operands are
-        // scalar Ints or Bools. A carried word in one of those positions is
-        // projected through the emitted scalar helper; no runtime tag chooses
-        // which source type the operand is.
-        let scalar_kind = match primitive.symbol.as_str() {
-            "add_int" | "sub_int" | "mul_int" | "eq_int" | "leq_int" | "uint8_to_int"
-            | "int_to_uint8_raw" => Some("Int"),
-            "not_bool" | "and_bool" | "or_bool" => Some("Bool"),
-            _ => None,
-        };
-        let lowered_args = if primitive.symbol == "bytes_length" {
+        let lowered_args = match route {
+            Some(OperandRoute::CarriedBytes) => {
             match lowered_args.as_slice() {
                 [LoweringOperand::Specialized(_)] => {
                     specialized_operands_at(&lowered_args, "the bytes_length operand")?
@@ -140,7 +334,8 @@ impl<'a> Lowering<'a> {
                     ));
                 }
             }
-        } else if primitive.symbol == "bytes_at" {
+            }
+            Some(OperandRoute::BytesAndIndex) => {
             lowered_args
                 .into_iter()
                 .enumerate()
@@ -172,7 +367,8 @@ impl<'a> Lowering<'a> {
                     ),
                 })
                 .collect::<Result<Vec<_>, CraneliftBackendError>>()?
-        } else if let Some(kind) = scalar_kind {
+            }
+            Some(OperandRoute::Scalar(kind)) => {
             lowered_args
                 .into_iter()
                 .map(|arg| match arg {
@@ -188,16 +384,15 @@ impl<'a> Lowering<'a> {
                         builder.switch_to_block(unreachable);
                         let zero = builder.ins().iconst(types::I64, 0);
                         Ok(match kind {
-                            "Int" => self.lower_dynamic_small_int(builder, zero),
-                            "Bool" => Lowered::Bool { value: zero, known: None },
-                            _ => unreachable!("closed primitive scalar kind"),
+                            ScalarOperand::Int => self.lower_dynamic_small_int(builder, zero),
+                            ScalarOperand::Bool => Lowered::Bool { value: zero, known: None },
                         })
                     }
                     LoweringOperand::Specialized(value) => Ok(value),
                     LoweringOperand::Carried(word) => {
                         Ok(match kind {
-                            "Int" => self.decode_carried_int_operand(builder, word)?,
-                            "Bool" => {
+                            ScalarOperand::Int => self.decode_carried_int_operand(builder, word)?,
+                            ScalarOperand::Bool => {
                                 let value = self.emit_carrier_scalar(builder, word)?;
                                 let tag = builder.ins().band_imm(
                                     word.word,
@@ -210,7 +405,6 @@ impl<'a> Lowering<'a> {
                                 );
                                 Lowered::Bool { value, known: None }
                             }
-                            _ => unreachable!("closed primitive scalar kind"),
                         })
                     }
                     LoweringOperand::Residual(_) => Err(
@@ -220,34 +414,42 @@ impl<'a> Lowering<'a> {
                     ),
                 })
                 .collect::<Result<Vec<_>, CraneliftBackendError>>()?
-        } else {
-            specialized_operands_at(&lowered_args, "a primitive-call operand")?
+            }
+            Some(OperandRoute::SpecializedOnly | OperandRoute::Emitted) | None => {
+                specialized_operands_at(&lowered_args, "a primitive-call operand")?
+            }
         };
-        let lowered = match primitive.symbol.as_str() {
-            "add_int" => self.lower_int_binop(builder, "add_int", lowered_args, |lhs, rhs| {
+        let Some(native) = native else {
+            return Err(unsupported(LoweringCause::Fragment,
+                "PrimitiveCall",
+                format!("primitive {} is not in the supported native set", primitive.symbol),
+            ));
+        };
+        let lowered = match native {
+            NativePrimitive::AddInt => self.lower_int_binop(builder, native.symbol(), lowered_args, |lhs, rhs| {
                 lhs.checked_add(rhs)
             }),
-            "sub_int" => self.lower_int_binop(builder, "sub_int", lowered_args, |lhs, rhs| {
+            NativePrimitive::SubInt => self.lower_int_binop(builder, native.symbol(), lowered_args, |lhs, rhs| {
                 lhs.checked_sub(rhs)
             }),
-            "mul_int" => self.lower_int_binop(builder, "mul_int", lowered_args, |lhs, rhs| {
+            NativePrimitive::MulInt => self.lower_int_binop(builder, native.symbol(), lowered_args, |lhs, rhs| {
                 lhs.checked_mul(rhs)
             }),
-            "eq_int" => self.lower_int_cmp(
+            NativePrimitive::EqInt => self.lower_int_cmp(
                 builder,
-                "eq_int",
+                native.symbol(),
                 lowered_args,
                 cranelift_codegen::ir::condcodes::IntCC::Equal,
                 |lhs, rhs| lhs == rhs,
             ),
-            "leq_int" => self.lower_int_cmp(
+            NativePrimitive::LeqInt => self.lower_int_cmp(
                 builder,
-                "leq_int",
+                native.symbol(),
                 lowered_args,
                 cranelift_codegen::ir::condcodes::IntCC::SignedLessThanOrEqual,
                 |lhs, rhs| lhs <= rhs,
             ),
-            "uint8_to_int" | "int_to_uint8_raw" | "int_to_uint64_raw" => {
+            NativePrimitive::Uint8ToInt | NativePrimitive::IntToUint8Raw | NativePrimitive::IntToUint64Raw => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
                     unsupported(LoweringCause::PlannerInvariant,
                         "PrimitiveCall",
@@ -266,28 +468,28 @@ impl<'a> Lowering<'a> {
                 };
                 Ok(value)
             }
-            "not_bool" => self.lower_bool_not(builder, lowered_args),
-            "and_bool" => self.lower_bool_binop(
+            NativePrimitive::NotBool => self.lower_bool_not(builder, lowered_args),
+            NativePrimitive::AndBool => self.lower_bool_binop(
                 builder,
-                "and_bool",
+                native.symbol(),
                 lowered_args,
                 |builder, lhs, rhs| builder.ins().band(lhs, rhs),
                 |lhs, rhs| lhs && rhs,
             ),
-            "or_bool" => self.lower_bool_binop(
+            NativePrimitive::OrBool => self.lower_bool_binop(
                 builder,
-                "or_bool",
+                native.symbol(),
                 lowered_args,
                 |builder, lhs, rhs| builder.ins().bor(lhs, rhs),
                 |lhs, rhs| lhs || rhs,
             ),
-            "bytes_length" => self.lower_bytes_length(builder, lowered_args),
-            "bytes_at" => self.lower_bytes_at(builder, lowered_args, &primitive.partiality),
-            "bytes_slice" => self.lower_bytes_slice(lowered_args, &primitive.partiality),
-            "bytes_concat" => self.lower_bytes_concat(lowered_args),
-            "bytes_encode" => self.lower_bytes_encode(lowered_args),
-            "bytes_decode" => self.lower_bytes_decode(lowered_args, &primitive.partiality),
-            "list_char_to_string" => {
+            NativePrimitive::BytesLength => self.lower_bytes_length(builder, lowered_args),
+            NativePrimitive::BytesAt => self.lower_bytes_at(builder, lowered_args, &primitive.partiality),
+            NativePrimitive::BytesSlice => self.lower_bytes_slice(lowered_args, &primitive.partiality),
+            NativePrimitive::BytesConcat => self.lower_bytes_concat(lowered_args),
+            NativePrimitive::BytesEncode => self.lower_bytes_encode(lowered_args),
+            NativePrimitive::BytesDecode => self.lower_bytes_decode(lowered_args, &primitive.partiality),
+            NativePrimitive::ListCharToString => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
                     unsupported(LoweringCause::PlannerInvariant,
                         "PrimitiveCall",
@@ -305,12 +507,9 @@ impl<'a> Lowering<'a> {
                 })?;
                 Ok(Lowered::String(chars.into_iter().nfc().collect()))
             }
-            "byte_length" => self.lower_string_byte_length(builder, lowered_args),
-            "char_length" => self.lower_string_char_length(builder, lowered_args),
-            other => Err(unsupported(LoweringCause::Fragment,
-                "PrimitiveCall",
-                format!("primitive {other} is not in the supported native set"),
-            )),
+            NativePrimitive::ByteLength => self.lower_string_byte_length(builder, lowered_args),
+            NativePrimitive::CharLength => self.lower_string_char_length(builder, lowered_args),
+            NativePrimitive::BytesToList => unreachable!("the emitted bytes_to_list returned above"),
         };
         // ⭐ Back onto the spine: a primitive's result is a fresh specialized
         // value re-entering the phase sum.
@@ -374,10 +573,10 @@ impl<'a> Lowering<'a> {
         let output_pointer = builder.ins().stack_addr(pointer_type, output, 0);
         let operation = builder.ins().iconst(
             types::I64,
-            match symbol {
-                "add_int" => 0,
-                "sub_int" => 1,
-                "mul_int" => 2,
+            match NativePrimitive::from_symbol(symbol) {
+                Some(NativePrimitive::AddInt) => 0,
+                Some(NativePrimitive::SubInt) => 1,
+                Some(NativePrimitive::MulInt) => 2,
                 _ => unreachable!("caller supplies exact Int arithmetic symbol"),
             },
         );
@@ -443,9 +642,9 @@ impl<'a> Lowering<'a> {
         })?;
         let operation = builder.ins().iconst(
             types::I64,
-            match symbol {
-                "eq_int" => 0,
-                "leq_int" => 1,
+            match NativePrimitive::from_symbol(symbol) {
+                Some(NativePrimitive::EqInt) => 0,
+                Some(NativePrimitive::LeqInt) => 1,
                 _ => unreachable!("caller supplies exact Int comparison symbol"),
             },
         );
@@ -841,7 +1040,7 @@ impl<'a> Lowering<'a> {
                 "bytes_at requires safe Option result metadata",
             ));
         };
-        let (bytes, index) = expect_two_args("bytes_at", args)?;
+        let (bytes, index) = expect_two_args(NativePrimitive::BytesAt.symbol(), args)?;
         let Lowered::Int {
             known: Some(index), ..
         } = index
@@ -1027,7 +1226,7 @@ impl<'a> Lowering<'a> {
     }
 
     fn lower_bytes_concat(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {
-        let (lhs, rhs) = expect_two_args("bytes_concat", args)?;
+        let (lhs, rhs) = expect_two_args(NativePrimitive::BytesConcat.symbol(), args)?;
         let (Lowered::Bytes(mut lhs), Lowered::Bytes(rhs)) = (lhs, rhs) else {
             return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
@@ -1036,6 +1235,145 @@ impl<'a> Lowering<'a> {
         };
         lhs.extend(rhs);
         Ok(Lowered::Bytes(lhs))
+    }
+
+    /// `bytes_concat` with a runtime operand. Lengths are read first, the result
+    /// is claimed at their sum, and each source is copied at its offset. A
+    /// persistent Bytes source is viewed again after the claim, because a byte
+    /// view is stable only until the next reservation of its image (AC-11).
+    fn lower_dynamic_bytes_concat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        args: &[LoweringOperand],
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let [lhs, rhs] = args else {
+            return Err(unsupported(
+                LoweringCause::PlannerInvariant,
+                "PrimitiveCall",
+                "bytes_concat requires exactly two bytes operands",
+            ));
+        };
+        let lhs_len = self.bytes_concat_operand_len(builder, lhs)?;
+        let rhs_len = self.bytes_concat_operand_len(builder, rhs)?;
+        let total = builder.ins().iadd(lhs_len, rhs_len);
+        let wrapped = builder.ins().icmp(IntCC::UnsignedLessThan, total, lhs_len);
+        let wrapped = builder.ins().uextend(types::I64, wrapped);
+        Self::require_i64(builder, wrapped, 0);
+        let (tag, class) = Self::carrier_handle_disposition(&Lowered::Bytes(Vec::new()))?;
+        let word = self.emit_carrier_bytes_claim(builder, tag, class, total)?;
+        self.copy_bytes_concat_operand(builder, word, lhs, lhs_len, None)?;
+        self.copy_bytes_concat_operand(builder, word, rhs, rhs_len, Some(lhs_len))?;
+        Ok(word)
+    }
+
+    fn bytes_concat_operand_len(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        operand: &LoweringOperand,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        match operand {
+            LoweringOperand::Specialized(Lowered::Bytes(bytes)) => {
+                let len = i64::try_from(bytes.len()).map_err(|_| {
+                    unsupported(
+                        LoweringCause::Capacity,
+                        "PrimitiveCall",
+                        "a bytes_concat literal is longer than the ABI can name",
+                    )
+                })?;
+                Ok(builder.ins().iconst(types::I64, len))
+            }
+            LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => Ok(span.len()),
+            LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) => {
+                Ok(Self::borrowed_bytes_view(builder, *pointer).1)
+            }
+            LoweringOperand::Carried(word) => {
+                match self.lower_carried_bytes_operand(builder, *word)? {
+                    Lowered::ResponseBytes(span) => Ok(span.len()),
+                    _ => Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "a carried bytes operand did not normalize to a byte span",
+                    )),
+                }
+            }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "bytes_concat requires an ordinary bytes value",
+                },
+            ),
+            LoweringOperand::Specialized(_) => Err(unsupported(
+                LoweringCause::Fragment,
+                "PrimitiveCall",
+                "bytes_concat only supports Bytes arguments in native lowering",
+            )),
+        }
+    }
+
+    fn copy_bytes_concat_operand(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+        operand: &LoweringOperand,
+        len: cranelift_codegen::ir::Value,
+        offset: Option<cranelift_codegen::ir::Value>,
+    ) -> Result<(), CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        match operand {
+            LoweringOperand::Specialized(Lowered::Bytes(bytes)) => {
+                let refs = self.carrier_refs()?;
+                let arena = self.carrier_arena()?;
+                for (index, byte) in bytes.iter().enumerate() {
+                    let index = i64::try_from(index).map_err(|_| {
+                        unsupported(
+                            LoweringCause::Capacity,
+                            "PrimitiveCall",
+                            "a bytes_concat literal is longer than the ABI can name",
+                        )
+                    })?;
+                    let position = match offset {
+                        Some(offset) => builder.ins().iadd_imm(offset, index),
+                        None => builder.ins().iconst(types::I64, index),
+                    };
+                    let byte = builder.ins().iconst(types::I64, i64::from(*byte));
+                    let write = builder
+                        .ins()
+                        .call(refs.store_byte, &[arena, word.word, position, byte]);
+                    Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+                }
+                Ok(())
+            }
+            LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => {
+                self.emit_carrier_bytes_copy(builder, word, span.pointer(), len, offset)
+            }
+            LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) => {
+                let (data, _) = Self::borrowed_bytes_view(builder, *pointer);
+                self.emit_carrier_bytes_copy(builder, word, data, len, offset)
+            }
+            LoweringOperand::Carried(source) => {
+                // Viewed again after the claim; only the length survives the first view.
+                let Lowered::ResponseBytes(span) =
+                    self.lower_carried_bytes_operand(builder, *source)?
+                else {
+                    return Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "a carried bytes operand did not normalize to a byte span",
+                    ));
+                };
+                let same = builder.ins().icmp(IntCC::Equal, span.len(), len);
+                let same = builder.ins().uextend(types::I64, same);
+                Self::require_i64(builder, same, 1);
+                self.emit_carrier_bytes_copy(builder, word, span.pointer(), len, offset)
+            }
+            LoweringOperand::Residual(_) | LoweringOperand::Specialized(_) => {
+                Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "PrimitiveCall",
+                    "bytes_concat copied an operand its length pass refused",
+                ))
+            }
+        }
     }
 
     fn lower_bytes_encode(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {

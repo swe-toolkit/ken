@@ -3488,6 +3488,11 @@ impl ProducerTrampolineStep<'_> {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static COMPOSED_BORROWED_OPTION_SUFFIXES: std::cell::RefCell<Vec<usize>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 impl<'a> Lowering<'a> {
     /// Seal a settlement placement read against the physical Function owner.
     /// Passing a transient record authority here is a named planner error,
@@ -3818,6 +3823,7 @@ impl<'a> Lowering<'a> {
         }))
     }
 
+    #[deny(unreachable_patterns)]
     fn lower_computational_producer_expr_once<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4293,11 +4299,23 @@ impl<'a> Lowering<'a> {
                 let then_expr = self.child_occurrence(static_origin, 1, then_expr)?;
                 let else_expr = self.child_occurrence(static_origin, 2, else_expr)?;
                 let selected = self.lower_expr(builder, scrutinee, producer_env)?;
-                let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected else {
-                    return Err(unsupported(LoweringCause::Fragment,
+                let (value, known) = match MatchScrutinee::classify(selected) {
+                    MatchScrutinee::Bool { value, known } => (value, known),
+                    MatchScrutinee::Carried(_)
+                    | MatchScrutinee::Residual(_)
+                    | MatchScrutinee::RecursiveBackedge
+                    | MatchScrutinee::HostResult { .. }
+                    | MatchScrutinee::BorrowedOption { .. }
+                    | MatchScrutinee::BorrowedNativeValue { .. }
+                    | MatchScrutinee::DynamicConstructor(_)
+                    | MatchScrutinee::BoundedNat(_)
+                    | MatchScrutinee::StructuralNat(_)
+                    | MatchScrutinee::ProcessExitStatus { .. }
+                    | MatchScrutinee::Constructor { .. }
+                    | MatchScrutinee::Opaque(_) => return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         "tree-producing If scrutinee is not Bool",
-                    ));
+                    )),
                 };
                 if let Some(known) = known {
                     let unselected = if known { else_expr } else { then_expr };
@@ -4636,6 +4654,7 @@ impl<'a> Lowering<'a> {
         }
     }
 
+    #[deny(unreachable_patterns)]
     fn lower_computational_match_value_composed_once<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -4727,210 +4746,24 @@ impl<'a> Lowering<'a> {
         if matches!(eliminator, EliminatorFrame::InvocationReturn) {
             return Ok(ProducerTrampolineStep::ordinary(scrutinee));
         }
-        // A process-object producer stack must retain its outer interface while
-        // an ordinary source Match eliminates a host result. Lowering this
-        // match standalone is what produced a ProcessExitStatus in an Option
-        // frame; each branch is instead lowered under the remaining composed
-        // eliminators, then joined at this Match's own planned join.
-        if let LoweringOperand::Specialized(Lowered::HostResult {
-            success,
-            error,
-            ok,
-            err_constructor,
-            ok_constructor,
-        }) = scrutinee
-        {
-            let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "ComputationalMatch",
-                    "a specialized host result reached a non-ordinary composed eliminator",
-                ));
-            };
-            let remaining = &eliminators[1..];
-            let join_plan =
-                self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
-            let ok_block = builder.create_block();
-            let err_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            builder.ins().brif(success, ok_block, &[], err_block, &[]);
-            let mut merge_kind = None;
-            for (block, constructor, payload) in [
-                (ok_block, ok_constructor.as_str(), *ok),
-                (err_block, err_constructor.as_str(), *error),
-            ] {
-                builder.switch_to_block(block);
-                let lowered = if let Some((index, case)) =
-                    dynamic_host_result_producer_case(frame.cases, constructor)?
-                {
-                    let case_env = env_with([payload], frame.env);
-                    let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
-                    if remaining.is_empty() {
-                        self.lower_expr(builder, body, &case_env)?
-                    } else {
-                        self.lower_computational_producer_expr(builder, body, &case_env, remaining)?
-                    }
-                } else {
-                    LoweringOperand::Specialized(Lowered::Trap(frame.default.clone()))
-                };
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a composed HostResult Match merge despite a continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
-                    builder,
-                    merge,
-                    &join_plan,
-                    frame.static_origin,
-                    lowered,
-                    &mut merge_kind,
-                    "ComputationalMatch",
-                )?;
-            }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                return Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::Trap(frame.default.clone())),
-                ));
-            };
-            return self
-                .finish_planned_join(builder, merge, &join_plan, merge_kind, "ComputationalMatch")
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = scrutinee {
-            let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "ComputationalMatch",
-                    "a specialized Bool reached a non-ordinary composed eliminator",
-                ));
-            };
-            let true_case =
-                frame.cases.iter().enumerate().find(|(_, case)| {
-                    case.binders == 0 && case.constructor.ends_with("::Bool::True")
-                });
-            let false_case =
-                frame.cases.iter().enumerate().find(|(_, case)| {
-                    case.binders == 0 && case.constructor.ends_with("::Bool::False")
-                });
-            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "ComputationalMatch",
-                    "a composed Bool Match requires zero-binder True and False cases",
-                ));
-            };
-            let remaining = &eliminators[1..];
-            if let Some(selected) = known {
-                let (index, case) = if selected { true_case } else { false_case };
-                self.disposition_statically_unselected_match_cases(
-                    frame.static_origin,
-                    Some(index),
-                )?;
-                let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
-                return if remaining.is_empty() {
-                    self.lower_expr(builder, body, frame.env)
-                } else {
-                    self.lower_computational_producer_expr(builder, body, frame.env, remaining)
-                }
-                .map(ProducerTrampolineStep::ordinary);
-            }
-            let join_plan =
-                self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
-            let true_block = builder.create_block();
-            let false_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            builder.ins().brif(value, true_block, &[], false_block, &[]);
-            let mut merge_kind = None;
-            for (block, (index, case)) in [(true_block, true_case), (false_block, false_case)] {
-                builder.switch_to_block(block);
-                let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
-                let lowered = if remaining.is_empty() {
-                    self.lower_expr(builder, body, frame.env)?
-                } else {
-                    self.lower_computational_producer_expr(builder, body, frame.env, remaining)?
-                };
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a composed Bool Match merge despite a continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
-                    builder,
-                    merge,
-                    &join_plan,
-                    body.static_origin,
-                    lowered,
-                    &mut merge_kind,
-                    "ComputationalMatch",
-                )?;
-            }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                return Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::Trap(frame.default.clone())),
-                ));
-            };
-            return self
-                .finish_planned_join(builder, merge, &join_plan, merge_kind, "ComputationalMatch")
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = scrutinee {
-            let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "ComputationalMatch",
-                    "a dynamic constructor reached a non-ordinary composed eliminator",
-                ));
-            };
-            return self
-                .lower_dynamic_constructor_match(
-                    builder,
-                    dynamic,
-                    DynamicConstructorContinuation::Producer {
-                        cases: frame.cases,
-                        default: frame.default,
-                        env: frame.env,
-                        static_origin: frame.static_origin,
-                        eliminators: &eliminators[1..],
-                    },
-                )
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        // ⭐⭐ `D3`'s CARRIED arm for the composed route, ahead of the boundary
-        // below — otherwise a carried scrutinee reaching a real eliminator
-        // would fail closed at `specialized_at` even though `§2g` gives it a
-        // route. ⛔ The phase is classified with no wildcard.
-        let ordinary_word = match &scrutinee {
-            LoweringOperand::Carried(word) => Some(*word),
-            LoweringOperand::Residual(residual) => match eliminator {
-                EliminatorFrame::Ordinary(_) => {
-                    Some(self.decode_residual_child(builder, *residual)?)
-                }
-                EliminatorFrame::Computational(_) | EliminatorFrame::PendingLet(_)
-                | EliminatorFrame::InvocationReturn | EliminatorFrame::Active(_) => None,
-            },
-            LoweringOperand::Specialized(_) => None,
-        };
-        if let Some(word) = ordinary_word {
-            return match eliminator {
+        #[cfg(test)]
+        let trace = |owner, kind| d5a_trace(format!(
+            "RT-D2 E COMPOSED-CONSUMER owner={:?} actual_kind={} eliminators={:?}",
+            owner,
+            kind,
+            eliminators
+                .iter()
+                .map(|frame| match frame {
+                    EliminatorFrame::Computational(f) => ("Computational", Some(f.static_origin)),
+                    EliminatorFrame::Ordinary(f) => ("Ordinary", Some(f.static_origin)),
+                    EliminatorFrame::PendingLet(_) => ("PendingLet", None),
+                    EliminatorFrame::InvocationReturn => ("InvocationReturn", None),
+                    EliminatorFrame::Active(_) => ("Active", None),
+                })
+                .collect::<Vec<_>>(),
+        ));
+        let lower_carrier = |this: &mut Self, builder: &mut FunctionBuilder<'_>, word: CarriedBoundaryWord| {
+            match eliminator {
                 EliminatorFrame::Computational(mut frame) => {
                     // `D6a` -- the predecessor's route RAISES the frame's, and
                     // never lowers it. The frame's own field stays the
@@ -4956,7 +4789,7 @@ impl<'a> Lowering<'a> {
                         frame_field,
                         joined: frame.answer_route,
                     });
-                    self.lower_carried_computational_match(
+                    this.lower_carried_computational_match(
                         builder, word, frame, &eliminators[1..],
                     )
                     .map(ProducerTrampolineStep::ordinary)
@@ -5047,9 +4880,9 @@ impl<'a> Lowering<'a> {
                     // ship a termination argument whose only witness is an
                     // argument.
                     if !suffix.is_empty() {
-                        self.carried_suffix_reentries += 1;
-                        if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
-                            self.carried_suffix_reentries -= 1;
+                        this.carried_suffix_reentries += 1;
+                        if this.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
+                            this.carried_suffix_reentries -= 1;
                             return Err(unsupported(LoweringCause::Capacity,
                                 "BoundaryCarrier",
                                 "a carried ordinary elimination's composed suffix exceeded the                                  bounded re-entry depth; the continuation is refused rather than                                  recursing without a measured bound",
@@ -5058,7 +4891,7 @@ impl<'a> Lowering<'a> {
                     }
                     #[cfg(test)]
                     PRODUCER_MATCH_UNIT_PORTS.with(|calls| calls.set(calls.get() + 1));
-                    let eliminated = self.lower_carried_match(
+                    let eliminated = this.lower_carried_match(
                         builder,
                         word,
                         frame.cases,
@@ -5072,7 +4905,7 @@ impl<'a> Lowering<'a> {
                         COC_D2_SUFFIX_CONTINUATIONS.with(|count| count.set(count.get() + 1));
                     }
                     if !suffix.is_empty() {
-                        self.carried_suffix_reentries -= 1;
+                        this.carried_suffix_reentries -= 1;
                     }
                     eliminated.map(ProducerTrampolineStep::ordinary)
                 }
@@ -5121,7 +4954,7 @@ impl<'a> Lowering<'a> {
                     }
                     #[cfg(test)]
                     CCR_D2_ACTIVE_ROUTES.with(|count| count.set(count.get() + 1));
-                    self.resume_active_continuation(builder, LoweringOperand::Carried(word), active)
+                    this.resume_active_continuation(builder, LoweringOperand::Carried(word), active)
                         .map(ProducerTrampolineStep::ordinary)
                 }
                 // `PendingLet` keeps the original refusal verbatim. `D1` measured
@@ -5145,74 +4978,283 @@ impl<'a> Lowering<'a> {
                 EliminatorFrame::InvocationReturn => Ok(ProducerTrampolineStep::ordinary(
                     LoweringOperand::Carried(word),
                 )),
-            };
-        }
-        let scrutinee = scrutinee.specialized_at("a composed computational-match scrutinee")?;
-        if let Lowered::BoundedNat(nat) = scrutinee {
-            return self
-                .lower_bounded_nat_computational(builder, nat, false, eliminators)
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        if let Lowered::StructuralNat(nat) = scrutinee {
-            return self
-                .lower_bounded_nat_computational(
-                    builder,
-                    BoundedNatV1::derived_from_validated(nat.value),
-                    true,
-                    eliminators,
-                )
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        #[cfg(test)]
-        d5a_trace(format!(
-            "RT-D2 E COMPOSED-CONSUMER owner={:?} actual_kind={} eliminators={:?}",
-            self.defining_emission_owner,
-            lowered_value_kind(&scrutinee),
-            eliminators
-                .iter()
-                .map(|frame| match frame {
-                    EliminatorFrame::Computational(f) => ("Computational", Some(f.static_origin)),
-                    EliminatorFrame::Ordinary(f) => ("Ordinary", Some(f.static_origin)),
-                    EliminatorFrame::PendingLet(_) => ("PendingLet", None),
-                    EliminatorFrame::InvocationReturn => ("InvocationReturn", None),
-                    EliminatorFrame::Active(_) => ("Active", None),
-                })
-                .collect::<Vec<_>>(),
-        ));
-        // A specialized process status outside the M6 carried process-object
-        // interface still resumes an Active continuation without projecting a
-        // constructor. The checked process population now reaches this seam as
-        // `Carried`; this residual covers non-process callers only.
-        if let (Lowered::ProcessExitStatus { .. }, EliminatorFrame::Active(active)) =
-            (&scrutinee, eliminator)
-        {
-            if !eliminators[1..].is_empty() {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
+            }
+        };
+        let (constructor, synthesized_identity, occurrence, args) = match MatchScrutinee::classify(scrutinee) {
+            MatchScrutinee::Carried(word) => return lower_carrier(self, builder, word),
+            operand @ MatchScrutinee::Residual(residual) => {
+                if matches!(eliminator, EliminatorFrame::Ordinary(_)) {
+                    let word = self.decode_residual_child(builder, residual)?;
+                    return lower_carrier(self, builder, word);
+                }
+                operand.into_operand().specialized_at("a composed computational-match scrutinee")?;
+                unreachable!("a residual is never specialized")
+            }
+            MatchScrutinee::HostResult {
+                success,
+                error,
+                ok,
+                err_constructor,
+                ok_constructor,
+            } => {
+                let EliminatorFrame::Ordinary(frame) = eliminator else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a specialized host result reached a non-ordinary composed eliminator",
+                    ));
+                };
+                let remaining = &eliminators[1..];
+                let join_plan =
+                    self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
+                let ok_block = builder.create_block();
+                let err_block = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                builder.ins().brif(success, ok_block, &[], err_block, &[]);
+                let mut merge_kind = None;
+                for (block, constructor, payload) in [
+                    (ok_block, ok_constructor.as_str(), *ok),
+                    (err_block, err_constructor.as_str(), *error),
+                ] {
+                    builder.switch_to_block(block);
+                    let lowered = if let Some((index, case)) =
+                        dynamic_host_result_producer_case(frame.cases, constructor)?
+                    {
+                        let case_env = env_with([payload], frame.env);
+                        let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                        if remaining.is_empty() {
+                            self.lower_expr(builder, body, &case_env)?
+                        } else {
+                            self.lower_computational_producer_expr(builder, body, &case_env, remaining)?
+                        }
+                    } else {
+                        LoweringOperand::Specialized(Lowered::Trap(frame.default.clone()))
+                    };
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "join plan omitted a composed HostResult Match merge despite a continuing predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        frame.static_origin,
+                        lowered,
+                        &mut merge_kind,
+                        "ComputationalMatch",
+                    )?;
+                }
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    return Ok(ProducerTrampolineStep::ordinary(
+                        LoweringOperand::Specialized(Lowered::Trap(frame.default.clone())),
+                    ));
+                };
+                return self
+                    .finish_planned_join(builder, merge, &join_plan, merge_kind, "ComputationalMatch")
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::Bool { value, known } => {
+                let EliminatorFrame::Ordinary(frame) = eliminator else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a specialized Bool reached a non-ordinary composed eliminator",
+                    ));
+                };
+                let true_case =
+                    frame.cases.iter().enumerate().find(|(_, case)| {
+                        case.binders == 0 && case.constructor.ends_with("::Bool::True")
+                    });
+                let false_case =
+                    frame.cases.iter().enumerate().find(|(_, case)| {
+                        case.binders == 0 && case.constructor.ends_with("::Bool::False")
+                    });
+                let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a composed Bool Match requires zero-binder True and False cases",
+                    ));
+                };
+                let remaining = &eliminators[1..];
+                if let Some(selected) = known {
+                    let (index, case) = if selected { true_case } else { false_case };
+                    self.disposition_statically_unselected_match_cases(
+                        frame.static_origin,
+                        Some(index),
+                    )?;
+                    let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                    return if remaining.is_empty() {
+                        self.lower_expr(builder, body, frame.env)
+                    } else {
+                        self.lower_computational_producer_expr(builder, body, frame.env, remaining)
+                    }
+                    .map(ProducerTrampolineStep::ordinary);
+                }
+                let join_plan =
+                    self.consumed_composed_join_plan_token(frame.static_origin, remaining)?;
+                let true_block = builder.create_block();
+                let false_block = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                builder.ins().brif(value, true_block, &[], false_block, &[]);
+                let mut merge_kind = None;
+                for (block, (index, case)) in [(true_block, true_case), (false_block, false_case)] {
+                    builder.switch_to_block(block);
+                    let body = self.case_body_occurrence(frame.static_origin, index, &case.body)?;
+                    let lowered = if remaining.is_empty() {
+                        self.lower_expr(builder, body, frame.env)?
+                    } else {
+                        self.lower_computational_producer_expr(builder, body, frame.env, remaining)?
+                    };
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "join plan omitted a composed Bool Match merge despite a continuing predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        body.static_origin,
+                        lowered,
+                        &mut merge_kind,
+                        "ComputationalMatch",
+                    )?;
+                }
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    return Ok(ProducerTrampolineStep::ordinary(
+                        LoweringOperand::Specialized(Lowered::Trap(frame.default.clone())),
+                    ));
+                };
+                return self
+                    .finish_planned_join(builder, merge, &join_plan, merge_kind, "ComputationalMatch")
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::DynamicConstructor(dynamic) => {
+                let EliminatorFrame::Ordinary(frame) = eliminator else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a dynamic constructor reached a non-ordinary composed eliminator",
+                    ));
+                };
+                return self
+                    .lower_dynamic_constructor_match(
+                        builder,
+                        dynamic,
+                        DynamicConstructorContinuation::Producer {
+                            cases: frame.cases,
+                            default: frame.default,
+                            env: frame.env,
+                            static_origin: frame.static_origin,
+                            eliminators: &eliminators[1..],
+                        },
+                    )
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::BoundedNat(nat) => {
+                return self
+                    .lower_bounded_nat_computational(builder, nat, false, eliminators)
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::StructuralNat(nat) => {
+                return self
+                    .lower_bounded_nat_computational(
+                        builder,
+                        BoundedNatV1::derived_from_validated(nat.value),
+                        true,
+                        eliminators,
+                    )
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            status @ MatchScrutinee::ProcessExitStatus { .. } => {
+                #[cfg(test)]
+                trace(self.defining_emission_owner, "ProcessExitStatus");
+                let EliminatorFrame::Active(active) = eliminator else {
+                    return Err(unsupported(LoweringCause::Fragment,
+                        "ComputationalMatch",
+                        "scrutinee is not a constructor value after ordinary expression lowering",
+                    ));
+                };
+                if !eliminators[1..].is_empty() {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a specialized ordinary-live scrutinee reached an active continuation frame \
+                         with further composed eliminators behind it; the resume consumes the \
+                         frame's own pending suffix, so the remainder would be silently dropped",
+                    ));
+                }
+                return self
+                    .resume_active_continuation(
+                        builder,
+                        status.into_operand(),
+                        active,
+                    )
+                    .map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::BorrowedOption { present, value, none, some } => {
+                #[cfg(test)]
+                trace(self.defining_emission_owner, "BorrowedOption");
+                let EliminatorFrame::Ordinary(frame) = eliminator else {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "ComputationalMatch",
+                        "a borrowed option reached a non-ordinary composed eliminator",
+                    ));
+                };
+                if let Some(index) = frame.retained_scrutinee_index {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "BoundaryCarrier",
+                        format!("a borrowed option scrutinee reached an ordinary eliminator that retains its scrutinee at binder {index}; this shape is not ported"),
+                    ));
+                }
+                if frame.deferred_constructor_case.is_some() {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "BoundaryCarrier",
+                        "a borrowed option scrutinee reached an ordinary eliminator carrying a deferred constructor case",
+                    ));
+                }
+                #[cfg(test)]
+                COMPOSED_BORROWED_OPTION_SUFFIXES.with(|seen| seen.borrow_mut().push(eliminators.len() - 1));
+                return self.lower_borrowed_option_selection(
+                    builder, present, value, &none, &some, frame.cases, frame.default,
+                    frame.static_origin, frame.env,
+                    OptionSelectionMode::ComposedContinuation { eliminators: &eliminators[1..] },
+                ).map(ProducerTrampolineStep::ordinary);
+            }
+            MatchScrutinee::Constructor { constructor, synthesized_identity, occurrence, args } => {
+                #[cfg(test)]
+                trace(self.defining_emission_owner, "Constructor");
+                (constructor, synthesized_identity, occurrence, args)
+            }
+            _refused @ (MatchScrutinee::RecursiveBackedge
+            | MatchScrutinee::BorrowedNativeValue { .. }
+            | MatchScrutinee::Opaque(_)) => {
+                #[cfg(test)]
+                trace(self.defining_emission_owner, _refused.observation_kind());
+                return Err(unsupported(LoweringCause::Fragment,
                     "ComputationalMatch",
-                    "a specialized ordinary-live scrutinee reached an active continuation frame \
-                     with further composed eliminators behind it; the resume consumes the \
-                     frame's own pending suffix, so the remainder would be silently dropped",
+                    "scrutinee is not a constructor value after ordinary expression lowering",
                 ));
             }
-            return self
-                .resume_active_continuation(
-                    builder,
-                    LoweringOperand::Specialized(scrutinee),
-                    active,
-                )
-                .map(ProducerTrampolineStep::ordinary);
-        }
-        let Lowered::Constructor {
-            constructor,
-            synthesized_identity,
-            occurrence,
-            args,
-        } = scrutinee
-        else {
-            return Err(unsupported(LoweringCause::Fragment,
-                "ComputationalMatch",
-                "scrutinee is not a constructor value after ordinary expression lowering",
-            ));
         };
         let retained_scrutinee = Lowered::Constructor {
             constructor: constructor.clone(),
@@ -7040,6 +7082,7 @@ impl<'a> Lowering<'a> {
         }
     }
 
+    #[deny(unreachable_patterns)]
     fn lower_computational_producer_match(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -7122,333 +7165,252 @@ impl<'a> Lowering<'a> {
             }
         }
         let selected = self.lower_expr(builder, scrutinee, producer_env)?;
-        let carried = match &selected {
-            LoweringOperand::Carried(word) => Some(*word),
-            LoweringOperand::Residual(residual) => {
-                Some(self.decode_residual_child(builder, *residual)?)
-            }
-            LoweringOperand::Specialized(_) => None,
-        };
-        if let Some(word) = carried {
+        let lower_carrier = |this: &mut Self, builder: &mut FunctionBuilder<'_>, word| {
             if !eliminators.is_empty() {
-                self.carried_suffix_reentries += 1;
-                if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
-                    self.carried_suffix_reentries -= 1;
+                this.carried_suffix_reentries += 1;
+                if this.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
+                    this.carried_suffix_reentries -= 1;
                     return Err(unsupported(LoweringCause::Capacity,
                         "BoundaryCarrier",
                         "a carried producer match's pending eliminators exceeded the bounded re-entry depth",
                     ));
                 }
             }
-            let eliminated = self.lower_carried_match(
+            let eliminated = this.lower_carried_match(
                 builder, word, producer_cases, producer_default, static_origin, producer_env,
                 Some(eliminators),
             );
             if !eliminators.is_empty() {
-                self.carried_suffix_reentries -= 1;
+                this.carried_suffix_reentries -= 1;
             }
             return eliminated;
-        }
-        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected {
-            let true_case = producer_cases
-                .iter()
-                .enumerate()
-                .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::True"));
-            let false_case = producer_cases
-                .iter()
-                .enumerate()
-                .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::False"));
-            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(LoweringCause::Fragment,
-                    "ComputationalMatch",
-                    "Bool tree producer requires True and False cases",
-                ));
-            };
-            if let Some(known) = known {
-                let (index, case) = if known { true_case } else { false_case };
-                self.disposition_statically_unselected_match_cases(static_origin, Some(index))?;
-                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                return self.lower_computational_producer_expr(
-                    builder,
-                    body,
-                    producer_env,
-                    eliminators,
-                );
+        };
+        let (constructor, args) = match MatchScrutinee::classify(selected) {
+            MatchScrutinee::Carried(word) => return lower_carrier(self, builder, word),
+            MatchScrutinee::Residual(residual) => {
+                let word = self.decode_residual_child(builder, residual)?;
+                return lower_carrier(self, builder, word);
             }
-            // The arms below apply the suffix: use the outer value lanes
-            // with this Match's predecessor topology.
-            let join_plan =
-                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
-            let true_block = builder.create_block();
-            let false_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            builder.ins().brif(value, true_block, &[], false_block, &[]);
-            let mut merge_kind = None;
-            for (block, (index, producer_case)) in
-                [(true_block, true_case), (false_block, false_case)]
-            {
-                builder.switch_to_block(block);
-                let body = self.case_body_occurrence(static_origin, index, &producer_case.body)?;
-                let lowered = self.lower_computational_producer_expr(
-                    builder,
-                    body,
-                    producer_env,
-                    eliminators,
-                )?;
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a producer Bool Match merge despite a \
-                         continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
-                    builder,
-                    merge,
-                    &join_plan,
-                    body.static_origin,
-                    lowered,
-                    &mut merge_kind,
-                    "ComputationalMatch",
-                )?;
-            }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                    producer_default.clone(),
-                )));
-            };
-            return self.finish_planned_join(
-                builder,
-                merge,
-                &join_plan,
-                merge_kind,
-                "ComputationalMatch",
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::HostResult {
-            success,
-            error,
-            ok,
-            err_constructor,
-            ok_constructor,
-        }) = selected
-        {
-            let join_plan =
-                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
-            let ok_block = builder.create_block();
-            let err_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            builder.ins().brif(success, ok_block, &[], err_block, &[]);
-            let mut merge_kind = None;
-            for (block, constructor, payload) in [
-                (ok_block, ok_constructor.as_str(), *ok),
-                (err_block, err_constructor.as_str(), *error),
-            ] {
-                builder.switch_to_block(block);
-                let lowered = if let Some((index, producer_case)) =
-                    dynamic_host_result_producer_case(producer_cases, constructor)?
-                {
-                    let case_env = env_with([payload], producer_env);
-                    let body =
-                        self.case_body_occurrence(static_origin, index, &producer_case.body)?;
-                    self.lower_computational_producer_expr(builder, body, &case_env, eliminators)?
-                } else {
-                    LoweringOperand::Specialized(Lowered::Trap(producer_default.clone()))
-                };
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a producer HostResult merge despite a \
-                         continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
-                    builder,
-                    merge,
-                    &join_plan,
-                    static_origin,
-                    lowered,
-                    &mut merge_kind,
-                    "ComputationalMatch",
-                )?;
-            }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                    producer_default.clone(),
-                )));
-            };
-            return self.finish_planned_join(
-                builder,
-                merge,
-                &join_plan,
-                merge_kind,
-                "ComputationalMatch",
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::BorrowedOption {
-            present,
-            value,
-            none,
-            some,
-        }) = selected
-        {
-            // Same branch selection as the ordinary chain's
-            // `lower_borrowed_option_match`, but each arm continues through the
-            // pending eliminators instead of joining at this Match.
-            let join_plan =
-                self.consumed_composed_join_plan_token(static_origin, eliminators)?;
-            let some_block = builder.create_block();
-            let none_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            builder.ins().brif(present, some_block, &[], none_block, &[]);
-            let mut merge_kind = None;
-            for (block, constructor, fields) in [
-                (some_block, some.as_str(), vec![Lowered::Int { value, known: None }]),
-                (none_block, none.as_str(), Vec::new()),
-            ] {
-                builder.switch_to_block(block);
-                let case = producer_cases
+            MatchScrutinee::Bool { value, known } => {
+                let true_case = producer_cases
                     .iter()
                     .enumerate()
-                    .find(|(_, case)| case.constructor == constructor);
-                let (arm_origin, lowered) = match case {
-                    Some((index, producer_case)) => {
-                        if producer_case.binders != fields.len() {
-                            return Err(unsupported(LoweringCause::PlannerInvariant,
-                                "ComputationalMatch",
-                                "borrowed Option producer arity mismatch",
-                            ));
-                        }
-                        let case_env = env_with(fields, producer_env);
-                        let body =
-                            self.case_body_occurrence(static_origin, index, &producer_case.body)?;
-                        let lowered = self.lower_computational_producer_expr(
-                            builder,
-                            body,
-                            &case_env,
-                            eliminators,
-                        )?;
-                        (body.static_origin, lowered)
-                    }
-                    None => (
-                        static_origin,
-                        LoweringOperand::Specialized(Lowered::Trap(producer_default.clone())),
-                    ),
+                    .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::True"));
+                let false_case = producer_cases
+                    .iter()
+                    .enumerate()
+                    .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::False"));
+                let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                    return Err(unsupported(LoweringCause::Fragment,
+                        "ComputationalMatch",
+                        "Bool tree producer requires True and False cases",
+                    ));
                 };
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
+                if let Some(known) = known {
+                    let (index, case) = if known { true_case } else { false_case };
+                    self.disposition_statically_unselected_match_cases(static_origin, Some(index))?;
+                    let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                    return self.lower_computational_producer_expr(
+                        builder,
+                        body,
+                        producer_env,
+                        eliminators,
+                    );
                 }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a producer BorrowedOption merge despite a \
-                         continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
+                // The arms below apply the suffix: use the outer value lanes
+                // with this Match's predecessor topology.
+                let join_plan =
+                    self.consumed_composed_join_plan_token(static_origin, eliminators)?;
+                let true_block = builder.create_block();
+                let false_block = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                builder.ins().brif(value, true_block, &[], false_block, &[]);
+                let mut merge_kind = None;
+                for (block, (index, producer_case)) in
+                    [(true_block, true_case), (false_block, false_case)]
+                {
+                    builder.switch_to_block(block);
+                    let body = self.case_body_occurrence(static_origin, index, &producer_case.body)?;
+                    let lowered = self.lower_computational_producer_expr(
+                        builder,
+                        body,
+                        producer_env,
+                        eliminators,
+                    )?;
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "join plan omitted a producer Bool Match merge despite a \
+                             continuing predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        body.static_origin,
+                        lowered,
+                        &mut merge_kind,
+                        "ComputationalMatch",
+                    )?;
+                }
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                        producer_default.clone(),
+                    )));
+                };
+                return self.finish_planned_join(
                     builder,
                     merge,
                     &join_plan,
-                    arm_origin,
-                    lowered,
-                    &mut merge_kind,
+                    merge_kind,
                     "ComputationalMatch",
-                )?;
+                );
             }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                return Ok(LoweringOperand::Specialized(Lowered::Trap(
-                    producer_default.clone(),
-                )));
-            };
-            return self.finish_planned_join(
-                builder,
-                merge,
-                &join_plan,
-                merge_kind,
-                "ComputationalMatch",
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = selected {
-            return self.lower_dynamic_constructor_match(
-                builder,
-                dynamic,
-                DynamicConstructorContinuation::Producer {
+            MatchScrutinee::HostResult {
+                success,
+                error,
+                ok,
+                err_constructor,
+                ok_constructor,
+            } => {
+                let join_plan =
+                    self.consumed_composed_join_plan_token(static_origin, eliminators)?;
+                let ok_block = builder.create_block();
+                let err_block = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                builder.ins().brif(success, ok_block, &[], err_block, &[]);
+                let mut merge_kind = None;
+                for (block, constructor, payload) in [
+                    (ok_block, ok_constructor.as_str(), *ok),
+                    (err_block, err_constructor.as_str(), *error),
+                ] {
+                    builder.switch_to_block(block);
+                    let lowered = if let Some((index, producer_case)) =
+                        dynamic_host_result_producer_case(producer_cases, constructor)?
+                    {
+                        let case_env = env_with([payload], producer_env);
+                        let body =
+                            self.case_body_occurrence(static_origin, index, &producer_case.body)?;
+                        self.lower_computational_producer_expr(builder, body, &case_env, eliminators)?
+                    } else {
+                        LoweringOperand::Specialized(Lowered::Trap(producer_default.clone()))
+                    };
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "join plan omitted a producer HostResult merge despite a \
+                             continuing predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        static_origin,
+                        lowered,
+                        &mut merge_kind,
+                        "ComputationalMatch",
+                    )?;
+                }
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                        producer_default.clone(),
+                    )));
+                };
+                return self.finish_planned_join(
+                    builder,
+                    merge,
+                    &join_plan,
+                    merge_kind,
+                    "ComputationalMatch",
+                );
+            }
+            MatchScrutinee::BorrowedOption {
+                present,
+                value,
+                none,
+                some,
+            } => {
+                return self.lower_borrowed_option_selection(
+                    builder, present, value, &none, &some, producer_cases, producer_default,
+                    static_origin, producer_env, OptionSelectionMode::ComposedContinuation { eliminators },
+                );
+            }
+            MatchScrutinee::DynamicConstructor(dynamic) => {
+                return self.lower_dynamic_constructor_match(
+                    builder,
+                    dynamic,
+                    DynamicConstructorContinuation::Producer {
+                        cases: producer_cases,
+                        default: producer_default,
+                        env: producer_env,
+                        static_origin,
+                        eliminators,
+                    },
+                );
+            }
+            MatchScrutinee::BoundedNat(nat) => {
+                let frame = OrdinaryEliminatorFrame {
                     cases: producer_cases,
                     default: producer_default,
                     env: producer_env,
                     static_origin,
-                    eliminators,
-                },
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = selected {
-            let frame = OrdinaryEliminatorFrame {
-                cases: producer_cases,
-                default: producer_default,
-                env: producer_env,
-                static_origin,
-                retained_scrutinee_index: None,
-                deferred_constructor_case: None,
-            };
-            let mut composed = Vec::with_capacity(eliminators.len() + 1);
-            composed.push(EliminatorFrame::Ordinary(frame));
-            composed.extend_from_slice(eliminators);
-            return self.lower_bounded_nat_computational(builder, nat, false, &composed);
-        }
-        if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = selected {
-            let frame = OrdinaryEliminatorFrame {
-                cases: producer_cases,
-                default: producer_default,
-                env: producer_env,
-                static_origin,
-                retained_scrutinee_index: None,
-                deferred_constructor_case: None,
-            };
-            let mut composed = Vec::with_capacity(eliminators.len() + 1);
-            composed.push(EliminatorFrame::Ordinary(frame));
-            composed.extend_from_slice(eliminators);
-            return self.lower_bounded_nat_computational(
-                builder,
-                BoundedNatV1::derived_from_validated(nat.value),
-                true,
-                &composed,
-            );
-        }
-        let LoweringOperand::Specialized(Lowered::Constructor {
-            constructor, args, ..
-        }) = selected
-        else {
-            return Err(unsupported(LoweringCause::Fragment,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                };
+                let mut composed = Vec::with_capacity(eliminators.len() + 1);
+                composed.push(EliminatorFrame::Ordinary(frame));
+                composed.extend_from_slice(eliminators);
+                return self.lower_bounded_nat_computational(builder, nat, false, &composed);
+            }
+            MatchScrutinee::StructuralNat(nat) => {
+                let frame = OrdinaryEliminatorFrame {
+                    cases: producer_cases,
+                    default: producer_default,
+                    env: producer_env,
+                    static_origin,
+                    retained_scrutinee_index: None,
+                    deferred_constructor_case: None,
+                };
+                let mut composed = Vec::with_capacity(eliminators.len() + 1);
+                composed.push(EliminatorFrame::Ordinary(frame));
+                composed.extend_from_slice(eliminators);
+                return self.lower_bounded_nat_computational(
+                    builder,
+                    BoundedNatV1::derived_from_validated(nat.value),
+                    true,
+                    &composed,
+                );
+            }
+            MatchScrutinee::Constructor { constructor, args, .. } => (constructor, args),
+            MatchScrutinee::RecursiveBackedge
+            | MatchScrutinee::BorrowedNativeValue { .. }
+            | MatchScrutinee::ProcessExitStatus { .. }
+            | MatchScrutinee::Opaque(_) => return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "tree-producing match scrutinee is not Bool or a constructor",
-            ));
+            )),
         };
         let Some((case_index, producer_case)) = producer_cases
             .iter()
@@ -16977,6 +16939,7 @@ impl<'a> Lowering<'a> {
     /// Native construction nests carried matches inside constructor descent;
     /// the match arm's live locals must not be retained by every recursive
     /// `lower_expr` call, even when that call is not itself a match.
+    #[deny(unreachable_patterns)]
     fn lower_runtime_match_expr(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -17005,229 +16968,207 @@ impl<'a> Lowering<'a> {
             );
         }
         let lowered_scrutinee = self.lower_expr(builder, scrutinee_occurrence, env)?;
-        // ⭐⭐ `D3`'s CARRIED arm, and it MUST come first.
-        //
-        // ⚠ Every test below asks for a specific `Lowered` shape, and
-        // the chain ends in *"scrutinee is not a constructor value"*. A
-        // carried scrutinee would fall past all of them and land on
-        // that refusal — a **true sentence about the wrong thing**,
-        // which is worse than an error, because it names a cause that
-        // is not the cause. Classifying the phase first is what makes
-        // the rest of the chain a statement about `Lowered` only.
-        match &lowered_scrutinee {
-            LoweringOperand::Carried(word) => return self.lower_carried_match(
-                builder, *word, cases, default, static_origin, env, None,
+        let (constructor, args) = match MatchScrutinee::classify(lowered_scrutinee) {
+            MatchScrutinee::Carried(word) => return self.lower_carried_match(
+                builder, word, cases, default, static_origin, env, None,
             ),
-            LoweringOperand::Residual(residual) => {
-                let child = self.decode_residual_child(builder, *residual)?;
+            MatchScrutinee::Residual(residual) => {
+                let child = self.decode_residual_child(builder, residual)?;
                 return self.lower_carried_match(
                     builder, child, cases, default, static_origin, env, None,
                 );
             }
-            LoweringOperand::Specialized(_) => {}
-        }
-        if let LoweringOperand::Specialized(Lowered::BorrowedNativeValue { pointer }) = lowered_scrutinee {
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
-            return self.lower_borrowed_match(
-                builder,
-                pointer,
-                cases,
-                default,
-                static_origin,
-                env,
-                &join_plan,
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::BorrowedOption {
-            present,
-            value,
-            none,
-            some,
-        }) = lowered_scrutinee
-        {
-            return self.lower_borrowed_option_match(
-                builder,
-                present,
-                value,
-                &none,
-                &some,
-                cases,
-                default,
-                static_origin,
-                env,
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::BoundedNat(nat)) = lowered_scrutinee {
-            return self.lower_bounded_nat_match(
-                builder,
-                nat,
-                false,
-                cases,
-                default,
-                static_origin,
-                env,
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::StructuralNat(nat)) = lowered_scrutinee {
-            return self.lower_bounded_nat_match(
-                builder,
-                BoundedNatV1::derived_from_validated(nat.value),
-                true,
-                cases,
-                default,
-                static_origin,
-                env,
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::HostResult {
-            success,
-            error,
-            ok,
-            err_constructor,
-            ok_constructor,
-        }) = lowered_scrutinee
-        {
-            return self.lower_dynamic_host_result_match(
-                builder,
-                success,
-                *error,
-                *ok,
-                &err_constructor,
-                &ok_constructor,
-                cases,
-                default,
-                static_origin,
-                env,
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = lowered_scrutinee {
-            return self.lower_dynamic_constructor_match(
-                builder,
-                dynamic,
-                DynamicConstructorContinuation::Ordinary {
+            MatchScrutinee::BorrowedNativeValue { pointer } => {
+                let join_plan = self.consumed_join_plan_token(static_origin)?;
+                return self.lower_borrowed_match(
+                    builder,
+                    pointer,
                     cases,
                     default,
+                    static_origin,
                     env,
-                    static_origin,
-                },
-            );
-        }
-        if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee {
-            // ⭐ These two cases are found by CONSTRUCTOR NAME, and a
-            // search yields no position — so both lookups enumerate and
-            // keep the index. The index, not the found body, is what the
-            // origin is derived from.
-            let true_case = cases.iter().enumerate().find(|(_, case)| {
-                case.binders == 0 && case.constructor.ends_with("::Bool::True")
-            });
-            let false_case = cases.iter().enumerate().find(|(_, case)| {
-                case.binders == 0 && case.constructor.ends_with("::Bool::False")
-            });
-            let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(LoweringCause::Fragment,
-                    "Match",
-                    "Bool match requires zero-binder True and False cases",
-                ));
-            };
-            if let Some(selected) = known {
-                let (index, case) = if selected { true_case } else { false_case };
-                self.disposition_statically_unselected_match_cases(
-                    static_origin,
-                    Some(index),
-                )?;
-                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                return self.lower_expr(builder, body, env);
+                    &join_plan,
+                );
             }
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
-            let true_block = builder.create_block();
-            let false_block = builder.create_block();
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
+            MatchScrutinee::BorrowedOption {
+                present,
+                value,
+                none,
+                some,
+            } => {
+                return self.lower_borrowed_option_selection(
+                    builder,
+                    present,
+                    value,
+                    &none,
+                    &some,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                    OptionSelectionMode::OrdinaryJoin,
+                );
             }
-            builder
-                .ins()
-                .brif(value, true_block, &[], false_block, &[]);
-            let mut merge_kind = None;
-            let mut terminal_trap = None;
-            for (block, (index, case)) in
-                [(true_block, true_case), (false_block, false_case)]
-            {
-                builder.switch_to_block(block);
-                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                let lowered = self.lower_expr(builder, body, env)?;
-                match &lowered {
-                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
-                        terminal_trap.get_or_insert_with(|| trap.clone());
+            MatchScrutinee::BoundedNat(nat) => {
+                return self.lower_bounded_nat_match(
+                    builder,
+                    nat,
+                    false,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                );
+            }
+            MatchScrutinee::StructuralNat(nat) => {
+                return self.lower_bounded_nat_match(
+                    builder,
+                    BoundedNatV1::derived_from_validated(nat.value),
+                    true,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                );
+            }
+            MatchScrutinee::HostResult {
+                success,
+                error,
+                ok,
+                err_constructor,
+                ok_constructor,
+            } => {
+                return self.lower_dynamic_host_result_match(
+                    builder,
+                    success,
+                    *error,
+                    *ok,
+                    &err_constructor,
+                    &ok_constructor,
+                    cases,
+                    default,
+                    static_origin,
+                    env,
+                );
+            }
+            MatchScrutinee::DynamicConstructor(dynamic) => {
+                return self.lower_dynamic_constructor_match(
+                    builder,
+                    dynamic,
+                    DynamicConstructorContinuation::Ordinary {
+                        cases,
+                        default,
+                        env,
+                        static_origin,
+                    },
+                );
+            }
+            MatchScrutinee::Bool { value, known } => {
+                // ⭐ These two cases are found by CONSTRUCTOR NAME, and a
+                // search yields no position — so both lookups enumerate and
+                // keep the index. The index, not the found body, is what the
+                // origin is derived from.
+                let true_case = cases.iter().enumerate().find(|(_, case)| {
+                    case.binders == 0 && case.constructor.ends_with("::Bool::True")
+                });
+                let false_case = cases.iter().enumerate().find(|(_, case)| {
+                    case.binders == 0 && case.constructor.ends_with("::Bool::False")
+                });
+                let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
+                    return Err(unsupported(LoweringCause::Fragment,
+                        "Match",
+                        "Bool match requires zero-binder True and False cases",
+                    ));
+                };
+                if let Some(selected) = known {
+                    let (index, case) = if selected { true_case } else { false_case };
+                    self.disposition_statically_unselected_match_cases(
+                        static_origin,
+                        Some(index),
+                    )?;
+                    let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                    return self.lower_expr(builder, body, env);
+                }
+                let join_plan = self.consumed_join_plan_token(static_origin)?;
+                let true_block = builder.create_block();
+                let false_block = builder.create_block();
+                let merge = join_plan
+                    .has_continuing_predecessor
+                    .then(|| builder.create_block());
+                if let Some(merge) = merge {
+                    self.append_planned_join_params(builder, merge, &join_plan);
+                }
+                builder
+                    .ins()
+                    .brif(value, true_block, &[], false_block, &[]);
+                let mut merge_kind = None;
+                let mut terminal_trap = None;
+                for (block, (index, case)) in
+                    [(true_block, true_case), (false_block, false_case)]
+                {
+                    builder.switch_to_block(block);
+                    let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                    let lowered = self.lower_expr(builder, body, env)?;
+                    match &lowered {
+                        LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                            terminal_trap.get_or_insert_with(|| trap.clone());
+                        }
+                        LoweringOperand::Residual(_) => {}
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                     }
-                    LoweringOperand::Residual(_) => {}
-                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
+                    if self.seal_source_trap_branch(builder, &lowered)? {
+                        continue;
+                    }
+                    let merge = merge.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "join plan omitted a Bool Match merge despite a continuing \
+                             predecessor"
+                                .to_string(),
+                        )
+                    })?;
+                    self.jump_planned_join_arm(
+                        builder,
+                        merge,
+                        &join_plan,
+                        body.static_origin,
+                        lowered,
+                        &mut merge_kind,
+                        "Match",
+                    )?;
                 }
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "join plan omitted a Bool Match merge despite a continuing \
-                         predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
+                let Some(merge) = merge else {
+                    let unreachable = builder.create_block();
+                    builder.switch_to_block(unreachable);
+                    let trap = terminal_trap.ok_or_else(|| {
+                        backend_module(LoweringCause::PlannerInvariant,
+                            "Bool Match join omitted both a continuing predecessor and a \
+                             source trap"
+                                .to_string(),
+                        )
+                    })?;
+                    return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+                };
+                return self.finish_planned_join(
                     builder,
                     merge,
                     &join_plan,
-                    body.static_origin,
-                    lowered,
-                    &mut merge_kind,
+                    merge_kind,
                     "Match",
-                )?;
+                );
             }
-            let Some(merge) = merge else {
-                let unreachable = builder.create_block();
-                builder.switch_to_block(unreachable);
-                let trap = terminal_trap.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "Bool Match join omitted both a continuing predecessor and a \
-                         source trap"
-                            .to_string(),
-                    )
-                })?;
-                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
-            };
-            return self.finish_planned_join(
-                builder,
-                merge,
-                &join_plan,
-                merge_kind,
-                "Match",
-            );
-        }
-        #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-        let refusal_operand_kind = match &lowered_scrutinee {
-            LoweringOperand::Specialized(value) => lowered_value_kind(value),
-            LoweringOperand::Carried(_) => {
-                unreachable!("the carried Match arm returned above")
+            MatchScrutinee::Constructor { constructor, args, .. } => (constructor, args),
+            _refused @ (MatchScrutinee::RecursiveBackedge
+            | MatchScrutinee::ProcessExitStatus { .. }
+            | MatchScrutinee::Opaque(_)) => {
+                #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+                record_checked_ih_realization_observation(
+                    CheckedIhRealizationObservation::MatchRefusal {
+                        site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
+                        operand_kind: _refused.observation_kind(),
+                    },
+                );
+                return Err(unsupported(LoweringCause::Fragment, "Match", "scrutinee is not a constructor value"));
             }
-            LoweringOperand::Residual(_) => {
-                unreachable!("the residual Match arm decoded above")
-            }
-        };
-        let LoweringOperand::Specialized(Lowered::Constructor {
-            constructor,
-            args,
-            ..
-        }) = lowered_scrutinee else {
-            #[cfg(any(test, feature = "checked-ih-realization-observation"))]
-            record_checked_ih_realization_observation(
-                CheckedIhRealizationObservation::MatchRefusal {
-                    site: CheckedIhMatchRefusalSite::GenericExpressionSelector,
-                    operand_kind: refusal_operand_kind,
-                },
-            );
-            return Err(unsupported(LoweringCause::Fragment, "Match", "scrutinee is not a constructor value"));
         };
         let Some((index, case)) = cases
             .iter()
@@ -17586,6 +17527,7 @@ impl<'a> Lowering<'a> {
     ///
     /// ⛔ Where the two orders could ever disagree the **planner's** position
     /// wins: the plane's records are already laid out against it.
+    #[deny(unreachable_patterns)]
     pub(super) fn lower_expr(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -17758,18 +17700,23 @@ impl<'a> Lowering<'a> {
                 let then_expr = self.child_occurrence(static_origin, 1, then_expr)?;
                 let else_expr = self.child_occurrence(static_origin, 2, else_expr)?;
                 let lowered_scrutinee = self.lower_expr(builder, scrutinee, env)?;
-                if match &lowered_scrutinee {
-                    LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
-                    LoweringOperand::Residual(_) => false,
-                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
-                } {
-                    return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
-                }
-                let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee else {
-                    return Err(unsupported(LoweringCause::Fragment,
+                let (value, known) = match MatchScrutinee::classify(lowered_scrutinee) {
+                    MatchScrutinee::Bool { value, known } => (value, known),
+                    backedge @ MatchScrutinee::RecursiveBackedge => return Ok(backedge.into_operand()),
+                    MatchScrutinee::Carried(_)
+                    | MatchScrutinee::Residual(_)
+                    | MatchScrutinee::HostResult { .. }
+                    | MatchScrutinee::BorrowedOption { .. }
+                    | MatchScrutinee::BorrowedNativeValue { .. }
+                    | MatchScrutinee::DynamicConstructor(_)
+                    | MatchScrutinee::BoundedNat(_)
+                    | MatchScrutinee::StructuralNat(_)
+                    | MatchScrutinee::ProcessExitStatus { .. }
+                    | MatchScrutinee::Constructor { .. }
+                    | MatchScrutinee::Opaque(_) => return Err(unsupported(LoweringCause::Fragment,
                         "If",
                         "branch lowering requires a Bool scrutinee",
-                    ));
+                    )),
                 };
                 if let Some(scrutinee) = known {
                     let unselected = if scrutinee { else_expr } else { then_expr };

@@ -1352,6 +1352,7 @@ impl<'a> Lowering<'a> {
     }
 
     #[inline(never)]
+    #[deny(unreachable_patterns)]
     fn lower_source_machine_with_continuation_inner<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -1899,13 +1900,10 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // forwards it without entering the Match occurrence or selecting a
                             // case. Preserve the exact predecessor route and role: resetting
                             // either would silently turn propagation into a new value.
-                            if match &value {
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
-                                LoweringOperand::Residual(_) => false,
-                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
-                            } {
+                            let value = MatchScrutinee::classify(value);
+                            if matches!(&value, MatchScrutinee::RecursiveBackedge) {
                                 let forwarded = RoutedAnswer::forward(
-                                    value,
+                                    value.into_operand(),
                                     incoming_route,
                                     incoming_role,
                                 );
@@ -1947,28 +1945,13 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             record_checked_ih_realization_observation(
                                 CheckedIhRealizationObservation::
                                     SourceMatchOccurrencePlanEntryAttempt {
-                                        operand_kind: match &value {
-                                            LoweringOperand::Specialized(value) => {
-                                                lowered_value_kind(value)
-                                            }
-                                            LoweringOperand::Carried(_) => "Carried",
-                                            LoweringOperand::Residual(_) => "Residual",
-                                        },
+                                        operand_kind: value.observation_kind(),
                                     },
                             );
                             self.enter_source_occurrence_plan(static_origin)?;
                             control.continuation = *next;
-                            #[cfg(any(
-                                test,
-                                feature = "checked-ih-realization-observation"
-                            ))]
-                            let refusal_operand_kind = match &value {
-                                LoweringOperand::Specialized(value) => lowered_value_kind(value),
-                                LoweringOperand::Carried(_) => "Carried",
-                                LoweringOperand::Residual(_) => "Residual",
-                            };
                             match value {
-                                LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
+                                MatchScrutinee::BoundedNat(nat) => {
                                     return self.lower_source_bounded_nat_match(
                                         builder,
                                         nat,
@@ -1980,7 +1963,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Specialized(Lowered::StructuralNat(nat)) => {
+                                MatchScrutinee::StructuralNat(nat) => {
                                     return self.lower_source_bounded_nat_match(
                                         builder,
                                         BoundedNatV1::derived_from_validated(nat.value),
@@ -1992,7 +1975,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Specialized(Lowered::Bool { value, known }) => {
+                                MatchScrutinee::Bool { value, known } => {
                                     let true_case = cases.iter().enumerate().find(|(_, case)| {
                                         case.binders == 0
                                             && case.constructor.ends_with("::Bool::True")
@@ -2049,13 +2032,13 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         ).map(SourceMachineExit::Complete);
                                     }
                                 }
-                                LoweringOperand::Specialized(Lowered::HostResult {
+                                MatchScrutinee::HostResult {
                                     success,
                                     error,
                                     ok,
                                     err_constructor,
                                     ok_constructor,
-                                }) => {
+                                } => {
                                     return self.lower_source_dynamic_host_result_match(
                                         builder,
                                         success,
@@ -2070,7 +2053,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) => {
+                                MatchScrutinee::DynamicConstructor(dynamic) => {
                                     return self.lower_source_dynamic_constructor_match(
                                         builder,
                                         dynamic,
@@ -2081,11 +2064,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Specialized(Lowered::Constructor {
+                                MatchScrutinee::Constructor {
                                     constructor,
                                     args,
                                     ..
-                                }) => {
+                                } => {
                                     let Some((case_index, case)) = cases
                                         .iter()
                                         .enumerate()
@@ -2155,14 +2138,14 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 // `LoweringOperand` and a third variant is a
                                 // compile error here rather than a silent
                                 // refusal.
-                                LoweringOperand::Residual(residual) => {
+                                MatchScrutinee::Residual(residual) => {
                                     let child = self.decode_residual_child(builder, residual)?;
                                     return self.lower_source_carried_match(
                                         builder, child, &cases, &default, static_origin,
                                         &env, control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Carried(word) => {
+                                MatchScrutinee::Carried(word) => {
                                     // Family 5 control seam. The operand is
                                     // already classified `Carried` here, so a
                                     // refusal below is evidence about the real
@@ -2185,7 +2168,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         control,
                                     ).map(SourceMachineExit::Complete);
                                 }
-                                LoweringOperand::Specialized(_) => {
+                                _refused @ (MatchScrutinee::RecursiveBackedge
+                                | MatchScrutinee::BorrowedOption { .. }
+                                | MatchScrutinee::BorrowedNativeValue { .. }
+                                | MatchScrutinee::ProcessExitStatus { .. }
+                                | MatchScrutinee::Opaque(_)) => {
                                     #[cfg(any(
                                         test,
                                         feature = "checked-ih-realization-observation"
@@ -2193,7 +2180,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     record_checked_ih_realization_observation(
                                         CheckedIhRealizationObservation::MatchRefusal {
                                             site: CheckedIhMatchRefusalSite::SourceMachineSelector,
-                                            operand_kind: refusal_operand_kind,
+                                            operand_kind: _refused.observation_kind(),
                                         },
                                     );
                                     return Err(unsupported(LoweringCause::Fragment,
@@ -2242,11 +2229,8 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // selection below and is still refused; only the
                             // marker, which was never a scrutinee value, is
                             // routed past it.
-                            if match &value {
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
-                                LoweringOperand::Residual(_) => false,
-                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
-                            } {
+                            let value = MatchScrutinee::classify(value);
+                            if matches!(&value, MatchScrutinee::RecursiveBackedge) {
                                 #[cfg(test)]
                                 LRC_D2A_BACKEDGE_ARRIVALS.with(|count| {
                                     count.set(count.get().saturating_add(1))
@@ -2264,7 +2248,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                     control.continuation = *next;
                                     break 'computational_scrutinee SourceMachineState::Value {
                                         value: RoutedAnswer {
-                                            value,
+                                            value: value.into_operand(),
                                             route: incoming_route,
                                             role: EliminatorRole::Scrutinee,
                                         },
@@ -2306,7 +2290,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 control.continuation = *next;
                                 break 'computational_scrutinee SourceMachineState::Value {
                                     value: RoutedAnswer {
-                                        value,
+                                        value: value.into_operand(),
                                         route: incoming_route,
                                         role: EliminatorRole::Scrutinee,
                                     },
@@ -2320,123 +2304,126 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // source.rs ordinary Match). Placed after the backedge forward and
                             // fused takeover, which pass the operand on unchanged without
                             // selecting a case.
-                            let value = match value {
-                                LoweringOperand::Residual(residual) => LoweringOperand::Carried(
-                                    self.decode_residual_child(builder, residual)?,
-                                ),
-                                other => other,
-                            };
                             #[cfg(test)]
-                            d5a_trace(format!(
+                            let trace = |description| d5a_trace(format!(
                                 "RT-D2 D COMPUTATIONAL-MATCH-SCRUTINEE consumed \
 match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={:?}",
-                                rt_operand_desc(&value),
+                                description,
                                 rt_continuation_kinds(next.as_ref()),
                             ));
-                            // ⭐⭐ `AC-C4` — THE RESUMPTION POINT. An induction
-                            // hypothesis over a carried child hands its word back
-                            // as the machine's value, and it lands **here**: this
-                            // continuation is what "resumes the same computational
-                            // eliminator over that carried word" means on the
-                            // source-machine route.
-                            //
-                            // ⛔ Taken before the specialized selection below,
-                            // which reads `Lowered::Constructor` — a compile-time
-                            // template the carried value does not have and must
-                            // not be asked for. Without this arm the resumed word
-                            // reaches `"source scrutinee is not a constructor
-                            // value"`, which is a **true sentence about the wrong
-                            // thing**: the value is fine, the question is.
-                            if let LoweringOperand::Carried(word) = &value {
-                                let word = *word;
-                                let frame = ComputationalEliminatorFrame {
-                                    cases: &cases,
-                                    default: &default,
-                                    env: &env,
-                                    static_origin,
-                                    retained_scrutinee_index: None,
-                                    deferred_constructor_case: None,
-                                    provenance,
-                                    checked_frame_id,
-                                    checked_invocation_id: checked_frame_id.map(|_| {
-                                        self.active_recursive_invocations
+                            let (constructor, synthesized_identity, occurrence, args) = match value {
+                                operand @ (MatchScrutinee::Carried(_) | MatchScrutinee::Residual(_)) => {
+                                    let word = if let MatchScrutinee::Carried(word) = operand {
+                                        word
+                                    } else {
+                                        let MatchScrutinee::Residual(residual) = operand else {
+                                            unreachable!("only carried and residual scrutinees reach this arm")
+                                        };
+                                        self.decode_residual_child(builder, residual)?
+                                    };
+                                    #[cfg(test)]
+                                    trace(rt_operand_desc(&LoweringOperand::Carried(word)));
+                                    let frame = ComputationalEliminatorFrame {
+                                        cases: &cases,
+                                        default: &default,
+                                        env: &env,
+                                        static_origin,
+                                        retained_scrutinee_index: None,
+                                        deferred_constructor_case: None,
+                                        provenance,
+                                        checked_frame_id,
+                                        checked_invocation_id: checked_frame_id.map(|_| {
+                                            self.active_recursive_invocations
+                                                .last()
+                                                .map_or(0, |instance| instance.invocation_instance_id)
+                                        }),
+                                        checked_invocation_source: self
+                                            .active_recursive_invocations
                                             .last()
-                                            .map_or(0, |instance| instance.invocation_instance_id)
-                                    }),
-                                    checked_invocation_source: self
-                                        .active_recursive_invocations
-                                        .last()
-                                        .map(|instance| instance.source),
-                                    checked_invocation_depth: self
-                                        .active_recursive_invocations
-                                        .last()
-                                        .map_or(0, |instance| instance.semantic_depth),
-                                    // ⭐⭐ `D6a` -- THE PREDECESSOR'S ROUTE RAISES THE
-                                    // CONTINUATION'S, and never lowers it.
-                                    //
-                                    // The continuation's own field stays the
-                                    // recursor-layer producer's authority. It is not
-                                    // the sole authority: an exact claimed and emitted
-                                    // continuation-specialization call result arrives
-                                    // here already checked, and letting the
-                                    // continuation's `DirectScrutinee` overwrite that
-                                    // is precisely the drop measured at `ae45e804`.
-                                    answer_route: RoutedAnswer {
-                                        value: LoweringOperand::Carried(word),
-                                        route: incoming_route,
-                                        role: EliminatorRole::Scrutinee,
+                                            .map(|instance| instance.source),
+                                        checked_invocation_depth: self
+                                            .active_recursive_invocations
+                                            .last()
+                                            .map_or(0, |instance| instance.semantic_depth),
+                                        // ⭐⭐ `D6a` -- THE PREDECESSOR'S ROUTE RAISES THE
+                                        // CONTINUATION'S, and never lowers it.
+                                        //
+                                        // The continuation's own field stays the
+                                        // recursor-layer producer's authority. It is not
+                                        // the sole authority: an exact claimed and emitted
+                                        // continuation-specialization call result arrives
+                                        // here already checked, and letting the
+                                        // continuation's `DirectScrutinee` overwrite that
+                                        // is precisely the drop measured at `ae45e804`.
+                                        answer_route: RoutedAnswer {
+                                            value: LoweringOperand::Carried(word),
+                                            route: incoming_route,
+                                            role: EliminatorRole::Scrutinee,
+                                        }
+                                        .raise(answer_route),
+                                    };
+                                    #[cfg(test)]
+                                    let mut frame = frame;
+                                    #[cfg(test)]
+                                    if d6a_route_mutation()
+                                        == D6aRouteMutation::OverwriteIncomingWithFrameField
+                                    {
+                                        record_d6a_route_application();
+                                        frame.answer_route = answer_route;
                                     }
-                                    .raise(answer_route),
-                                };
-                                #[cfg(test)]
-                                let mut frame = frame;
-                                #[cfg(test)]
-                                if d6a_route_mutation()
-                                    == D6aRouteMutation::OverwriteIncomingWithFrameField
-                                {
-                                    record_d6a_route_application();
-                                    frame.answer_route = answer_route;
+                                    #[cfg(test)]
+                                    record_d6a_route_event(D6aRouteEvent::ConsumerRoute {
+                                        seat: D6aConsumerSeat::SourceMachine,
+                                        static_origin,
+                                        incoming: incoming_route,
+                                        frame_field: answer_route,
+                                        joined: frame.answer_route,
+                                    });
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    record_checked_ih_fresh_result_route_source(
+                                        static_origin,
+                                        word.word,
+                                    );
+                                    let eliminated = self
+                                        .lower_carried_computational_match(builder, word, frame, &[])?;
+                                    control.continuation = *next;
+                                    break 'computational_scrutinee SourceMachineState::Value {
+                                        value: RoutedAnswer::direct(eliminated),
+                                        control,
+                                    };
                                 }
-                                #[cfg(test)]
-                                record_d6a_route_event(D6aRouteEvent::ConsumerRoute {
-                                    seat: D6aConsumerSeat::SourceMachine,
-                                    static_origin,
-                                    incoming: incoming_route,
-                                    frame_field: answer_route,
-                                    joined: frame.answer_route,
-                                });
-                                #[cfg(feature = "px8-ds-test-support")]
-                                record_checked_ih_fresh_result_route_source(
-                                    static_origin,
-                                    word.word,
-                                );
-                                let eliminated = self
-                                    .lower_carried_computational_match(builder, word, frame, &[])?;
-                                control.continuation = *next;
-                                break 'computational_scrutinee SourceMachineState::Value {
-                                    value: RoutedAnswer::direct(eliminated),
-                                    control,
-                                };
-                            }
-                            let retained = value.clone();
+                                MatchScrutinee::Constructor { constructor, synthesized_identity, occurrence, args } => {
+                                    #[cfg(test)]
+                                    trace("phase=Specialized kind=Constructor".to_string());
+                                    (constructor, synthesized_identity, occurrence, args)
+                                }
+                                _refused @ (MatchScrutinee::RecursiveBackedge
+                                | MatchScrutinee::Bool { .. }
+                                | MatchScrutinee::HostResult { .. }
+                                | MatchScrutinee::BorrowedOption { .. }
+                                | MatchScrutinee::BorrowedNativeValue { .. }
+                                | MatchScrutinee::DynamicConstructor(_)
+                                | MatchScrutinee::BoundedNat(_)
+                                | MatchScrutinee::StructuralNat(_)
+                                | MatchScrutinee::ProcessExitStatus { .. }
+                                | MatchScrutinee::Opaque(_)) => {
+                                    #[cfg(test)]
+                                    trace(format!("phase=Specialized kind={}", _refused.observation_kind()));
+                                    return Err(unsupported(LoweringCause::Fragment,
+                                        "ComputationalMatch",
+                                        "source scrutinee is not a constructor value",
+                                    ));
+                                }
+                            };
+                            let retained = MatchScrutinee::Constructor {
+                                constructor: constructor.clone(),
+                                synthesized_identity,
+                                occurrence,
+                                args: args.clone(),
+                            }.into_operand();
                             #[cfg(test)]
-                            let actual_constructor = match &value {
-                                LoweringOperand::Specialized(Lowered::Constructor {
-                                    constructor,
-                                    ..
-                                }) => Some(constructor.clone()),
-                                LoweringOperand::Specialized(_)
-                                | LoweringOperand::Carried(_)
-                                | LoweringOperand::Residual(_) => None,
-                            };
-                            let selected = match &value {
-                                LoweringOperand::Specialized(Lowered::Constructor { constructor, .. }) => cases
-                                    .iter()
-                                    .enumerate()
-                                    .find(|(_, case)| case.constructor == *constructor),
-                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
-                                LoweringOperand::Residual(_) => None,
-                            };
+                            let actual_constructor = Some(constructor.clone());
+                            let selected = cases.iter().enumerate().find(|(_, case)| case.constructor == constructor);
                             let (case_index, case) = if let Some(selected) = selected {
                                 self.record_source_machine_computational_match_selection(
                                     static_origin,
@@ -2445,7 +2432,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 selected
                             } else if answer_route
                                 == SourceComputationalAnswerRoute::CheckedSelectedRecursor
-                                && matches!(&value, LoweringOperand::Specialized(Lowered::Constructor { .. }))
                                 && px8tr_deforested_answer_route_enabled()
                             {
                                 let mut returns = cases.iter().enumerate().filter(|(_, case)| {
@@ -2512,12 +2498,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     control,
                                 ).map(SourceMachineExit::Complete);
                             } else {
-                                if !matches!(&value, LoweringOperand::Specialized(Lowered::Constructor { .. })) {
-                                    return Err(unsupported(LoweringCause::Fragment,
-                                        "ComputationalMatch",
-                                        "source scrutinee is not a constructor value",
-                                    ));
-                                }
                                 self.record_source_machine_computational_match_selection(
                                     static_origin,
                                     None,
@@ -2537,9 +2517,6 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     );
                                 }
                                 return Ok(SourceMachineExit::Complete(LoweringOperand::Specialized(Lowered::Trap(default))));
-                            };
-                            let LoweringOperand::Specialized(Lowered::Constructor { args, .. }) = value else {
-                                unreachable!("a selected source case has a constructor value")
                             };
                             if case.argument_binders != args.len() {
                                 return Err(unsupported(LoweringCause::PlannerInvariant,

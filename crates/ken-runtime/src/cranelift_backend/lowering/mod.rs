@@ -17,6 +17,7 @@
 
 pub(in crate::cranelift_backend) mod core;
 mod residual;
+mod scrutinee;
 use crate::cranelift_backend::surface::LoweringCause;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
@@ -57,6 +58,8 @@ pub(in crate::cranelift_backend) mod boundary;
 // `CheckedFrameFunctionScope` from `core` rather than through a blanket
 // re-export here.
 pub(in crate::cranelift_backend) use boundary::{BoundaryDisposition, LoweredVariant};
+use joins::OptionSelectionMode;
+use scrutinee::MatchScrutinee;
 #[cfg(test)]
 pub(in crate::cranelift_backend) use boundary::BoundaryTransferInvokingSite;
 
