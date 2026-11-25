@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-RESULT-JOIN-PHASE
 title: "A Result-returning function whose Ok payload is a borrowed Bytes argument, built under nested matches on specialized scalars, refuses at native-build when an outer match consumes it: the planner plans the outer join's lanes as native scalar and lowering produces a carried boundary word. The interpreter runs it, and builds older than RT-NATIVE-BYTES-TO-LIST refuse it the same way. Name from an AC-0 which side is wrong at the join, repair that side, and land the socket_unix_path parity rows that this refusal blocks"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1

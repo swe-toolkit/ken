@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO
 title: "Spec 65 §14 proves that a zero self-dot forces the zero vector, but no law lifts this to matrices: a client holding trace m (matrix_product m n m a (transpose m n a)) = 0 cannot conclude a is the zero matrix, and nothing states that a matrix times its own transpose is symmetric. Rule from a checked D0 at zero trust that the Gram trace vanishes only at the zero matrix and that the Gram product equals its transpose, and state both with a seed that separates a zero matrix from one nonzero entry"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
