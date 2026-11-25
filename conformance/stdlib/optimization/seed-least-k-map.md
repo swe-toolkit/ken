@@ -147,8 +147,12 @@ theorem refused_uncomposed_cost : Equal (List Nat)
 ## Evidence boundary
 
 The accepted and refused rows are transcribed from Architect AC-0's
-measured seed rows. This seed has not been checked against the
-Foundation implementation child or run by the official conformance
-runner. Its Ken fences may be formatter-checked, but that does not
-establish semantic execution. No package test, CI, publication,
-landing, or landed-trust measurement is claimed.
+measured seed rows. The corresponding clients were checked through
+`cat_optimization_least_k_map` at exact candidate
+`e85b0ca3de2458a7c40234d08d007cf8085621c4` (4/4). The package test
+accepted the positive client and rejected the false uncomposed-cost claim as
+`KernelRejected(TypeMismatch)` at the `least_k_map` application. The
+trusted-identity measurements were `114 → 114 → 114 → 114`.
+The Markdown seed itself has not been run by the official conformance
+runner. These candidate-local checks do not establish official
+conformance, CI, publication, landing, or a landed-trust measurement.
