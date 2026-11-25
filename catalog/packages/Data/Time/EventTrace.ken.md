@@ -3878,6 +3878,104 @@ pub theorem trace_merge_all_singletons_sort
           (trace_merge_all_singletons_sort p t))
   }
 
+pub theorem trace_merge_ordered_sort
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : time_ordered p xs
+      → time_ordered p ys
+      → Equal
+        (List (Event p))
+        (trace_merge p xs ys)
+        (sort (Event p) (event_before p) (list_append (Event p) xs ys)) =
+  match xs {
+    Nil ↦
+      λordered_xs.
+        λordered_ys.
+          sym
+            (List (Event p))
+            (sort (Event p) (event_before p) ys)
+            ys
+            (trace_ordered_sort_fixed p ys ordered_ys);
+    Cons x xt ↦
+      λordered_xs.
+        λordered_ys.
+          let
+            single = Cons (Event p) x (Nil (Event p));
+            merged_tail = trace_merge p xt ys;
+            head_first : Equal
+              (List (Event p))
+              (trace_merge p single xt)
+              (Cons (Event p) x xt) =
+              trace_merge_cons_left
+                p
+                x
+                (Nil (Event p))
+                xt
+                (list_sorted_head (Event p) (event_before p) x xt ordered_xs);
+            regrouped : Equal
+              (List (Event p))
+              (trace_merge p (Cons (Event p) x xt) ys)
+              (trace_merge p (trace_merge p single xt) ys) =
+              cong
+                (List (Event p))
+                (List (Event p))
+                (Cons (Event p) x xt)
+                (trace_merge p single xt)
+                (λleft. trace_merge p left ys)
+                (sym
+                  (List (Event p))
+                  (trace_merge p single xt)
+                  (Cons (Event p) x xt)
+                  head_first);
+            tail_sorted : Equal
+              (List (Event p))
+              merged_tail
+              (sort (Event p) (event_before p) (list_append (Event p) xt ys)) =
+              trace_merge_ordered_sort
+                p
+                xt
+                ys
+                (list_sorted_tail (Event p) (event_before p) x xt ordered_xs)
+                ordered_ys
+          in
+            trans
+              (List (Event p))
+              (trace_merge p (Cons (Event p) x xt) ys)
+              (trace_merge p (trace_merge p single xt) ys)
+              (insert
+                (Event p)
+                (event_before p)
+                x
+                (sort (Event p) (event_before p) (list_append (Event p) xt ys)))
+              regrouped
+              (trans
+                (List (Event p))
+                (trace_merge p (trace_merge p single xt) ys)
+                (trace_merge p single merged_tail)
+                (insert
+                  (Event p)
+                  (event_before p)
+                  x
+                  (sort (Event p) (event_before p) (list_append (Event p) xt ys)))
+                (trace_merge_assoc p single xt ys)
+                (trans
+                  (List (Event p))
+                  (trace_merge p single merged_tail)
+                  (insert (Event p) (event_before p) x merged_tail)
+                  (insert
+                    (Event p)
+                    (event_before p)
+                    x
+                    (sort (Event p) (event_before p) (list_append (Event p) xt ys)))
+                  (trace_merge_single_insert p x merged_tail)
+                  (cong
+                    (List (Event p))
+                    (List (Event p))
+                    merged_tail
+                    (sort (Event p) (event_before p) (list_append (Event p) xt ys))
+                    (insert (Event p) (event_before p) x)
+                    tail_sorted)))
+  }
+
 theorem trace_merge_single_insert_cons
       (p : Type)
       (x : Event p)
@@ -3940,6 +4038,46 @@ theorem trace_merge_single_insert_cons
             (Cons (Event p) y)
             ih)
           (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_ordered_sort_fixed
+      (p : Type) (tr : List (Event p))
+    : time_ordered p tr → Equal (List (Event p)) (sort (Event p) (event_before p) tr) tr =
+  match tr {
+    Nil ↦ λordered. Proved;
+    Cons h t ↦
+      λordered.
+        trans
+          (List (Event p))
+          (insert (Event p) (event_before p) h (sort (Event p) (event_before p) t))
+          (insert (Event p) (event_before p) h t)
+          (Cons (Event p) h t)
+          (cong
+            (List (Event p))
+            (List (Event p))
+            (sort (Event p) (event_before p) t)
+            t
+            (insert (Event p) (event_before p) h)
+            (trace_ordered_sort_fixed
+              p
+              t
+              (list_sorted_tail (Event p) (event_before p) h t ordered)))
+          (trans
+            (List (Event p))
+            (insert (Event p) (event_before p) h t)
+            (trace_merge p (Cons (Event p) h (Nil (Event p))) t)
+            (Cons (Event p) h t)
+            (sym
+              (List (Event p))
+              (trace_merge p (Cons (Event p) h (Nil (Event p))) t)
+              (insert (Event p) (event_before p) h t)
+              (trace_merge_single_insert p h t))
+            (trace_merge_cons_left
+              p
+              h
+              (Nil (Event p))
+              t
+              (list_sorted_head (Event p) (event_before p) h t ordered)))
   }
 ```
 
@@ -4136,6 +4274,21 @@ transports Derived's sort proofs, including orderedness, permutation and
 stability. In particular, events with the same timestamp retain their order
 in the original trace, regardless of payload.
 
+Merging two time-ordered traces gives exactly the sort of their append, not
+necessarily the append itself. For equal timestamps, events from the left
+trace come before events from the right, and each trace keeps its own tie
+order. The structural equality lets a client use Derived's sort laws on the
+merge result.
+
+The proof inducts on the left trace, keeping the right trace fixed. When the
+left trace is empty, private `trace_ordered_sort_fixed` shows that sorting the
+already ordered right trace leaves it unchanged. In the step, the ordered
+left head merges unchanged with its own tail. Associativity moves that head,
+as a singleton, outside the merge of the left tail with the right trace.
+The singleton-insertion law turns that outer merge into an insertion; the
+induction hypothesis identifies the inner merge with the sort of the left
+tail appended to the right trace.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -4168,8 +4321,9 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-two
-   laws form the package surface.
+   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-three
+   checked laws form the package surface. The nine public functions are
+   unchanged by `trace_merge_ordered_sort`.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -4224,7 +4378,10 @@ merging, not window multiplicity.
    each missed head, without an additional helper or import. The singleton
    laws reuse Derived's `insert`, `sort` and `map`; only the cons-case proof
    `trace_merge_single_insert_cons` is private. Neither law takes a premise.
-4. **Trusted-base delta.** Zero: all thirty-two exported laws have checked
+   The ordered merge equation reuses singleton insertion, merge
+   associativity, and ordered left-head selection. Its sole new helper,
+   `trace_ordered_sort_fixed`, is private; no new import is needed.
+4. **Trusted-base delta.** Zero: all thirty-three exported laws have checked
    proof bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -4284,4 +4441,8 @@ merging, not window multiplicity.
    merge. The `cat_time_merge_singletons_sort` package test compares exact
    trust identities, uses both open equations to transport orderedness,
    and refuses the swapped tie-order claim after checking the accepted
-   order. These package tests are not conformance-runner execution.
+   order. The [ordered merge seed](../../../../conformance/stdlib/time-and-events/seed-trace-merge-ordered-sort.md)
+   uses the new equation to obtain the interleaved list and refuses the plain
+   append in the same proof form. Separate package controls check left-first
+   ties and distinguish the two ordering premises. These package tests are
+   not conformance-runner execution.
