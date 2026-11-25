@@ -404,7 +404,8 @@ CI, publication, landing or landed trust. No rational or `Float`
 tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–14 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`**. Its first fourteen sections cover
+SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION;
@@ -417,7 +418,7 @@ SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-CONGRUENCE §10;
 SPEC-SYMBOLIC-ALGEBRA-POLY-EQ-EQUIVALENCE §11;
 SPEC-SYMBOLIC-ALGEBRA-DERIV-CONSTANT-FACTOR §12;
 SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-POINTWISE-CONGRUENCE §13;
-SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14). The §1
+SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE-ABSENT-VARIABLE §14. The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -507,8 +508,11 @@ Architect ruled the generic law D0-CLEAN after a fixture-only import
 correction; scratch trusted identity sets remained equal at 114.
 The §14 checked exports, seed and package-owned test are present on
 this base; candidate-local tests do not establish official
-conformance, CI or measured landed trust. A sorted-list
-normal form and signed/field arithmetic remain deferred.
+conformance, CI or measured landed trust. Section 23
+(SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH) specifies `substitute_fresh`:
+if a variable is absent from every replacement used by the expression,
+it is absent from the substituted expression. A sorted-list normal form
+and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;

@@ -21,7 +21,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-EVAL-ABSENT-VARIABLE §19;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20;
 > SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE §21;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE §22).**
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE §22;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH §23).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -1784,3 +1785,49 @@ proof refuse: one substitution gives `EAdd (EConst 7) (EConst 2)` and the
 other leaves `EAdd (EVar 1) (EConst 2)`. These closed cases test the
 premise's boundary; they do not replace the generic proof or assembled
 AC-T.
+
+## 23. Substitution preserves freshness of a variable
+
+> **Section 23 status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH).**
+> Architect AC-0 `evt_6x7mbs8q441fb` on `f14bb6479` checked the generic
+> theorem and open clients in scratch. It reports no added `Axiom`,
+> postulate or foreign declaration and equal exact trusted `GlobalId`
+> identity sets (114 → 114). These results do not establish assembled
+> AC-T, official conformance, CI or landing.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export this public
+Transparent checked theorem directly after `substitute_coincidence`
+and before `deriv_substitute`:
+
+```ken
+pub theorem substitute_fresh
+      (v : Nat) (s : Nat → Expr) (e : Expr)
+    : ((w : Nat) → Equal Bool (occurs w e) True → Equal Bool (occurs v (s w)) False)
+      → Equal Bool (occurs v (substitute s e)) False
+```
+
+For every variable `w` that occurs syntactically in `e`, the sole
+premise requires that `v` not occur in `s w`. Nothing is required of
+replacements at unused indices, and `v` need not be absent from `e`
+itself. The conclusion is syntactic absence from the substituted
+expression, not equality with `e` as in §20. The result can supply
+`deriv_absent` (§14) or `eval_absent` (§19) with their absence premise
+on `substitute s e`; their remaining arguments and premises are unchanged.
+
+The premise follows the colon so a match on the written `e` refines it.
+The constant case closes with `Proved`; the variable case applies the
+premise to the variable's self-occurrence proof. For each sum or product,
+`or_left` and `or_right` lift occurrence evidence from the respective
+operand to the whole expression, so each induction hypothesis can use the
+premise. Congruence with the left result and transitivity with the right
+result show that the combined occurrence is `False`. No new helper or
+import is needed. The §22 roster grows from forty-one to **forty-two**
+public checked theorems; the fifteen public operations and all §§1–22
+operation and law types stay unchanged.
+
+The closed discriminator uses `EAdd (EVar 0) (EVar 1)` with replacements
+`EVar 2` at index 0 and `EConst 3` at index 1. Variable 1 occurs in the
+input but is absent from the result, so the law applies. Changing only
+the tested variable to 2 makes the freshness premise fail at index 0:
+its replacement introduces variable 2. D0 observed refusal at the
+client's premise declaration, before the theorem application.
