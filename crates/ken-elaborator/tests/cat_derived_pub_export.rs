@@ -6,7 +6,8 @@
 //! The two `nth` bound
 //! proofs, five `list_append` attached proofs (the three monoid laws,
 //! `list_append::length`, and `list_append::count`), the `map::{id, fusion, append}`
-//! proofs, and the checked `reverse::involutive` proof are published beside
+//! proofs, and the checked `reverse::involutive` and `reverse::perm` proofs
+//! are published beside
 //! their subjects.
 //! Generic `Perm`, `insert`, `sort`, public `take`, and `zip`, with their
 //! attached proofs where applicable, are exported; proof helpers and the
@@ -344,7 +345,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// complete loader-visible export surface is exactly the authorized
 /// collection operations (including list_concat and list_all), two `nth`
 /// bound proofs, five `list_append` attached
-/// proofs, three `map` proofs, `reverse::involutive`, three generic sort
+/// proofs, three `map` proofs, `reverse::involutive` and `reverse::perm`,
+/// three generic sort
 /// operations (`Perm`, `insert`, `sort`), their six attached sort proofs,
 /// structural `is_sorted`, public `take` and its six attached laws, the
 /// generic insert/sort laws, public `zip`, and Ω-list membership with checked
@@ -481,6 +483,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "starts_after".to_owned(),
             "reverse".to_owned(),
             "reverse::involutive".to_owned(),
+            "reverse::perm".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
          collection operations, attached proofs, sort/prefix laws and membership names"

@@ -1513,6 +1513,7 @@ goal with an ABSTRACT shared element `y` does not itself collapse to bare
 right-nested Σ pairing the stuck, `y`-abstract element equality with the
 collapsed tail equality, so `Proved`/`Refl` alone both fail); lifting `Proved`
 through `Cons` via `cong` is the direct, minimal proof. The checked
+`reverse::perm` law preserves each element count for any comparator. The
 `reverse::involutive` law is available alongside `reverse` to recover a
 list from its reversed view; `reverse_snoc` remains an internal lemma.
 The exported `zip` truncates at the shorter list (`Nil` on either empty), NOT the
@@ -1580,6 +1581,38 @@ pub proof involutive for reverse
           t
           (Cons a h)
           ((proof involutive for reverse) a t))
+  }
+
+pub proof perm for reverse
+      (a : Type) (eqf : a → a → Bool) (xs : List a)
+    : Perm a eqf xs (reverse a xs) =
+  match xs {
+    Nil ↦ λq. Proved;
+    Cons h t ↦
+      λq.
+        trans
+          Nat
+          (count a eqf q (Cons a h t))
+          (add (count a eqf q t) (count a eqf q (Cons a h (Nil a))))
+          (count a eqf q (reverse a (Cons a h t)))
+          (count_cons_case a eqf q h t (eqf q h) Refl)
+          (trans
+            Nat
+            (add (count a eqf q t) (count a eqf q (Cons a h (Nil a))))
+            (add (count a eqf q (reverse a t)) (count a eqf q (Cons a h (Nil a))))
+            (count a eqf q (reverse a (Cons a h t)))
+            (cong
+              Nat
+              Nat
+              (count a eqf q t)
+              (count a eqf q (reverse a t))
+              (λn. add n (count a eqf q (Cons a h (Nil a))))
+              (reverse::perm a eqf t q))
+            (sym
+              Nat
+              (count a eqf q (reverse a (Cons a h t)))
+              (add (count a eqf q (reverse a t)) (count a eqf q (Cons a h (Nil a))))
+              (list_append::count a eqf q (reverse a t) (Cons a h (Nil a)))))
   }
 
 theorem append_length_snoc
@@ -5717,7 +5750,8 @@ reference implementation.
    `filter::empty_if_none`, `take::length`, `take::member`, `take::sorted`,
    `take::filter_prefix`, `take::prefix`, `take::saturated`,
    `nth::at_or_beyond_is_none`,
-   `nth::some_below_length`, `reverse::involutive`. Generic sorting adds
+   `nth::some_below_length`, `reverse::involutive`, `reverse::perm`.
+   Generic sorting adds
    the operations `Perm`, `insert`, and `sort`, with attached proofs
    `insert::sorted`, `insert::count`, `insert::member`, `insert::length`,
    `insert::stable_class`, `insert::comparator_cong`, `sort::sorted`,

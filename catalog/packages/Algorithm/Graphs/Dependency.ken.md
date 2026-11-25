@@ -754,6 +754,54 @@ pub fn topo_order_edge_antitone
       (ordered_complete q d g order)
       (λx. λy. λhxy. ordered_forward q d g order x y (included x y hxy))
 
+pub fn topo_order_reverse
+      (q : Type) (d : DecEq q) (g : Graph q)
+    : TopoOrder q d g → TopoOrder q d (graph_reverse q g) =
+  λorder.
+    MkTopoOrder
+      q
+      d
+      (graph_reverse q g)
+      (DC.reverse q (ordered_vertices q d g order))
+      (nodup_perm
+        q
+        d
+        (ordered_vertices q d g order)
+        (DC.reverse q (ordered_vertices q d g order))
+        (DC.reverse::perm q d.eq (ordered_vertices q d g order))
+        (ordered_unique q d g order))
+      (λx.
+        trans
+          Bool
+          (contains q d x (DC.reverse q (ordered_vertices q d g order)))
+          (contains q d x (ordered_vertices q d g order))
+          True
+          (sym
+            Bool
+            (contains q d x (ordered_vertices q d g order))
+            (contains q d x (DC.reverse q (ordered_vertices q d g order)))
+            (contains_reverse q d x (ordered_vertices q d g order)))
+          (ordered_complete q d g order x))
+      (λx.
+        λy.
+          λhxy.
+            before_reverse_flip
+              q
+              d
+              x
+              y
+              (ordered_vertices q d g order)
+              (ordered_unique q d g order)
+              (ordered_forward q d g order y x hxy))
+
+pub theorem topo_order_reverse_vertices
+      (q : Type) (d : DecEq q) (g : Graph q) (order : TopoOrder q d g)
+    : Equal
+        (List q)
+        (ordered_vertices q d (graph_reverse q g) (topo_order_reverse q d g order))
+        (DC.reverse q (ordered_vertices q d g order)) =
+  Refl
+
 pub theorem before_irreflexive
       (q : Type) (d : DecEq q) (x : q) (xs : List q)
     : Equal Bool (before q d x x xs) False =
@@ -1002,6 +1050,16 @@ const reaches_false : Bool = graph_reachable Bool bool_finite forward True (λv.
 ```
 
 ## 4. Laws & proofs
+
+`topo_order_reverse` rebuilds an order on the reversed graph using the
+reversed vertex list. `DC.reverse::perm` carries distinctness and coverage
+through the private `nodup_perm` and `contains_perm` proofs. For each
+reversed edge, the original order gives the opposite `before` relation.
+The private `before_reverse_flip` uses distinctness to reverse that relation:
+when the original first endpoint is the head, it is absent from the tail
+and moves to the end; when both endpoints are in the tail, the reversed
+relation survives appending the head. `topo_order_reverse_vertices` exposes
+the exact list by conversion, even for an open order.
 
 Reachability uses the existing finite-state decision with state and alphabet
 both `q`. A candidate letter advances only on a checked edge; letters for
@@ -3099,6 +3157,249 @@ theorem bool_or_regroup
     True ↦ Proved;
     False ↦ Refl
   }
+
+theorem before_reverse_flip
+      (q : Type) (d : DecEq q) (x : q) (y : q) (xs : List q)
+    : Equal Bool (no_duplicates q d xs) True
+      → Equal Bool (before q d y x xs) True
+      → Equal Bool (before q d x y (DC.reverse q xs)) True =
+  match xs {
+    Nil ↦ λunique. λyx. absurd yx;
+    Cons head tail ↦
+      λunique.
+        match unique_parts q d head tail unique {
+          MkUniqueParts absent tail_unique ↦
+            reverse_flip_step
+              q
+              d
+              x
+              y
+              head
+              tail
+              (before_reverse_flip q d x y tail tail_unique)
+              (d.eq y head)
+              (d.eq x head)
+              (λsame.
+                trans
+                  Bool
+                  (contains q d y tail)
+                  (contains q d head tail)
+                  False
+                  (cong q Bool y head (λv. contains q d v tail) (d.sound y head same))
+                  absent)
+              (λsame. cong Bool Bool (d.eq y head) True (λv. bool_or v False) same)
+        }
+  }
+
+theorem reverse_flip_step
+      (q : Type)
+      (d : DecEq q)
+      (x : q)
+      (y : q)
+      (head : q)
+      (tail : List q)
+      (rest : Equal
+        Bool
+        (before q d y x tail)
+        True
+        → Equal
+        Bool
+        (before q d x y (DC.reverse q tail))
+        True)
+      (yb : Bool)
+      (xb : Bool)
+    : (Equal Bool yb True → Equal Bool (contains q d y tail) False)
+      → (Equal Bool yb True → Equal Bool (contains q d y (Cons q head (Nil q))) True)
+      → Equal Bool (before_step q d y x head tail yb xb) True
+      → Equal Bool
+        (before q d x y (list_append q (DC.reverse q tail) (Cons q head (Nil q))))
+        True =
+  match yb {
+    True ↦
+      match xb {
+        True ↦ λabsent. λhit. λyx. absurd yx;
+        False ↦
+          λabsent.
+            λhit.
+              λyx.
+                before_append_found
+                  q
+                  d
+                  x
+                  y
+                  (DC.reverse q tail)
+                  (Cons q head (Nil q))
+                  (trans
+                    Bool
+                    (contains q d x (DC.reverse q tail))
+                    (contains q d x tail)
+                    True
+                    (sym
+                      Bool
+                      (contains q d x tail)
+                      (contains q d x (DC.reverse q tail))
+                      (contains_reverse q d x tail))
+                    yx)
+                  (trans
+                    Bool
+                    (contains q d y (DC.reverse q tail))
+                    (contains q d y tail)
+                    False
+                    (sym
+                      Bool
+                      (contains q d y tail)
+                      (contains q d y (DC.reverse q tail))
+                      (contains_reverse q d y tail))
+                    (absent Proved))
+                  (hit Proved)
+      };
+    False ↦
+      match xb {
+        True ↦ λabsent. λhit. λyx. absurd yx;
+        False ↦
+          λabsent.
+            λhit.
+              λyx.
+                before_append_left q d x y (DC.reverse q tail) (Cons q head (Nil q)) (rest yx)
+      }
+  }
+
+theorem before_append_found
+      (q : Type) (d : DecEq q) (x : q) (y : q) (xs : List q) (ys : List q)
+    : Equal Bool (contains q d x xs) True
+      → Equal Bool (contains q d y xs) False
+      → Equal Bool (contains q d y ys) True
+      → Equal Bool (before q d x y (list_append q xs ys)) True =
+  match xs {
+    Nil ↦ λhx. λhy. λhit. absurd hx;
+    Cons head tail ↦
+      append_found_step
+        q
+        d
+        x
+        y
+        head
+        tail
+        ys
+        (before_append_found q d x y tail ys)
+        (d.eq x head)
+        (d.eq y head)
+  }
+
+theorem append_found_step
+      (q : Type)
+      (d : DecEq q)
+      (x : q)
+      (y : q)
+      (head : q)
+      (tail : List q)
+      (ys : List q)
+      (rest : Equal
+        Bool
+        (contains q d x tail)
+        True
+        → Equal
+        Bool
+        (contains q d y tail)
+        False
+        → Equal
+        Bool
+        (contains q d y ys)
+        True
+        → Equal
+        Bool
+        (before q d x y (list_append q tail ys))
+        True)
+      (xb : Bool)
+      (yb : Bool)
+    : Equal Bool (bool_or xb (contains q d x tail)) True
+      → Equal Bool (bool_or yb (contains q d y tail)) False
+      → Equal Bool (contains q d y ys) True
+      → Equal Bool (before_step q d x y head (list_append q tail ys) xb yb) True =
+  match yb {
+    True ↦ λhx. λhy. λhit. absurd hy;
+    False ↦
+      match xb {
+        True ↦
+          λhx.
+            λhy.
+              λhit.
+                trans
+                  Bool
+                  (contains q d y (list_append q tail ys))
+                  (bool_or (contains q d y tail) (contains q d y ys))
+                  True
+                  (contains_append q d y tail ys)
+                  (or_right (contains q d y tail) (contains q d y ys) hit);
+        False ↦ λhx. λhy. λhit. rest hx hy hit
+      }
+  }
+
+theorem before_append_left
+      (q : Type) (d : DecEq q) (x : q) (y : q) (xs : List q) (ys : List q)
+    : Equal Bool (before q d x y xs) True
+      → Equal Bool (before q d x y (list_append q xs ys)) True =
+  match xs {
+    Nil ↦ λxy. absurd xy;
+    Cons head tail ↦
+      append_left_step
+        q
+        d
+        x
+        y
+        head
+        tail
+        ys
+        (before_append_left q d x y tail ys)
+        (d.eq x head)
+        (d.eq y head)
+  }
+
+theorem append_left_step
+      (q : Type)
+      (d : DecEq q)
+      (x : q)
+      (y : q)
+      (head : q)
+      (tail : List q)
+      (ys : List q)
+      (rest : Equal
+        Bool
+        (before q d x y tail)
+        True
+        → Equal
+        Bool
+        (before q d x y (list_append q tail ys))
+        True)
+      (xb : Bool)
+      (yb : Bool)
+    : Equal Bool (before_step q d x y head tail xb yb) True
+      → Equal Bool (before_step q d x y head (list_append q tail ys) xb yb) True =
+  match xb {
+    True ↦
+      match yb {
+        True ↦ λxy. absurd xy;
+        False ↦
+          λxy.
+            trans
+              Bool
+              (contains q d y (list_append q tail ys))
+              (bool_or (contains q d y tail) (contains q d y ys))
+              True
+              (contains_append q d y tail ys)
+              (or_left (contains q d y tail) (contains q d y ys) xy)
+      };
+    False ↦
+      match yb {
+        True ↦ λxy. absurd xy;
+        False ↦ λxy. rest xy
+      }
+  }
+
+theorem contains_reverse
+      (q : Type) (d : DecEq q) (x : q) (xs : List q)
+    : Equal Bool (contains q d x xs) (contains q d x (DC.reverse q xs)) =
+  contains_perm q d xs (DC.reverse q xs) (DC.reverse::perm q d.eq xs) x
 ```
 
 ## 5. Design notes
@@ -3133,7 +3434,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–20](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–21](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3168,24 +3469,26 @@ checks absorption with a proper subgraph, idempotence, and refusal when the
 second graph adds an edge. The §20
 [seed](../../../../conformance/stdlib/graphs/seed-graph-successor-append-union.md)
 checks that an appended successor list has the union's edge, in both operand
-orders, and that neither operand alone supplies the missing edge. The public
-API exports six data families (`Graph`, `Walk`, `Cycle`, `ReachWitness`,
+orders, and that neither operand alone supplies the missing edge. The §21
+[seed](../../../../conformance/stdlib/graphs/seed-topo-order-reverse.md)
+checks the reversed vertex list on a one-way edge and refuses the original
+list in the same proof form. The public API exports six data families (`Graph`, `Walk`, `Cycle`, `ReachWitness`,
 `TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
-`MkTopoOrder`, `HasOrder`, `HasCycle`). Its eighteen functions are `edge`,
+`MkTopoOrder`, `HasOrder`, `HasCycle`). Its nineteen functions are `edge`,
 `walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
-`topo_order_edge_antitone`, `dependency_order_or_cycle`, and
-`graph_from_successors` and `successors_append`. Thirty-six kernel-checked
-theorems expose their laws, including successor-list soundness, completeness,
-and the appended-list edge equation. Every other helper is private to this
+`topo_order_edge_antitone`, `topo_order_reverse`, `dependency_order_or_cycle`,
+`graph_from_successors`, and `successors_append`. Thirty-seven kernel-checked
+theorems expose their laws, including the appended-list edge equation and
+`topo_order_reverse_vertices`. Every other helper is private to this
 package.
 
 | Reader task | Section |
 |---|---|
 | Find a graph path or decision | [Definition](#2-definition), [Using it](#3-using-it) |
-| Reverse a graph and a walk | [Definition](#2-definition), [Laws & proofs](#4-laws--proofs) |
+| Reverse a graph, walk, or order | [Definition](#2-definition), [Laws & proofs](#4-laws--proofs) |
 | Review order or cycle evidence | [Definition](#2-definition), [Laws & proofs](#4-laws--proofs) |
 | Inspect search, proof and trust | [Laws & proofs](#4-laws--proofs), [Trust & derivation](#7-trust--derivation) |
 
