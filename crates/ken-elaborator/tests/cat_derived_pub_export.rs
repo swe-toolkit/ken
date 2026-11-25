@@ -311,6 +311,7 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
                 "import Data.Collections.Derived (filter, eq_from_ord)\n\
                  import Core.Classes.LawfulClasses (bool_or)\n"
             }
+            "insert::map" | "sort::map" | "take::map" => "import Data.Collections.Derived (map)\n",
             "sort::take_append" => {
                 "import Data.Collections.Derived (list_append, take)\n\
                  import Core.Classes.LawfulClasses (bool_or)\n"
@@ -459,6 +460,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "insert::length".to_owned(),
             "insert::stable_class".to_owned(),
             "insert::comparator_cong".to_owned(),
+            "insert::map".to_owned(),
             "is_sorted".to_owned(),
             "sort".to_owned(),
             "sort::perm".to_owned(),
@@ -468,6 +470,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "sort::stable_class".to_owned(),
             "sort::comparator_cong".to_owned(),
             "sort::take_append".to_owned(),
+            "sort::map".to_owned(),
             "take".to_owned(),
             "take::length".to_owned(),
             "take::member".to_owned(),
@@ -475,6 +478,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "take::filter_prefix".to_owned(),
             "take::prefix".to_owned(),
             "take::saturated".to_owned(),
+            "take::map".to_owned(),
             "zip".to_owned(),
             "list_sorted_cons".to_owned(),
             "list_sorted_head".to_owned(),

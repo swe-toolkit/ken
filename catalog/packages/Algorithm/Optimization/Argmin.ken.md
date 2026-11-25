@@ -36,8 +36,8 @@ The minimum selector and its ten laws lead, followed by its Option selector
 and seven laws. `cost_le`, `least_k` and their public laws follow before the
 maximum selector and its ten laws, then its Option selector and seven laws.
 Private selection and least-k helpers close the definition. Natural-order
-facts come from `Data.Numeric.Nat.Order`; stable sorting, `take` and their
-proofs come from `Data.Collections.Derived`.
+facts come from `Data.Numeric.Nat.Order`; stable sorting, `take`, `map`,
+and their list laws come from `Data.Collections.Derived`.
 
 ```ken
 import Core.Classes.LawfulClasses
@@ -63,6 +63,7 @@ import Data.Collections.Derived
     take,
     insert,
     sort,
+    map,
     filter,
     is_sorted,
     eq_from_ord,
@@ -558,6 +559,37 @@ pub theorem least_k_append_merge
     k
     xs
     ys
+
+pub theorem least_k_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (k : Nat) (xs : List a)
+    : Equal
+        (List b)
+        (least_k b cost k (map a b f xs))
+        (map a b f (least_k a (comp a b Nat cost f) k xs)) =
+  sym
+    (List b)
+    (map a b f (take a k (sort a (cost_le a (comp a b Nat cost f)) xs)))
+    (take b k (sort b (cost_le b cost) (map a b f xs)))
+    (trans
+      (List b)
+      (map a b f (take a k (sort a (cost_le a (comp a b Nat cost f)) xs)))
+      (take b k (map a b f (sort a (cost_le a (comp a b Nat cost f)) xs)))
+      (take b k (sort b (cost_le b cost) (map a b f xs)))
+      ((proof map for take) a b f k (sort a (cost_le a (comp a b Nat cost f)) xs))
+      (cong
+        (List b)
+        (List b)
+        (map a b f (sort a (cost_le a (comp a b Nat cost f)) xs))
+        (sort b (cost_le b cost) (map a b f xs))
+        (take b k)
+        ((proof map for sort)
+          a
+          b
+          f
+          (cost_le a (comp a b Nat cost f))
+          (cost_le b cost)
+          (λx. λy. Refl)
+          xs)))
 
 pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
   argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
@@ -1963,6 +1995,13 @@ and transitive natural-cost comparison. Private helpers carry the
 head-order and Boolean comparisons; none decides candidate equality or adds an
 assumption.
 
+`least_k_map` lets a client select before mapping candidates, provided it
+ranks the original candidates by `cost` composed with the map. This makes
+the comparison on original candidates the same as the comparison on their
+images. `sort::map` therefore carries the entire sorted order across the map,
+including ties, and `take::map` carries the selected prefix. The proof joins
+these equalities and reverses the result. The map need not be injective.
+
 `argmax_member` transports the shared private selection-membership proof to
 the public list view. `argmax_greatest` inducts over the ordered tail and
 eliminates truncated membership only into `IsTrue`, bounding every member's
@@ -2031,7 +2070,7 @@ law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_ties_earliest`, `least_k_cheaper_class_selected`,
 `least_k_separation`, `least_k_one_nil`, `least_k_one_cons`,
 `least_k_cost_order_invariant`, `least_k_prefix`, `least_k_saturated`,
-`least_k_append_merge`);
+`least_k_append_merge`, `least_k_map`);
 `argmin`, its seven §1.2 theorems,
 `argmin_cost_order_invariant`, `argmin_append_keeps_left` and
 `argmin_append_takes_right`; `argmin_option` and its seven laws:

@@ -519,7 +519,11 @@ or postulated law is added. `take_drop_decomposition`, `map_length`, and
 `take::member`, `take::sorted` and `take::filter_prefix` characterize its
 ordered prefix without testing value equality. `take::prefix` states that the
 k-prefix of an n-prefix is the k-prefix whenever k ≤ n. `take::saturated`
-states that taking at least the list's length returns the same list. The public
+states that taking at least the list's length returns the same list. With
+`take::map`, taking a prefix commutes with mapping its elements. The proof
+inducts on the bound, then splits on the list at a successor bound. Zero and
+`Nil` reduce to empty-list equalities closed by `Proved`; the `Cons` case
+lifts the tail equality under the mapped head. The public
 `list_append::length` and private `length_drop` laws hold for any element type
 and list. The append law uses the canonical addition laws because `add`
 recurses on its second argument. The private `mem_filter` theorem characterizes
@@ -1341,6 +1345,25 @@ pub proof saturated for take
       }
   }
 
+pub proof map for take
+      (a : Type) (b : Type) (f : a → b) (n : Nat) (xs : List a)
+    : Equal (List b) (map a b f (take a n xs)) (take b n (map a b f xs)) =
+  match n {
+    Zero ↦ Proved;
+    Suc m ↦
+      match xs {
+        Nil ↦ Proved;
+        Cons h t ↦
+          cong
+            (List b)
+            (List b)
+            (map a b f (take a m t))
+            (take b m (map a b f t))
+            (Cons b (f h))
+            ((proof map for take) a b f m t)
+      }
+  }
+
 theorem derived_take_sorted_tail
       (a : Type) (le : a → a → Bool) (h : a) (t : List a)
     : is_sorted a le (Cons a h t) → is_sorted a le t =
@@ -1871,6 +1894,14 @@ also transitive. `sort::take_append` states that selecting a prefix after
 sorting an append equals sorting and selecting a prefix after each part has
 first been sorted and truncated at the same bound; it needs totality and
 transitivity, not a premise about the bound or the input lists.
+`insert::map` and `sort::map` commute with mapping when `f` carries `le1` to
+`le2`: every comparison gives the same Boolean before and after mapping.
+Thus even tied elements follow the same insertion decisions. Inserting into
+`Nil` gives identical singleton lists whose mapped element is abstract, so
+`Refl` closes that case. On `Cons`, the private decision lemma rules out
+mixed comparisons and uses the tail equality when both comparisons are
+false. Sorting then uses `insert::map` at each step; its `Nil` equality
+reduces and closes with `Proved`.
 `list_sorted_head_bounded` makes the transitivity premise
 explicit when extending an adjacent order fact to a later list member.
 
@@ -2278,6 +2309,61 @@ pub proof take_append for sort
           (derived_sort_append_sort_right a le total (take a k (sort a le xs)) ys))))
     (derived_take_sort_cut_right a le total k (take a k (sort a le xs)) ys)
 
+pub proof map for insert
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (le2 : b → b → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 (f x) (f y)))
+      (x : a)
+      (xs : List a)
+    : Equal (List b) (map a b f (insert a le1 x xs)) (insert b le2 (f x) (map a b f xs)) =
+  match xs {
+    Nil ↦ Refl;
+    Cons h t ↦
+      derived_map_insert_choice
+        a
+        b
+        f
+        le1
+        le2
+        x
+        h
+        t
+        ((proof map for insert) a b f le1 le2 same_le x t)
+        (le1 x h)
+        (le2 (f x) (f h))
+        (same_le x h)
+  }
+
+pub proof map for sort
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (le2 : b → b → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 (f x) (f y)))
+      (xs : List a)
+    : Equal (List b) (map a b f (sort a le1 xs)) (sort b le2 (map a b f xs)) =
+  match xs {
+    Nil ↦ Proved;
+    Cons h t ↦
+      trans
+        (List b)
+        (map a b f (insert a le1 h (sort a le1 t)))
+        (insert b le2 (f h) (map a b f (sort a le1 t)))
+        (insert b le2 (f h) (sort b le2 (map a b f t)))
+        ((proof map for insert) a b f le1 le2 same_le h (sort a le1 t))
+        (cong
+          (List b)
+          (List b)
+          (map a b f (sort a le1 t))
+          (sort b le2 (map a b f t))
+          (insert b le2 (f h))
+          ((proof map for sort) a b f le1 le2 same_le t))
+  }
+
 theorem derived_meet
       (t : Type) (p : t) (m : t) (q : t) (left : Equal t p m) (right : Equal t q m)
     : Equal t p q =
@@ -2316,6 +2402,78 @@ theorem derived_insert_cons_false
           (Cons a h (insert a le x t)))
       Refl
       (sym Bool (le x h) False after)
+
+fn derived_map_insert_left
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (d : Bool)
+    : List b =
+  map
+    a
+    b
+    f
+    (match d {
+      True ↦ Cons a x (Cons a h t);
+      False ↦ Cons a h (insert a le1 x t)
+    })
+
+fn derived_map_insert_right
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le2 : b → b → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (d : Bool)
+    : List b =
+  match d {
+    True ↦ Cons b (f x) (Cons b (f h) (map a b f t));
+    False ↦ Cons b (f h) (insert b le2 (f x) (map a b f t))
+  }
+
+theorem derived_map_insert_choice
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (le2 : b → b → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (rest : Equal (List b) (map a b f (insert a le1 x t)) (insert b le2 (f x) (map a b f t)))
+      (d1 : Bool)
+      (d2 : Bool)
+    : Equal Bool d1 d2
+      → Equal
+        (List b)
+        (derived_map_insert_left a b f le1 x h t d1)
+        (derived_map_insert_right a b f le2 x h t d2) =
+  match d1 {
+    True ↦
+      match d2 {
+        True ↦ λsame. Refl;
+        False ↦ λsame. absurd same
+      };
+    False ↦
+      match d2 {
+        True ↦ λsame. absurd same;
+        False ↦
+          λsame.
+            cong
+              (List b)
+              (List b)
+              (map a b f (insert a le1 x t))
+              (insert b le2 (f x) (map a b f t))
+              (Cons b (f h))
+              rest
+      }
+  }
 
 theorem derived_insert_head_ordered
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
@@ -5830,8 +5988,9 @@ reference implementation.
    these and `map::append` through a qualified alias, while
    `Capability.Parsing.Parsing` uses `map::append` for byte-code lists.
    Derived's `map_length` and filter-membership laws use its structural
-   operations locally. `Algorithm.Optimization.Argmin` imports the public
-   `take`/`sort` and their laws for stable least-k selection.
+   operations locally. `Algorithm.Optimization.Argmin` imports `take`,
+   `sort`, and `map` for stable least-k selection. It uses `sort::map` and
+   `take::map` to move selection across a map under a composed cost.
    `Algorithm.FormalLanguages.Regex` imports `list_concat` and `list_all`
    for concatenation and repetition evidence.
    `Application.Configuration.Decoder` imports this module wholesale.
