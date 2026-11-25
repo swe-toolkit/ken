@@ -1473,55 +1473,97 @@ impl<'a> Lowering<'a> {
         }
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum OptionSelectionMode<'e, 'b> {
+    OrdinaryJoin,
+    /// An empty suffix lowers each arm as an ordinary expression, as C's HostResult arm does; P never passes an empty list.
+    ComposedContinuation { eliminators: &'e [EliminatorFrame<'b>] },
+}
+
 impl<'a> Lowering<'a> {
-        #[allow(clippy::too_many_arguments)]
-        pub(super) fn lower_borrowed_option_match(
-            &mut self,
-            builder: &mut FunctionBuilder<'_>,
-            present: cranelift_codegen::ir::Value,
-            value: cranelift_codegen::ir::Value,
-            none: &str,
-            some: &str,
-            cases: &[crate::RuntimeMatchCase],
-            _default: &RuntimeTrap,
-            static_origin: StaticOriginId,
-            env: &[LoweringEnvironmentBinding],
-        ) -> Result<LoweringOperand, CraneliftBackendError> {
-            let join_plan = self.consumed_join_plan_token(static_origin)?;
-            let merge = join_plan
-                .has_continuing_predecessor
-                .then(|| builder.create_block());
-            if let Some(merge) = merge {
-                self.append_planned_join_params(builder, merge, &join_plan);
-            }
-            let some_block = builder.create_block();
-            let none_block = builder.create_block();
-            let mut merge_kind = None;
-            let mut terminal_trap = None;
-            builder
-                .ins()
-                .brif(present, some_block, &[], none_block, &[]);
-            for (block, symbol, fields) in [
-                (some_block, some, vec![Lowered::Int { value, known: None }]),
-                (none_block, none, Vec::new()),
-            ] {
-                builder.switch_to_block(block);
-                let case = cases
-                    .iter()
-                    .enumerate()
-                    .find(|(_, case)| case.constructor == symbol);
-                let Some((index, case)) = case else {
-                    let failure = builder.ins().iconst(types::I64, -1);
-                    builder.ins().return_(&[failure]);
-                    self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
-                    continue;
-                };
-                if case.binders != fields.len() {
-                    return Err(unsupported(LoweringCause::PlannerInvariant, "Match", "borrowed Option arity mismatch"));
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn lower_borrowed_option_selection(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        present: cranelift_codegen::ir::Value,
+        value: cranelift_codegen::ir::Value,
+        none: &str,
+        some: &str,
+        cases: &[crate::RuntimeMatchCase],
+        default: &RuntimeTrap,
+        static_origin: StaticOriginId,
+        env: &[LoweringEnvironmentBinding],
+        mode: OptionSelectionMode<'_, '_>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (join_plan, some_block, none_block, merge, construct, arity_error, merge_error) =
+            match mode {
+                OptionSelectionMode::OrdinaryJoin => {
+                    let join_plan = self.consumed_join_plan_token(static_origin)?;
+                    let merge = join_plan.has_continuing_predecessor.then(|| builder.create_block());
+                    if let Some(merge) = merge {
+                        self.append_planned_join_params(builder, merge, &join_plan);
+                    }
+                    let some_block = builder.create_block();
+                    let none_block = builder.create_block();
+                    (join_plan, some_block, none_block, merge, "Match",
+                     "borrowed Option arity mismatch",
+                     "borrowed Option join omitted a merge despite a continuing predecessor")
                 }
-                let arm_env = env_with(fields, env);
-                let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                let lowered = self.lower_expr(builder, body, &arm_env)?;
+                OptionSelectionMode::ComposedContinuation { eliminators } => {
+                    let join_plan = self.consumed_composed_join_plan_token(static_origin, eliminators)?;
+                    let some_block = builder.create_block();
+                    let none_block = builder.create_block();
+                    let merge = join_plan.has_continuing_predecessor.then(|| builder.create_block());
+                    if let Some(merge) = merge {
+                        self.append_planned_join_params(builder, merge, &join_plan);
+                    }
+                    (join_plan, some_block, none_block, merge, "ComputationalMatch",
+                     "borrowed Option producer arity mismatch",
+                     "join plan omitted a producer BorrowedOption merge despite a continuing predecessor")
+                }
+            };
+        let mut merge_kind = None;
+        let mut terminal_trap = None;
+        builder.ins().brif(present, some_block, &[], none_block, &[]);
+        for (block, symbol, fields) in [
+            (some_block, some, vec![Lowered::Int { value, known: None }]),
+            (none_block, none, Vec::new()),
+        ] {
+            builder.switch_to_block(block);
+            let case = cases.iter().enumerate().find(|(_, case)| case.constructor == symbol);
+            let (arm_origin, lowered) = match case {
+                Some((index, case)) => {
+                    if case.binders != fields.len() {
+                        return Err(unsupported(LoweringCause::PlannerInvariant, construct, arity_error));
+                    }
+                    let arm_env = env_with(fields, env);
+                    let body = self.case_body_occurrence(static_origin, index, &case.body)?;
+                    let lowered = match mode {
+                        OptionSelectionMode::OrdinaryJoin => self.lower_expr(builder, body, &arm_env)?,
+                        OptionSelectionMode::ComposedContinuation { eliminators } => {
+                            if eliminators.is_empty() {
+                                self.lower_expr(builder, body, &arm_env)?
+                            } else {
+                                self.lower_computational_producer_expr(builder, body, &arm_env, eliminators)?
+                            }
+                        }
+                    };
+                    (body.static_origin, lowered)
+                }
+                None => match mode {
+                    OptionSelectionMode::OrdinaryJoin => {
+                        let failure = builder.ins().iconst(types::I64, -1);
+                        builder.ins().return_(&[failure]);
+                        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+                        continue;
+                    }
+                    OptionSelectionMode::ComposedContinuation { .. } => (
+                        static_origin,
+                        LoweringOperand::Specialized(Lowered::Trap(default.clone())),
+                    ),
+                },
+            };
+            if matches!(mode, OptionSelectionMode::OrdinaryJoin) {
                 match &lowered {
                     LoweringOperand::Specialized(Lowered::Trap(trap)) => {
                         terminal_trap.get_or_insert_with(|| trap.clone());
@@ -1529,39 +1571,31 @@ impl<'a> Lowering<'a> {
                     LoweringOperand::Residual(_) => {}
                     LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
-                if self.seal_source_trap_branch(builder, &lowered)? {
-                    continue;
-                }
-                let merge = merge.ok_or_else(|| {
-                    backend_module(LoweringCause::PlannerInvariant,
-                        "borrowed Option join omitted a merge despite a continuing predecessor"
-                            .to_string(),
-                    )
-                })?;
-                self.jump_planned_join_arm(
-                    builder,
-                    merge,
-                    &join_plan,
-                    body.static_origin,
-                    lowered,
-                    &mut merge_kind,
-                    "Match",
-                )?;
             }
-            let Some(merge) = merge else {
-                let unreachable_continuation = builder.create_block();
-                builder.switch_to_block(unreachable_continuation);
-                let trap = terminal_trap.ok_or_else(|| {
+            if self.seal_source_trap_branch(builder, &lowered)? {
+                continue;
+            }
+            let merge = merge.ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, merge_error.to_string()))?;
+            self.jump_planned_join_arm(
+                builder, merge, &join_plan, arm_origin, lowered, &mut merge_kind, construct,
+            )?;
+        }
+        let Some(merge) = merge else {
+            let unreachable_continuation = builder.create_block();
+            builder.switch_to_block(unreachable_continuation);
+            let trap = match mode {
+                OptionSelectionMode::OrdinaryJoin => terminal_trap.ok_or_else(|| {
                     backend_module(LoweringCause::PlannerInvariant,
                         "borrowed Option join omitted both a continuing predecessor and a source \
-                         trap"
-                            .to_string(),
+                         trap".to_string(),
                     )
-                })?;
-                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+                })?,
+                OptionSelectionMode::ComposedContinuation { .. } => default.clone(),
             };
-            self.finish_planned_join(builder, merge, &join_plan, merge_kind, "Match")
-        }
+            return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+        };
+        self.finish_planned_join(builder, merge, &join_plan, merge_kind, construct)
+    }
 }
 
 impl<'a> Lowering<'a> {
