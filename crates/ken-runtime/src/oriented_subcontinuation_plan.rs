@@ -716,6 +716,7 @@ impl OrientedSubcontinuationPlanV1 {
             .map(|frame| (frame.frame_id, frame))
             .collect::<BTreeMap<_, _>>();
         let mut roots_by_segment = BTreeMap::<u64, usize>::new();
+        let mut orientation_by_segment = BTreeMap::<u64, bool>::new();
         for frame in &self.frames {
             if let OrientedControlWitnessV1::ParentFrame(parent) = frame.control_witness {
                 if parent == frame.frame_id || !by_id.contains_key(&parent) {
@@ -723,6 +724,32 @@ impl OrientedSubcontinuationPlanV1 {
                 }
                 if by_id[&parent].segment_site_id != frame.segment_site_id {
                     return Err("oriented subcontinuation parent crosses a prompt region");
+                }
+                let parent_frame = by_id[&parent];
+                let child_first = match frame.semantic_position.cmp(&parent_frame.semantic_position)
+                {
+                    std::cmp::Ordering::Less => true,
+                    std::cmp::Ordering::Greater => false,
+                    std::cmp::Ordering::Equal => {
+                        return Err("oriented subcontinuation parent shares a semantic position");
+                    }
+                };
+                if *orientation_by_segment
+                    .entry(frame.segment_site_id)
+                    .or_insert(child_first)
+                    != child_first
+                {
+                    return Err(
+                        "oriented subcontinuation prompt region mixes semantic orientations",
+                    );
+                }
+                let (earlier, later) = if child_first {
+                    (frame, parent_frame)
+                } else {
+                    (parent_frame, frame)
+                };
+                if earlier.output_interface != later.input_interface {
+                    return Err("oriented subcontinuation checked endpoints do not compose");
                 }
                 let mut seen = BTreeSet::from([frame.frame_id]);
                 let mut cursor = parent;
@@ -743,22 +770,14 @@ impl OrientedSubcontinuationPlanV1 {
                 *roots_by_segment.entry(frame.segment_site_id).or_default() += 1;
             }
         }
-        let mut by_segment = BTreeMap::<u64, Vec<&OrientedSubcontinuationFramePlanV1>>::new();
-        for frame in &self.frames {
-            by_segment
-                .entry(frame.segment_site_id)
-                .or_default()
-                .push(frame);
-        }
-        for (segment, frames) in &mut by_segment {
+        let segments = self
+            .frames
+            .iter()
+            .map(|frame| frame.segment_site_id)
+            .collect::<BTreeSet<_>>();
+        for segment in &segments {
             if roots_by_segment.get(segment).copied() != Some(1) {
                 return Err("oriented subcontinuation prompt region has no unique root");
-            }
-            frames.sort_by_key(|frame| frame.semantic_position);
-            for pair in frames.windows(2) {
-                if pair[0].output_interface != pair[1].input_interface {
-                    return Err("oriented subcontinuation checked endpoints do not compose");
-                }
             }
         }
         Ok(())
@@ -1279,6 +1298,63 @@ mod tests {
         assert_eq!(
             OrientedSubcontinuationPlanV1::decode(&plan.canonical_bytes()),
             Err("oriented subcontinuation occurrence binding is inconsistent")
+        );
+    }
+
+    fn parent_edge_test_plan(
+        mut frames: Vec<OrientedSubcontinuationFramePlanV1>,
+    ) -> OrientedSubcontinuationPlanV1 {
+        for frame in &mut frames {
+            frame.occurrence_binding_fingerprint =
+                compiler_private_oriented_occurrence_binding_fingerprint(frame);
+        }
+        OrientedSubcontinuationPlanV1 {
+            representation_rule_version: OrientedSubcontinuationPlanV1::REPRESENTATION_RULE_VERSION,
+            frames,
+            recursive_calls: Vec::new(),
+            computational_ih_slots: Vec::new(),
+            computational_ih_calls: Vec::new(),
+        }
+    }
+
+    fn sibling_edge_frames() -> Vec<OrientedSubcontinuationFramePlanV1> {
+        let mut first = frame(0, Some(2));
+        let second = frame(1, Some(2));
+        let root = frame(2, None);
+        first.output_interface = root.input_interface.clone();
+        vec![first, second, root]
+    }
+
+    #[test]
+    fn sibling_frames_compose_with_their_parent_not_each_other() {
+        let frames = sibling_edge_frames();
+        assert_ne!(frames[0].input_interface, frames[1].input_interface);
+        assert_ne!(frames[0].output_interface, frames[1].input_interface);
+        assert_eq!(parent_edge_test_plan(frames).validate(), Ok(()));
+    }
+
+    #[test]
+    fn sibling_frames_reject_bad_parent_endpoint() {
+        let mut frames = sibling_edge_frames();
+        frames[1].output_interface = interface(b"wrong parent endpoint");
+        assert_eq!(
+            parent_edge_test_plan(frames).validate(),
+            Err("oriented subcontinuation checked endpoints do not compose")
+        );
+    }
+
+    #[test]
+    fn parent_edges_reject_mixed_segment_orientation() {
+        let mut root = frame(0, None);
+        let mut middle = frame(1, Some(0));
+        let mut leaf = frame(2, Some(1));
+        root.semantic_position = 0;
+        middle.semantic_position = 2;
+        leaf.semantic_position = 1;
+        leaf.output_interface = middle.input_interface.clone();
+        assert_eq!(
+            parent_edge_test_plan(vec![root, middle, leaf]).validate(),
+            Err("oriented subcontinuation prompt region mixes semantic orientations")
         );
     }
 

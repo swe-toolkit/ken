@@ -10951,6 +10951,16 @@ fn compose_oriented_subcontinuation(
                         "invocation-local oriented segment crosses checked prompt regions",
                     ));
                 }
+                let parent_edge = matches!(left.control_witness,
+                        crate::OrientedControlWitnessV1::ParentFrame(parent) if parent == right.frame_id)
+                    || matches!(right.control_witness,
+                        crate::OrientedControlWitnessV1::ParentFrame(parent) if parent == left.frame_id);
+                if !parent_edge {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "OrientedSubcontinuationPlanV1",
+                        "invocation-local oriented segment pairs frames with no parent edge",
+                    ));
+                }
                 if left.output_interface != right.input_interface {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",

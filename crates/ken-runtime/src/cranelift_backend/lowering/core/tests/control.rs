@@ -2815,6 +2815,49 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
     assert!(lowering.consumed_join_sites.is_empty());
 }
 #[test]
+fn oriented_invocation_rejects_siblings_with_matching_endpoints() {
+    let plan = crate::OrientedSubcontinuationPlanV1 {
+        frames: vec![
+            oriented_test_frame(0, 0, 0, 2, Some(2)),
+            oriented_test_frame(1, 1, 2, 2, Some(2)),
+            oriented_test_frame(2, 2, 2, 3, None),
+        ],
+        ..oriented_test_plan()
+    };
+    assert_eq!(plan.validate(), Ok(()));
+    assert_eq!(plan.frames[0].output_interface, plan.frames[1].input_interface);
+    let origin = RecursorProducerOriginId(40);
+    let invocation = RecursorInvocationSegment::new(
+        origin,
+        0,
+        oriented_test_layer(0, RecursorLayerRole::SelectsOccurrence { origin }),
+        RecursorUnwindStack {
+            later_wrappers_in_construction_order: vec![oriented_test_layer(
+                1,
+                RecursorLayerRole::ExitsScope {
+                    origin,
+                    scope_origin: RecursorProducerOriginId(41),
+                    parent_scope: None,
+                },
+            )],
+        },
+        ContinuationCursorId(7),
+        None,
+        None,
+    );
+    let result = compose_oriented_subcontinuation(
+        Some(&plan), None, ContinuationActivationId(8), invocation, Vec::new(),
+    );
+    let Err(error) = result else {
+        panic!("interface coincidence must not compose sibling continuations");
+    };
+    assert!(
+        error.to_string().contains("invocation-local oriented segment pairs frames with no parent edge"),
+        "{error}",
+    );
+}
+
+#[test]
 fn oriented_segment_keeps_semantic_and_control_axes_independent() {
     let installed = compose_oriented_subcontinuation(
         Some(&oriented_test_plan()),
