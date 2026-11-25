@@ -278,6 +278,14 @@ there. Its trust measurements were Order `114 → 114` and NatOrientation
 `114 → 114`. These are Architect-reported scratch results, not AC-T on
 an assembled candidate.
 
+At exact assembled candidate
+`4b666a3011e98fac972ccacd6e282b3efe7d82cb`, Foundation QA reports the
+AC-T package target `cat_geometry_nat_orientation` passed 14/14. The
+Order trusted `GlobalId` set was unchanged (`114 → 114`), as was the
+NatOrientation set (`114 → 114`). Both zero-factor claims were rejected
+at their own theorem as `KernelRejected(TypeMismatch)`. These are
+candidate-local package results, not official Markdown-seed conformance.
+
 This seed has not been run by the official conformance runner. No
-assembled-candidate AC-T, official conformance, CI, publication, or
-landing is claimed.
+official conformance, full CI, publication, landing, or landed-trust
+claim is made.
