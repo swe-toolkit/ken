@@ -106,6 +106,25 @@ base, stop and report the mismatch; do not build around it.
 - §1a: the chain carries at 2 from DESCRIPTOR, so the first stop here is
   the third, and it triggers a research pull.
 
+## Inventory
+
+1. The native join closeout's recursive-predecessor union counted a
+   continuation call whose producer is in excluded code
+   (`evt_6k4h2m6hc5249`).
+2. The detached-result seat treated the same dead call as owed by the
+   unit result (`evt_45863hkv60etq`).
+3. statically-unselected relation: R2i's known-Bool `if` guard (interp/native Ret, exit 23, empty trace) recorded zero roots at the disposition_statically_unselected_source_subtree choke point and zero settlements; the relation's If-seat arms (core.rs:4322, :17723) have no witnessing producer — keyed on the guard's surface form (`if` vs match) reaching a lowering seat. (evt_38n77hdbscbj0)
+4. M-settle's registered observation named candidate totality, but
+   response-owner coverage (F5) reads the same settled disposition and
+   closes first in close_continuation_claim_ledger, so R1 refused there and
+   M-settle and M-resp were not separated on R1 — keyed on the close order
+   across the consumers of one disposition (evt_e689rjqtpjb1)
+
+§1a reached 3 at entry 3, and research advised (`evt_38g8yeaf3k7q`); the
+Architect ruled (`evt_4wahmne7eeh60`). §1a reached 4 at entry 4, ruled
+`evt_293131gty98bg`. The next research trigger is the 6th; the next §1b
+answer falls due at the 6th entry.
+
 Checks: 2 fired. The guarded property is "a planned call lowering never
 emits is disposed, not refused". Its fan-in is every population whose
 close requires emission, which is why AC-0 starts with a census by
