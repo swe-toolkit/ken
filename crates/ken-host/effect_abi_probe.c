@@ -41,7 +41,6 @@ struct FsWriteAtRequestV1 {
     uint64_t length;
     uint64_t span_origin;
 };
-struct FsSeekRequestV1 { uint64_t resource; uint64_t origin; uint64_t offset; };
 struct FsSetLengthRequestV1 { uint64_t resource; uint64_t length; };
 struct FsSyncRequestV1 { uint64_t resource; uint64_t mode; };
 struct FsGetInheritanceRequestV1 { uint64_t resource; };
@@ -130,7 +129,6 @@ int main(void) {
     FACT_SIZE(ResourceRequestV1); FACT_ALIGN(ResourceRequestV1); FACT_OFFSET(ResourceRequestV1, resource);
     FACT_SIZE(FsPositionedRequestV1); FACT_ALIGN(FsPositionedRequestV1); FACT_OFFSET(FsPositionedRequestV1, file); FACT_OFFSET(FsPositionedRequestV1, buffer); FACT_OFFSET(FsPositionedRequestV1, file_offset); FACT_OFFSET(FsPositionedRequestV1, buffer_start); FACT_OFFSET(FsPositionedRequestV1, length);
     FACT_SIZE(FsWriteAtRequestV1); FACT_ALIGN(FsWriteAtRequestV1); FACT_OFFSET(FsWriteAtRequestV1, file); FACT_OFFSET(FsWriteAtRequestV1, buffer); FACT_OFFSET(FsWriteAtRequestV1, file_offset); FACT_OFFSET(FsWriteAtRequestV1, buffer_start); FACT_OFFSET(FsWriteAtRequestV1, length); FACT_OFFSET(FsWriteAtRequestV1, span_origin);
-    FACT_SIZE(FsSeekRequestV1); FACT_ALIGN(FsSeekRequestV1); FACT_OFFSET(FsSeekRequestV1, resource); FACT_OFFSET(FsSeekRequestV1, origin); FACT_OFFSET(FsSeekRequestV1, offset);
     FACT_SIZE(FsSetLengthRequestV1); FACT_ALIGN(FsSetLengthRequestV1); FACT_OFFSET(FsSetLengthRequestV1, resource); FACT_OFFSET(FsSetLengthRequestV1, length);
     FACT_SIZE(FsSyncRequestV1); FACT_ALIGN(FsSyncRequestV1); FACT_OFFSET(FsSyncRequestV1, resource); FACT_OFFSET(FsSyncRequestV1, mode);
     FACT_SIZE(FsGetInheritanceRequestV1); FACT_ALIGN(FsGetInheritanceRequestV1); FACT_OFFSET(FsGetInheritanceRequestV1, resource);

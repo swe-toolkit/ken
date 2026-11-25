@@ -434,14 +434,6 @@ mod linux {
         File::from(handle.0.try_clone()?).write_at(bytes, offset)
     }
 
-    pub(super) fn resource_seek(handle: &ResourceHandle, from: FsSeekFromV1) -> io::Result<u64> {
-        File::from(handle.0.try_clone()?).seek(match from {
-            FsSeekFromV1::Start(offset) => SeekFrom::Start(offset),
-            FsSeekFromV1::Current(offset) => SeekFrom::Current(offset),
-            FsSeekFromV1::End(offset) => SeekFrom::End(offset),
-        })
-    }
-
     pub(super) fn resource_set_length(handle: &ResourceHandle, length: u64) -> io::Result<()> {
         File::from(handle.0.try_clone()?).set_len(length)
     }
@@ -1071,19 +1063,6 @@ pub fn process_stream_write_v1(
     bytes: &[u8],
 ) -> std::io::Result<usize> {
     process_v1::stream_write_v1(fd, bytes)
-}
-
-pub fn resource_seek_v1(handle: &ResourceHandleV1, from: FsSeekFromV1) -> HostResult<u64> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_seek(&handle.inner, from).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, from);
-        unsupported()
-    }
 }
 
 pub fn resource_set_length_v1(handle: &ResourceHandleV1, length: u64) -> HostResult<()> {

@@ -102,9 +102,8 @@ operation|FsOpen|030B|native|FsOpenRequestV1|3|HostReplyV1|1
 operation|FsHandleMetadata|030C|native|ResourceRequestV1|1|HostReplyV1|1
 operation|FsReadAt|030D|native|FsPositionedRequestV1|5|HostReplyV1|1
 operation|FsWriteAt|030E|native|FsWriteAtRequestV1|6|HostReplyV1|1
-operation|FsSeek|030F|unavailable|FsSeekRequestV1|3|HostReplyV1|1
-operation|FsSetLength|0310|unavailable|FsSetLengthRequestV1|2|HostReplyV1|1
-operation|FsSync|0311|unavailable|FsSyncRequestV1|2|HostReplyV1|1
+operation|FsSetLength|0310|native|FsSetLengthRequestV1|2|HostReplyV1|1
+operation|FsSync|0311|native|FsSyncRequestV1|2|HostReplyV1|1
 operation|FsGetInheritance|0312|unavailable|FsGetInheritanceRequestV1|1|HostReplyV1|1
 operation|FsSetInheritance|0313|unavailable|FsSetInheritanceRequestV1|2|HostReplyV1|1
 operation|FsDuplicate|0314|unavailable|FsDuplicateRequestV1|2|HostReplyV1|1

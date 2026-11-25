@@ -329,6 +329,8 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_fs_open_id: z,
         private_fs_open_directory_id: z,
         private_fs_read_directory_batch_id: z,
+        private_fs_set_length_id: z,
+        private_fs_sync_id: z,
         private_fs_handle_metadata_id: z,
         private_buffer_allocate_id: z,
         private_fs_read_at_id: z,
@@ -508,6 +510,8 @@ pub struct PreludeEnv {
     pub private_fs_open_id: GlobalId,
     pub private_fs_open_directory_id: GlobalId,
     pub private_fs_read_directory_batch_id: GlobalId,
+    pub private_fs_set_length_id: GlobalId,
+    pub private_fs_sync_id: GlobalId,
     pub private_fs_handle_metadata_id: GlobalId,
     pub private_buffer_allocate_id: GlobalId,
     pub private_fs_read_at_id: GlobalId,
@@ -901,6 +905,8 @@ struct PreludeOperationIds {
     private_fs_open_id: GlobalId,
     private_fs_open_directory_id: GlobalId,
     private_fs_read_directory_batch_id: GlobalId,
+    private_fs_set_length_id: GlobalId,
+    private_fs_sync_id: GlobalId,
     private_fs_handle_metadata_id: GlobalId,
     private_resource_release_id: GlobalId,
     private_bracket_release_id: GlobalId,
@@ -922,6 +928,8 @@ struct PreludeResourceIds {
     private_fs_open_id: GlobalId,
     private_fs_open_directory_id: GlobalId,
     private_fs_read_directory_batch_id: GlobalId,
+    private_fs_set_length_id: GlobalId,
+    private_fs_sync_id: GlobalId,
     private_fs_handle_metadata_id: GlobalId,
     private_buffer_allocate_id: GlobalId,
     private_fs_read_at_id: GlobalId,
@@ -2541,7 +2549,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                     bytes_t.clone(),
                     resource_mapping_t,
                 ]),
-                named(vec![resource_fs_handle_t, int_t.clone(), mapping_prot_t]),
+                named(vec![resource_fs_handle_t.clone(), int_t.clone(), mapping_prot_t]),
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![resource_plan_t.clone(), int_t.clone(), bytes_t.clone(), bytes_t.clone(), int_t.clone()]),
                 named(vec![resource_plan_t]),
@@ -2558,6 +2566,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![resource_socket_stream_t.clone(), resource_buffer_t.clone(), int_t.clone(), int_t.clone(), resource_buffer_t]),
                 named(vec![resource_socket_stream_t.clone(), socket_shutdown_t]),
                 named(vec![socket_target_t]),
+                named(vec![resource_fs_handle_t.clone(), int_t]),
+                named(vec![resource_fs_handle_t]),
             ]
         },
     })
@@ -2611,6 +2621,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateNetSend",
         "PrivateNetShutdown",
         "PrivateNetLocalAddress",
+        "PrivateFsSetLength",
+        "PrivateFsSync",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2620,6 +2632,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let private_fs_open_id = elab.globals["PrivateFsOpen"];
     let private_fs_open_directory_id = elab.globals["PrivateFsOpenDirectory"];
     let private_fs_read_directory_batch_id = elab.globals["PrivateFsReadDirectoryBatch"];
+    let private_fs_set_length_id = elab.globals["PrivateFsSetLength"];
+    let private_fs_sync_id = elab.globals["PrivateFsSync"];
     let private_fs_handle_metadata_id = elab.globals["PrivateFsHandleMetadata"];
     let private_resource_release_id = elab.globals["PrivateResourceRelease"];
     let private_bracket_release_id = elab.globals["PrivateBracketRelease"];
@@ -2645,6 +2659,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         private_fs_open_id,
         private_fs_open_directory_id,
         private_fs_read_directory_batch_id,
+        private_fs_set_length_id,
+        private_fs_sync_id,
         private_fs_handle_metadata_id,
         private_resource_release_id,
         private_bracket_release_id,
@@ -2675,6 +2691,8 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
         private_fs_open_id: op.private_fs_open_id,
         private_fs_open_directory_id: op.private_fs_open_directory_id,
         private_fs_read_directory_batch_id: op.private_fs_read_directory_batch_id,
+        private_fs_set_length_id: op.private_fs_set_length_id,
+        private_fs_sync_id: op.private_fs_sync_id,
         private_fs_handle_metadata_id: op.private_fs_handle_metadata_id,
         private_buffer_allocate_id: op.private_buffer_allocate_id,
         private_fs_read_at_id: op.private_fs_read_at_id,
@@ -2758,7 +2776,9 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateNetReceive stream buffer start length |-> Result ResourceError ReadProgress; \
            PrivateNetSend stream buffer start length origin |-> Result ResourceError WriteProgress; \
            PrivateNetShutdown stream how |-> Result ResourceError Unit; \
-           PrivateNetLocalAddress target |-> Result ResourceError SocketAddress \
+           PrivateNetLocalAddress target |-> Result ResourceError SocketAddress; \
+           PrivateFsSetLength file length |-> Result ResourceError Unit; \
+           PrivateFsSync file |-> Result ResourceError Unit \
          }"
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -3278,6 +3298,8 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "PrivateNetSend",
         "PrivateNetShutdown",
         "PrivateNetLocalAddress",
+        "PrivateFsSetLength",
+        "PrivateFsSync",
         "private_net_error",
         "private_net_after_acquire",
         "SpawnPlan.PrivateSpawnPlan",
@@ -3713,6 +3735,8 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         private_fs_open_id: fs_ids.private_fs_open_id,
         private_fs_open_directory_id: fs_ids.private_fs_open_directory_id,
         private_fs_read_directory_batch_id: fs_ids.private_fs_read_directory_batch_id,
+        private_fs_set_length_id: fs_ids.private_fs_set_length_id,
+        private_fs_sync_id: fs_ids.private_fs_sync_id,
         private_fs_handle_metadata_id: fs_ids.private_fs_handle_metadata_id,
         private_buffer_allocate_id: fs_ids.private_buffer_allocate_id,
         private_fs_read_at_id: fs_ids.private_fs_read_at_id,
@@ -3899,6 +3923,36 @@ fn register_post_bracket_io(elab: &mut ElabEnv) -> Result<(), ElabError> {
              (Result ResourceError DirectoryProgress) r)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude readDirectoryBatch failed: {e}")))?;
+
+    elab.elaborate_decl(
+        "proc setLength (a : Auth) (file : Resource ResourceKind.FsHandle) (length : Int) \
+           : HostIO a (Result ResourceError Unit) visits [FS] = \
+         match intToUInt64 length { \
+           None |-> Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError Unit) (Err ResourceError Unit InvalidOffset); \
+           Some bounded_length |-> Vis (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError Unit) \
+             (InL (FSOp a) AmbientOp (PrivateFsSetLength a file length)) \
+             (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result ResourceError Unit) r) \
+         }",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude setLength failed: {e}")))?;
+    elab.elaborate_decl(
+        "proc sync (a : Auth) (file : Resource ResourceKind.FsHandle) \
+           : HostIO a (Result ResourceError Unit) visits [FS] = \
+         Vis (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+           (Result ResourceError Unit) \
+           (InL (FSOp a) AmbientOp (PrivateFsSync a file)) \
+           (\\r. Ret (Coproduct (FSOp a) AmbientOp) \
+             (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+             (Result ResourceError Unit) r)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude sync failed: {e}")))?;
 
     // Positioned buffer I/O. Public zero-length reads are discharged without a
     // host visit; positive transfers and freezes use the constructor-private

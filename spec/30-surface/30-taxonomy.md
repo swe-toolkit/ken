@@ -614,6 +614,8 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `console_resp` | B | Checked Console response operation, no H row. |
 | `intToChar` | H | `Core.Classes.LawfulClasses` beside `charToInt`. |
 | `writeAt` | H | `Capability.System.IO` beside `readAt`. |
+| `setLength` | H | `Capability.System.IO` beside `writeAt` (§38 §1.7.1). |
+| `sync` | H | `Capability.System.IO` beside `writeAt` (§38 §1.7.1). |
 | `flush` | H | `Capability.Console.Text` beside `write`. |
 | `FileMetadata` | B | Scoped `FileMetadata.MkFileMetadata`, no H row. |
 | `Write` | R: replace the hand-built Console `Vis` by `let _ = write s b in k` | Import `Capability.Console.Text (write)`; same oracle output for the affected program; non-Console shapes Q. |

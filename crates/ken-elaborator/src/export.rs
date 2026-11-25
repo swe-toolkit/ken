@@ -618,7 +618,6 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::FsHandleMetadata
         | ken_host::HostOpV1::FsReadAt
         | ken_host::HostOpV1::FsWriteAt
-        | ken_host::HostOpV1::FsSeek
         | ken_host::HostOpV1::FsSetLength
         | ken_host::HostOpV1::FsSync
         | ken_host::HostOpV1::FsGetInheritance
@@ -724,7 +723,6 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::FsHandleMetadata => "FsHandleMetadata",
         ken_host::HostOpV1::FsReadAt => "FsReadAt",
         ken_host::HostOpV1::FsWriteAt => "FsWriteAt",
-        ken_host::HostOpV1::FsSeek => "FsSeek",
         ken_host::HostOpV1::FsSetLength => "FsSetLength",
         ken_host::HostOpV1::FsSync => "FsSync",
         ken_host::HostOpV1::FsGetInheritance => "FsGetInheritance",

@@ -1,0 +1,152 @@
+program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt, setLength, spanBytes, sync, writeAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketOk, ResourceBracketResult, withBuffer, withResource)
+
+fn body_result (ok : Bool) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit)
+    (match ok { True |-> ResourceBodyOk Unit Unit MkUnit; False |-> ResourceBodyErr Unit Unit MkUnit })
+
+fn unit_ok (outcome : Result ResourceError Unit) : Bool =
+  match outcome { Ok value |-> True; Err error |-> False }
+
+fn buffer_ok (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : Bool =
+  match outcome { Ok (ResourceBracketOk value) |-> True; Ok other |-> False; Err error |-> False }
+
+fn file_ok (outcome : Result FileError (ResourceBracketResult Unit Unit)) : Bool =
+  match outcome { Ok (ResourceBracketOk value) |-> True; Ok other |-> False; Err error |-> False }
+
+proc freeze_read (buffer : BufferHandle) (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Ok (ReadProgress.ReadSome span count) |->
+      host_bind AFull (Result ResourceError Bytes) (ResourceBodyResult Unit Unit)
+        (spanBytes AFull buffer span)
+        (\frozen. match frozen { Ok bytes |-> body_result True; Err error |-> body_result False });
+    Ok ReadProgress.ReadEof |-> body_result False;
+    Err error |-> body_result False
+  }
+
+proc read_buffer (file : Resource ResourceKind.FsHandle) (width : Int) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file 0 buffer (MkBufferWindow 0 width)) (freeze_read buffer)
+
+proc read_file (width : Int) (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit width (read_buffer file width))
+    (\outcome. body_result (buffer_ok outcome))
+
+proc read_subject (cap : Cap AFull) (width : Int)
+  : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit)) visits [FS] =
+  withResource AFull Unit Unit cap (bytes_encode "subject") ResourceOpenMode.ResourceRead (read_file width)
+
+proc resize_file (length : Int) (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (setLength AFull file length) (\outcome. body_result (unit_ok outcome))
+
+proc change_extent (cap : Cap AFull) (length : Int)
+  : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit)) visits [FS] =
+  withResource AFull Unit Unit cap (bytes_encode "subject")
+    (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep) (resize_file length)
+
+fn final_exit (outcome : Result FileError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
+  host_pure AFull ExitCode (match file_ok outcome { True |-> ExitCode.Success; False |-> ExitCode.Failure 73 })
+
+proc read_extended (cap : Cap AFull) (extension : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match file_ok extension {
+    False |-> host_pure AFull ExitCode (ExitCode.Failure 74);
+    True |-> host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      (read_subject cap 12) final_exit
+  }
+
+proc extend_after_prefix (cap : Cap AFull) (prefix : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match file_ok prefix {
+    False |-> host_pure AFull ExitCode (ExitCode.Failure 75);
+    True |-> host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      (change_extent cap 12) (read_extended cap)
+  }
+
+proc read_prefix (cap : Cap AFull) (shrunk : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match file_ok shrunk {
+    False |-> host_pure AFull ExitCode (ExitCode.Failure 76);
+    True |-> host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      (read_subject cap 10) (extend_after_prefix cap)
+  }
+
+proc resize_sequence (cap : Cap AFull) : HostIO AFull ExitCode visits [FS] =
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (change_extent cap 4) (read_prefix cap)
+
+proc sync_written (file : Resource ResourceKind.FsHandle) (outcome : Result ResourceError WriteProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Ok progress |-> host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (sync AFull file) (\synced. body_result (unit_ok synced));
+    Err error |-> body_result False
+  }
+
+proc write_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle) (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Ok (ReadProgress.ReadSome span count) |->
+      host_bind AFull (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
+        (writeAt AFull file 0 buffer span) (sync_written file);
+    Ok ReadProgress.ReadEof |-> body_result False;
+    Err error |-> body_result False
+  }
+
+proc sync_buffer (file : Resource ResourceKind.FsHandle) (source : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull source 0 buffer (MkBufferWindow 0 1)) (write_read file buffer)
+
+proc sync_source (file : Resource ResourceKind.FsHandle) (source : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit 1 (sync_buffer file source))
+    (\outcome. body_result (buffer_ok outcome))
+
+proc sync_after_write (cap : Cap AFull) (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withResource AFull Unit Unit cap (bytes_encode "source") ResourceOpenMode.ResourceRead (sync_source file))
+    (\outcome. body_result (file_ok outcome))
+
+fn expect_denied (outcome : Result ResourceError Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Err (ResourceError.RightNotHeld required held) |-> body_result True;
+    Err other |-> body_result False;
+    Ok value |-> body_result False
+  }
+
+proc denied_length (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (setLength AFull file 4) expect_denied
+
+proc denied_sync (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (sync AFull file) expect_denied
+
+proc invalid_length (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (setLength AFull file (sub_int 0 1))
+    (\outcome. match outcome {
+      Err ResourceError.InvalidOffset |-> body_result True;
+      Err other |-> body_result False;
+      Ok value |-> body_result False
+    })
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull) : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |-> DESCRIPTOR_ENTRY
+  }
