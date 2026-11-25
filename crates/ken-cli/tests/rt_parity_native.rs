@@ -6030,6 +6030,7 @@ fn assert_continuation_inheritance_mutation_child() {
         "reclassify-ret" => Mutation::ReclassifyRetChildAsIh,
         "descriptor-only" => Mutation::SubstituteDescriptorOnlyAuthority,
         "earlier-result" | "earlier-result-p2" => Mutation::SubstituteEarlierResult,
+        "later-capture-parameters-p2" => Mutation::SubstituteLaterCaptureParameterCount,
         "read-write-swap" => Mutation::SwapReadWriteEndpoints,
         other => panic!("unknown continuation-inheritance mutation: {other}"),
     };
@@ -6039,9 +6040,9 @@ fn assert_continuation_inheritance_mutation_child() {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 differential("fs-write-at-offset-single", "rt_write_writable_stage")
             }))
-        } else if mode == "earlier-result-p2" {
+        } else if matches!(mode.as_str(), "earlier-result-p2" | "later-capture-parameters-p2") {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                fresh_population_differential("fresh-population-p2-m2", FRESH_POPULATION_P2)
+                fresh_population_differential("fresh-population-p2-mutation", FRESH_POPULATION_P2)
             }))
         } else {
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -6992,5 +6993,13 @@ generated_entry_checked_case!(
     in_large_stack_thread,
     assert_continuation_inheritance_mutation_child,
     "earlier-result-p2",
-    "earlier transport source result was substituted"
+    "an earlier transport source result was substituted into the fresh-result destination"
+);
+generated_entry_checked_case!(
+    continuation_inheritance_later_capture_parameter_count_p2,
+    CONTINUATION_INHERITANCE_MUTATION_CHILD,
+    in_large_stack_thread,
+    assert_continuation_inheritance_mutation_child,
+    "later-capture-parameters-p2",
+    "the fresh-result destination does not reference its exact existing boundary-closure environment record"
 );

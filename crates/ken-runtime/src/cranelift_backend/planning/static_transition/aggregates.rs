@@ -2917,6 +2917,9 @@ pub enum CheckedIhContinuationInheritanceMutation {
     ReclassifyRetChildAsIh,
     SubstituteDescriptorOnlyAuthority,
     SubstituteEarlierResult,
+    /// Perturb a non-first capture member's environment-only field, which
+    /// disjointness does not read.
+    SubstituteLaterCaptureParameterCount,
     SwapReadWriteEndpoints,
     /// Test-only inertness baseline: omit this otherwise validated planner-only
     /// projection so emitted artifacts can be compared byte-for-byte.
@@ -3258,6 +3261,17 @@ pub(super) fn apply_checked_ih_continuation_inheritance_mutation(
                 let source_result_origin = inheritance.transport.source_result_origin;
                 if let Some(capture) = inheritance.fresh_result_destination.captures.last_mut() {
                     capture.capture_occurrence = source_result_origin;
+                }
+            }
+        }
+        Mutation::SubstituteLaterCaptureParameterCount => {
+            let index = inheritances
+                .iter()
+                .rposition(|inheritance| inheritance.fresh_result_destination.captures.len() > 1)
+                .or_else(|| inheritances.len().checked_sub(1));
+            if let Some(inheritance) = index.map(|index| &mut inheritances[index]) {
+                if let Some(capture) = inheritance.fresh_result_destination.captures.last_mut() {
+                    capture.closure_parameter_count = capture.closure_parameter_count.wrapping_add(1);
                 }
             }
         }
