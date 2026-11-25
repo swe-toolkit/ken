@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH
 title: "Spec 66 says how substitution acts on an expression without a variable (§20) and when two substitutions agree (§22), but says nothing about which variables a substituted expression contains: a client cannot show that a variable absent from every replacement it uses is absent from the result, so it cannot apply deriv_absent or eval_absent after a substitution. Rule from a checked D0 at zero trust that, if v occurs in no s w for any w occurring in e, then v does not occur in substitute s e, and state it with a seed that separates the fresh variable from one a replacement introduces"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

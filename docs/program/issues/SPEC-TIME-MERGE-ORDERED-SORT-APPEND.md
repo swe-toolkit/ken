@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-ORDERED-SORT-APPEND
 title: "Spec 69 proves that merging singleton traces is insertion sort (§21), but says nothing like it for two ordered traces: a client holding a merge of time-ordered xs and ys cannot transport Derived's perm and stable_class proofs to it without re-deriving the merge step. Rule from a checked D0 at zero trust that, for time-ordered xs and ys, trace_merge xs ys is structurally the Derived sort of xs ++ ys under event_before, and state it with a seed that separates the sorted merge from the plain append"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

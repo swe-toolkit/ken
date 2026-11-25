@@ -1,7 +1,7 @@
 ---
 id: RT-CHECKED-IH-FRESH-RESULT-CAPTURE-POPULATION
 title: "Checked-IH continuation inheritance holds a fresh result's ordinary Ret/capture destination as one capturing closure, and refuses with N0003 'more than one ordinary fresh-result capture destination' when two sibling closures capture and read the same Ret constructor child. PX11's exchange main has two such transports into one frame. Record every capturing closure as a population over the one binder, validate each member, and refuse only distinct cases, distinct children or distinct predecessor frames"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1

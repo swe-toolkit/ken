@@ -1,7 +1,7 @@
 ---
 id: RT-STATIC-POSITIONAL-CAPTURE-RUN
 title: "Static aggregate planning describes a captured environment's positional children by slicing one fixed 64-entry static run, and refuses any record with more captures. PX11's exchange has 80 such records with a maximum of 79, and eight above 64, so the build refuses with N0002 in static planning. Grow one process-wide positional run by doubling, issue each arity its exact prefix, and refuse only an arity the u32 ordinal cannot name"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T1
