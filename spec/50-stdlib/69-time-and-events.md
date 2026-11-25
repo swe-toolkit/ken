@@ -20,7 +20,8 @@
 > SPEC-TIME-MERGE-ALL-APPEND §18;
 > SPEC-TIME-MERGE-LENGTH §19;
 > SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE §20;
-> SPEC-TIME-MERGE-SINGLETONS-SORT §21).** The §1–2 EventTrace
+> SPEC-TIME-MERGE-SINGLETONS-SORT §21;
+> SPEC-TIME-MERGE-ORDERED-SORT-APPEND §22).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -1804,3 +1805,51 @@ stated list equality.
 
 Section 21 adds one public function and two public theorems. It changes
 no §§1–20 operation or law type and needs no `Axiom` or change to Derived.
+
+## 22. Merging ordered traces is sorting their append
+
+> **Section 22 status: DRAFT v0 (SPEC-TIME-MERGE-ORDERED-SORT-APPEND).**
+
+`Data.Time.EventTrace` must export this public Transparent theorem immediately
+following `trace_merge_all_singletons_sort`:
+
+```ken
+pub theorem trace_merge_ordered_sort
+      (p : Type) (xs : List (Event p)) (ys : List (Event p))
+    : time_ordered p xs
+      → time_ordered p ys
+      → Equal
+        (List (Event p))
+        (trace_merge p xs ys)
+        (sort (Event p) (event_before p) (list_append (Event p) xs ys))
+```
+
+Both inputs must be ordered, but their times may overlap. If one input is
+empty and the other contains events at times 5 and 1 in that order, merge
+returns the nonempty input unchanged while sort puts time 1 first. This
+counterexample works with the unordered input on either side. Neither
+premise implies that the append is ordered.
+
+The conclusion is structural list equality, not just a permutation. At
+an equal timestamp, left-trace events precede right-trace events, and
+within each trace their original order is preserved. The equation lets
+clients transport Derived's sort properties to the merge result.
+
+For the empty left input, a private proof shows that sorting an already
+ordered right input leaves it unchanged. For a nonempty left input, its
+ordered head merges unchanged with its own tail. Merge associativity
+moves the singleton head outside the merge of that tail with the right
+input. The §21 singleton-insertion law turns the outer merge into an
+insertion, and induction identifies the inner merge with the sorted
+append of the remaining inputs.
+
+The [ordered merge seed](../../conformance/stdlib/time-and-events/seed-trace-merge-ordered-sort.md)
+applies the law to time sequences `[1, 3]` and `[2]`, then checks the
+sort's value `[1, 2, 3]` by `Refl`. On a fresh copy of the same accepted
+prefix, the same proof with `[1, 3, 2]` must refuse at the closing `Refl`.
+These closed cases distinguish the sort from plain append; they do not
+establish the generic law.
+
+Section 22 adds one theorem (thirty-three in total) and leaves the nine
+public functions and all §§1–21 operation and law types unchanged. It
+requires no `Axiom`, new import, or change to Derived.
