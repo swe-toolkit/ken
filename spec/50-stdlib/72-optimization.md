@@ -17,7 +17,8 @@
 > SPEC-OPTIMIZATION-LEAST-K-COST-ORDER-INVARIANCE §4.4;
 > SPEC-OPTIMIZATION-LEAST-K-PREFIX §4.5;
 > SPEC-OPTIMIZATION-LEAST-K-SATURATED §4.6;
-> SPEC-OPTIMIZATION-LEAST-K-APPEND-MERGE §4.7).** Section 1 specifies
+> SPEC-OPTIMIZATION-LEAST-K-APPEND-MERGE §4.7;
+> SPEC-OPTIMIZATION-LEAST-K-MAP §4.8).** Section 1 specifies
 > the non-empty least-cost selector and seven initial laws; its catalog
 > module and seed are present on main. Section 1.4's Option selector,
 > four laws and seed are also present on main. Section 1.5's checked
@@ -1951,3 +1952,92 @@ the cross-part tie is resolved by original occurrence order. These
 closed values distinguish the promised selection and tie boundaries;
 they do not replace the generic checked proof or the separately
 owned CV seed and package trust gate.
+
+### 4.8 Stable selection of mapped candidates
+
+> **Section 4.8 status: DRAFT v0 (SPEC-OPTIMIZATION-LEAST-K-MAP).**
+> Architect AC-0 `evt_r9yxp2tff2kp` on `8fa7d8a12` checked all four
+> laws and their open clients in scratch. The exact trusted `GlobalId`
+> sets were equal at both the Derived and Argmin boundaries
+> (114 → 114 → 114), without added `Axiom`, postulate or foreign
+> declaration. This does not establish assembled AC-T, official
+> conformance, CI or landing.
+
+`Algorithm.Optimization.Argmin` must export this public Transparent
+checked theorem directly after `least_k_append_merge` and before
+`argmax`. `map` is imported from `Data.Collections.Derived` after
+`sort`, and `comp` is the existing import from
+`Core.Function.Combinators`.
+
+```ken
+pub theorem least_k_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (k : Nat) (xs : List a)
+    : Equal
+        (List b)
+        (least_k b cost k (map a b f xs))
+        (map a b f (least_k a (comp a b Nat cost f) k xs))
+```
+
+Selecting after mapping is the same as selecting with the composed cost
+`cost ∘ f` and then mapping the result. The equality is structural:
+order and multiplicity are preserved, not just costs or membership.
+There is no extra premise: `f` need not be injective, even when several
+inputs map to the same value. Equal-cost occurrences retain their input
+order on both sides because both routes make the same comparisons.
+
+`Data.Collections.Derived` must publish three public Transparent
+checked attached laws. Place `insert::map` and `sort::map`, in that
+order, directly after `sort::take_append` and before `derived_meet`.
+Their premise `same_le` says that `f` carries `le1` to `le2`: every
+source comparison equals the target comparison after mapping both
+arguments. Neither law requires a total or transitive comparator.
+
+```ken
+pub proof map for insert
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (le2 : b → b → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 (f x) (f y)))
+      (x : a)
+      (xs : List a)
+    : Equal (List b) (map a b f (insert a le1 x xs)) (insert b le2 (f x) (map a b f xs))
+
+pub proof map for sort
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (le1 : a → a → Bool)
+      (le2 : b → b → Bool)
+      (same_le : (x : a) → (y : a) → Equal Bool (le1 x y) (le2 (f x) (f y)))
+      (xs : List a)
+    : Equal (List b) (map a b f (sort a le1 xs)) (sort b le2 (map a b f xs))
+```
+
+Place `take::map` directly after `take::saturated` and before
+`derived_take_sorted_tail`. Taking a prefix commutes with mapping
+without a comparator or any premise.
+
+```ken
+pub proof map for take
+      (a : Type) (b : Type) (f : a → b) (n : Nat) (xs : List a)
+    : Equal (List b) (map a b f (take a n xs)) (take b n (map a b f xs))
+```
+
+The insertion proof uses `same_le` to take the same branch on both
+lists, then applies induction in the recursive branch. Sorting uses
+that insertion law and induction on the input; the prefix law
+reuses the same bound on both lists. Derived's insertion helpers stay
+private. For `least_k_map`, the two `cost_le` comparators both reduce
+to `leq_nat (cost (f x)) (cost (f y))`, so `same_le` holds by reflexivity.
+The theorem combines `take::map` with `sort::map` through the definition
+of `least_k`. No new selection operation, `argmin_option` companion or
+change to any §§1–4.7 operation or law type is specified.
+
+The closed discriminator takes `xs = [0,1,2]`, `k = 1`, identity cost,
+and `f` mapping those inputs to `[2,1,0]`. Selecting on the mapped list
+and selecting under the composed cost then mapping both give `[0]`.
+Changing only the right-hand selection to use the uncomposed identity
+cost gives `[2]`. Architect's D0 refused that claim at the law
+application; the finite example does not replace the generic proof.
