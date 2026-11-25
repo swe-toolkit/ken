@@ -907,7 +907,12 @@ mod tests {
                     argument_binders: 1,
                     recursive_positions: vec![0],
                     body: RuntimeExpr::Let {
-                        value: Box::new(RuntimeExpr::Value(RuntimeValue::Int(0.into()))),
+                        // Put an IH-resolved Var in the plan outside the result
+                        // path, without changing the scalar bound for the call.
+                        value: Box::new(RuntimeExpr::Let {
+                            value: Box::new(RuntimeExpr::Var(0)),
+                            body: Box::new(RuntimeExpr::Value(RuntimeValue::Int(0.into()))),
+                        }),
                         body: Box::new(RuntimeExpr::CheckedComputationalIHInvocation {
                             call_template_id: 0,
                             checked_occurrence_path: vec![],
@@ -964,12 +969,19 @@ mod tests {
         });
     }
 
-    // Durable invariant: the wrapper does not make an ordinary binder an IH.
+    // Durable invariant: only provenance at the callee's origin can select an
+    // IH endpoint, even when another occurrence in the plan resolves to an IH.
     #[test]
     fn returned_vis_refuses_an_edgeless_non_ih_under_the_invocation_wrapper() {
         with_returned_vis_ih_fixture(0, |plan| {
             let root = plan.root_static_origin().expect("match origin");
             let recursive_case = plan.child_static_origin(root, 2).expect("recursive case");
+            let scalar_value = plan
+                .child_static_origin(recursive_case, 0)
+                .expect("scalar-producing let");
+            let unrelated_ih = plan
+                .child_static_origin(scalar_value, 0)
+                .expect("unrelated IH read");
             let invocation = plan
                 .child_static_origin(recursive_case, 1)
                 .expect("invocation");
@@ -983,6 +995,12 @@ mod tests {
             assert!(matches!(
                 binders[&callee].provenance,
                 CheckedBinderProvenance::Ordinary
+            ));
+            assert_ne!(callee, unrelated_ih);
+            assert!(matches!(
+                binders[&unrelated_ih].provenance,
+                CheckedBinderProvenance::InductionHypothesis(binding)
+                    if binding.frame_origin() == root && binding.recursive_position() == 0
             ));
             let error = plan
                 .returned_vis_in_context(root, &units, &edges, &binders)
