@@ -663,11 +663,22 @@ pub(in crate::cranelift_backend) struct CheckedIhCapabilityInheritance {
 ///
 /// This is intentionally a sibling of [`CheckedIhCapabilityInheritance`], not
 /// its tail. It names no transport source result and states no value equality.
+/// The Ret binder is one; its consumers are a population. Every boundary
+/// closure in the Ret case body that captures and reads the ordinary
+/// constructor child is a member, and none is selected over another.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct CheckedIhFreshResultDestination {
     active_frame_origin: StaticOriginId,
     ret_case_body_origin: StaticOriginId,
     constructor_child: CheckedBinderProvenance,
+    /// Non-empty, strictly ordered by (closure_origin, capture_ordinal).
+    captures: Vec<CheckedIhFreshResultCapture>,
+}
+
+/// One boundary closure that captures and reads the fresh result's ordinary
+/// constructor child.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhFreshResultCapture {
     closure_environment_record: AggregateOccurrenceId,
     closure_origin: StaticOriginId,
     closure_body_origin: StaticOriginId,
@@ -1431,12 +1442,6 @@ impl CheckedIhCapabilityInheritance {
     }
 }
 
-impl CheckedIhFreshResultDestination {
-    pub(in crate::cranelift_backend) fn closure_environment_record(&self) -> AggregateOccurrenceId {
-        self.closure_environment_record
-    }
-}
-
 impl CheckedIhEnvironmentTransport {
     pub(in crate::cranelift_backend) fn source_owner(&self) -> ContinuationEmissionOwner {
         self.source_owner
@@ -1620,6 +1625,9 @@ pub struct CheckedIhContinuationInheritanceObservation {
     pub closure_body_origin: u32,
     pub body_capture_reads: Vec<u32>,
     pub closure_parameter_count: usize,
+    pub fresh_result_capture_count: usize,
+    pub fresh_result_captures: Vec<(u32, u32)>,
+    pub fresh_result_constructor_child: String,
     pub fresh_destination_mentions_source_result: bool,
     pub ordinary_non_governed_exclusion_count: usize,
     pub descriptor_only_exclusion_count: usize,
@@ -2813,15 +2821,23 @@ pub(super) fn record_checked_ih_continuation_inheritances(
                     locator.environment_index
                 })
                 .collect();
+            let first_capture = destination
+                .captures
+                .first()
+                .expect("validated fresh-result destination has at least one capture");
             let mut destination_origins = vec![
                 destination.active_frame_origin.0,
                 destination.ret_case_body_origin.0,
-                destination.closure_origin.0,
-                destination.closure_body_origin.0,
-                destination.capture_occurrence.0,
             ];
-            destination_origins
-                .extend(destination.body_capture_reads.iter().map(|origin| origin.0));
+            for capture in &destination.captures {
+                destination_origins.extend([
+                    capture.closure_origin.0,
+                    capture.closure_body_origin.0,
+                    capture.capture_occurrence.0,
+                ]);
+                destination_origins
+                    .extend(capture.body_capture_reads.iter().map(|origin| origin.0));
+            }
             observations.push(CheckedIhContinuationInheritanceObservation {
                 source_specialization: inheritance.transport.source_specialization.0,
                 source_call_identity: format!("{:?}", inheritance.transport.source_call_identity),
@@ -2853,16 +2869,23 @@ pub(super) fn record_checked_ih_continuation_inheritances(
                     .map(|provenance| format!("{provenance:?}")),
                 immediate_k_lineage_environment_indices,
                 ret_case_body_origin: destination.ret_case_body_origin.0,
-                closure_origin: destination.closure_origin.0,
-                capture_ordinal: destination.capture_ordinal,
-                capture_occurrence: destination.capture_occurrence.0,
-                closure_body_origin: destination.closure_body_origin.0,
-                body_capture_reads: destination
+                closure_origin: first_capture.closure_origin.0,
+                capture_ordinal: first_capture.capture_ordinal,
+                capture_occurrence: first_capture.capture_occurrence.0,
+                closure_body_origin: first_capture.closure_body_origin.0,
+                body_capture_reads: first_capture
                     .body_capture_reads
                     .iter()
                     .map(|origin| origin.0)
                     .collect(),
-                closure_parameter_count: destination.closure_parameter_count as usize,
+                closure_parameter_count: first_capture.closure_parameter_count as usize,
+                fresh_result_capture_count: destination.captures.len(),
+                fresh_result_captures: destination
+                    .captures
+                    .iter()
+                    .map(|capture| (capture.closure_origin.0, capture.capture_ordinal))
+                    .collect(),
+                fresh_result_constructor_child: format!("{:?}", destination.constructor_child),
                 fresh_destination_mentions_source_result: destination_origins
                     .contains(&source_result_origin),
                 ordinary_non_governed_exclusion_count,
@@ -3227,9 +3250,15 @@ pub(super) fn apply_checked_ih_continuation_inheritance_mutation(
             }
         }
         Mutation::SubstituteEarlierResult => {
-            if let Some(inheritance) = inheritances.last_mut() {
-                inheritance.fresh_result_destination.capture_occurrence =
-                    inheritance.transport.source_result_origin;
+            let index = inheritances
+                .iter()
+                .rposition(|inheritance| inheritance.fresh_result_destination.captures.len() > 1)
+                .or_else(|| inheritances.len().checked_sub(1));
+            if let Some(inheritance) = index.map(|index| &mut inheritances[index]) {
+                let source_result_origin = inheritance.transport.source_result_origin;
+                if let Some(capture) = inheritance.fresh_result_destination.captures.last_mut() {
+                    capture.capture_occurrence = source_result_origin;
+                }
             }
         }
         Mutation::SwapReadWriteEndpoints => {
@@ -6936,7 +6965,7 @@ fn fresh_result_destination(
             "a continuation-inheritance active frame is not computational",
         ));
     };
-    let mut destinations = Vec::new();
+    let mut found = Vec::new();
     for (alternative, case) in cases.iter().enumerate() {
         // A recursive case binds induction hypotheses, not the ordinary fresh
         // result accepted by Ret. We do not identify Ret by spelling or tag;
@@ -7019,36 +7048,54 @@ fn fresh_result_destination(
                             }
                             continue;
                         }
-                        destinations.push(CheckedIhFreshResultDestination {
-                            active_frame_origin: active_frame,
-                            ret_case_body_origin: case_body,
-                            constructor_child: provenance,
-                            closure_environment_record: environment.record(),
-                            closure_origin: environment.seat(),
-                            closure_body_origin: environment.body_origin(),
-                            closure_parameter_count: u32::try_from(environment.params().len())
-                                .map_err(|_| {
-                                    planner_capacity_error(
-                                        "fresh-result closure parameter count exhausted",
-                                    )
-                                })?,
-                            capture_ordinal,
-                            capture_occurrence,
-                            body_capture_reads,
-                        });
+                        found.push((
+                            case_body,
+                            provenance,
+                            CheckedIhFreshResultCapture {
+                                closure_environment_record: environment.record(),
+                                closure_origin: environment.seat(),
+                                closure_body_origin: environment.body_origin(),
+                                closure_parameter_count: u32::try_from(environment.params().len())
+                                    .map_err(|_| {
+                                        planner_capacity_error(
+                                            "fresh-result closure parameter count exhausted",
+                                        )
+                                    })?,
+                                capture_ordinal,
+                                capture_occurrence,
+                                body_capture_reads,
+                            },
+                        ));
                     }
                 }
             }
             pending.extend(plan.semantic.child_origins(origin)?.iter().rev().copied());
         }
     }
-    match destinations.as_slice() {
-        [] => Ok(None),
-        [destination] => Ok(Some(destination.clone())),
-        _ => Err(planner_error(
-            "one inherited continuation invocation has more than one ordinary fresh-result capture destination",
-        )),
+    let Some(&(ret_case_body_origin, constructor_child, _)) = found.first() else {
+        return Ok(None);
+    };
+    let mut captures = Vec::with_capacity(found.len());
+    for (case_body, provenance, capture) in found {
+        if case_body != ret_case_body_origin {
+            return Err(planner_error(
+                "one inherited continuation invocation has ordinary fresh-result captures in more than one non-recursive case",
+            ));
+        }
+        if provenance != constructor_child {
+            return Err(planner_error(
+                "one inherited continuation invocation's fresh-result captures read more than one ordinary constructor child",
+            ));
+        }
+        captures.push(capture);
     }
+    captures.sort_by_key(|capture| (capture.closure_origin, capture.capture_ordinal));
+    Ok(Some(CheckedIhFreshResultDestination {
+        active_frame_origin: active_frame,
+        ret_case_body_origin,
+        constructor_child,
+        captures,
+    }))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -7181,11 +7228,15 @@ fn validate_fresh_result_disjointness(
     let mut destination_origins = vec![
         destination.active_frame_origin,
         destination.ret_case_body_origin,
-        destination.closure_origin,
-        destination.closure_body_origin,
-        destination.capture_occurrence,
     ];
-    destination_origins.extend(destination.body_capture_reads.iter().copied());
+    for capture in &destination.captures {
+        destination_origins.extend([
+            capture.closure_origin,
+            capture.closure_body_origin,
+            capture.capture_occurrence,
+        ]);
+        destination_origins.extend(capture.body_capture_reads.iter().copied());
+    }
     if destination_origins.contains(&earlier_result) {
         return Err(planner_error(
             "an earlier transport source result was substituted into the fresh-result destination",
@@ -7560,25 +7611,34 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
                 ));
             }
         }
-        let destination_environment = plan.boundary_closure_environment_by_record(
-            inheritance
-                .fresh_result_destination
-                .closure_environment_record(),
-        )?;
-        let destination_capture = destination_environment
-            .capture_origins()
-            .get(inheritance.fresh_result_destination.capture_ordinal as usize)
-            .copied();
-        if destination_environment.seat() != inheritance.fresh_result_destination.closure_origin
-            || destination_environment.body_origin()
-                != inheritance.fresh_result_destination.closure_body_origin
-            || u32::try_from(destination_environment.params().len()).ok()
-                != Some(inheritance.fresh_result_destination.closure_parameter_count)
-            || destination_capture != Some(inheritance.fresh_result_destination.capture_occurrence)
+        let captures = &inheritance.fresh_result_destination.captures;
+        if captures.is_empty()
+            || !captures.windows(2).all(|pair| {
+                (pair[0].closure_origin, pair[0].capture_ordinal)
+                    < (pair[1].closure_origin, pair[1].capture_ordinal)
+            })
         {
             return Err(planner_error(
-                "the fresh-result destination does not reference its exact existing boundary-closure environment record",
+                "a fresh-result destination's capture population is empty or not canonically ordered",
             ));
+        }
+        for capture in captures {
+            let destination_environment =
+                plan.boundary_closure_environment_by_record(capture.closure_environment_record)?;
+            let destination_capture = destination_environment
+                .capture_origins()
+                .get(capture.capture_ordinal as usize)
+                .copied();
+            if destination_environment.seat() != capture.closure_origin
+                || destination_environment.body_origin() != capture.closure_body_origin
+                || u32::try_from(destination_environment.params().len()).ok()
+                    != Some(capture.closure_parameter_count)
+                || destination_capture != Some(capture.capture_occurrence)
+            {
+                return Err(planner_error(
+                    "the fresh-result destination does not reference its exact existing boundary-closure environment record",
+                ));
+            }
         }
         match inheritance.fresh_result_destination.constructor_child {
             CheckedBinderProvenance::ConstructorChild { frame_origin, .. }
@@ -8142,7 +8202,11 @@ fn checked_ih_fresh_result_route(
                             CheckedIhFreshResultRetInputDelivery::ProducerResultDirect,
                         // Cross-variant control: carry the Direct destination's
                         // ordinal so the synthesized Tail route is well-formed.
-                        fresh_result_capture_ordinal: destination.capture_ordinal,
+                        fresh_result_capture_ordinal: destination
+                            .captures
+                            .first()
+                            .expect("validated fresh-result destination has at least one capture")
+                            .capture_ordinal,
                     };
                 }
             }
@@ -8594,49 +8658,76 @@ fn mutate_checked_ih_generated_entry_projection(
             }
         }
         Mutation::FreshClosureRecord => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.closure_environment_record =
-                AggregateOccurrenceId(destination.closure_environment_record.0.wrapping_add(1))
+            capture.closure_environment_record =
+                AggregateOccurrenceId(capture.closure_environment_record.0.wrapping_add(1))
         }
         Mutation::FreshClosureOrigin => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.closure_origin = shifted(destination.closure_origin)
+            capture.closure_origin = shifted(capture.closure_origin)
         }
         Mutation::FreshClosureBody => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.closure_body_origin = shifted(destination.closure_body_origin)
+            capture.closure_body_origin = shifted(capture.closure_body_origin)
         }
         Mutation::FreshClosureParameterCount => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.closure_parameter_count =
-                destination.closure_parameter_count.wrapping_add(1)
+            capture.closure_parameter_count = capture.closure_parameter_count.wrapping_add(1)
         }
         Mutation::FreshCaptureOrdinal => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.capture_ordinal = destination.capture_ordinal.wrapping_add(1)
+            capture.capture_ordinal = capture.capture_ordinal.wrapping_add(1)
         }
         Mutation::FreshCaptureOccurrence => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            destination.capture_occurrence = shifted(destination.capture_occurrence)
+            capture.capture_occurrence = shifted(capture.capture_occurrence)
         }
         Mutation::FreshBodyReadMembership => {
-            let Some(destination) = projection.route.destination_mut() else {
+            let Some(capture) = projection
+                .route
+                .destination_mut()
+                .and_then(|destination| destination.captures.last_mut())
+            else {
                 return;
             };
-            if destination.body_capture_reads.pop().is_none() {
-                destination.body_capture_reads.push(StaticOriginId(0));
+            if capture.body_capture_reads.pop().is_none() {
+                capture.body_capture_reads.push(StaticOriginId(0));
             }
         }
         Mutation::Exact
@@ -15080,42 +15171,47 @@ pub(in crate::cranelift_backend::planning::static_transition) fn checked_ih_post
     let binder_provenance = build_checked_binder_provenance(plan)?;
     let identity = &transport.source_call_identity;
     let worker = &identity.token.worker;
-    let mut matching = Vec::new();
+    let mut matching = BTreeSet::new();
     for inheritance in &plan.checked_ih_continuation_inheritances {
         let destination = &inheritance.fresh_result_destination;
-        if destination.ret_case_body_origin != identity.token.producer_construct_origin
-            || destination.closure_origin != worker.closure_origin
-            || destination.closure_body_origin != worker.body_origin
-            || destination.closure_parameter_count != worker.declared_arity
-        {
+        if destination.ret_case_body_origin != identity.token.producer_construct_origin {
             continue;
         }
-        let Some(capture) = worker.captures.get(destination.capture_ordinal as usize) else {
-            continue;
-        };
-        if capture.owner != identity.token.producer_owner
-            || capture.closure_origin != destination.closure_origin
-            || capture.source
-                != ContinuationWorkerCaptureSource::Lexical(destination.capture_occurrence)
-            || !destination.body_capture_reads.iter().all(|origin| {
-                binder_provenance.get(origin).is_some_and(|resolution| {
-                    resolution.provenance
-                        == CheckedBinderProvenance::LexicalClosureCapture {
-                            closure_origin: destination.closure_origin,
-                            capture_ordinal: destination.capture_ordinal,
-                            source_origin: destination.capture_occurrence,
-                        }
+        for member in &destination.captures {
+            if member.closure_origin != worker.closure_origin
+                || member.closure_body_origin != worker.body_origin
+                || member.closure_parameter_count != worker.declared_arity
+            {
+                continue;
+            }
+            let Some(capture) = worker.captures.get(member.capture_ordinal as usize) else {
+                continue;
+            };
+            if capture.owner != identity.token.producer_owner
+                || capture.closure_origin != member.closure_origin
+                || capture.source
+                    != ContinuationWorkerCaptureSource::Lexical(member.capture_occurrence)
+                || !member.body_capture_reads.iter().all(|origin| {
+                    binder_provenance.get(origin).is_some_and(|resolution| {
+                        resolution.provenance
+                            == CheckedBinderProvenance::LexicalClosureCapture {
+                                closure_origin: member.closure_origin,
+                                capture_ordinal: member.capture_ordinal,
+                                source_origin: member.capture_occurrence,
+                            }
+                    })
                 })
-            })
-        {
-            continue;
+            {
+                continue;
+            }
+            matching.insert(destination.active_frame_origin);
         }
-        matching.push(vec![destination.active_frame_origin]);
     }
-    match matching.as_slice() {
-        [] => Ok(None),
-        [frames] => Ok(Some(frames.clone())),
-        _ => Err(planner_error(
+    let mut frames = matching.into_iter();
+    match (frames.next(), frames.next()) {
+        (None, _) => Ok(None),
+        (Some(frame), None) => Ok(Some(vec![frame])),
+        (Some(_), Some(_)) => Err(planner_error(
             "one checked-IH transport has more than one exact fresh-result predecessor",
         )),
     }
