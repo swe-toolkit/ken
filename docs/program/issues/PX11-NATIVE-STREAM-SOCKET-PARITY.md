@@ -6,7 +6,7 @@ owner: runtime
 size: L
 tier: T1
 gate: architect
-depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN, RT-RETURNED-VIS-IH-ENDPOINT, RT-CHECKED-IH-FRESH-RESULT-CAPTURE-POPULATION]
+depends_on: [PX11-STREAM-SOCKET-CONNECT-ACCEPT, RT-NET-UNIX-PATH-FS-ROOT-SCOPE, RT-NET-UNIX-STREAM-LOCAL-ADDRESS, RT-NATIVE-BYTES-TO-LIST, RT-NATIVE-CLOSURE-INDEX-COST, RT-NATIVE-RESULT-JOIN-PHASE, RT-NATIVE-INDEXED-FAMILY-LOWERING, ELAB-OMEGA-PLAN-ELIM-RULE-TYPES, RT-ORIENTED-PARENT-EDGE-COMPOSITION, RT-STATIC-POSITIONAL-CAPTURE-RUN, RT-RETURNED-VIS-IH-ENDPOINT, RT-CHECKED-IH-FRESH-RESULT-CAPTURE-POPULATION, RT-NATIVE-LOWERING-REPRESENTATION-AUTHORITY]
 blocks: [PX11]
 github: null
 origin: "Steward ruling arm I (evt_y7p1h3h3ybys) on PX11-STREAM-SOCKET-CONNECT-ACCEPT's AC-0 (Architect D0 evt_23ptn1v4a1jkm): native parity is that slice's immediate successor and closes the interpreter-admission set. docs/program/10-linux-abi-completion.md:84-87 (an operation counts only with native parity). Steward-filed per COORDINATION section 2."
@@ -183,6 +183,8 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 9. The returned-Vis settlement could not derive response owner 9's returned set: the Call at StaticOriginId(33) has no emitted call edge — keyed on the callee having a static call edge (provisional, pending P-RV). (evt_12a6ccjxmfnjw)
 9. The returned-Vis walker resolved callees only through emitted call edges, and a computational IH callee, which lowers in its owning unit, has none — keyed on callee class (an IH binder resolved by checked binder provenance). (asked evt_12a6ccjxmfnjw; confirmed evt_427vemb7ks8fd)
 10. checked-IH continuation inheritance: the fresh-result destination record held exactly one capturing closure, but the active frame's Ret constructor child is captured and read by two sibling closures in main — keyed on the cardinality of the record, over a checked relation that is one binder to many captures. (evt_66ga05tmvxvdw)
+11. native lowering: a primitive with a runtime bytes operand had no emitted route. bytes_concat folded only two compile-time literals, so a carried accumulator reached the specialized-only else. Keyed on primitive symbol. (evt_7ahjpbxbgvw09)
+12. native lowering: a composed computational match received a BorrowedOption scrutinee that its consumer does not enumerate (bytes_at on a carried Bytes, origin 3918, under an Ordinary head 3919 in decl main, one eliminator remaining). The ordinary and producer match consumers both accept BorrowedOption. The composed consumer's let-else at core.rs:5205 refuses it with N0001. Exposed by the entry-11 fix, which made the Bytes operand carried. Keyed on the scrutinee's Lowered variant. (evt_5116n6wy5wt40)
 
 §1b classifications:
 - At entry 3 (evt_42ncdsdxj34kk): entries 2, in its ResourceKind half, and 3 share a predicate. The native lane holds hand-enumerated copies of a closed population the host owns, each frozen at the wave that wrote it. The closure was ruled. Entry 1 is independent: it was a missing authority record, not a stale enumeration.
@@ -193,4 +195,5 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 - The next §1b check is at the 12th entry.
 - At entry 9: No for X. The refusal recurs in bind's own body without inlining. Entries 7 and 9 share a narrower property, a proxy relation used where a checked witness existed; it is recorded, with no class closure at two members. (evt_427vemb7ks8fd)
 - At entry 10 (evt_66ga05tmvxvdw): No for the 7/9 property; entry 10 uses the checked relation and holds it in a record of the wrong cardinality. Entries 8 and 10 share "a population carried in a fixed-cardinality representation"; recorded with two members and no closure. The next §1b check is at the 12th entry.
+- At entry 12 (evt_5116n6wy5wt40): Yes. Entries 5, 11 and 12 share predicate R, a native-lowering consumer that enumerates per site which Lowered representations it accepts. Closure: RT-NATIVE-LOWERING-REPRESENTATION-AUTHORITY. R is independent of 2-4, 7/9 and 8/10.
 ```
