@@ -20,7 +20,8 @@
 > SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE §18;
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT §19;
 > SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
-> SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21;
+> SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -1972,3 +1973,42 @@ a `theorem` (`33 §8.4`) or a Boolean disjunction claim.
 Section 21 adds one public function, raising the count from eight to
 nine while leaving the sixty public theorems unchanged. No operation or
 law type from §§1–20 changes.
+
+## 22. A split divides the width
+
+> **Section 22 status: DRAFT v0 (SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM).**
+
+`Algorithm.Numeric.RationalInterval` exports this public Transparent theorem
+immediately after `interval_split_covers` and before `interval_contains`:
+
+```ken
+pub theorem interval_split_width
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue (rational_leq lo m)
+      → IsTrue (rational_leq m hi)
+      → rational_equiv
+        (rational_add (interval_width (MkInterval lo m)) (interval_width (MkInterval m hi)))
+        (interval_width (MkInterval lo hi))
+```
+
+The two premises say that `m` lies between the endpoints, inclusively.
+Unlike §21's coverage law, this theorem does not apply to exterior splits.
+For example, splitting `[1, 5]` at `7` gives widths six and zero, which sum
+to six rather than four: the inverted half's width is truncated to zero.
+The conclusion compares rational values, not stored representations.
+
+The proof adds `lo` to each side. Reordering and regrouping the sum lets
+`proof add_cancel for rational_sub` first recover `m` from the lower
+half-width plus `lo`, then recover `hi` from the upper half-width plus `m`.
+The whole width plus `lo` also recovers `hi`, since `lo ≤ hi` follows by
+transitivity. `rational_add_cancel_r` removes the common addend. No new
+helper, import or trusted assumption is needed.
+
+For `[1, 5]` split at `2`, an application of the theorem followed by
+closed value equivalence proves that the sum is four. The same proof form
+with total three must refuse. This closed refusal controls the claimed
+value; an open client is needed to check the generic contract.
+
+Section 22 raises the public theorem count from sixty to sixty-one and
+leaves the public function count at nine. No operation or law type from
+§§1–21 changes.

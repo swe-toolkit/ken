@@ -29,10 +29,11 @@ without requiring either interval to contain a member.
 `Interval` holds two rational values and exports `MkInterval` so clients can
 construct boxes directly. The six arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
-source; their operations follow. The width operation and six checked laws,
+source; their operations follow. The width operation and seven checked laws,
 including `interval_width_mul`, `interval_width_inside`,
-`interval_width_bounds_sub` and `interval_width_zero_equiv`, use Rational's
-truncated subtraction, not a subtraction of intervals. The checked
+`interval_width_bounds_sub`, `interval_width_zero_equiv` and
+`interval_split_width`, use Rational's truncated subtraction, not a
+subtraction of intervals. The checked
 inverted-emptiness and two ordered-endpoint membership laws make the endpoint
 boundary explicit.
 Enclosure uses both membership premises and the checked Rational monotonicity
@@ -463,6 +464,83 @@ pub fn interval_split_covers
       Refl
       ((proof left for bool_and) (rational_leq lo x) (rational_leq x hi) member)
       ((proof right for bool_and) (rational_leq lo x) (rational_leq x hi) member)
+
+pub theorem interval_split_width
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue (rational_leq lo m)
+      → IsTrue (rational_leq m hi)
+      → rational_equiv
+        (rational_add (interval_width (MkInterval lo m)) (interval_width (MkInterval m hi)))
+        (interval_width (MkInterval lo hi)) =
+  λlower.
+    λupper.
+      let
+        lower_width = rational_sub m lo;
+        upper_width = rational_sub hi m;
+        whole_width = rational_sub hi lo;
+        halves = rational_add lower_width upper_width;
+        whole_cancel : rational_equiv (rational_add whole_width lo) hi =
+          (proof add_cancel for rational_sub)
+            hi
+            lo
+            ((proof trans for rational_leq) lo m hi lower upper);
+        lower_cancel : rational_equiv (rational_add lower_width lo) m =
+          (proof add_cancel for rational_sub) m lo lower;
+        upper_cancel : rational_equiv (rational_add upper_width m) hi =
+          (proof add_cancel for rational_sub) hi m upper;
+        swapped : rational_equiv
+          (rational_add halves lo)
+          (rational_add (rational_add upper_width lower_width) lo) =
+          (proof respect for rational_add)
+            halves
+            (rational_add upper_width lower_width)
+            lo
+            lo
+            ((proof comm for rational_add) lower_width upper_width)
+            ((proof refl for rational_equiv) lo);
+        regrouped : rational_equiv
+          (rational_add (rational_add upper_width lower_width) lo)
+          (rational_add upper_width (rational_add lower_width lo)) =
+          (proof sym for rational_equiv)
+            (rational_add upper_width (rational_add lower_width lo))
+            (rational_add (rational_add upper_width lower_width) lo)
+            ((proof assoc for rational_add) upper_width lower_width lo);
+        lower_closed : rational_equiv
+          (rational_add upper_width (rational_add lower_width lo))
+          (rational_add upper_width m) =
+          (proof respect for rational_add)
+            upper_width
+            upper_width
+            (rational_add lower_width lo)
+            m
+            ((proof refl for rational_equiv) upper_width)
+            lower_cancel;
+        halves_cancel : rational_equiv (rational_add halves lo) hi =
+          (proof trans for rational_equiv)
+            (rational_add halves lo)
+            (rational_add (rational_add upper_width lower_width) lo)
+            hi
+            swapped
+            ((proof trans for rational_equiv)
+              (rational_add (rational_add upper_width lower_width) lo)
+              (rational_add upper_width (rational_add lower_width lo))
+              hi
+              regrouped
+              ((proof trans for rational_equiv)
+                (rational_add upper_width (rational_add lower_width lo))
+                (rational_add upper_width m)
+                hi
+                lower_closed
+                upper_cancel));
+        same_after_add : rational_equiv (rational_add halves lo) (rational_add whole_width lo) =
+          (proof trans for rational_equiv)
+            (rational_add halves lo)
+            hi
+            (rational_add whole_width lo)
+            halves_cancel
+            ((proof sym for rational_equiv) (rational_add whole_width lo) hi whole_cancel)
+      in
+        rational_add_cancel_r halves whole_width lo same_after_add
 
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
@@ -2003,6 +2081,20 @@ Boolean result. If it is true, the original lower bound and `x ≤ m` give
 lower-half membership. If it is false, Rational order totality gives `m ≤ x`,
 which combines with the original upper bound to give upper-half membership.
 
+### Adding the widths of a split (§22)
+
+If `lo ≤ m ≤ hi`, the two half-widths add to the original width by rational
+value. A split at either endpoint is allowed: that half has width zero.
+Unlike the membership law, this law requires the split point to be between
+`lo` and `hi`. For example, splitting `[1, 5]` at `7` gives widths six and
+zero rather than a sum of four, because subtraction truncates at zero.
+
+The proof adds `lo` to both the sum and the original width. On the sum
+side, it rearranges the terms to add `lo` to the lower half-width, recovering
+`m`. Adding `m` to the upper half-width recovers `hi`. The original width
+plus `lo` also recovers `hi`, since `lo ≤ hi` follows by transitivity.
+Rational right-add cancellation removes the common `lo`.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -2044,19 +2136,19 @@ interval subtraction are not.
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
    `interval_hull`, `interval_intersect`, `interval_inside` and
-   `interval_split_covers` form the public contract with sixty checked public
-   theorems, including `interval_width_mul`, `interval_width_inside`,
-   `interval_width_bounds_sub` and `interval_width_zero_equiv`.
-   Section 21 adds one checked public function, for nine public functions in
-   total. No operation or law type from §§1–20 changes.
+   `interval_split_covers` form the public contract with sixty-one checked
+   public theorems, including `interval_width_mul`, `interval_width_inside`,
+   `interval_width_bounds_sub`, `interval_width_zero_equiv` and
+   `interval_split_width`. Section 22 adds one theorem and leaves the nine
+   public functions and all operation and law types from §§1–21 unchanged.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
    including endpoint inclusion, its witnessed converse, the four
    distributivity/factoring inclusions, hull/intersection regrouping, the
    four point-unit inclusions, two point-zero absorption inclusions,
-   and the point, ordered-addition, inside-monotonicity and zero-width
-   member-equivalence proofs.
+   and the point, ordered-addition, inside-monotonicity, zero-width
+   member-equivalence and split-width proofs.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -2092,7 +2184,10 @@ interval subtraction are not.
    equivalence. These helpers are not part of the public API.
    [Splitting an enclosure](#splitting-an-enclosure-21) reuses Rational order
    totality and Boolean conjunction proofs through the private split helper.
-4. **Trusted-base delta.** Zero: all sixty theorems and the split cover
+   [Adding the widths of a split](#adding-the-widths-of-a-split-22) uses public
+   Rational order transitivity and addition/subtraction cancellation, with no
+   new helper or import.
+4. **Trusted-base delta.** Zero: all sixty-one theorems and the split cover
    function have checked bodies, and the package declares no `Axiom` or new
    primitive. Imported rational, natural-number and logical providers retain
    their inherited trust.
