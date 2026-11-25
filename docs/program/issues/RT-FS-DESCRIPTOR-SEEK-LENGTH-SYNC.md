@@ -80,10 +80,22 @@ handle-open modes, or to the FS root confinement.
 - Sync durability cannot be observed differently from a no-op on the
   CI filesystem. Report that; do not assert it from the call returning.
 
-Checks: 4 fired. I read the three host functions and dispatch arms, and
-the absence of a prelude constructor or interpreter decoder, on
-`ccfc01de1`, and re-checked them on ABI-S2 `98242db31` at release. 3
-fired. AC-0 sweeps the operation identity, because the planner, wire
-format, export table and row-injection test all name it. 8 fired. The
-truncate-then-read row fails on a host that ignores the length. The seek
-row fails on a host that does not move the position.
+## Inventory
+
+1. A statically folded guard that selects Ret left the Vis case's
+   planned join undisposed. The native join closeout's
+   recursive-predecessor union counted a continuation call whose
+   producer is in excluded code: it is keyed on planner call membership
+   without call liveness (Architect `evt_6k4h2m6hc5249`).
+2. The detached-result seat treated the same dead call as owed by the
+   unit result, and refused because the result is not its producer
+   constructor. It is keyed on planner result-edge membership minus
+   emitted, discharged and claimed, with no statically-unselected form.
+
+§1b at entry 2 (Architect `evt_45863hkv60etq`): shared predicate, the
+call population lacks a statically-unselected disposition. Steward scope
+`evt_6gyt3n9jqxe08`: this WP proceeds with the checked guard, the -1
+parity row and an interpreter-only overflow row. The overflow literal's
+native build is a named build-time PlannerInvariant refusal, owned by
+`RT-STATIC-UNSELECTED-CALL-DISPOSITION`, which carries the native row
+and the join fix `8cee29d96`.
