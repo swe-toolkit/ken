@@ -407,8 +407,9 @@ fn assert_region_exit_owners(
 /// match 12; the ReturnedVisSettlement producer is the same region-0
 /// body-entry Construct, not the fold. PX11's checked Net prelude shifts
 /// the smoke exit and returned owner origins by 66. Retiring the checked
-/// `create_directory` operand then shifts both origins back by one; fold 12
-/// is unchanged.
+/// `create_directory` operand then shifts both origins back by one.
+/// The ABI-S2 FS dispatch adds eight nodes before the settlement and
+/// returned owner; fold 12 is unchanged.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -435,7 +436,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 698, 12), (ReturnedVisSettlement, 698, 733)],
+            &[(ReturnFold, 706, 12), (ReturnedVisSettlement, 706, 741)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -453,6 +454,11 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
 /// by 66 while its fold-12 owner stays fixed. Retiring the checked
 /// `create_directory` operand moves these argv origins back by two (one
 /// for its first fold owner) and the shifted live origins back by one.
+/// ABI-S2 replaces the whole-directory dispatch arm (9 nodes including
+/// CaseTest) with directory acquisition (9) and batch read (8). Each
+/// preceding copy of that dispatch adds 8 graph nodes: two for argv's
+/// exits and all but its first fold owner, one for that owner and for
+/// live's exits and non-fold-12 owners. The checked fixture paths are unchanged.
 #[test]
 fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
@@ -461,10 +467,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1310, 646),
-                (ReturnFold, 1555, 1315),
-                (ReturnedVisSettlement, 1310, 1933),
-                (ReturnedVisSettlement, 1555, 1650),
+                (ReturnFold, 1326, 654),
+                (ReturnFold, 1571, 1331),
+                (ReturnedVisSettlement, 1326, 1949),
+                (ReturnedVisSettlement, 1571, 1666),
             ][..],
             None,
         ),
@@ -472,10 +478,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 676, 12),
-                (ReturnFold, 921, 681),
-                (ReturnedVisSettlement, 676, 1375),
-                (ReturnedVisSettlement, 921, 1094),
+                (ReturnFold, 684, 12),
+                (ReturnFold, 929, 689),
+                (ReturnedVisSettlement, 684, 1383),
+                (ReturnedVisSettlement, 929, 1102),
             ][..],
             None,
         ),
