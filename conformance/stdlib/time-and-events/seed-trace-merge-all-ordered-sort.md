@@ -3,8 +3,10 @@
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/69-time-and-events.md` §23.
 
-The three cases use the closed law at its public boundary. Each case runs on an
-independent fresh copy of the accepted prefix below. They distinguish sorting
+The first two cases apply the closed law at its public boundary. The third is
+a premise counterexample: it compares concrete read-offs and does not apply the
+law. Each case runs on an independent fresh copy of the accepted prefix below.
+They distinguish sorting
 the concatenation from preserving plain concatenation; they do not establish
 the generic theorem. Equal-time tie behavior remains the concern of §22 and
 its package test.
