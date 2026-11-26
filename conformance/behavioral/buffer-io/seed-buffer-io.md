@@ -595,6 +595,80 @@ Runtime identities such as `file_r` and `buffer_r` do not.
   sentinel that happens to fail later is not equivalent to rejecting the
   malformed integer at the consuming operation's narrowing boundary.
 
+### buffer-io/file-offset-above-host-width-refuses-before-dispatch
+
+- status: **RED-UNTIL-RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION**; post-promotion
+  contract case, not run against pre-promotion main.
+- promise class: durable invariant.
+- spec: `38 §1.7.1`; RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION AC-0/Ruling 4.
+- engine matrix: run each R1/W1 arm independently on interpreter and native;
+  each must meet the specified result and event observations directly.
+- given: use a fresh file containing `A` under valid FS authority. Acquire a
+  capacity-`8` `BufferHandle` through `withBuffer 8`. R1 uses a file handle
+  acquired through `withResource` in `ResourceOpenMode.ResourceRead` and a
+  `BufferWindow(start = 0, length = 1)`. W1 uses a file handle acquired
+  through `withResource` in
+  `ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep` and a
+  one-byte `BufferSpan` minted by a successful `readAt` at file offset `0`
+  with `BufferWindow(start = 0, length = 1)` on a read handle with the same
+  buffer acquisition. Record the target-operation baseline after resource and buffer
+  setup; for W1, after the span-minting read.
+  Use otherwise-identical fixtures with only `fileOffset` changed to `0` as
+  controls.
+- measured: each public result, the target `FsReadAt`/`FsWriteAt` event delta,
+  backend calls, and file bytes.
+- expect: R1 and W1 return `Err InvalidOffset`, with no target host event and
+  no backend call after the baseline. Each offset-`0` control emits one
+  corresponding event and reaches the backend; R1 returns `ReadSome` for the
+  one-byte file and W1 returns `Wrote 1`.
+- claimed: a file position above the host-width maximum is refused before
+  dispatch even when the buffer window or span is valid.
+- the gap: the result alone could also follow a host-side refusal; the event
+  and backend observations locate the early admission.
+- controls: each valid offset-`0` operation uses the same valid resources,
+  window or span, and recording host; only `fileOffset` changes.
+- why: the paired arms distinguish host-width admission from malformed buffer
+  input, missing rights, or a late backend error.
+
+### buffer-io/file-offset-plus-effective-above-host-width-refuses-in-dispatch
+
+- status: **RED-UNTIL-RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION**; post-promotion
+  contract case, not run against pre-promotion main.
+- promise class: durable invariant.
+- spec: `38 §1.7.1`; RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION AC-0/Ruling 4.
+- engine matrix: run each R2/W2 arm independently on interpreter and native;
+  each must meet the specified result and event observations directly.
+- given: use a fresh file containing `A` under valid FS authority. Acquire a
+  capacity-`8` `BufferHandle` through `withBuffer 8`. R2 uses a file handle
+  acquired through `withResource` in `ResourceOpenMode.ResourceRead` and a
+  valid `BufferWindow(start = 0, length = 1)`, so the effective length is
+  `1`. W2 uses a file handle acquired through `withResource` in
+  `ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep` and a
+  one-byte span minted by a successful `readAt` at file offset `0` with
+  `BufferWindow(start = 0, length = 1)` on a read handle with the same buffer
+  acquisition. Both use
+  `fileOffset = 9223372036854775807`
+  (`2^63 - 1`). Record the target-operation baseline after resource and buffer
+  setup; for W2, after the span-minting read. The controls use offset `0` with
+  the same operation and buffer input.
+- measured: each public result, the target event and outcome, backend read/write
+  calls, and file bytes.
+- expect: R2 and W2 return `Err InvalidOffset` and each emits exactly one
+  corresponding `FsReadAt`/`FsWriteAt` event with outcome
+  `Error(Resource(InvalidOffset))`; the backend is not called and the file
+  remains unchanged. Each offset-`0` control reaches the backend; R2 returns
+  `ReadSome` with transfer count `1`, and W2 returns `Wrote 1`.
+- claimed: a representable `fileOffset` is admitted, but a
+  `fileOffset + effective` above the host-width maximum is rejected after
+  dispatch and before host I/O.
+- the gap: an event alone does not establish backend access; the separate
+  backend-call observation places the end-bound check before I/O.
+- controls: offset-`0` requests use the same fixtures and effective length;
+  the positive event controls the recorder and operation route.
+- why: `2^63 - 1` is representable, but adding the one-byte effective range
+  reaches `2^63`. The event distinguishes this end-bound arm from R1/W1's
+  per-seat refusal.
+
 ## PR-B. Positioned bounds and tail capping
 
 ### buffer-io/positioned-transfer-bounds
