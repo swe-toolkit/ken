@@ -209,18 +209,6 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
             "FileOperation.OpChangeMode",
             roles.file_operation_change_mode,
         ),
-        ("FileOperation.OpSeek", roles.file_operation_seek),
-        ("FileOperation.OpSetLength", roles.file_operation_set_length),
-        ("FileOperation.OpSync", roles.file_operation_sync),
-        (
-            "FileOperation.OpGetInheritance",
-            roles.file_operation_get_inheritance,
-        ),
-        (
-            "FileOperation.OpSetInheritance",
-            roles.file_operation_set_inheritance,
-        ),
-        ("FileOperation.OpDuplicate", roles.file_operation_duplicate),
     ] {
         assert_eq!(
             baseline.globals[path], native_id,
@@ -251,12 +239,6 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
                 "OpRemoveDirectory",
                 "OpRename",
                 "OpChangeMode",
-                "OpSeek",
-                "OpSetLength",
-                "OpSync",
-                "OpGetInheritance",
-                "OpSetInheritance",
-                "OpDuplicate",
             ],
         ),
     ] {
@@ -352,6 +334,63 @@ fn admitted_scoped_families_expose_only_qualified_checked_constructors() {
             Ok(_) => panic!("{leaf} leaked as a bare constructor"),
         }
     }
+}
+
+/// The handle-operation cases FileOperation no longer has (38 §1.12): handle
+/// operations report through ResourceError.
+const RETIRED_FILE_OPERATIONS: [&str; 6] = [
+    "OpSeek",
+    "OpSetLength",
+    "OpSync",
+    "OpGetInheritance",
+    "OpSetInheritance",
+    "OpDuplicate",
+];
+
+/// Promise class: durable invariant. MEASURED: for each retired case, a strict
+/// client constructing `FileOperation.<case>` refuses as an unbound name, and
+/// the same client with only the case replaced by `OpChangeMode` accepts.
+/// CLAIMED: no source can construct a retired case. THE GAP: construction is
+/// measured; matching on a retired case is covered by the ten-arm row below.
+#[test]
+fn retired_file_operation_cases_are_unbound_at_strict_entry() {
+    for case in RETIRED_FILE_OPERATIONS {
+        let path = format!("FileOperation.{case}");
+        let refused = format!("const operation : FileOperation = {path}\n");
+        match strict(&refused) {
+            Err(ElabError::UnboundName { name, .. }) => assert_eq!(name, path),
+            Err(err) => panic!("{path}: wrong refusal: {err:?}"),
+            Ok(_) => panic!("{path} is still constructible"),
+        }
+        let accepted = refused.replace(&path, "FileOperation.OpChangeMode");
+        assert_ne!(accepted, refused);
+        strict(&accepted).unwrap_or_else(|err| panic!("{case} control: {err:?}"));
+    }
+}
+
+/// Promise class: durable invariant. MEASURED: a top-level match naming the ten
+/// path cases, with no wildcard, accepts at strict entry. CLAIMED:
+/// FileOperation is exactly the ten path operations, since a further case
+/// fails exhaustiveness and a missing one is unbound. THE GAP: the order of
+/// the cases is pinned by the scoped-family snapshot above, not here.
+#[test]
+fn ten_path_operation_cases_match_exhaustively_at_strict_entry() {
+    let arms = [
+        "OpReadFile",
+        "OpWriteFile",
+        "OpAppendFile",
+        "OpMetadata",
+        "OpReadDirectory",
+        "OpCreateDirectory",
+        "OpRemoveFile",
+        "OpRemoveDirectory",
+        "OpRename",
+        "OpChangeMode",
+    ]
+    .map(|case| format!("FileOperation.{case} |-> True"))
+    .join(" ; ");
+    let source = format!("fn path_operation (o : FileOperation) : Bool = match o {{ {arms} }}\n");
+    strict(&source).unwrap_or_else(|err| panic!("ten-arm match: {err:?}"));
 }
 
 /// Promise class: durable invariant. MEASURED: the imported `Not` is a

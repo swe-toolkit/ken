@@ -86,12 +86,6 @@ pub struct NativeProcessSymbols {
     pub dir_entry: RuntimeSymbol,
     pub directory_entries: RuntimeSymbol,
     pub directory_end: RuntimeSymbol,
-    pub file_operation_seek: RuntimeSymbol,
-    pub file_operation_set_length: RuntimeSymbol,
-    pub file_operation_sync: RuntimeSymbol,
-    pub file_operation_get_inheritance: RuntimeSymbol,
-    pub file_operation_set_inheritance: RuntimeSymbol,
-    pub file_operation_duplicate: RuntimeSymbol,
     pub resource_mapping_limit: RuntimeSymbol,
     pub resource_kind_mapping: RuntimeSymbol,
     pub px10_kind_symbols: [RuntimeSymbol; 4],
@@ -195,14 +189,6 @@ impl NativeProcessSymbols {
             dir_entry: "ctor:prelude::DirEntry::MkDirEntry".to_string(),
             directory_entries: "ctor:prelude::DirectoryProgress::DirectoryEntries".to_string(),
             directory_end: "ctor:prelude::DirectoryProgress::DirectoryEnd".to_string(),
-            file_operation_seek: "ctor:prelude::FileOperation::OpSeek".to_string(),
-            file_operation_set_length: "ctor:prelude::FileOperation::OpSetLength".to_string(),
-            file_operation_sync: "ctor:prelude::FileOperation::OpSync".to_string(),
-            file_operation_get_inheritance: "ctor:prelude::FileOperation::OpGetInheritance"
-                .to_string(),
-            file_operation_set_inheritance: "ctor:prelude::FileOperation::OpSetInheritance"
-                .to_string(),
-            file_operation_duplicate: "ctor:prelude::FileOperation::OpDuplicate".to_string(),
             resource_mapping_limit: "ctor:prelude::ResourceError::MappingLimit".to_string(),
             resource_kind_mapping: "ctor:prelude::ResourceKind::Mapping".to_string(),
             px10_kind_symbols: ["SpawnPlan", "ChildProcess", "PipeRead", "PipeWrite"]

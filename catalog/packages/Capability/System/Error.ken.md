@@ -202,13 +202,7 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
         FileOperation.OpRemoveFile ↦ NonIdempotent;
         FileOperation.OpRemoveDirectory ↦ NonIdempotent;
         FileOperation.OpRename ↦ NonIdempotent;
-        FileOperation.OpChangeMode ↦ Idempotent;
-        FileOperation.OpSeek ↦ NonIdempotent;
-        FileOperation.OpSetLength ↦ Idempotent;
-        FileOperation.OpSync ↦ Idempotent;
-        FileOperation.OpGetInheritance ↦ Idempotent;
-        FileOperation.OpSetInheritance ↦ Idempotent;
-        FileOperation.OpDuplicate ↦ NonIdempotent
+        FileOperation.OpChangeMode ↦ Idempotent
       };
     ProcessOp process_operation ↦
       match process_operation {

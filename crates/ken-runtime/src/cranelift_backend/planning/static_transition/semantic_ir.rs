@@ -140,13 +140,6 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     DirectoryEnd,
     ListNil,
     ListCons,
-    /// ABI-S1 descriptor-operation error identities append without moving prior roles.
-    FileOperationSeek,
-    FileOperationSetLength,
-    FileOperationSync,
-    FileOperationGetInheritance,
-    FileOperationSetInheritance,
-    FileOperationDuplicate,
     /// ABI-S6 D4 appends the Mapping governor refusal role.
     ResourceMappingLimit,
     /// ABI-S6 D5a appends the third resource-kind reification role.
@@ -164,7 +157,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 63] = [
+    pub(super) const ALL: [Self; 57] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -211,12 +204,6 @@ impl SynthesizedFixedConstructorRole {
         Self::DirectoryEnd,
         Self::ListNil,
         Self::ListCons,
-        Self::FileOperationSeek,
-        Self::FileOperationSetLength,
-        Self::FileOperationSync,
-        Self::FileOperationGetInheritance,
-        Self::FileOperationSetInheritance,
-        Self::FileOperationDuplicate,
         Self::ResourceMappingLimit,
         Self::ResourceKindMapping,
         Self::ExitSuccess,
@@ -281,12 +268,6 @@ impl SynthesizedFixedConstructorRole {
             Self::DirectoryEnd => &symbols.directory_end,
             Self::ListNil => &symbols.list_nil,
             Self::ListCons => &symbols.list_cons,
-            Self::FileOperationSeek => &symbols.file_operation_seek,
-            Self::FileOperationSetLength => &symbols.file_operation_set_length,
-            Self::FileOperationSync => &symbols.file_operation_sync,
-            Self::FileOperationGetInheritance => &symbols.file_operation_get_inheritance,
-            Self::FileOperationSetInheritance => &symbols.file_operation_set_inheritance,
-            Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
             Self::ResourceMappingLimit => &symbols.resource_mapping_limit,
             Self::ResourceKindMapping => &symbols.resource_kind_mapping,
             Self::ResourceKindSpawnPlan => &symbols.px10_kind_symbols[0],

@@ -1485,23 +1485,22 @@ The existing exact checked FS result carriers `FileKind` (`KFile`,
 metadata and directory replies select their checked constructors;
 source uses only `FileKind.KFile` and its three sibling qualified
 cases, `FileMetadata.MkFileMetadata` and `DirEntry.MkDirEntry`.
-`FileOperation` has sixteen exact checked operation cases and is already
-named by source in `Capability.System.Error` (§33 §3.3). It moves from that package home
-to the scoped floor, with its complete cases available as
-`FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
+`FileOperation` has ten exact checked path-operation cases and is named
+by source in `Capability.System.Error` (§33 §3.3). It moved from that
+package home to the scoped floor in Increment 3a. Its complete cases
+are available as `FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
 `FileOperation.OpAppendFile`, `FileOperation.OpMetadata`,
 `FileOperation.OpReadDirectory`, `FileOperation.OpCreateDirectory`,
 `FileOperation.OpRemoveFile`, `FileOperation.OpRemoveDirectory`,
-`FileOperation.OpRename`, `FileOperation.OpChangeMode`,
-`FileOperation.OpSeek`, `FileOperation.OpSetLength`,
-`FileOperation.OpSync`, `FileOperation.OpGetInheritance`,
-`FileOperation.OpSetInheritance` and `FileOperation.OpDuplicate`.
-The six handle-operation cases (OpSeek through OpDuplicate) are not selected
-by any current producer; handle operations report through ResourceError.
+`FileOperation.OpRename`, and `FileOperation.OpChangeMode`.
+`FileOperation` names only path operations; handle operations report through
+`ResourceError` and have no `FileOperation` case.
 Only these five I/O family names enter the counted floor from this
 paragraph; none of their constructor leaves joins bare protected B.
 `StateOp.Get` and `StateOp.Put` are likewise scoped (§36 §4.2).
-Native stable-symbol leaves and runtime IDs do not change.
+Native stable-symbol leaves and runtime IDs do not change for the cases
+that remain, including all ten `FileOperation` cases. The six retired
+leaves have no stable symbol or runtime ID.
 
 For ABI-S4, `FileMetadata` grows in place, retaining its scoped-floor
 family and the qualified `FileMetadata.MkFileMetadata` constructor.

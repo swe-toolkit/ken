@@ -225,12 +225,6 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
             "FileOperation.OpRemoveDirectory",
             "FileOperation.OpRename",
             "FileOperation.OpChangeMode",
-            "FileOperation.OpSeek",
-            "FileOperation.OpSetLength",
-            "FileOperation.OpSync",
-            "FileOperation.OpGetInheritance",
-            "FileOperation.OpSetInheritance",
-            "FileOperation.OpDuplicate",
         ]
     );
     assert_eq!(
@@ -405,12 +399,6 @@ theorem px9_remove_file : Equal Idempotence (operation_idempotence (FilesystemOp
 theorem px9_remove_directory : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpRemoveDirectory)) NonIdempotent = Proved
 theorem px9_rename : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpRename)) NonIdempotent = Proved
 theorem px9_change_mode : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpChangeMode)) Idempotent = Proved
-theorem px9_seek : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSeek)) NonIdempotent = Proved
-theorem px9_set_length : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetLength)) Idempotent = Proved
-theorem px9_sync : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSync)) Idempotent = Proved
-theorem px9_get_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpGetInheritance)) Idempotent = Proved
-theorem px9_set_inheritance : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpSetInheritance)) Idempotent = Proved
-theorem px9_duplicate : Equal Idempotence (operation_idempotence (FilesystemOp FileOperation.OpDuplicate)) NonIdempotent = Proved
 theorem px9_signal_child : Equal Idempotence (operation_idempotence (ProcessOp SignalChild)) NonIdempotent = Proved
 theorem px11_connect_socket : Equal Idempotence (operation_idempotence (SocketOp ConnectSocket)) NonIdempotent = Proved
 theorem px11_local_socket_address : Equal Idempotence (operation_idempotence (SocketOp LocalSocketAddress)) Idempotent = Proved

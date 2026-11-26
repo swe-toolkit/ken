@@ -170,8 +170,9 @@ The loader proceeds as follows:
    `ReadResult.Chunk`/`ReadResult.Eof`,
    `FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`,
    `FileKind.KFile`/`FileKind.KDirectory`/`FileKind.KSymlink`/
-   `FileKind.KOther` and the sixteen `FileOperation.Op*` paths. The
-   additional scoped State carrier resolves `StateOp.Get` and
+   `FileKind.KOther` and the ten exact checked path-operation cases of
+   `FileOperation` as `FileOperation.Op*` paths (§38 §1.12). The additional
+   scoped State carrier resolves `StateOp.Get` and
    `StateOp.Put` at its exact checked constructor IDs; the `State s`
    effect label does not name this carrier as a second type. None
    reserves a bare case name. `Char`, `HostIO`, transparent `Pair`,

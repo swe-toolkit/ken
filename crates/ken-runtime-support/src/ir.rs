@@ -275,13 +275,6 @@ runtime_host_spine_v1! {
     file_operation_remove_file,
     file_operation_remove_directory,
     dir_entry,
-    // ABI-S1 appends descriptor-operation identities.
-    file_operation_seek,
-    file_operation_set_length,
-    file_operation_sync,
-    file_operation_get_inheritance,
-    file_operation_set_inheritance,
-    file_operation_duplicate,
     // ABI-S6 D4 appends without moving established positional identities.
     resource_mapping_limit,
     // ABI-S6 D5a makes the third resource kind native-reifiable.

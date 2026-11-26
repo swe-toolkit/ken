@@ -1009,13 +1009,6 @@ pub(crate) struct CheckedHostSpineV1 {
     pub dir_entry: StableSymbol,
     pub directory_entries: StableSymbol,
     pub directory_end: StableSymbol,
-    /// ABI-S1 appends descriptor-operation identities without moving prior roles.
-    pub file_operation_seek: StableSymbol,
-    pub file_operation_set_length: StableSymbol,
-    pub file_operation_sync: StableSymbol,
-    pub file_operation_get_inheritance: StableSymbol,
-    pub file_operation_set_inheritance: StableSymbol,
-    pub file_operation_duplicate: StableSymbol,
     /// ABI-S6 D4 appends without moving established positional roles.
     pub resource_mapping_limit: StableSymbol,
     /// ABI-S6 D5a appends the now-native Mapping kind role.
@@ -9638,24 +9631,6 @@ mod px7l_tests {
             dir_entry: StableSymbol::constructor(&family("DirEntry"), "MkDirEntry"),
             directory_entries: StableSymbol::constructor(&family("DirectoryProgress"), "DirectoryEntries"),
             directory_end: StableSymbol::constructor(&family("DirectoryProgress"), "DirectoryEnd"),
-            file_operation_seek: StableSymbol::constructor(&family("FileOperation"), "OpSeek"),
-            file_operation_set_length: StableSymbol::constructor(
-                &family("FileOperation"),
-                "OpSetLength",
-            ),
-            file_operation_sync: StableSymbol::constructor(&family("FileOperation"), "OpSync"),
-            file_operation_get_inheritance: StableSymbol::constructor(
-                &family("FileOperation"),
-                "OpGetInheritance",
-            ),
-            file_operation_set_inheritance: StableSymbol::constructor(
-                &family("FileOperation"),
-                "OpSetInheritance",
-            ),
-            file_operation_duplicate: StableSymbol::constructor(
-                &family("FileOperation"),
-                "OpDuplicate",
-            ),
             resource_mapping_limit: StableSymbol::constructor(
                 &family("ResourceError"),
                 "MappingLimit",
@@ -10134,12 +10109,6 @@ mod d1b_role_b_decoder_alignment {
             dir_entry: sentinel("dir_entry"),
             directory_entries: sentinel("directory_entries"),
             directory_end: sentinel("directory_end"),
-            file_operation_seek: sentinel("file_operation_seek"),
-            file_operation_set_length: sentinel("file_operation_set_length"),
-            file_operation_sync: sentinel("file_operation_sync"),
-            file_operation_get_inheritance: sentinel("file_operation_get_inheritance"),
-            file_operation_set_inheritance: sentinel("file_operation_set_inheritance"),
-            file_operation_duplicate: sentinel("file_operation_duplicate"),
             resource_mapping_limit: sentinel("resource_mapping_limit"),
             resource_kind_mapping: sentinel("resource_kind_mapping"),
             px10_kind_symbols: [0, 1, 2, 3].map(|i| sentinel(&format!("px10_kind_{i}"))),
@@ -10282,24 +10251,6 @@ mod d1b_role_b_decoder_alignment {
                 "file_operation_remove_directory",
             ),
             (spine.dir_entry.as_str(), "dir_entry"),
-            (spine.file_operation_seek.as_str(), "file_operation_seek"),
-            (
-                spine.file_operation_set_length.as_str(),
-                "file_operation_set_length",
-            ),
-            (spine.file_operation_sync.as_str(), "file_operation_sync"),
-            (
-                spine.file_operation_get_inheritance.as_str(),
-                "file_operation_get_inheritance",
-            ),
-            (
-                spine.file_operation_set_inheritance.as_str(),
-                "file_operation_set_inheritance",
-            ),
-            (
-                spine.file_operation_duplicate.as_str(),
-                "file_operation_duplicate",
-            ),
             (
                 spine.resource_mapping_limit.as_str(),
                 "resource_mapping_limit",

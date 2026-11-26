@@ -3305,16 +3305,6 @@ fn emit_native_program_preparation(
                 dir_entry: host_spine.dir_entry.to_string(),
                 directory_entries: host_spine.directory_entries.to_string(),
                 directory_end: host_spine.directory_end.to_string(),
-                file_operation_seek: host_spine.file_operation_seek.to_string(),
-                file_operation_set_length: host_spine.file_operation_set_length.to_string(),
-                file_operation_sync: host_spine.file_operation_sync.to_string(),
-                file_operation_get_inheritance: host_spine
-                    .file_operation_get_inheritance
-                    .to_string(),
-                file_operation_set_inheritance: host_spine
-                    .file_operation_set_inheritance
-                    .to_string(),
-                file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
                 resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
                 px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
@@ -4464,12 +4454,6 @@ fn checked_host_spine_v1(
         dir_entry: resolve_id(roles.dir_entry)?,
         directory_entries: resolve_id(roles.directory_entries)?,
         directory_end: resolve_id(roles.directory_end)?,
-        file_operation_seek: resolve_id(roles.file_operation_seek)?,
-        file_operation_set_length: resolve_id(roles.file_operation_set_length)?,
-        file_operation_sync: resolve_id(roles.file_operation_sync)?,
-        file_operation_get_inheritance: resolve_id(roles.file_operation_get_inheritance)?,
-        file_operation_set_inheritance: resolve_id(roles.file_operation_set_inheritance)?,
-        file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
         resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
         px10_kind_symbols: [
@@ -4732,13 +4716,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_remove_file,
         &spine.file_operation_remove_directory,
         &spine.dir_entry,
-        // ABI-S1 appends without changing established positional identities.
-        &spine.file_operation_seek,
-        &spine.file_operation_set_length,
-        &spine.file_operation_sync,
-        &spine.file_operation_get_inheritance,
-        &spine.file_operation_set_inheritance,
-        &spine.file_operation_duplicate,
         // ABI-S6 D4 appends without moving established positional identities.
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
@@ -9442,30 +9419,6 @@ mod d1b_role_c1_roster_identity {
             ("dir_entry", record.spine.dir_entry.clone()),
             ("directory_entries", record.spine.directory_entries.clone()),
             ("directory_end", record.spine.directory_end.clone()),
-            (
-                "file_operation_seek",
-                record.spine.file_operation_seek.clone(),
-            ),
-            (
-                "file_operation_set_length",
-                record.spine.file_operation_set_length.clone(),
-            ),
-            (
-                "file_operation_sync",
-                record.spine.file_operation_sync.clone(),
-            ),
-            (
-                "file_operation_get_inheritance",
-                record.spine.file_operation_get_inheritance.clone(),
-            ),
-            (
-                "file_operation_set_inheritance",
-                record.spine.file_operation_set_inheritance.clone(),
-            ),
-            (
-                "file_operation_duplicate",
-                record.spine.file_operation_duplicate.clone(),
-            ),
             (
                 "resource_mapping_limit",
                 record.spine.resource_mapping_limit.clone(),
