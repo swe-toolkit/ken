@@ -148,6 +148,11 @@ fn socket(address: &SocketAddressV1) -> io::Result<OwnedFd> {
         SocketAddressV1::Inet6 { .. } => libc::AF_INET6,
         SocketAddressV1::Unix { .. } => libc::AF_UNIX,
     };
+    crate::facility_v1::require(match address {
+        SocketAddressV1::Inet4 { .. } => crate::facility_v1::HostFacilityV1::StreamSocketInet4,
+        SocketAddressV1::Inet6 { .. } => crate::facility_v1::HostFacilityV1::StreamSocketInet6,
+        SocketAddressV1::Unix { .. } => crate::facility_v1::HostFacilityV1::StreamSocketUnix,
+    })?;
     let fd = unsafe { libc::socket(family, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
     if fd < 0 {
         return Err(io::Error::last_os_error());
@@ -184,8 +189,10 @@ fn bind_and_listen(
 }
 
 fn unix_parent(root: &RootedHandle, path: &[u8]) -> NetResult<(RootedHandle, Vec<u8>)> {
-    let root_link = std::fs::read_link(format!("/proc/self/fd/{}", root.as_fd().as_raw_fd()))
-        .map_err(|_| IoErrorIdentityV1::CapabilityDenied)?;
+    let root_link = std::fs::read_link(
+        crate::facility_v1::proc_self_fd_path(root.as_fd()).map_err(io_identity)?,
+    )
+    .map_err(|_| IoErrorIdentityV1::CapabilityDenied)?;
     let spelling = root_link.as_os_str().as_bytes();
     if !spelling.starts_with(b"/") || spelling.ends_with(b" (deleted)") {
         return Err(IoErrorIdentityV1::CapabilityDenied);
@@ -253,7 +260,10 @@ fn listen_unix(root: &RootedHandle, path: &[u8]) -> NetResult<OwnedFd> {
         return Err(IoErrorIdentityV1::InvalidInput);
     }
     deny_symlink_leaf(&parent, &leaf)?;
-    let mut proc_path = format!("/proc/self/fd/{}/", parent.as_fd().as_raw_fd()).into_bytes();
+    let mut proc_path = crate::facility_v1::proc_self_fd_path(parent.as_fd())
+        .map_err(io_identity)?
+        .into_bytes();
+    proc_path.push(b'/');
     proc_path.extend_from_slice(&leaf);
     let resolved = SocketAddressV1::Unix { path: proc_path };
     let (raw, length) = resolved.as_sockaddr().map_err(io_identity)?;
@@ -284,7 +294,9 @@ fn connect_unix(root: &RootedHandle, path: &[u8]) -> NetResult<OwnedFd> {
         return Err(IoErrorIdentityV1::CapabilityDenied);
     }
     let resolved = SocketAddressV1::Unix {
-        path: format!("/proc/self/fd/{}", pinned_leaf.as_raw_fd()).into_bytes(),
+        path: crate::facility_v1::proc_self_fd_path(&pinned_leaf)
+            .map_err(io_identity)?
+            .into_bytes(),
     };
     let (raw, length) = resolved.as_sockaddr().map_err(io_identity)?;
     let fd = socket(&resolved).map_err(io_identity)?;
@@ -305,6 +317,7 @@ pub fn listen(root: &FsHandle, address: &SocketAddressV1) -> NetResult<OwnedFd> 
 }
 
 pub fn accept(listener: &OwnedFd) -> io::Result<OwnedFd> {
+    crate::facility_v1::require(crate::facility_v1::HostFacilityV1::Accept4)?;
     let fd = unsafe {
         libc::accept4(
             listener.as_raw_fd(),

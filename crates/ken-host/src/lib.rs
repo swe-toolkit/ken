@@ -32,6 +32,8 @@ mod account_db_v1;
 pub mod capability;
 mod effect_v1;
 mod effect_wire;
+#[cfg(target_os = "linux")]
+mod facility_v1;
 mod mapping_v1;
 #[cfg(target_os = "linux")]
 mod net_v1;
@@ -398,8 +400,19 @@ mod linux {
         })
     }
 
+    /// The one `statx` seat: the facility is required before the call.
+    fn statx_checked(
+        dir: impl rustix::fd::AsFd,
+        path: impl rustix::path::Arg,
+        flags: AtFlags,
+        mask: fs::StatxFlags,
+    ) -> io::Result<fs::Statx> {
+        crate::facility_v1::require(crate::facility_v1::HostFacilityV1::Statx)?;
+        fs::statx(dir, path, flags, mask).map_err(io::Error::from)
+    }
+
     fn statx_metadata(fd: impl rustix::fd::AsFd) -> io::Result<FileMetadataV1> {
-        let status = fs::statx(
+        let status = statx_checked(
             fd,
             "",
             AtFlags::EMPTY_PATH,
@@ -509,7 +522,7 @@ mod linux {
             if !matches!(name.to_bytes(), b"." | b"..") {
                 let kind = match entry.file_type() {
                     FileType::Unknown => {
-                        let status = fs::statx(
+                        let status = statx_checked(
                             &handle.0,
                             name,
                             AtFlags::SYMLINK_NOFOLLOW,
@@ -560,9 +573,8 @@ mod linux {
     }
 
     pub(super) fn remove_directory_tree(parent: &Handle, leaf: &PathComponent) -> io::Result<()> {
-        use std::os::fd::AsRawFd;
         use std::os::unix::ffi::OsStrExt;
-        let mut target = PathBuf::from(format!("/proc/self/fd/{}", parent.0.as_raw_fd()));
+        let mut target = PathBuf::from(crate::facility_v1::proc_self_fd_path(&*parent.0)?);
         target.push(std::ffi::OsStr::from_bytes(leaf.as_bytes()));
         std::fs::remove_dir_all(target)
     }

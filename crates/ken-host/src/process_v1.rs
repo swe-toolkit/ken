@@ -74,7 +74,7 @@ impl SpawnPlanV1 {
         if self.arguments.is_empty() {
             return Err(invalid_input());
         }
-        probe_pidfd_availability()?;
+        crate::facility_v1::require(crate::facility_v1::HostFacilityV1::Pidfd)?;
         let program = checked_cstring(&self.program)?;
         let arguments = self
             .arguments
@@ -349,12 +349,10 @@ fn pidfd_send_signal(fd: RawFd, signo: libc::c_int) -> io::Result<()> {
     }
 }
 
-fn probe_pidfd_availability() -> io::Result<()> {
-    let result = (|| {
-        #[cfg(test)]
-        if let Some(error) = injected_pidfd_error(PidfdStep::Probe) {
-            return Err(io::Error::from_raw_os_error(error));
-        }
+/// The `Pidfd` facility probe (`facility_v1`), unclassified: its caller maps
+/// the errno to a verdict.
+pub(crate) fn probe_pidfd_v1() -> io::Result<()> {
+    {
         let probe = pidfd_open(unsafe { libc::getpid() })?;
         pidfd_send_signal(probe.as_raw_fd(), 0)?;
         let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
@@ -375,13 +373,7 @@ fn probe_pidfd_availability() -> io::Result<()> {
             return Err(error);
         }
         Err(io::Error::from_raw_os_error(libc::EINVAL))
-    })();
-    result.map_err(|error| match error.raw_os_error() {
-        Some(libc::ENOSYS | libc::EINVAL | libc::EPERM | libc::EACCES) => {
-            io::Error::from(io::ErrorKind::Unsupported)
-        }
-        _ => error,
-    })
+    }
 }
 
 fn mint_pidfd(pid: libc::pid_t) -> io::Result<OwnedFd> {
@@ -418,7 +410,6 @@ fn reap_unheld_child(pid: libc::pid_t) {
 #[cfg(test)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PidfdStep {
-    Probe,
     Mint,
 }
 
