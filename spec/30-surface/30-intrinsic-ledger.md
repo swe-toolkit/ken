@@ -99,7 +99,7 @@ constructor still has the same checked parent and `GlobalId`.
 | `FileMetadata` (floor) | Yes | The native-selected constructor resolves only as `FileMetadata.MkFileMetadata`, with no bare reservation. |
 | `FileKind` (floor) | Yes | The four native-selected kind cases resolve only as `FileKind.KFile`, `FileKind.KDirectory`, `FileKind.KSymlink` and `FileKind.KOther`. |
 | `DirEntry` (floor) | Yes | The native-selected constructor resolves only as `DirEntry.MkDirEntry`, with no bare reservation. |
-| `FileOperation` (floor; former package home) | Yes | All sixteen checked operation cases resolve only as `FileOperation.Op*` paths; the old bare exports and home rows retire atomically. |
+| `FileOperation` (floor; former package home) | Yes | All ten checked path-operation cases resolve only as `FileOperation.Op*` paths; the old bare exports and home rows were withdrawn together at Increment 3a. |
 | `SocketAddress` (floor) | Yes | `PrivateSocketIPv4`, `PrivateSocketIPv6` and `PrivateSocketUnix` are private at their qualified paths and no leaf is bare-reserved; values come only from the `Capability.Net.Stream` smart constructors. |
 | `StateOp` (floor) | Yes | The exact checked State operation carrier resolves as `StateOp.Get` and `StateOp.Put`; neither generic leaf is bare-reserved. `State s` is its signature label, not a separate source type (§36 §4.2). |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
@@ -281,7 +281,7 @@ alone reserves a name.
 | `FileMetadata` (floor, scoped) | Native metadata replies create `MkFileMetadata` by exact ID; §38 §1.12 requires source to name the result. |
 | `FileKind` (floor, scoped) | Native metadata and directory replies create exact kind constructors; §38 §1.12 requires source case analysis. |
 | `DirEntry` (floor, scoped) | Native directory replies create `MkDirEntry` by exact ID; §38 §1.12 requires source to name it. |
-| `FileOperation` (floor, scoped; former package home) | Native FileError paths create exact operation cases; §33 §3.3 already requires source to name this family. Retire its H home and all sixteen constructor rows together. |
+| `FileOperation` (floor, scoped; former package home) | Native FileError paths create the ten exact path-operation cases; §33 §3.3 requires source to name this family. Its former H home and constructor rows were withdrawn together at Increment 3a. |
 | `Exited` (qualified floor constructor) | Checked exit-code result, source `ChildExit.Exited`, not bare. |
 | `Signaled` (qualified floor constructor) | Checked signal result, source `ChildExit.Signaled`, not bare. |
 | `Chunk` (qualified floor constructor) | Native Console-read reply constructs its exact checked ID; source `ReadResult.Chunk`. |
@@ -302,12 +302,6 @@ alone reserves a name.
 | `OpRemoveDirectory` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRemoveDirectory`. |
 | `OpRename` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpRename`. |
 | `OpChangeMode` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpChangeMode`. |
-| `OpSeek` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSeek`. |
-| `OpSetLength` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetLength`. |
-| `OpSync` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSync`. |
-| `OpGetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpGetInheritance`. |
-| `OpSetInheritance` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpSetInheritance`. |
-| `OpDuplicate` (qualified floor constructor) | Exact FileError operation ID; source `FileOperation.OpDuplicate`. |
 | `ResourceBodyResult` (package, not floor) | Source-promised bracket body-result carrier (`38 §1.7.1`); no native reader or producer of its exact ID. |
 | `ResourceBodyOk` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
 | `ResourceBodyErr` (package constructor) | Checked `ResourceBodyResult` case, not a floor constructor or bare reservation. |
