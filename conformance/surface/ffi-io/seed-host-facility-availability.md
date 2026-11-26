@@ -104,11 +104,12 @@ requires a supervisor with mount capability in the namespace.
   `FS AFull` grant rooted at `/`, and uses the public `with_socket_listener`
   route. Before the listener request, a supervisor helper in the target's
   mount and PID namespaces opens `/` with `O_PATH` and uses `readlinkat` on
-  `/proc/self/fd/<fd>`. After this helper
-  check, arm a one-shot syscall fault injector for the facility probe's
-  `readlinkat` on `/proc/self/fd/<n>` during the listener request. It returns
-  `EAGAIN` for that call only and allows later calls. The runner records the
-  actual `readlinkat` fault and confirms the helper check was not faulted. The
+  `/proc/self/fd/<fd>`. After this helper check, arm a one-shot syscall
+  fault injector for the facility probe's link read of `/proc/self/fd/<n>`
+  during the listener request. It returns `EAGAIN` for that call only and
+  allows later calls. On x86_64 the call is `readlink(2)`; on architectures
+  that use it, the call is `readlinkat(2)`. The runner records which syscall
+  was faulted and confirms the helper check was not faulted. The
   first listener path has a missing parent. After the result, the Ken client
   creates that parent with its same `FS AFull` grant. The supervisor then
   mounts an empty tmpfs over `/proc` in the target's mount namespace. A helper
@@ -126,8 +127,9 @@ requires a supervisor with mount capability in the namespace.
   the body or creating the second path. Neither faulted call enters the body
   or creates a socket path.
 - measured: both namespace-helper `readlinkat` results, the one-shot `EAGAIN`
-  fault on the probe's `readlinkat`, both exact listener results and body
-  markers, the mount transition, and both path states.
+  fault on the probe's link-read syscall and its recorded syscall name, both
+  exact listener results and body markers, the mount transition, and both
+  path states.
 - claimed: an undecided probe failure stops the current operation at the
   facility check and is reported through the operation's existing error
   mapping. No availability verdict is cached, and the next need probes again.
@@ -142,19 +144,21 @@ requires a supervisor with mount capability in the namespace.
   probe.
 - why: the helper checks are outside Ken's no-follow filesystem path API but
   run in the target's mount and PID namespaces. The fault injector must witness
-  and alter the probe's `readlinkat`, not an `open` on the same spelling. In
-  the faulted run the facility check stops before the parent walk; only the
-  unfaulted control reaches the missing-parent result. Changing the mount
-  before the next need makes failure to re-probe observable: it cannot produce
-  the specified `Unsupported`.
+  and alter the probe's link-read syscall, which is `readlink` on x86_64 and
+  may be `readlinkat` on another architecture; it must not fault an `open` on
+  the same spelling. The faulted run stops at the facility check before the
+  parent walk; only the unfaulted control reaches the missing-parent result.
+  A mount change before the next need makes failure to re-probe observable:
+  it cannot produce the specified `Unsupported`.
 
 This case requires a Linux runner that can inject one transient error into the
-facility probe's `readlinkat` on `/proc/self/fd/<n>` and change `/proc` within
-the target's mount namespace. A local `strace` 6.13 path-targeted `EAGAIN`
+facility probe's link read of `/proc/self/fd/<n>` and change `/proc` within the
+target's mount namespace. A local `strace` 6.13 path-targeted `EAGAIN`
 injection on an `open` of `/proc/self/fd` failed the first open and allowed
-the second, but did not target the probe's `readlinkat`; it is not evidence
-that the required fault injection is feasible. A local `unshare` supervisor
+the second, but did not target the probe's link read; it is not evidence that
+the required fault injection is feasible. A local `unshare` supervisor
 changed the same namespace from procfs to tmpfs. These are harness-feasibility
-checks, not Ken operation results. The required `readlinkat` observation and
-Ken operations were not executed. No official conformance execution, CI,
-publication, landing, or trust measurement is claimed.
+checks, not Ken operation results. The required namespace-helper observations,
+faulted link-read, and Ken operations were not executed. No official
+conformance execution, CI, publication, landing, or trust measurement is
+claimed.
