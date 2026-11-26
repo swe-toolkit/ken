@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH
 title: "Spec 66 says a derivative in an absent variable evaluates to zero (§14) and that evaluation ignores an absent variable (§19), and §23 keeps a variable fresh through substitution, but no law says which variables a derivative contains: a client holding deriv v e cannot apply deriv_absent or eval_absent to it in a variable absent from e, so a second partial derivative in an absent variable is not known to be zero. Rule from a checked D0 at zero trust that, if u does not occur in e, then u does not occur in deriv v e for every v, and state it with a seed that separates an absent variable from one the derivative keeps"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
@@ -87,7 +87,7 @@ SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH.
 - **AC-1.** §24 states the law by its public type. CV and the Architect
   review it, with a Decision.
 - **AC-2.** The seed takes `e = EMul (EVar 0) (EVar 1)` and `v = 0`.
-  - Its accepted block proves the premise for `u = 2` by `Refl` and
+  - Its accepted block proves the premise for `u = 2` by `Proved` and
     concludes through the law that variable 2 does not occur in
     `deriv 0 e`.
   - Its refused block, on a fresh accepted prefix and in the same form,
