@@ -1839,6 +1839,53 @@ retired in this same change. Neither new host operation reuses `0x0305`.
 There is no compatibility alias or bounded whole-list replacement.
 `FileOperation.OpReadDirectory` remains as the directory-open error tag.
 
+### 1.15 Monotonic clock, deadline sleep and kernel entropy
+
+> **Status: contract-pinned (RT-CLOCK-OP-NATIVE-PROMOTION).** Architect
+> AC-0 `evt_4zbmaff96r9wv` rules the contract on `b9c1853d6`;
+> implementation and assembled evidence are separate.
+
+In Strict source, import `monotonic_now` and `sleep_until` from
+`Capability.Time.Monotonic`, `EntropyIO` and `random_bytes` from
+`Capability.System.Entropy`, and `host_entropy` from
+`Capability.Process.Exit`, which also homes `host_clock`. These names
+are not ambient floor bindings. Clock operations visit `Clock`, and
+`random_bytes` visits `Entropy`; neither effect grants FS authority.
+
+`monotonic_now` returns a `MonotonicInstant` containing the `Int` count of
+nanoseconds elapsed since a process-wide baseline. Readings are nonnegative
+and do not decrease within a process. The epoch is otherwise unspecified:
+a reading or `Deadline` has no meaning outside its originating process.
+Programs should derive deadlines from readings in that process. These
+are host properties, not Ken theorems about external readings.
+
+The floor admits the exact checked types `MonotonicInstant` and `Deadline`.
+`MonotonicInstant.MkMonotonicInstant` wraps an `Int`, and
+`Deadline.MkDeadline` wraps a `MonotonicInstant`. Only the qualified
+constructors resolve at those checked identities. The native monotonic
+reply selects the exact checked instant constructor; native sleep reads
+both exact checked constructors, not their spellings.
+
+`sleep_until` takes a `Deadline`. Its nanosecond operand `d` must satisfy
+`0 ≤ d < 2^64`. With an admitted operand, sleep returns `Unit` only once
+that same clock reads at or past `d`. An already reached deadline returns
+without suspending. Sleep is uncancellable; cancellation is left to PX12.
+Outside the domain, both lanes refuse the effect with the same terminal
+class and no `ClockSleepUntil` trace event. There is no successful return
+for an out-of-domain deadline.
+
+`random_bytes` takes an `Int` count `n` and returns `Result IOError Bytes`.
+For `0 ≤ n ≤ MAX_ENTROPY_REQUEST_BYTES_V1` (1024 bytes), success returns
+exactly `n` bytes from the kernel CSPRNG, including empty `Bytes` for
+zero. A negative or over-bound count returns `Err` with
+`IOError.InvalidInput`, rather than truncating or supplying bytes. For a
+negative count, both lanes must record the same event or neither must
+record an event. If the kernel source cannot supply the full admitted
+count, the result is `Err` with `IOError.Unsupported` and no bytes. There is
+no fallback, substitute userspace PRNG, or retry on another source.
+Returned bytes are runtime observations, not a proof of unpredictability
+or a broader cryptographic guarantee.
+
 ## 2. The FFI surface — the `foreign` declaration
 
 A **`foreign`** declaration binds a Ken name to an external (C-ABI) symbol,
