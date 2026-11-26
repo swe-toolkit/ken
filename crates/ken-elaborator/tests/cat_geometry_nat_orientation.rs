@@ -140,7 +140,7 @@ import Data.Numeric.Nat.Order (compare)
 
 "#;
 
-const SCALE_COORDINATES: &str = r#"const n0 : Nat = Zero
+const UNIT_COORDINATES: &str = r#"const n0 : Nat = Zero
 const n1 : Nat = Suc n0
 
 "#;
@@ -225,8 +225,119 @@ theorem zero_equation_claim
 "#;
 
 fn scale_accepted() -> String {
-    format!("{SCALE_IMPORTS}{SCALE_COORDINATES}{SCALE_OPEN}{SCALE_ACCEPTED_ROWS}")
+    format!("{SCALE_IMPORTS}{UNIT_COORDINATES}{SCALE_OPEN}{SCALE_ACCEPTED_ROWS}")
 }
+
+const REFLECT_IMPORTS: &str = r#"import Algorithm.Geometry.NatOrientation (orient, orient_reflect_diagonal)
+import Algorithm.Geometry.NatBox (MkPoint)
+import Core.Logic.OrdResult (OrdResult, Lt, Gt, ord_result_flip)
+import Core.Logic.Transport (cong, trans)
+
+"#;
+
+const REFLECT_OPEN: &str = r#"theorem open_reflect
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+  : Equal OrdResult
+      (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc))
+      (ord_result_flip (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))) =
+  orient_reflect_diagonal xa ya xb yb xc yc
+
+"#;
+
+const REFLECT_UNIT_TURN: &str = r#"theorem unit_turn_gt
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) Gt = Proved
+
+"#;
+
+fn reflect_prefix() -> String {
+    format!("{REFLECT_IMPORTS}{UNIT_COORDINATES}{REFLECT_OPEN}{REFLECT_UNIT_TURN}")
+}
+
+const REFLECT_ACCEPTED_ROWS: &str = r#"theorem reflected_turn_by_law
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0)) Lt =
+  trans
+    OrdResult
+    (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0))
+    (ord_result_flip (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)))
+    Lt
+    (orient_reflect_diagonal n0 n0 n1 n0 n0 n1)
+    (cong
+      OrdResult
+      OrdResult
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1))
+      Gt
+      ord_result_flip
+      unit_turn_gt)
+
+theorem reflected_turn_closed
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0)) Lt = Proved
+
+theorem open_gt_reflects_to_lt
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    (h : Equal OrdResult (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) Gt)
+  : Equal OrdResult (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc)) Lt =
+  trans
+    OrdResult
+    (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc))
+    (ord_result_flip (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)))
+    Lt
+    (orient_reflect_diagonal xa ya xb yb xc yc)
+    (cong
+      OrdResult
+      OrdResult
+      (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+      Gt
+      ord_result_flip
+      h)
+"#;
+
+const REFLECT_REFUSED_LAW: &str = r#"theorem reflected_turn_preserved_by_law
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0)) Gt =
+  trans
+    OrdResult
+    (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0))
+    (ord_result_flip (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)))
+    Gt
+    (orient_reflect_diagonal n0 n0 n1 n0 n0 n1)
+    (cong
+      OrdResult
+      OrdResult
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1))
+      Gt
+      ord_result_flip
+      unit_turn_gt)
+"#;
+
+const REFLECT_REFUSED_OPEN: &str = r#"theorem open_gt_reflects_to_gt
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    (h : Equal OrdResult (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) Gt)
+  : Equal OrdResult (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc)) Gt =
+  trans
+    OrdResult
+    (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc))
+    (ord_result_flip (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)))
+    Gt
+    (orient_reflect_diagonal xa ya xb yb xc yc)
+    (cong
+      OrdResult
+      OrdResult
+      (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))
+      Gt
+      ord_result_flip
+      h)
+"#;
+
+const REFLECT_REFUSED_CLOSED: &str = r#"theorem reflected_turn_preserved_closed
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n0 n1) (MkPoint n1 n0)) Gt = Proved
+"#;
+
+const COMPARE_SWAP_OPEN: &str = r#"import Core.Logic.OrdResult (OrdResult, ord_result_flip)
+import Data.Numeric.Nat.Order (compare)
+
+theorem open_compare_swap (a : Nat) (b : Nat)
+  : Equal OrdResult (compare b a) (ord_result_flip (compare a b)) =
+  (proof swap for compare) a b
+"#;
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
@@ -323,11 +434,11 @@ fn owned_open_law(
     owner
 }
 
-/// SOURCE: spec/50-stdlib/67-geometry.md §§19, 21 and 22, Architect AC-0.
+/// SOURCE: spec/50-stdlib/67-geometry.md §§19, 21–23, Architect AC-0.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: provider-relative trust identity equality for each package;
 /// owned Transparent law identities cited in open clients; and the respective
-/// Order cancellation identity reachable from each geometry proof.
+/// Order law identity reachable from the translation, scaling or reflection proof.
 /// CLAIMED: the laws are available at their public types without new trust.
 /// THE GAP: providers carry their own trust, measured before each load.
 /// Adding unrelated exports or refactoring proofs while retaining the checked
@@ -397,6 +508,23 @@ fn public_laws_have_checked_owners_and_zero_new_trust() {
     assert!(
         proof_uses_order_law(&env, &owned, scale, mul_cancel),
         "the scaling proof consumes the Order law through geometry-owned proofs"
+    );
+
+    env.elaborate_file(&format!("{REFLECT_IMPORTS}{REFLECT_OPEN}"))
+        .expect("open reflection client checks");
+    env.elaborate_file(COMPARE_SWAP_OPEN)
+        .expect("open comparison swap client checks");
+    let reflect = owned_open_law(
+        &env,
+        GEOMETRY,
+        &owned,
+        "orient_reflect_diagonal",
+        "open_reflect",
+    );
+    let swap = owned_open_law(&env, ORDER, &order, "compare::swap", "open_compare_swap");
+    assert!(
+        proof_uses_order_law(&env, &owned, reflect, swap),
+        "the reflection proof consumes the Order swap law"
     );
 
     env.elaborate_file(AXIS_ACCEPTED)
@@ -655,4 +783,50 @@ fn zero_scaled_equation_refuses_at_its_own_theorem() {
         "zero_equation_claim",
         SCALE_REFUSED_EQUATION,
     );
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §23, Architect AC-0 and AC-2.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the unit turn is Gt and its reflection is Lt by computation.
+/// Three clients, two open and one closed, cite the owned reflection law.
+/// CLAIMED: swapping coordinates flips the turn, not just for the unit triple.
+/// THE GAP: only the open rows exercise the generic law; the closed rows
+/// alone cannot distinguish the law's type from a computed answer.
+/// Equivalent proofs stay green; losing the flip or bypassing the law fails.
+#[test]
+fn diagonal_reflection_flips_the_turn_in_open_and_closed_clients() {
+    let mut env = ElabEnv::new().expect("fresh elaborator");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_root()], GEOMETRY)
+        .expect("checked orientation provider roots-loads");
+    env.elaborate_file(&format!("{}{REFLECT_ACCEPTED_ROWS}", reflect_prefix()))
+        .expect("open reflection, Gt unit turn and Lt reflected turns check");
+    for client in [
+        "open_reflect",
+        "reflected_turn_by_law",
+        "open_gt_reflects_to_lt",
+    ] {
+        owned_open_law(&env, GEOMETRY, &owned, "orient_reflect_diagonal", client);
+    }
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §23, Architect AC-0 and AC-2.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: three fresh checked prefixes reach the new theorem and reject
+/// Gt in place of Lt: by the law on the unit triple, by the law for open
+/// coordinates under a Gt premise, and independently by computation.
+/// CLAIMED: reflection is not preservation of a Gt turn.
+/// THE GAP: the closed rows cover one triple; the open pair is needed to
+/// distinguish the generic flip from preservation without reducing coordinates.
+/// Diagnostic offsets may move; accepting Gt or failing the prefix breaks.
+#[test]
+fn preserved_gt_refuses_after_fresh_diagonal_reflection_prefixes() {
+    let prefix = reflect_prefix();
+    for (label, row) in [
+        ("reflected_turn_preserved_by_law", REFLECT_REFUSED_LAW),
+        ("open_gt_reflects_to_gt", REFLECT_REFUSED_OPEN),
+        ("reflected_turn_preserved_closed", REFLECT_REFUSED_CLOSED),
+    ] {
+        refuses_only_at_added_theorem(&prefix, label, row);
+    }
 }
