@@ -94,4 +94,5 @@ fix apart from a decoder that always traps.
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. the repair's sentinel early return was an unregistered frame terminal; the checked-frame validator classifies unregistered returns by IR form and refuses zero-constant and dynamic statuses — keyed on emitter terminal registration (evt_5edj7am7sdrhk)
+2. the exit sentinel's early return is not a certified finished-Result terminal: that verifier admits only provably-nonzero, `ne 0`-guarded Result-defined, or Trap-published returns, and the sentinel's `slt 0` return of a joined parameter or literal zero is none of them — keyed on the finished-Result verifier's admitted terminal forms
 ```
