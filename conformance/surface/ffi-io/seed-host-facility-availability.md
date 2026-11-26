@@ -101,30 +101,35 @@ capability in the namespace.
   in the target's mount namespace. In that same Ken process, `withDirectory`
   now observes `IOError.NotFound`; the client makes a second listener
   request at a fresh path under the created parent.
-- expect: the first listener request returns exactly
-  `Err (ResourceHostIO IOError.NotFound)`, does not enter the body, and
-  creates no socket path. This is the ordinary missing-parent result, not
-  `Unsupported`: the transient probe error does not establish absence. On
-  the next need, the implementation probes again, finds `/proc/self/fd`
-  absent, and returns exactly `Err (ResourceHostIO IOError.Unsupported)`
-  without entering the body or creating the second path.
+- expect: the first listener call stops at the facility check and returns
+  exactly `Err (ResourceHostIO (IOError.Other EAGAIN))`; on Linux, `EAGAIN`
+  is errno 11. It does not continue to the missing-parent check, enter the
+  body, or create a socket path. This is neither `NotFound` nor `Unsupported`.
+  On the next need, a fresh probe finds `/proc/self/fd` absent. The listener
+  returns exactly `Err (ResourceHostIO IOError.Unsupported)` without entering
+  the body or creating the second path. Neither faulted call enters the body
+  or creates a socket path.
 - measured: the in-process path checks, the one-shot `EAGAIN` probe
-  interception, both exact listener results and body markers, the mount
-  transition, and both path states.
-- claimed: a probe error that does not show absence leaves availability
-  undecided; the operation keeps its ordinary result, and the next need
-  probes again rather than caching the undecided failure.
-- controls: with the same client and procfs kept mounted, the first
-  missing-parent request returns `IOError.NotFound`; after the client creates
-  the parent, the second listener request succeeds and enters its body. The
-  faulted run's first `NotFound` rejects treating `EAGAIN` as absence. Its
-  second `Unsupported` rejects treating the undecided result as a cached
-  availability decision or skipping the next probe.
+  interception, the exact `Other(EAGAIN)` and `Unsupported` listener results,
+  both body markers, the mount transition, and both path states.
+- claimed: an undecided probe failure stops the current operation at the
+  facility check and is reported through the operation's existing error
+  mapping. No availability verdict is cached, and the next need probes again.
+- controls: with the same client, the fault disabled, and procfs kept mounted,
+  the first missing-parent request returns exactly
+  `Err (ResourceHostIO IOError.NotFound)`; after the client creates the parent,
+  the second listener request succeeds and enters its body. This unfaulted
+  control establishes the ordinary missing-parent result. The faulted run's
+  first `Other(EAGAIN)` distinguishes the probe error from both continuation to
+  `NotFound` and treating `EAGAIN` as absence. Its second `Unsupported`
+  rejects replaying or caching the undecided failure and skipping the next
+  probe.
 - why: the runner's one-shot fault is applied only after the checked Ken
   availability control, and the trace must witness its actual probe target.
-  The missing parent pins the operation's ordinary first result. Changing the
-  mount before the next need makes a failure to retry the probe observable as
-  an ordinary path error instead of the specified `Unsupported`.
+  In the faulted run the facility check stops before the parent walk; only the
+  unfaulted control reaches the missing-parent result. Changing the mount
+  before the next need makes failure to re-probe observable: it cannot produce
+  the specified `Unsupported`.
 
 This case requires a Linux runner that can inject one transient error at the
 facility probe and change `/proc` within the target's mount namespace. A local
