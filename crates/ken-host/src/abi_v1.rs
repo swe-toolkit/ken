@@ -262,26 +262,6 @@ struct FsSyncRequestV1 {
 
 #[repr(C)]
 #[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsGetInheritanceRequestV1 {
-    resource: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsSetInheritanceRequestV1 {
-    resource: u64,
-    policy: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsDuplicateRequestV1 {
-    resource: u64,
-    policy: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct ClockDeadlineRequestV1 {
     deadline: u64,
 }
@@ -1558,10 +1538,9 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 len: bytes.len(),
             };
         }
-        CanonicalOutcomeV1::Success(
-            CanonicalReplyV1::MonotonicInstant(_)
-            | CanonicalReplyV1::FdInheritancePolicy(_),
-        ) => reply.tag = REPLY_ERROR,
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::MonotonicInstant(_)) => {
+            reply.tag = REPLY_ERROR
+        }
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
             reply.tag = REPLY_RESOURCE_ERROR;
             match error {
@@ -2882,9 +2861,6 @@ mod tests {
         size_align!("FsWriteAtRequestV1", FsWriteAtRequestV1);
         size_align!("FsSetLengthRequestV1", FsSetLengthRequestV1);
         size_align!("FsSyncRequestV1", FsSyncRequestV1);
-        size_align!("FsGetInheritanceRequestV1", FsGetInheritanceRequestV1);
-        size_align!("FsSetInheritanceRequestV1", FsSetInheritanceRequestV1);
-        size_align!("FsDuplicateRequestV1", FsDuplicateRequestV1);
         size_align!("ClockDeadlineRequestV1", ClockDeadlineRequestV1);
         size_align!("EntropyRequestV1", EntropyRequestV1);
         size_align!("BufferAllocateRequestV1", BufferAllocateRequestV1);
@@ -2953,23 +2929,6 @@ mod tests {
         offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, length);
         offset!("FsSyncRequestV1", FsSyncRequestV1, resource);
         offset!("FsSyncRequestV1", FsSyncRequestV1, mode);
-        offset!(
-            "FsGetInheritanceRequestV1",
-            FsGetInheritanceRequestV1,
-            resource
-        );
-        offset!(
-            "FsSetInheritanceRequestV1",
-            FsSetInheritanceRequestV1,
-            resource
-        );
-        offset!(
-            "FsSetInheritanceRequestV1",
-            FsSetInheritanceRequestV1,
-            policy
-        );
-        offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, resource);
-        offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, policy);
         offset!("MappingAllocateRequestV1", MappingAllocateRequestV1, length);
         offset!(
             "MappingAllocateRequestV1",

@@ -442,9 +442,6 @@ fn host_effect_seat_contract(
                 | Op::FsWriteAt
                 | Op::FsSetLength
                 | Op::FsSync
-                | Op::FsGetInheritance
-                | Op::FsSetInheritance
-                | Op::FsDuplicate
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
@@ -699,9 +696,6 @@ fn host_effect_seat_contract(
         (
             Op::ClockMonotonicNow
             | Op::ClockSleepUntil
-            | Op::FsGetInheritance
-            | Op::FsSetInheritance
-            | Op::FsDuplicate
             | Op::EntropyRandomBytes
             | Op::NetListen | Op::NetAccept | Op::NetConnect
             | Op::NetReceive | Op::NetSend | Op::NetShutdown

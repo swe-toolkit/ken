@@ -198,7 +198,6 @@ fn normalize_outcome(
                 | CanonicalReplyV1::ReadProgress(_)
                 | CanonicalReplyV1::WriteProgress(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
-                | CanonicalReplyV1::FdInheritancePolicy(_)
                 | CanonicalReplyV1::ChildExit(_)
                 | CanonicalReplyV1::SocketAddress(_) => {
                     NormalizedReply::Other(reply.clone())
