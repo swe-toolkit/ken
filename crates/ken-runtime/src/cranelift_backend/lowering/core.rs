@@ -3165,6 +3165,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         defining_emission_owner: None,
         emitting_function_owner: None,
         defining_function_id: None,
+        transfer_helpers: Default::default(),
         aggregate_allocations: None,
         host_effect_seats: None,
         seed_env,

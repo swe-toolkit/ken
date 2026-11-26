@@ -106,6 +106,7 @@ pub use lowering::{
     with_settlement_footprint_sequence, SettlementFootprintEvent,
     with_recursive_residual_match_guard_observations,
     with_plain_native_unit_ir_observations,
+    with_transfer_helper_observations, TransferHelperObservation,
     RecursiveResidualMatchGuardMutation, RecursiveResidualMatchGuardObservation,
     checked_ih_direct_application_mutation_is_exact,
     composed_return_ret_sink_mutation_is_exact,

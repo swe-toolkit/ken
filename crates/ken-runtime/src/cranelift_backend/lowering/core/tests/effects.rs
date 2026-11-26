@@ -104,6 +104,7 @@ fn run_checked_bounded_nat_fixture(
         defining_emission_owner: None,
         emitting_function_owner: None,
         defining_function_id: None,
+        transfer_helpers: Default::default(),
         aggregate_allocations: None,
         host_effect_seats: None,
         process_object: false,

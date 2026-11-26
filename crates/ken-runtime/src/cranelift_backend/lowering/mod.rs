@@ -352,6 +352,41 @@ pub fn with_plain_native_unit_ir_observations<T>(body: impl FnOnce() -> T) -> (T
     (result, ir)
 }
 
+/// RT-NATIVE-AGGREGATE-DATA-NOT-CODE: one row per defined transfer helper.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferHelperObservation {
+    /// The transfer seat, rendered.
+    pub seat: String,
+    /// The helper body's SSA value count.
+    pub values: usize,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+std::thread_local! {
+    static TRANSFER_HELPER_OBSERVATIONS: std::cell::RefCell<Vec<TransferHelperObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run `body` and return every transfer helper it defined, in order.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_transfer_helper_observations<T>(
+    body: impl FnOnce() -> T,
+) -> (T, Vec<TransferHelperObservation>) {
+    TRANSFER_HELPER_OBSERVATIONS.with(|cell| cell.borrow_mut().clear());
+    let result = body();
+    let rows = TRANSFER_HELPER_OBSERVATIONS.with(|cell| std::mem::take(&mut *cell.borrow_mut()));
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_transfer_helper_definition(seat: StaticOriginId, func: &Function) {
+    TRANSFER_HELPER_OBSERVATIONS.with(|cell| cell.borrow_mut().push(TransferHelperObservation {
+        seat: format!("{seat:?}"),
+        values: func.dfg.num_values(),
+    }));
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 fn record_plain_native_unit_ir(id: FuncId, func: &Function) {
     PLAIN_NATIVE_UNIT_IR_OBSERVATIONS.with(|cell| cell.borrow_mut().push(
@@ -3540,6 +3575,8 @@ struct Lowering<'a> {
     /// this names the module definition the events belong to. One
     /// `PredeclaredFunctionId` can be built as more than one `FuncId` body.
     defining_function_id: Option<FuncId>,
+    /// RT-NATIVE-AGGREGATE-DATA-NOT-CODE: out-of-line transfer helpers.
+    transfer_helpers: aggregates::TransferHelperState,
     /// **`RT-DECL-CLOSURE-PORT` `D7`** — the aggregate-allocation event ledger,
     /// held across the whole emission pass.
     ///

@@ -1871,6 +1871,20 @@ impl<'a> Lowering<'a> {
             origin: StaticOriginId,
             value: &Lowered,
         ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+            if let Some(word) = self.emit_outlined_carrier_transfer(builder, origin, value)? {
+                return Ok(word);
+            }
+            self.emit_inline_carrier_transfer(builder, origin, value)
+        }
+
+        /// The per-node emitter. A transfer helper's body is this function,
+        /// run once in the helper's own Function.
+        fn emit_inline_carrier_transfer(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
             match value {
                 // ── the supported transfer surface ───────────────────────────
                 Lowered::Bool { value: word, .. } => {
@@ -6975,4 +6989,559 @@ pub(in crate::cranelift_backend::lowering) mod tests {
              identities at all: {reason}"
         );
     }
+}
+
+// ── RT-NATIVE-AGGREGATE-DATA-NOT-CODE: out-of-line transfer helpers ──────────
+//
+// A transfer whose static template contains a run-time selection (a
+// DynamicConstructor or a HostResult) is emitted once per (owner, transfer
+// seat, template signature) as a module function, and every site calls it
+// (Architect `evt_18xe7x3rjaqj5`, Rulings 1 and 2). The helper's body is the
+// unchanged per-node emitter, run in the helper's own Function under its own
+// FuncId. Every other template stays inline.
+
+/// The user-name namespace a caller's helper import carries until the
+/// helper's FuncId is declared. Never namespace 0, so an unpatched import
+/// cannot be mistaken for a declared function: the module refuses it.
+pub(in crate::cranelift_backend) const TRANSFER_HELPER_PLACEHOLDER_NAMESPACE: u32 = 0x4b54_4831;
+
+/// Transfer-helper state across the emission pass.
+#[derive(Default)]
+pub(in crate::cranelift_backend) struct TransferHelperState {
+    /// Present while a body that can carry helpers is lowered (every define
+    /// site); outlining is off everywhere else.
+    caller: Option<TransferHelperCaller>,
+    /// Set while a helper body is emitted, so its own selections stay inline.
+    emitting_helper: bool,
+    next_placeholder: u32,
+}
+
+struct TransferHelperCaller {
+    function: UserFuncName,
+    index: BTreeMap<(ContinuationEmissionOwner, PredeclaredFunctionId, StaticOriginId, String), usize>,
+    pending: Vec<PendingTransferHelper>,
+}
+
+/// One helper requested by the caller being lowered. Its body is emitted
+/// after the caller is defined.
+pub(in crate::cranelift_backend) struct PendingTransferHelper {
+    pub(in crate::cranelift_backend) seat: StaticOriginId,
+    pub(in crate::cranelift_backend) owner: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) unit: PredeclaredFunctionId,
+    pub(in crate::cranelift_backend) signature: cranelift_codegen::ir::Signature,
+    pub(in crate::cranelift_backend) placeholder: u32,
+    name: cranelift_codegen::ir::UserExternalNameRef,
+    callee: FuncRef,
+    template: Lowered,
+}
+
+/// True iff the template holds a run-time selection anywhere.
+fn transfer_template_has_selection(value: &Lowered) -> bool {
+    match value {
+        Lowered::HostResult { .. } | Lowered::DynamicConstructor(_) => true,
+        Lowered::Constructor { args, .. } => args.iter().any(|arg| match arg {
+            ConstructorField::Specialized(value) => transfer_template_has_selection(value),
+            ConstructorField::StaticWorker { .. } => false,
+        }),
+        Lowered::Record { fields, .. } => fields
+            .iter()
+            .any(|field| transfer_template_has_selection(&field.value)),
+        Lowered::Int { .. }
+        | Lowered::Bool { .. }
+        | Lowered::ProcessExitStatus { .. }
+        | Lowered::CapabilityToken { .. }
+        | Lowered::ResourceToken { .. }
+        | Lowered::BoundedNat(_)
+        | Lowered::StructuralNat(_)
+        | Lowered::ResponseBytes(_)
+        | Lowered::StaticResponseDeferred { .. }
+        | Lowered::Bytes(_)
+        | Lowered::BorrowedNativeValue { .. }
+        | Lowered::BorrowedOption { .. }
+        | Lowered::String(_)
+        | Lowered::Closure { .. }
+        | Lowered::DeclarationClosure { .. }
+        | Lowered::ComputationalRecursorClosure { .. }
+        | Lowered::RecursiveBackedge
+        | Lowered::Trap(_) => false,
+    }
+}
+
+/// Append the template's static signature and its run-time leaves, in
+/// preorder. `None` means the template holds a form the helper does not
+/// rebuild, and the transfer stays inline, where the existing arm handles or
+/// refuses it.
+fn collect_transfer_template(
+    value: &Lowered,
+    tags: &BTreeMap<cranelift_codegen::ir::Value, cranelift_codegen::ir::Value>,
+    signature: &mut String,
+    leaves: &mut Vec<cranelift_codegen::ir::Value>,
+) -> Option<()> {
+    use std::fmt::Write as _;
+    match value {
+        Lowered::Int { value, known } => {
+            // A dynamic Int carries its two-word tag beside the payload; the
+            // helper re-registers it for the payload parameter.
+            let tag = match known {
+                Some(_) => None,
+                None => Some(*tags.get(value)?),
+            };
+            write!(signature, "I{known:?};").ok()?;
+            leaves.push(*value);
+            leaves.extend(tag);
+        }
+        Lowered::Bool { value, known } => {
+            write!(signature, "B{known:?};").ok()?;
+            leaves.push(*value);
+        }
+        Lowered::ProcessExitStatus { value } => {
+            signature.push_str("X;");
+            leaves.push(*value);
+        }
+        Lowered::CapabilityToken { value } => {
+            signature.push_str("C;");
+            leaves.push(*value);
+        }
+        Lowered::ResourceToken { value } => {
+            signature.push_str("R;");
+            leaves.push(*value);
+        }
+        Lowered::BoundedNat(nat) => {
+            signature.push_str("N;");
+            leaves.push(nat.value);
+        }
+        Lowered::StructuralNat(nat) => {
+            signature.push_str("S;");
+            leaves.push(nat.value);
+        }
+        Lowered::ResponseBytes(span) => {
+            signature.push_str("Y;");
+            leaves.push(span.pointer());
+            leaves.push(span.len());
+        }
+        Lowered::BorrowedNativeValue { pointer } => {
+            signature.push_str("P;");
+            leaves.push(*pointer);
+        }
+        Lowered::Bytes(bytes) => {
+            write!(signature, "b{bytes:?};").ok()?;
+        }
+        Lowered::String(text) => {
+            write!(signature, "s{text:?};").ok()?;
+        }
+        Lowered::HostResult {
+            success,
+            error,
+            ok,
+            err_constructor,
+            ok_constructor,
+        } => {
+            write!(signature, "H({err_constructor:?},{ok_constructor:?})[").ok()?;
+            leaves.push(*success);
+            collect_transfer_template(error, tags, signature, leaves)?;
+            collect_transfer_template(ok, tags, signature, leaves)?;
+            signature.push(']');
+        }
+        Lowered::DynamicConstructor(dynamic) => {
+            signature.push_str("D[");
+            leaves.push(dynamic.discriminator);
+            for alternative in &dynamic.alternatives {
+                write!(
+                    signature,
+                    "A({},{:?},{:?},{:?})[",
+                    alternative.tag,
+                    alternative.constructor,
+                    alternative.identity,
+                    alternative.occurrence
+                )
+                .ok()?;
+                for field in &alternative.fields {
+                    collect_transfer_template(field, tags, signature, leaves)?;
+                }
+                signature.push(']');
+            }
+            signature.push(']');
+        }
+        Lowered::Constructor {
+            constructor,
+            synthesized_identity,
+            occurrence,
+            args,
+        } => {
+            write!(
+                signature,
+                "K({constructor:?},{synthesized_identity:?},{occurrence:?})["
+            )
+            .ok()?;
+            for arg in args {
+                match arg {
+                    ConstructorField::Specialized(value) => {
+                        collect_transfer_template(value, tags, signature, leaves)?
+                    }
+                    ConstructorField::StaticWorker { .. } => return None,
+                }
+            }
+            signature.push(']');
+        }
+        Lowered::Record { occurrence, fields } => {
+            write!(signature, "Q({occurrence:?})[").ok()?;
+            for field in fields {
+                write!(signature, "{:?}{:?}=", field.name, field.identity).ok()?;
+                collect_transfer_template(&field.value, tags, signature, leaves)?;
+            }
+            signature.push(']');
+        }
+        Lowered::StaticResponseDeferred { .. }
+        | Lowered::BorrowedOption { .. }
+        | Lowered::Closure { .. }
+        | Lowered::DeclarationClosure { .. }
+        | Lowered::ComputationalRecursorClosure { .. }
+        | Lowered::RecursiveBackedge
+        | Lowered::Trap(_) => return None,
+    }
+    Some(())
+}
+
+/// Rebuild `template` over the helper's leaf parameters, consumed in the
+/// preorder `collect_transfer_template` produced. Dynamic Int tags are
+/// returned as (payload, tag) pairs for the helper's tag table.
+fn rebuild_transfer_template(
+    template: &Lowered,
+    leaves: &mut impl Iterator<Item = cranelift_codegen::ir::Value>,
+    tags: &mut Vec<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value)>,
+) -> Result<Lowered, CraneliftBackendError> {
+    let mut next = || {
+        leaves.next().ok_or_else(|| {
+            backend_module(LoweringCause::PlannerInvariant,
+                "a transfer helper has fewer leaf parameters than its template".to_string())
+        })
+    };
+    Ok(match template {
+        Lowered::Int { known, .. } => {
+            let value = next()?;
+            if known.is_none() {
+                tags.push((value, next()?));
+            }
+            Lowered::Int { value, known: *known }
+        }
+        Lowered::Bool { known, .. } => Lowered::Bool { value: next()?, known: *known },
+        Lowered::ProcessExitStatus { .. } => Lowered::ProcessExitStatus { value: next()? },
+        Lowered::CapabilityToken { .. } => Lowered::CapabilityToken { value: next()? },
+        Lowered::ResourceToken { .. } => Lowered::ResourceToken { value: next()? },
+        Lowered::BoundedNat(_) => Lowered::BoundedNat(BoundedNatV1 { value: next()? }),
+        Lowered::StructuralNat(_) => Lowered::StructuralNat(StructuralNatV1 { value: next()? }),
+        Lowered::ResponseBytes(span) => {
+            let pointer = next()?;
+            let len = next()?;
+            Lowered::ResponseBytes(span.rebuild_from_collected(pointer, len))
+        }
+        Lowered::BorrowedNativeValue { .. } => Lowered::BorrowedNativeValue { pointer: next()? },
+        Lowered::Bytes(bytes) => Lowered::Bytes(bytes.clone()),
+        Lowered::String(text) => Lowered::String(text.clone()),
+        Lowered::HostResult {
+            error,
+            ok,
+            err_constructor,
+            ok_constructor,
+            ..
+        } => {
+            let success = next()?;
+            let error = rebuild_transfer_template(error, leaves, tags)?;
+            let ok = rebuild_transfer_template(ok, leaves, tags)?;
+            Lowered::HostResult {
+                success,
+                error: Box::new(error),
+                ok: Box::new(ok),
+                err_constructor: err_constructor.clone(),
+                ok_constructor: ok_constructor.clone(),
+            }
+        }
+        Lowered::DynamicConstructor(dynamic) => {
+            let discriminator = next()?;
+            let mut alternatives = Vec::with_capacity(dynamic.alternatives.len());
+            for alternative in &dynamic.alternatives {
+                let mut fields = Vec::with_capacity(alternative.fields.len());
+                for field in &alternative.fields {
+                    fields.push(rebuild_transfer_template(field, leaves, tags)?);
+                }
+                alternatives.push(DynamicConstructorAlternativeV1 {
+                    fields,
+                    ..alternative.clone()
+                });
+            }
+            Lowered::DynamicConstructor(DynamicConstructorV1 {
+                discriminator,
+                alternatives,
+            })
+        }
+        Lowered::Constructor {
+            constructor,
+            synthesized_identity,
+            occurrence,
+            args,
+        } => {
+            let mut rebuilt = Vec::with_capacity(args.len());
+            for arg in args {
+                match arg {
+                    ConstructorField::Specialized(value) => rebuilt.push(
+                        ConstructorField::Specialized(rebuild_transfer_template(value, leaves, tags)?),
+                    ),
+                    ConstructorField::StaticWorker { .. } => {
+                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                            "a transfer helper template carries a static worker field".to_string()));
+                    }
+                }
+            }
+            Lowered::Constructor {
+                constructor: constructor.clone(),
+                synthesized_identity: *synthesized_identity,
+                occurrence: *occurrence,
+                args: rebuilt,
+            }
+        }
+        Lowered::Record { occurrence, fields } => {
+            let mut rebuilt = Vec::with_capacity(fields.len());
+            for field in fields {
+                rebuilt.push(LoweredRecordField {
+                    name: field.name.clone(),
+                    identity: field.identity,
+                    value: rebuild_transfer_template(&field.value, leaves, tags)?,
+                });
+            }
+            Lowered::Record { occurrence: *occurrence, fields: rebuilt }
+        }
+        Lowered::StaticResponseDeferred { .. }
+        | Lowered::BorrowedOption { .. }
+        | Lowered::Closure { .. }
+        | Lowered::DeclarationClosure { .. }
+        | Lowered::ComputationalRecursorClosure { .. }
+        | Lowered::RecursiveBackedge
+        | Lowered::Trap(_) => {
+            return Err(backend_module(LoweringCause::PlannerInvariant,
+                "a transfer helper template holds a form the collector refused".to_string()));
+        }
+    })
+}
+
+impl<'a> Lowering<'a> {
+        /// Open outlining for one body. Its helpers are taken, declared and
+        /// patched before the body is verified, and defined after it commits.
+        pub(in crate::cranelift_backend) fn begin_transfer_helpers(&mut self, function: UserFuncName) {
+            self.transfer_helpers.caller = Some(TransferHelperCaller {
+                function,
+                index: BTreeMap::new(),
+                pending: Vec::new(),
+            });
+        }
+
+        /// Close outlining for the body and hand back its requested helpers.
+        pub(in crate::cranelift_backend) fn take_transfer_helpers(&mut self) -> Vec<PendingTransferHelper> {
+            self.transfer_helpers
+                .caller
+                .take()
+                .map(|caller| caller.pending)
+                .unwrap_or_default()
+        }
+
+        /// The call site: one call, a status check that forwards any failure
+        /// as this function's own status, and the returned word. `None` keeps
+        /// the transfer inline.
+        fn emit_outlined_carrier_transfer(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            origin: StaticOriginId,
+            value: &Lowered,
+        ) -> Result<Option<CarriedBoundaryWord>, CraneliftBackendError> {
+            if self.transfer_helpers.emitting_helper || !transfer_template_has_selection(value) {
+                return Ok(None);
+            }
+            let Some(caller) = self.transfer_helpers.caller.as_ref() else {
+                return Ok(None);
+            };
+            if builder.func.name != caller.function {
+                return Ok(None);
+            }
+            let Some(services) = self.function_local.services_pointer else {
+                return Ok(None);
+            };
+            // The helper is keyed on, and emitted under, this body's own owner.
+            let (Some(owner), Some(unit)) = (self.defining_emission_owner, self.defining_unit) else {
+                return Ok(None);
+            };
+            let mut signature_key = String::new();
+            let mut leaves = Vec::new();
+            if collect_transfer_template(
+                value,
+                &self.function_local.native_int_tags,
+                &mut signature_key,
+                &mut leaves,
+            )
+            .is_none()
+            {
+                // Every selection template the collector cannot rebuild is
+                // refused here, rather than left to a silent inline transfer
+                // (Architect evt_1zy2ge7kdz0qc, arm (b)).
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "TransferHelper",
+                    "a run-time-selected transfer template holds a form the transfer helper does not rebuild",
+                ));
+            }
+            let pointer = builder.func.dfg.value_type(services);
+            for leaf in &leaves {
+                use std::fmt::Write as _;
+                let _ = write!(signature_key, "|{}", builder.func.dfg.value_type(*leaf));
+            }
+            let key = (owner, unit, origin, signature_key);
+            let state = &mut self.transfer_helpers;
+            let caller = state.caller.as_mut().expect("checked above");
+            let callee = match caller.index.get(&key) {
+                Some(index) => caller.pending[*index].callee,
+                None => {
+                    let mut signature =
+                        cranelift_codegen::ir::Signature::new(builder.func.signature.call_conv);
+                    signature.params.push(AbiParam::new(pointer));
+                    signature.params.push(AbiParam::new(pointer));
+                    for leaf in &leaves {
+                        signature
+                            .params
+                            .push(AbiParam::new(builder.func.dfg.value_type(*leaf)));
+                    }
+                    signature.returns.push(AbiParam::new(types::I64));
+                    let placeholder = state.next_placeholder;
+                    state.next_placeholder += 1;
+                    let name = builder.func.declare_imported_user_function(
+                        cranelift_codegen::ir::UserExternalName {
+                            namespace: TRANSFER_HELPER_PLACEHOLDER_NAMESPACE,
+                            index: placeholder,
+                        },
+                    );
+                    let sig_ref = builder.func.import_signature(signature.clone());
+                    let callee = builder.func.import_function(cranelift_codegen::ir::ExtFuncData {
+                        name: cranelift_codegen::ir::ExternalName::User(name),
+                        signature: sig_ref,
+                        colocated: true,
+                    });
+                    caller.pending.push(PendingTransferHelper {
+                        seat: origin,
+                        owner,
+                        unit,
+                        signature,
+                        placeholder,
+                        name,
+                        callee,
+                        template: value.clone(),
+                    });
+                    caller.index.insert(key, caller.pending.len() - 1);
+                    callee
+                }
+            };
+            let (slot, out) = Self::carrier_out_slot(builder, pointer);
+            let mut arguments = vec![services, out];
+            arguments.extend(leaves);
+            let call = builder.ins().call(callee, &arguments);
+            let status = builder.inst_results(call)[0];
+            // The guard is `icmp_imm ne status, 0` with the failure block as
+            // the taken target: the shape the finished-Result proof certifies
+            // as a nonzero terminal (`value_is_guarded_nonzero_at_inst`).
+            let failed_status = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+                status,
+                0,
+            );
+            let done = builder.create_block();
+            let failed = builder.create_block();
+            builder.ins().brif(failed_status, failed, &[], done, &[]);
+            builder.switch_to_block(failed);
+            // The helper returns exactly the status its inline body would have
+            // returned from this function, so this function returns it.
+            builder.ins().return_(&[status]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+            builder.switch_to_block(done);
+            Ok(Some(CarriedBoundaryWord {
+                word: builder.ins().stack_load(types::I64, slot, 0),
+            }))
+        }
+
+        /// Give each requested helper its FuncId and point the caller's import
+        /// at it. Runs before the caller is verified and defined.
+        pub(in crate::cranelift_backend) fn declare_transfer_helpers<M: Module>(
+            module: &mut M,
+            caller: &mut Function,
+            pending: &[PendingTransferHelper],
+        ) -> Result<Vec<FuncId>, CraneliftBackendError> {
+            pending
+                .iter()
+                .map(|helper| {
+                    let id = module
+                        .declare_function(
+                            &format!("ken_transfer_helper_{}", helper.placeholder),
+                            Linkage::Local,
+                            &helper.signature,
+                        )
+                        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
+                    caller.params.reset_user_func_name(
+                        helper.name,
+                        cranelift_codegen::ir::UserExternalName {
+                            namespace: 0,
+                            index: id.as_u32(),
+                        },
+                    );
+                    Ok(id)
+                })
+                .collect()
+        }
+
+        /// Emit one helper body: the unchanged per-node emitter over the
+        /// template rebuilt on the helper's parameters. Writes the word through
+        /// the out parameter and returns 0; every failure inside returns its
+        /// status as before.
+        pub(in crate::cranelift_backend) fn emit_transfer_helper_body(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            pointer_type: types::Type,
+            helper: &PendingTransferHelper,
+        ) -> Result<(), CraneliftBackendError> {
+            let entry = builder.create_block();
+            builder.append_block_params_for_function_params(entry);
+            builder.switch_to_block(entry);
+            let parameters = builder.block_params(entry).to_vec();
+            let services = parameters[0];
+            let out = parameters[1];
+            let native_int_arena = builder.ins().load(
+                pointer_type,
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_NATIVE_INT_ARENA,
+            );
+            Lowering::require_nonzero(builder, native_int_arena);
+            let boundary_arena = builder.ins().load(
+                pointer_type,
+                MemFlags::trusted(),
+                services,
+                crate::activation_services::SERVICES_BOUNDARY_ARENA,
+            );
+            Lowering::require_nonzero(builder, boundary_arena);
+            self.function_local.native_int_arena = Some(native_int_arena);
+            self.function_local.boundary_arena = Some(boundary_arena);
+            self.function_local.services_pointer = Some(services);
+            let mut leaves = parameters[2..].iter().copied();
+            let mut tags = Vec::new();
+            let template = rebuild_transfer_template(&helper.template, &mut leaves, &mut tags)?;
+            if leaves.next().is_some() {
+                return Err(backend_module(LoweringCause::PlannerInvariant,
+                    "a transfer helper has more leaf parameters than its template".to_string()));
+            }
+            for (payload, tag) in tags {
+                self.function_local.native_int_tags.insert(payload, tag);
+            }
+            self.transfer_helpers.emitting_helper = true;
+            let word = self.emit_carrier_transfer(builder, helper.seat, &template);
+            self.transfer_helpers.emitting_helper = false;
+            let word = word?;
+            builder.ins().store(MemFlags::trusted(), word.word, out, 0);
+            let zero = builder.ins().iconst(types::I64, 0);
+            builder.ins().return_(&[zero]);
+            Ok(())
+        }
 }

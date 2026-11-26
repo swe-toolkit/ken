@@ -1,0 +1,57 @@
+program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_pure)
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+import Capability.System.IO (readAt)
+import Capability.System.Resource (ResourceBodyErr, ResourceBodyOk, ResourceBodyResult, ResourceBracketBodyAndReleaseError, ResourceBracketBodyError, ResourceBracketOk, ResourceBracketReleaseError, ResourceBracketResult, withBuffer, withResource)
+fn escape_buffer (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit (BufferHandle)) =
+  host_pure AFull (ResourceBodyResult Unit (BufferHandle))
+    (ResourceBodyOk Unit (BufferHandle) buffer)
+
+proc read_with_escaped_buffer (file : Resource ResourceKind.FsHandle) (buffer_closed : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer_closed (MkBufferWindow (0 : Int) (6 : Int)))
+    (\outcome. host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+
+proc after_buffer_escape
+  (file : Resource ResourceKind.FsHandle)
+  (inner : Result ResourceError (ResourceBracketResult Unit (BufferHandle)))
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match inner {
+    Err allocate_error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk buffer_closed |-> read_with_escaped_buffer file buffer_closed;
+      ResourceBracketBodyError error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      ResourceBracketReleaseError error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+    }
+  }
+
+proc file_body (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit (BufferHandle)))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit (BufferHandle) (6 : Int) escape_buffer)
+    (\inner. after_buffer_escape file inner)
+
+fn finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode =
+  match outcome {
+    Err error |-> host_pure AFull ExitCode (ExitCode.Failure 81);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk value |-> host_pure AFull ExitCode ExitCode.Success;
+      ResourceBracketBodyError error |-> host_pure AFull ExitCode (ExitCode.Failure 82);
+      ResourceBracketReleaseError error |-> host_pure AFull ExitCode (ExitCode.Failure 83);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_pure AFull ExitCode (ExitCode.Failure 84)
+    }
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap |->
+      host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+        (withResource AFull Unit Unit cap (bytes_encode "held.bin") ResourceOpenMode.ResourceRead file_body)
+        (\outcome. finish outcome)
+  }
