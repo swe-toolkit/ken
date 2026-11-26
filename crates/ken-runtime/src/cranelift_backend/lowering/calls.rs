@@ -3064,7 +3064,12 @@ impl<'a> Lowering<'a> {
             let decoded = builder.create_block();
             builder.ins().brif(negative, sentinel, &[], decoded, &[]);
             builder.switch_to_block(sentinel);
-            builder.ins().return_(&[status]);
+            // Every negative status already has bit 63 set, so this is the
+            // identity on this block. It gives the return the provably
+            // nonzero form the finished-Result verifier admits; the Abort
+            // registration below is what the checked-frame validator reads.
+            let abort = builder.ins().bor_imm(status, i64::MIN);
+            builder.ins().return_(&[abort]);
             self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             builder.switch_to_block(decoded);
             Ok(status)
