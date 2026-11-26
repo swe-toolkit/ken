@@ -271,15 +271,21 @@ fn pidfd_probe_unavailable_refuses_before_spawning() {
     let mut missing = SpawnPlanV1::new(b"/path/does-not-exist-pidfd".to_vec()).unwrap();
     missing.push_argument(b"not-executed".to_vec()).unwrap();
     LAST_MINT_PID.with(|last| last.set(None));
-    let error = with_pidfd_fault(PidfdStep::Probe, libc::ENOSYS, || {
-        missing.clone().spawn().unwrap_err()
-    });
-    assert_eq!(error.kind(), io::ErrorKind::Unsupported);
-    assert_eq!(
-        crate::effect_v1::io_error_identity_v1(&error),
-        crate::IoErrorIdentityV1::Unsupported
-    );
-    LAST_MINT_PID.with(|last| assert_eq!(last.get(), None));
+    // std already maps ENOSYS to Unsupported. EPERM distinguishes the
+    // facility's classifier from simply returning the original probe error.
+    for errno in [libc::ENOSYS, libc::EPERM] {
+        let error = crate::facility_v1::with_facility_fault(
+            crate::facility_v1::HostFacilityV1::Pidfd,
+            errno,
+            || missing.clone().spawn().unwrap_err(),
+        );
+        assert_eq!(error.kind(), io::ErrorKind::Unsupported, "{error:?}");
+        assert_eq!(
+            crate::effect_v1::io_error_identity_v1(&error),
+            crate::IoErrorIdentityV1::Unsupported
+        );
+        LAST_MINT_PID.with(|last| assert_eq!(last.get(), None));
+    }
     assert_eq!(
         missing.spawn().unwrap_err().raw_os_error(),
         Some(libc::ENOENT)

@@ -832,6 +832,36 @@ seed (`../../conformance/surface/ffi-io/`) discriminates each property against
 its non-conformant counterpart — a `retryable`-from-transience-alone
 implementation, and a `Revoked = Transient` or triplicated-`Revoked` surface.
 
+(3) `Unsupported` is host inability, probed once. `IOError.Unsupported`
+means that this host cannot provide a facility the operation requires; it
+is not an authority denial, an object-state error or an input error, and
+`error_transience IOError.Unsupported = Permanent`. For each facility
+below, the host decides availability at most once per process, on the
+first operation that needs it, by a probe that performs none of the
+operation's effects. While the probe has found its facility absent, each
+listed operation returns `IOError.Unsupported` in its existing error
+form before using the facility, with no fallback, whatever errno the
+kernel or a policy such as seccomp gave the probe; a policy's `EPERM` is
+not `PermissionDenied` here. If a probe fails without establishing absence,
+the current operation stops at that facility check and reports the probe's
+error through the operation's existing error mapping. No availability
+verdict is cached, and the next operation that needs the facility probes
+again. An operation whose facility
+is present behaves as if no probe existed.
+
+| Facility | Needed by |
+|---|---|
+| process descriptors (`pidfd_open`, `pidfd_send_signal`, `waitid(P_PIDFD)`) | `ProcessSpawn` |
+| `statx` | `FsMetadata`, `FsHandleMetadata`; `FsReadDirectoryBatch` only for an entry whose type the read did not report |
+| `/proc/self/fd`, describing this process | recursive `FsRemoveDirectory`; `NetListen` and `NetConnect` on a Unix address |
+| close-on-exec stream sockets, one facility per address family | `NetListen` and `NetConnect` on an address of that family |
+| `accept4` | `NetAccept` |
+
+Descriptor closure in a spawned child is performed by the C library's
+spawn machinery, whose mechanism Ken does not observe, so it is not
+probed. A policy that denies a host call outside this table reaches that
+operation's ordinary error mapping.
+
 ### 1.9 Memory mappings as opaque runtime-owned regions and bounded views (ABI-S6)
 
 A **mapping** — anonymous or file-backed — is a third runtime resource kind

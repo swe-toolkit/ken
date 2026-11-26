@@ -1,11 +1,12 @@
 # Error-classification conformance — seed cases (PX9)
 
-Format: `../../README.md`. These pin the two normative error-classification
-properties of `spec/30-surface/38-ffi-io.md §1.8` (the cross-domain error
-surface, `docs/program/10-linux-abi-completion.md §4`/`§7`, PX9): **transience
-does not imply retry-safety** and **`Revoked` is a single `Permanent`
-identity**. The cases net the *discriminating* form of each property — each
-reds a plausible non-conforming implementation — not the prose.
+Format: `../../README.md`. These pin the three normative properties of
+`spec/30-surface/38-ffi-io.md §1.8`: **transience does not imply
+retry-safety**, **`Revoked` is a single `Permanent` identity**, and
+**`Unsupported` is `Permanent`**. The cross-domain error surface is also
+specified in `docs/program/10-linux-abi-completion.md §4`/`§7` (PX9). The
+cases net the *discriminating* form of each property — each reds a plausible
+non-conforming implementation — not the prose.
 
 The classification model (`error_transience`, `retry_guidance`, and the verdicts
 `RetryAdvised`/`RetryUnsafeNonIdempotent`, the transience `Transient`/`Permanent`,
@@ -28,7 +29,8 @@ Each case below carries the non-conforming implementation it must red.
 
 - promise class: **normative property** — transience ⊥ idempotence; no
   `retryable : error → Bool`
-- spec: `38 §1.8` (property 1); `../../../docs/program/10-linux-abi-completion.md §4`
+- spec: `38 §1.8` (property 1);
+  `../../../docs/program/10-linux-abi-completion.md §4`
 - given: one error identity classified `Transient`, evaluated by `retry_guidance`
   under an `Idempotent` operation and, unchanged otherwise, under a
   `NonIdempotent` operation — a non-degenerate pair on a shared transience
@@ -66,6 +68,23 @@ Each case below carries the non-conforming implementation it must red.
   cannot restore a lost authority, so a transient misclassification is a live
   liveness hazard (an unbounded retry of a permanently-failing operation), not
   cosmetic.
+
+### surface/ffi-io/unsupported-is-permanent (facility error)
+
+- promise class: normative property — `Unsupported` is `Permanent`.
+- spec: `38 §1.8` property (3).
+- given: the `IOError.Unsupported` identity under `error_transience`, and
+  `retry_guidance` for that same identity with `Idempotent` operation
+  idempotence.
+- expect: `error_transience IOError.Unsupported = Permanent`, and
+  `retry_guidance` does not return `RetryAdvised`. The §1.8(1) rule allows
+  that verdict only for the pair `(Transient, Idempotent)`.
+- control: relabeling `Unsupported` as `Transient` reds the permanence
+  assertion. Together with the `retry-guidance-requires-idempotence` positive
+  arm, that mutation also reaches `RetryAdvised` for `Idempotent` and violates
+  the expected no-retry result.
+- why: the host-facility row observes the error identity, but not its retry
+  classification. This case pins the separate normative permanence claim.
 
 ### surface/ffi-io/revoked-single-identity (current carriers)
 
