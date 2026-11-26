@@ -35,6 +35,19 @@
 use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum UnselectedRootSeat {
+    MatchCloseout,
+    KnownBoolIf,
+    LetAfterTrap,
+}
+
+// LetAfterTrap is unmeasured and must not authorize call settlement.
+const WITNESSED_UNSELECTED_SEATS: &[UnselectedRootSeat] = &[
+    UnselectedRootSeat::MatchCloseout,
+    UnselectedRootSeat::KnownBoolIf,
+];
+
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
     static FORCE_OWNER_VIS_JOIN_CONSUMED: std::cell::Cell<bool> =
@@ -2031,7 +2044,9 @@ impl<'a> Lowering<'a> {
         pub(super) fn disposition_statically_unselected_source_subtree(
             &mut self,
             root: StaticOriginId,
+            seat: UnselectedRootSeat,
         ) -> Result<(), CraneliftBackendError> {
+            self.function_local.statically_unselected_roots.entry(root).or_insert(seat);
             #[cfg(test)]
             if D8_JOIN_CONSUMPTION_MUTATION.with(std::cell::Cell::get)
                 == JoinConsumptionMutation::IncludeStaticallyUnselected
@@ -2154,49 +2169,16 @@ impl<'a> Lowering<'a> {
 impl<'a> Lowering<'a> {
         /// Close every recorded static `Match` selection against its validated
         /// positional-child population.
+        /// A planned recursive predecessor makes every case reachable only
+        /// when its producer construct is itself reachable; a call written
+        /// inside a case this closeout excludes is never emitted and has no
+        /// return edge.
         fn close_statically_unselected_match_cases(&mut self) -> Result<(), CraneliftBackendError> {
-            let reached = self
-                .function_local
-                .emission_reachable_match_cases
-                .iter()
-                .map(|(origin, cases)| (*origin, cases.clone()))
-                .collect::<Vec<_>>();
-            // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 3 — the planner-issued
-            // recursive predecessors. Read once, outside the loop, and from the
-            // planner rather than from anything observed here.
-            let recursive_predecessors = self
-                .static_transition_plan
-                .source_machine_recursive_predecessor_origins()?;
-            for (match_origin, reached_cases) in reached {
+            let mut matches = BTreeMap::new();
+            for (&match_origin, reached_cases) in &self.function_local.emission_reachable_match_cases {
                 let case_bodies = self
                     .static_transition_plan
                     .source_match_case_body_origins(match_origin)?;
-                // ⭐ **THE UNION `D5a` checkpoint 3 repairs.** Final reachability is
-                // the initial selection PLUS every planner-issued source-machine
-                // recursive predecessor -- not the initial selection alone.
-                //
-                // A predecessor's contribution here is the planner's **closed case
-                // population**, because what re-enters the match is the *return* of
-                // a generated call: a carried word with no compile-time constructor
-                // template, so no case can be ruled out for it. Concretely, the
-                // initial scrutinee selecting `Vis` used to disposition the `Ret`
-                // arm's whole subtree, while the emitted causal call's return edge
-                // makes `Ret` genuinely reachable -- lowering then both materialized
-                // that arm's join and dispositioned it, and the finished CFG
-                // correctly exposed the contradiction.
-                //
-                // ⚠ The ruling also says *"specialized re-entry keeps its exact
-                // selected case"*. That describes the specialization **body**, which
-                // lowers its own selected alternative directly and never re-enters
-                // this match; it contributes to that generated function's own
-                // population, not to this one. ⇒ There is deliberately **no**
-                // exact-alternative narrowing at this seat: a narrowing that can
-                // never fire is a branch that rots, and adding one here would read
-                // as covering a case it could not reach.
-                //
-                // ⛔ The validator is untouched and this does not force any block
-                // dead or delete origin 25. The repair is to stop asserting a
-                // deadness that was never true.
                 let owner_ret_only = self.static_transition_plan
                     .owner_fed_match_population(match_origin, self.defining_emission_owner)?;
                 // P2: mutate only the closeout consumer to an ordinary answer.
@@ -2243,11 +2225,55 @@ impl<'a> Lowering<'a> {
                             }
                         }
                         BTreeSet::from([ret])
-                    } else if recursive_predecessors.contains(&match_origin) {
-                        (0..case_bodies.len()).collect()
                     } else {
-                        reached_cases
+                        reached_cases.clone()
                     };
+                matches.insert(match_origin, (case_bodies, owner_ret_only, final_reachable));
+            }
+
+            let calls = self.static_transition_plan.continuation_calls()?;
+            loop {
+                let mut dead = BTreeSet::new();
+                for &root in self.function_local.statically_unselected_roots.keys() {
+                    dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(root)?);
+                }
+                for (case_bodies, _, final_reachable) in matches.values() {
+                    for (index, &body) in case_bodies.iter().enumerate() {
+                        if !final_reachable.contains(&index) {
+                            dead.extend(self.static_transition_plan.source_origins_in_owner_subtree(body)?);
+                        }
+                    }
+                }
+
+                // Only owner-local excluded subtrees contribute to `dead`.
+                // Cross-owner producers therefore conservatively stay live.
+                let mut changed = false;
+                for call in calls.iter() {
+                    let producer = call.producer_construct_origin();
+                    if dead.contains(&producer)
+                        && !self.function_local.lowered_construct_origins.contains(&producer)
+                    {
+                        continue;
+                    }
+                    if let Some((bodies, None, final_reachable)) =
+                        matches.get_mut(&call.continuation_origin())
+                    {
+                        if final_reachable.len() < bodies.len() {
+                            // M-b GAP: no measured row distinguishes this contribution while consumption
+                            // wins (F1, the join closeout and F2 defer to an emitted or lowered item). It
+                            // keeps a planned item that is neither emitted nor lowered, in a case reached
+                            // through a live call, refused rather than settled StaticallyUnselected.
+                            final_reachable.extend(0..bodies.len());
+                            changed = true;
+                        }
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+
+            for (case_bodies, _, final_reachable) in matches.into_values() {
                 #[cfg(test)]
                 let mut omitted_for_mutation = false;
                 for (index, root) in case_bodies.into_iter().enumerate() {
@@ -2262,7 +2288,7 @@ impl<'a> Lowering<'a> {
                         omitted_for_mutation = true;
                         continue;
                     }
-                    self.disposition_statically_unselected_source_subtree(root)?;
+                    self.disposition_statically_unselected_source_subtree(root, UnselectedRootSeat::MatchCloseout)?;
                 }
             }
             Ok(())
@@ -2371,7 +2397,58 @@ impl<'a> Lowering<'a> {
                     },
                 );
             }
-            outcome
+            outcome?;
+            self.settle_statically_unselected_calls(function)
+        }
+
+        /// Settle ordinary calls whose producer Construct this unit owns but
+        /// never reached because its source subtree was statically excluded.
+        fn settle_statically_unselected_calls(
+            &mut self,
+            function: PredeclaredFunctionId,
+        ) -> Result<(), CraneliftBackendError> {
+            let owner = ContinuationEmissionOwner::Predeclared(function);
+            let mut dead_all = BTreeSet::new();
+            let mut dead_witnessed = BTreeSet::new();
+            for (&root, seat) in &self.function_local.statically_unselected_roots {
+                let subtree = self.static_transition_plan.source_origins_in_owner_subtree(root)?;
+                if WITNESSED_UNSELECTED_SEATS.contains(seat) {
+                    dead_witnessed.extend(subtree.iter().copied());
+                }
+                dead_all.extend(subtree);
+            }
+            for identity in self.static_transition_plan.ordinary_continuation_call_identities()? {
+                let producer = identity.producer_construct_origin();
+                if identity.emission_owner() != owner
+                    || !dead_all.contains(&producer)
+                    || self.continuation_candidate_is_consumed(&identity)
+                {
+                    continue;
+                }
+                if self.function_local.lowered_construct_origins.contains(&producer) {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a continuation call whose producer Construct was lowered in its emission \
+                         owner lies in a statically unselected subtree and has no disposition"
+                            .to_string(),
+                    ));
+                }
+                if !dead_witnessed.contains(&producer) {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a planned continuation call lies only under a statically unselected root whose \
+                         seat has no witnessed producer; its disposition is unmeasured, so it is refused \
+                         rather than settled".to_string(),
+                    ));
+                }
+                self.settle_continuation_candidate(
+                    &identity,
+                    super::units::CandidateDisposition::StaticallyUnselected,
+                )?;
+                self.function_local.statically_unselected_calls.insert(identity);
+            }
+            self.function_local.unselected_calls_settled = true;
+            Ok(())
         }
 }
 

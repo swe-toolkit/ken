@@ -4229,6 +4229,17 @@ impl<'a> Lowering<'a> {
                 .map(ProducerTrampolineStep::ordinary),
             RuntimeExpr::Construct { constructor, args } => {
                 self.lowered_construct_origins.insert(static_origin);
+                self.function_local.lowered_construct_origins.insert(static_origin);
+                if self.function_local.unselected_calls_settled
+                    && self.function_local.statically_unselected_calls.iter()
+                        .any(|identity| identity.producer_construct_origin() == static_origin)
+                {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a statically unselected continuation call's producer Construct was lowered after \
+                         its owner's closeout settled it".to_string(),
+                    ));
+                }
                 self.lower_computational_producer_construct(
                     builder,
                     static_origin,
@@ -4321,6 +4332,7 @@ impl<'a> Lowering<'a> {
                     let unselected = if known { else_expr } else { then_expr };
                     self.disposition_statically_unselected_source_subtree(
                         unselected.static_origin,
+                        super::joins::UnselectedRootSeat::KnownBoolIf,
                     )?;
                     return self
                         .lower_computational_producer_expr(
@@ -9085,7 +9097,7 @@ impl<'a> Lowering<'a> {
     /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1`** — settle one candidate at
     /// the seat that observed the event. Inert when no candidate ledger is open,
     /// which is every non-`FunctionizedUnits` path.
-    fn settle_continuation_candidate(
+    pub(super) fn settle_continuation_candidate(
         &mut self,
         identity: &ContinuationCallIdentity,
         disposition: super::units::CandidateDisposition,
@@ -9136,7 +9148,10 @@ impl<'a> Lowering<'a> {
             .any(|pending| &pending.identity == identity)
     }
 
-    fn continuation_candidate_is_consumed(&self, identity: &ContinuationCallIdentity) -> bool {
+    pub(super) fn continuation_candidate_is_consumed(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> bool {
         if self
             .continuation_candidates
             .as_ref()
@@ -13102,6 +13117,7 @@ impl<'a> Lowering<'a> {
                         .composed_discharges
                         .contains_key(&edge.identity)
                     && !claimed
+                    && !self.function_local.statically_unselected_calls.contains(&edge.identity)
             })
             .collect::<Vec<_>>();
         // `D5a` checkpoint 4 step 3 — the multi-member reaching mutation.
@@ -17722,6 +17738,7 @@ impl<'a> Lowering<'a> {
                     let unselected = if scrutinee { else_expr } else { then_expr };
                     self.disposition_statically_unselected_source_subtree(
                         unselected.static_origin,
+                        super::joins::UnselectedRootSeat::KnownBoolIf,
                     )?;
                     return if scrutinee {
                         self.lower_expr(builder, then_expr, env)
@@ -17785,6 +17802,17 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::Construct { constructor, args } => {
                 self.lowered_construct_origins.insert(static_origin);
+                self.function_local.lowered_construct_origins.insert(static_origin);
+                if self.function_local.unselected_calls_settled
+                    && self.function_local.statically_unselected_calls.iter()
+                        .any(|identity| identity.producer_construct_origin() == static_origin)
+                {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a statically unselected continuation call's producer Construct was lowered after \
+                         its owner's closeout settled it".to_string(),
+                    ));
+                }
                 // Kept out of this recursive frame: only a claimed Deferred
                 // settlement's Copy id stays live across the arm below.
                 let bracket = match self.lower_construct_bracket_entry(

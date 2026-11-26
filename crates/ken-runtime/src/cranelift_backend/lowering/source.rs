@@ -1598,12 +1598,14 @@ impl<'a> Lowering<'a> {
                                     if let Some(root) = root {
                                         self.disposition_statically_unselected_source_subtree(
                                             root,
+                                            super::joins::UnselectedRootSeat::LetAfterTrap,
                                         )?;
                                     }
                                 }
                                 #[cfg(not(test))]
                                 self.disposition_statically_unselected_source_subtree(
                                     body.static_origin,
+                                    super::joins::UnselectedRootSeat::LetAfterTrap,
                                 )?;
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else if match &value {
@@ -3058,6 +3060,17 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 mut args,
             } => {
                 self.lowered_construct_origins.insert(static_origin);
+                self.function_local.lowered_construct_origins.insert(static_origin);
+                if self.function_local.unselected_calls_settled
+                    && self.function_local.statically_unselected_calls.iter()
+                        .any(|identity| identity.producer_construct_origin() == static_origin)
+                {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a statically unselected continuation call's producer Construct was lowered after \
+                         its owner's closeout settled it".to_string(),
+                    ));
+                }
                 // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
                 // classifier as direct descent before the source
                 // machine lowers any field. D1 established that every

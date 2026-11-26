@@ -13,6 +13,29 @@ use crate::cranelift_backend::lowering::units::{
 };
 use crate::cranelift_backend::lowering::calls::rt_seed_capture_words_take;
 
+// Durable invariant. MEASURED: the direct IR If returns its Ret value and
+// settles a planned unselected call. CLAIMED: the KnownBoolIf inventory row
+// authorizes that settlement. THE GAP: the fixture is at the lowering boundary,
+// not a promise that surface If reaches this representation.
+#[test]
+fn statically_unselected_ir_if_settles_the_dead_vis_call() {
+    use crate::cranelift_backend::lowering::units::{
+        d1_last_dispositions, reset_d1_dispositions, CandidateDisposition,
+    };
+    let expr = crate::cranelift_backend::planning::statically_unselected_if_fixture();
+    let profile = crate::boundary_resource_profile::starter_smoke_profile();
+    reset_d1_dispositions();
+    let compiled = crate::cranelift_backend::artifact::compile_expr_for_lowering_tests(
+        &expr,
+        &NativeSeedEnvironment::empty(profile),
+    )
+    .expect("the IR If with an unselected Vis compiles");
+    let dispositions = d1_last_dispositions();
+    assert!(dispositions.contains_key(&CandidateDisposition::StaticallyUnselected), "{dispositions:?}");
+    let (observed, _) = compiled.run_with_profile(None, profile).expect("the Ret arm runs");
+    assert_eq!(observed, RuntimeObservation::Returned(RuntimeGroundValue::Int(23.into())));
+}
+
 /// **`RT-DECL-CLOSURE-PORT` `D5a` — the witness compiles, and its checked-IH
 /// marker is consumed at the static-worker call edge exactly once.**
 ///

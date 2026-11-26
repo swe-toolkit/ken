@@ -1059,7 +1059,7 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(owned)
     }
 
-    fn source_origins_in_owner_subtree(
+    pub(in crate::cranelift_backend) fn source_origins_in_owner_subtree(
         &self,
         root: StaticOriginId,
     ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
