@@ -15189,11 +15189,8 @@ impl<'a> Lowering<'a> {
         builder.ins().jump(merge, &[malformed.into()]);
 
         builder.switch_to_block(merge);
-        self.emit_carrier_immediate(
-            builder,
-            BoundaryTag::ImmediateExitStatus,
-            builder.block_params(merge)[0],
-        )
+        let status = Self::return_exit_sentinel(builder, builder.block_params(merge)[0]);
+        self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
     }
 
 
