@@ -11304,6 +11304,8 @@ mod cat_numeric_interval_public_export_tests {
             "interval_width_zero_equiv",
             "interval_split_covers",
             "interval_split_width",
+            "interval_split_hull_inside",
+            "interval_inside_split_hull",
             "interval_hull_contains_left",
             "interval_hull_contains_right",
             "interval_intersect_sound",

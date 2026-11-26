@@ -21,7 +21,8 @@
 > SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT §19;
 > SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
 > SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21;
-> SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22;
+> SPEC-NUMERICAL-INTERVAL-SPLIT-HULL §23).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -2012,3 +2013,61 @@ value; an open client is needed to check the generic contract.
 Section 22 raises the public theorem count from sixty to sixty-one and
 leaves the public function count at nine. No operation or law type from
 §§1–21 changes.
+
+## 23. A split reassembles the enclosure
+
+> **Section 23 status: DRAFT v0 (SPEC-NUMERICAL-INTERVAL-SPLIT-HULL).**
+> Architect AC-0 `evt_3r99j1a9gzk6v` on `fb353916f` reports successful
+> scratch checking and formatting of the two laws, accepted open clients
+> and half-membership derivations, and an unchanged exact trusted identity
+> set in the existing split-width package test. The scratch patch adds no
+> `Axiom`. This is not assembled AC-T, official conformance, CI or landing.
+
+`Algorithm.Numeric.RationalInterval` exports these public Transparent
+theorems in the following order, immediately after `interval_split_width`
+and before `interval_contains`:
+
+```ken
+pub theorem interval_split_hull_inside
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue (rational_leq lo m)
+      → IsTrue (rational_leq m hi)
+      → IsTrue
+        (interval_inside
+          (interval_hull (MkInterval lo m) (MkInterval m hi))
+          (MkInterval lo hi))
+
+pub theorem interval_inside_split_hull
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue
+        (interval_inside
+          (MkInterval lo hi)
+          (interval_hull (MkInterval lo m) (MkInterval m hi)))
+```
+
+When `lo ≤ m ≤ hi`, the hull of the halves lies inside the original
+interval by `interval_hull_least`: each half has one unchanged endpoint
+bound by reflexivity and one bound supplied by the premises. The reverse
+inclusion needs no premises: the hull's lower endpoint is at most `lo`
+and its upper endpoint is at least `hi` by the min and max bounds.
+Both laws compare rational endpoint values, not stored `Interval`
+structure. No new helper, import or Rational export is needed.
+
+Direct inclusion of the lower half needs only `m ≤ hi`, and direct
+inclusion of the upper half needs only `lo ≤ m`. For `lo ≤ m ≤ hi`, a
+client can derive each half's membership implication by composing
+`interval_inside_hull_left` or `interval_inside_hull_right` with
+`interval_split_hull_inside` via `interval_inside_trans` and applying
+`interval_inside_sound`; there is no separate public corollary.
+
+This supplies the converse that §21 does not assert: for `lo ≤ m ≤ hi`,
+every member of either half is a member of the original interval. The
+converse does not hold in general for exterior splits: for `[0, 1]`
+split at `2`, the hull includes `2`, so only the premise-free inclusion
+of the original in the hull holds. A refusal at the `m ≤ hi` premise
+only checks that the order evidence is unavailable; the false exterior
+conclusion and the exact open-client types check distinct claims.
+
+Section 23 raises the public theorem count from sixty-one to sixty-three
+and leaves the public function count at nine. No operation or law type
+from §§1–22 changes.
