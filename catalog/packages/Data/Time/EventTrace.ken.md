@@ -48,8 +48,10 @@ The all-in-window identity follows it and reuses the existing private
 `window_keep` and public list membership lemmas without a new helper.
 The no-member window law follows the identity with the same membership
 premise shape and an empty-list conclusion, without another helper.
-The singleton insert and sort laws close the checked source, in that order,
-followed by the private proof of the insert law's cons case.
+The singleton insert and sort laws are followed by `trace_merge_ordered_sort`
+and `trace_merge_all_ordered_sort`. The private insert cons-case proof comes
+next, then `trace_ordered_sort_fixed` and the private
+`trace_sort_append_sorted_suffix`, which closes the definition fence.
 Windowing includes the lower bound
 but excludes the upper; a merge tie favors the left input without examining
 payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
