@@ -592,8 +592,16 @@ resource-kind, liveness, rights, and range validation as defense in depth; the
 checked handle does not replace those checks.
 
 `fileOffset` is nonnegative, and target offset-plus-length arithmetic is checked
-for overflow before host I/O. Neither operation mutates a file-description
-cursor. Sequential reads, writes, copies, and seek-like state are derived code
+for overflow before host I/O. The host-width limit for `readAt` and `writeAt`
+`fileOffset`, for `fileOffset` plus the effective transfer length, and for a
+`setLength` length is the host's largest representable file offset: `2^63 − 1`
+on the Linux reference host, whose `off_t` is signed 64-bit. A value above
+this limit returns `InvalidOffset` at its existing check: before dispatch for
+the file offset or `setLength` length, and before backend I/O for the sum.
+A value at or below the limit passes the width check but does not guarantee
+success; an I/O refusal by the backend (for example `EFBIG`) is reported as
+`ResourceHostIO`. Neither operation mutates a file-description cursor.
+Sequential reads, writes, copies, and seek-like state are derived code
 that explicitly threads `fileOffset + transferred`. There is no seek
 primitive or relative file I/O, and PX8 adds no vectored I/O.
 
