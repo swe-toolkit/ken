@@ -3050,6 +3050,10 @@ impl HostOpV1 {
 /// in-crate differential-evidence tests can reach the implemented arms of
 /// operations that are not yet promoted. Out-of-crate callers cannot, and do
 /// not need to.
+///
+/// The gate is `dispatch_host_op_v1_admitted_by`, parameterised by its predicate
+/// so the refusal can be witnessed when the production predicate admits every
+/// operation.
 pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     backend: &mut B,
     capabilities: &CapabilityTableV1,
@@ -3060,7 +3064,35 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
-    if !operation.executor_admits() {
+    dispatch_host_op_v1_admitted_by(
+        HostOpV1::executor_admits,
+        backend,
+        capabilities,
+        revocation,
+        resources,
+        operation,
+        capability,
+        resource,
+        request,
+    )
+}
+
+/// The executor entry's gate. Production passes exactly
+/// [`HostOpV1::executor_admits`]; the parameter exists so the refusal's
+/// position (before validation and before any backend leaf) stays observable
+/// when that predicate admits every operation in the inventory.
+fn dispatch_host_op_v1_admitted_by<B: HostEffectBackendV1>(
+    admits: fn(HostOpV1) -> bool,
+    backend: &mut B,
+    capabilities: &CapabilityTableV1,
+    revocation: &crate::RevocationDomain,
+    resources: &mut ResourceTableV1,
+    operation: HostOpV1,
+    capability: Option<CapabilityTokenV1>,
+    resource: ResourceInputsV1,
+    request: &CanonicalRequestV1,
+) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
+    if !admits(operation) {
         return Err(TerminalErrorV1::OperationUnavailable(operation));
     }
     dispatch_host_op_v1_for_promotion_evidence(
@@ -6079,8 +6111,13 @@ mod tests {
         );
     }
 
-    /// `AC-GATE` + `AC-PREDICATE`. Every `RepresentedUnavailable` operation is
-    /// refused by the executor entry.
+    /// `AC-GATE` + `AC-PREDICATE`. Durable invariant. MEASURED: the executor
+    /// entry refuses each production-unadmitted operation, and the gate refuses
+    /// every operation under a deny-all predicate without touching the backend.
+    /// CLAIMED: refusal precedes validation and dispatch.
+    /// THE GAP: bypassing the helper in the public entry is observationally
+    /// equivalent when all operations are admitted. P1 turns red for such a
+    /// bypass once an operation is unadmitted.
     ///
     /// **The population is DERIVED from `availability()`, never named.** An
     /// eleventh unavailable operation is covered by this test with zero edits;
@@ -6101,8 +6138,11 @@ mod tests {
         let capabilities = CapabilityTableV1::default();
         let revocation = RevocationDomain::default();
         let mut backend = AllOpsBackend::default();
-        let mut refused = 0usize;
 
+        // P1. This population is derived and may be empty: after
+        // RT-CLOCK-OP-NATIVE-PROMOTION every operation is executor-admitted.
+        // It is kept so that a future unadmitted operation is covered with
+        // zero edits; the mechanism is witnessed by the loop below.
         for operation in HostOpV1::ALL {
             if operation.executor_admits() {
                 continue;
@@ -6124,16 +6164,34 @@ mod tests {
                 "{operation:?} is not executor-admitted, so dispatch_host_op_v1 \
                  must refuse it before any other check"
             );
-            refused += 1;
         }
 
-        // Vacuity control: a predicate that selects nothing passes without
-        // asserting anything. This is the only line that may name a number,
-        // and it is a floor on the population rather than a pin on it.
-        assert!(
-            refused > 0,
-            "the predicate selected an empty set, so this test proved nothing"
-        );
+        // P2. Witness the refusal mechanism independently of the production
+        // population, using real operations and the same uniform request.
+        let mut refused_by_gate = 0;
+        for operation in HostOpV1::ALL {
+            let mut resources = ResourceTableV1::default();
+            let result = dispatch_host_op_v1_admitted_by(
+                |_| false,
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                None,
+                ResourceInputsV1::None,
+                &CanonicalRequestV1::ClockMonotonicNow,
+            );
+            assert_eq!(
+                result,
+                Err(TerminalErrorV1::OperationUnavailable(operation)),
+                "P2: the gate must refuse {operation:?} before validation"
+            );
+            refused_by_gate += 1;
+        }
+
+        // Vacuity control: P2 must witness the entire inventory.
+        assert_eq!(refused_by_gate, HostOpV1::ALL.len());
 
         // The refusal happens ABOVE the backend, not inside it. AllOpsBackend
         // records every leaf it is asked to perform; the gate must mean it was
