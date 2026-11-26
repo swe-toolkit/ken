@@ -111,7 +111,7 @@ Neither arm is a catch-all (`64 §1`).
 | **`FileMetadata`** | internal provision: native metadata reply and source result use (`38 §1.12`) | exact checked scoped family with `FileMetadata.MkFileMetadata`. |
 | **`FileKind`** | internal provision: native metadata and directory reply kind (`38 §1.12`) | exact checked scoped family with all four `FileKind.C` cases. |
 | **`DirEntry`** | internal provision: native directory reply (`38 §1.12`) | exact checked scoped family with `DirEntry.MkDirEntry`. |
-| **`FileOperation`** | internal provision: native FileError operation and source case analysis (`33 §3.3`, `38 §1.12`) | exact checked scoped family with all sixteen `FileOperation.Op*` cases; its former home retires. |
+| **`FileOperation`** | internal provision: native FileError operation and source case analysis (`33 §3.3`, `38 §1.12`) | exact checked scoped family with ten path-operation `FileOperation.Op*` cases; its former home retires. |
 | **`StateOp`** | internal provision: direct State tree carrier (`36 §4.2`) | exact checked scoped `StateOp.Get`/`StateOp.Put` family; `State` is the effect label, not this type. |
 | **`ConsoleOp`** | internal provision: effect reifier and direct Console trees (`36 §2.1`) | exact checked scoped four-case family, preserving its constructor IDs. |
 | **`resp_state`** | internal provision: dependent State response required by direct trees (`36 §4.2`) | exact checked operation, reducing to `s` on `Get` and `Unit` on `Put`. |
@@ -245,10 +245,7 @@ possession.
   `FileOperation.OpMetadata`, `FileOperation.OpReadDirectory`,
   `FileOperation.OpCreateDirectory`, `FileOperation.OpRemoveFile`,
   `FileOperation.OpRemoveDirectory`, `FileOperation.OpRename`,
-  `FileOperation.OpChangeMode`, `FileOperation.OpSeek`,
-  `FileOperation.OpSetLength`, `FileOperation.OpSync`,
-  `FileOperation.OpGetInheritance`, `FileOperation.OpSetInheritance`,
-  `FileOperation.OpDuplicate`, `StateOp.Get`, `StateOp.Put`,
+  `FileOperation.OpChangeMode`, `StateOp.Get`, `StateOp.Put`,
   `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
   `ConsoleOp.IsTerminal`. These retain their exact parents and do not reserve
   bare scoped leaves. `ResourceKind` contributes exactly
