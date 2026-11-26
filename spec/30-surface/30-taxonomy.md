@@ -454,8 +454,8 @@ at their exact checked constructor IDs; none reserves a bare leaf.
 Increment 3a admits six more complete scoped families:
 `ReadResult.Chunk`/`ReadResult.Eof`, `FileKind.KFile`/
 `FileKind.KDirectory`/`FileKind.KSymlink`/`FileKind.KOther`,
-`FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`, every
-`FileOperation.Op*` case in the existing sixteen-constructor family
+`FileMetadata.MkFileMetadata`, `DirEntry.MkDirEntry`, the ten exact checked
+path-operation cases of `FileOperation` as `FileOperation.Op*` paths
 (§38 §1.12), and `StateOp.Get`/`StateOp.Put` (§36 §4.2). The `State`
 label is not a second checked operation type: `StateOp s` is that
 signature's source-nameable operation carrier; `resp_state s` is its
@@ -670,7 +670,7 @@ switches `check`, `run` or `native-build` to Strict; that is Increment 3b.
 | `remove_directory` | H | `Capability.Filesystem.Authority`. |
 | `remove_file` | H | `Capability.Filesystem.Authority`. |
 | `rename_file` | H | `Capability.Filesystem.Authority`. |
-| `FileOperation` | B, pre-existing H home withdrawn | Complete scoped sixteen-case family; remove its seventeen H rows. |
+| `FileOperation` | B, pre-existing H home withdrawn | At Increment 3a, the complete scoped sixteen-case family entered B; its seventeen H rows were withdrawn. |
 
 The two IO advance-start H rows are beyond the historical Increment 3a
 ninety-six-row roster and the later fifty-six non-home additions; neither

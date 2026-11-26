@@ -361,10 +361,10 @@ is a **surface error** (`24`) — it never reaches the kernel:
     `transfer_count_remaining`, `transfer_count_nat_succ`, and
     `transfer_count_predecessor`. This does not publish either private
     constructor of the floor `BufferSpan` or `TransferCount` family.
-  `Capability.System.Error` continues to use the same checked
-  `FileOperation` identity and its sixteen cases, but no longer homes or
-  exports that family: §30 §4 admits it to the scoped floor in Increment
-  3a. Each source use of a case takes the qualified `FileOperation.C`
+  At Increment 3a, `Capability.System.Error` kept the same checked
+  `FileOperation` identity and all sixteen cases then present, but ceased
+  to home or export that family when §30 §4 admitted it to the scoped
+  floor. Each source use of a case takes the qualified `FileOperation.C`
   path, including in this package.
   - `Capability.System.IO` homes the checked
     `write_all_exact_prefix_prop` definition and its attached proof
@@ -488,10 +488,11 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `FileError` is unscoped: `MkFileError` remains bare and reserved with
   its exact parent. `ReadResult`, `FileKind`, `FileMetadata`, `DirEntry`
   and `FileOperation` are scoped complete families: their public cases
-  use `T.C` only, never a bare reservation. The sixteen existing
-  `FileOperation` cases, including `FileOperation.OpReadFile`, keep their
-  exact identities and native artifact leaves; no case is dropped to
-  make the family fit the floor. `ConsoleOp` is scoped as the complete
+  use `T.C` only, never a bare reservation. `FileOperation` has ten exact
+  checked path-operation cases (§38 §1.12). The ten remaining cases keep
+  their checked identities and native stable-symbol leaves and runtime IDs.
+  The six retired leaves have no stable symbol or runtime ID.
+  `ConsoleOp` is scoped as the complete
   `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush` and
   `ConsoleOp.IsTerminal` family; no bare case joins B. `StateOp` is
   likewise scoped as the complete `StateOp.Get` and `StateOp.Put`
