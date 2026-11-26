@@ -354,9 +354,12 @@ impl HostOpV1 {
 /// while believing it received all of them.
 pub const MAX_ENTROPY_REQUEST_BYTES_V1: u64 = 1024;
 
-/// PX5's intended promotion set. Membership is a plan, not evidence: every
-/// operation remains `RepresentedUnavailable` until its artifact differential
-/// gates promote it explicitly.
+/// Historical PX5 five-operation fixture vector. ABI-S3 AC-5 required
+/// preserving its exact contents, not just its length. The host catalog test
+/// pins those contents; Verify's five-op differential tests confirmation for
+/// each member against its independently specified trace. This is not a live
+/// promotion roster or evidence of availability; later promotions update
+/// `NATIVE_TESTED_TARGETS_V1`, not this fixture.
 pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -6111,10 +6114,12 @@ mod tests {
         assert!(fact("SIZE_FsReadFileRequestV1") > fact("SIZE_EntropyRequestV1"));
     }
 
-    /// Promotion transition sentinel: the clock and entropy roles become
-    /// NativeTested while the historical PX5 population stays exact.
+    /// Promise class: durable invariant (§38.1.15). The three named clock and
+    /// entropy operations retain native availability. Promoting another
+    /// operation leaves this green; demoting any of these three fails it.
+    /// This checks catalog availability, not artifact behavior.
     #[test]
-    fn clock_and_entropy_are_promoted_without_changing_the_px5_set() {
+    fn clock_and_entropy_keep_native_availability() {
         for operation in [
             HostOpV1::ClockMonotonicNow,
             HostOpV1::ClockSleepUntil,
@@ -6123,16 +6128,6 @@ mod tests {
             assert_eq!(operation.availability(), HostOpAvailabilityV1::NativeTested);
             assert!(NATIVE_TESTED_TARGETS_V1.contains(&operation));
         }
-        assert_eq!(
-            PX5_PLANNED_NATIVE_TARGETS,
-            [
-                HostOpV1::ConsoleWrite,
-                HostOpV1::ConsoleFlush,
-                HostOpV1::ConsoleIsTerminal,
-                HostOpV1::FsReadFile,
-                HostOpV1::FsWriteFile,
-            ]
-        );
     }
 
     /// Durable invariant. MEASURED: the actual source reader returns exactly
