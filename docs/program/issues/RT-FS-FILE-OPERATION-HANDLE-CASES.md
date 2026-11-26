@@ -1,7 +1,7 @@
 ---
 id: RT-FS-FILE-OPERATION-HANDLE-CASES
 title: "FileOperation still carries six handle-operation cases, OpSeek through OpDuplicate, that spec 38 says no producer selects. Four of them name operations the descriptor WPs retired from HostOpV1 (FsSeek, FsGetInheritance, FsSetInheritance, FsDuplicate). Yet the prelude, the constructor-ID spine, both lanes and System.Error's idempotence table still carry all six, so a Ken program can construct and match an operation context that no host path can produce. Rule from an AC-0 whether only the path cases stay, and remove what it retires across every consumer"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1

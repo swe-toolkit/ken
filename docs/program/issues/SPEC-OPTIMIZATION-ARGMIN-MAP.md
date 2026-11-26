@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-MAP
 title: "Spec 72 proves that the k least-cost candidates commute with a map (least_k_map) and that argmin ignores an order-preserving cost change, but no law moves argmin or argmin_option through a map: a client that selects over mapped candidates cannot rewrite the choice to the original list under the composed cost. Rule from a checked D0 at zero trust that argmin over nonempty_map f xs is f applied to argmin over xs under cost composed with f, with the option form if AC-0 rules it, and state it with a seed that separates the composed cost from the original one"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
