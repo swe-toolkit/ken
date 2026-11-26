@@ -6327,6 +6327,16 @@ fn narrow_host_u64(
         .ok_or(error)
 }
 
+fn narrow_host_file_position(value: &EvalVal) -> Result<u64, ken_host::ResourceErrorV1> {
+    use ken_host::{ResourceErrorV1::InvalidOffset, FILE_POSITION_MAX_V1};
+    let position = narrow_host_u64(value, InvalidOffset)?;
+    if position <= FILE_POSITION_MAX_V1 {
+        Ok(position)
+    } else {
+        Err(InvalidOffset)
+    }
+}
+
 fn resource_error_value_v1(
     error: ken_host::ResourceErrorV1,
     fs: &FSIds,
@@ -6697,7 +6707,7 @@ fn fs_dispatch<H: HostHandler>(
             fs.op_metadata_id,
         )
     } else if op_id == fs.private_fs_set_length_id {
-        let length = match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+        let length = match narrow_host_file_position(args.get(2)?) {
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
@@ -6717,7 +6727,7 @@ fn fs_dispatch<H: HostHandler>(
         )
     } else if op_id == fs.private_fs_read_at_id {
         let file_offset =
-            match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+            match narrow_host_file_position(args.get(2)?) {
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
@@ -6750,7 +6760,7 @@ fn fs_dispatch<H: HostHandler>(
         )
     } else if op_id == fs.private_fs_write_at_id {
         let file_offset =
-            match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+            match narrow_host_file_position(args.get(2)?) {
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);

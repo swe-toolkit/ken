@@ -1776,6 +1776,24 @@ impl<'a> Lowering<'a> {
             "deadline operand does not carry the exact checked unary constructors"))
     }
 
+    fn narrow_file_position_seat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seats: &ClaimedEffectSeats<'_>,
+        index: u32,
+        name: &'static str,
+    ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
+    {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let (value, valid) = self.narrow_positioned_int_seat(builder, seats, index, name)?;
+        let within_host_width = builder.ins().icmp_imm(
+            IntCC::UnsignedLessThanOrEqual,
+            value,
+            ken_host::FILE_POSITION_MAX_V1 as i64,
+        );
+        Ok((value, builder.ins().band(valid, within_host_width)))
+    }
+
     pub(super) fn narrow_carried_int_u64(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -3887,7 +3905,7 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(token, request, request_offset(0));
                 if operation == ken_host::HostOpV1::FsSetLength {
-                    let (length, valid) = self.narrow_positioned_int_seat(
+                    let (length, valid) = self.narrow_file_position_seat(
                         builder, &seats, 1, "setLength length",
                     )?;
                     let invalid = builder.ins().icmp_imm(
@@ -4265,7 +4283,7 @@ impl<'a> Lowering<'a> {
                 let (file_offset, file_offset_valid) = if stream {
                     (builder.ins().iconst(types::I64, 0), builder.ins().iconst(types::I64, 1))
                 } else {
-                    self.narrow_positioned_int_seat(builder, &seats, 1, "file offset")?
+                    self.narrow_file_position_seat(builder, &seats, 1, "file offset")?
                 };
                 let buffer = self.lower_resource_token_seat(
                     builder,

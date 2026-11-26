@@ -12,9 +12,10 @@ fn run_descriptor(mode: &str, body: &str) -> CanonicalDifferentialRun {
     execute_scenario(&scenario).expect("descriptor fixture executes in both real roots")
 }
 
-fn descriptor_scenario(mode: &str, body: &str, invalid_length: &str) -> Scenario {
-    let entry = if body == "resize_sequence" {
-        "resize_sequence cap".to_owned()
+fn descriptor_scenario(mode: &str, body: &str, position: &str) -> Scenario {
+    // These bodies sequence their own file brackets.
+    let entry = if matches!(body, "resize_sequence" | "max_length_then_shrink") {
+        format!("{body} cap")
     } else {
         format!("host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode \
                   (withResource AFull Unit Unit cap (bytes_encode \"subject\") {mode} {body}) final_exit")
@@ -40,7 +41,7 @@ fn descriptor_scenario(mode: &str, body: &str, invalid_length: &str) -> Scenario
             package_name: "fs-descriptor".into(),
             source: SOURCE
                 .replace("DESCRIPTOR_ENTRY", &entry)
-                .replace("INVALID_DESCRIPTOR_LENGTH", invalid_length),
+                .replace("DESCRIPTOR_POSITION", position),
         },
         initial_filesystem: vec![
             SeedNode {
@@ -302,8 +303,193 @@ fn positive_u64_overflow_refuses_before_dispatch() {
     assert_exit_success(&run);
     run.compare_exact().unwrap();
     for lane in [&run.interpreter, &run.native] {
-        let operations: Vec<_> = lane.effect_trace.iter().map(|event| event.operation).collect();
+        let operations: Vec<_> = lane
+            .effect_trace
+            .iter()
+            .map(|event| event.operation)
+            .collect();
         assert_eq!(operations, [HostOpV1::FsOpen, HostOpV1::ResourceRelease]);
     }
     assert_eq!(subject(&run), [BEFORE, BEFORE]);
+}
+
+// Keep the oracle independent of the production bound.
+const HOST_MAX: u64 = 9_223_372_036_854_775_807;
+const OVER_HOST_MAX: u64 = 9_223_372_036_854_775_808;
+const INVALID_OFFSET: CanonicalOutcomeV1 =
+    CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::InvalidOffset));
+
+fn run_position(mode: &str, body: &str, position: u64) -> CanonicalDifferentialRun {
+    execute_scenario(&descriptor_scenario(mode, body, &position.to_string()))
+        .expect("position fixture executes in both real roots")
+}
+
+fn width_events(
+    run: &CanonicalDifferentialRun,
+    operation: HostOpV1,
+) -> [Vec<(&CanonicalRequestV1, &CanonicalOutcomeV1)>; 2] {
+    // Keep both lanes in the assertion, so a symmetric failure is visible
+    // rather than stopping at the first bad lane or relying on parity alone.
+    [&run.interpreter, &run.native].map(|lane| {
+        lane.effect_trace
+            .iter()
+            .filter(|event| event.operation == operation)
+            .map(|event| (&event.request, &event.outcome))
+            .collect()
+    })
+}
+
+fn assert_position_result(run: &CanonicalDifferentialRun, final_bytes: &[u8]) {
+    assert_exit_success(run);
+    run.compare_exact().unwrap();
+    assert_eq!(subject(run), [final_bytes, final_bytes]);
+}
+
+fn assert_length_refused_before_dispatch(length: u64) {
+    let run = run_position(WRITE, "invalid_length", length);
+    assert_eq!(
+        width_events(&run, HostOpV1::FsSetLength),
+        [vec![], vec![]],
+        "setLength admission events (interpreter, native)"
+    );
+    // Only Err InvalidOffset yields exit 0 in this body.
+    assert_position_result(&run, BEFORE);
+}
+
+// Durable invariant (S1/S2). MEASURED: checked InvalidOffset with no
+// setLength event and unchanged real roots for two u64 values above the
+// host bound. CLAIMED: width refusal at lane admission. THE GAP: these
+// sample the endpoints of the u64-only range, not every interior value.
+#[test]
+fn set_length_one_past_host_width_refuses_before_dispatch() {
+    assert_length_refused_before_dispatch(OVER_HOST_MAX);
+}
+
+#[test]
+fn set_length_u64_max_refuses_before_dispatch() {
+    assert_length_refused_before_dispatch(u64::MAX);
+}
+
+// Durable invariant (S3). MEASURED: max host length dispatch, then an
+// unconditional successful shrink, before either root is read. CLAIMED:
+// the admission maximum is inclusive. THE GAP: the first host outcome is
+// filesystem-dependent; only a width refusal is excluded.
+#[test]
+fn set_length_host_max_dispatches_before_small_shrink() {
+    let run = run_position(WRITE, "max_length_then_shrink", HOST_MAX);
+    let events = width_events(&run, HostOpV1::FsSetLength);
+    for (lane, events) in ["interpreter", "native"].into_iter().zip(events) {
+        let [(first_request, first_outcome), (second_request, second_outcome)] = events.as_slice()
+        else {
+            panic!("{lane}: expected two resize events, got {events:?}");
+        };
+        assert_eq!(
+            **first_request,
+            CanonicalRequestV1::FsSetLength { length: HOST_MAX }
+        );
+        assert_ne!(**first_outcome, INVALID_OFFSET);
+        assert_eq!(
+            **second_request,
+            CanonicalRequestV1::FsSetLength { length: 4 }
+        );
+        assert_eq!(
+            **second_outcome,
+            CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
+        );
+    }
+    assert_position_result(&run, b"0123");
+}
+
+fn assert_read_position(offset: u64, outcome: Option<CanonicalOutcomeV1>) {
+    let run = run_position(READ, "width_read", offset);
+    let request = CanonicalRequestV1::FsReadAt {
+        file_offset: offset,
+        buffer_start: 0,
+        length: 1,
+    };
+    let expected: Vec<_> = outcome
+        .as_ref()
+        .map(|outcome| (&request, outcome))
+        .into_iter()
+        .collect();
+    assert_eq!(
+        width_events(&run, HostOpV1::FsReadAt),
+        [expected.clone(), expected],
+        "readAt events (interpreter, native)"
+    );
+    assert_position_result(&run, BEFORE);
+}
+
+// Durable invariant (R1–R3). MEASURED: checked refusal without an event,
+// dispatched InvalidOffset, and EOF at the inclusive end bound. The offset
+// alone varies. CLAIMED: width is checked at the seat and the effective end
+// before host I/O. THE GAP: one-byte windows; no claim about larger reads.
+#[test]
+fn read_at_one_past_host_width_refuses_before_dispatch() {
+    assert_read_position(OVER_HOST_MAX, None);
+}
+
+#[test]
+fn read_at_end_past_host_width_refuses_at_dispatch() {
+    assert_read_position(HOST_MAX, Some(INVALID_OFFSET));
+}
+
+#[test]
+fn read_at_end_at_host_max_dispatches_to_eof() {
+    assert_read_position(
+        HOST_MAX - 1,
+        Some(CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadProgress(
+            ken_host::ReadProgressV1::ReadEof,
+        ))),
+    );
+}
+
+fn assert_write_position(offset: u64, outcome: Option<CanonicalOutcomeV1>) {
+    let run = run_position(WRITE, "(width_write cap)", offset);
+    let request = CanonicalRequestV1::FsWriteAt {
+        file_offset: offset,
+        buffer_start: 0,
+        length: 1,
+    };
+    let expected: Vec<_> = outcome
+        .as_ref()
+        .map(|outcome| (&request, outcome))
+        .into_iter()
+        .collect();
+    assert_eq!(
+        width_events(&run, HostOpV1::FsWriteAt),
+        [expected.clone(), expected],
+        "writeAt events (interpreter, native)"
+    );
+    // Both lanes made a one-byte span from a separate, live source; a
+    // missing write is not evidence if the preceding read never succeeded.
+    for reads in width_events(&run, HostOpV1::FsReadAt) {
+        assert!(
+            matches!(
+                reads.as_slice(),
+                [(
+                    CanonicalRequestV1::FsReadAt { file_offset: 0, buffer_start: 0, length: 1 },
+                    CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadProgress(
+                        ken_host::ReadProgressV1::ReadSome { transferred, .. }
+                    ))
+                )] if transferred.get() == 1
+            ),
+            "span producer: {reads:?}"
+        );
+    }
+    assert_position_result(&run, BEFORE);
+}
+
+// Durable invariant (W1/W2). MEASURED: a valid one-byte span, refusal without
+// an event at the next offset, and one InvalidOffset event at the maximum.
+// CLAIMED: the seat and effective-end checks are distinct. THE GAP: no
+// high successful write, which could leave an enormous sparse file.
+#[test]
+fn write_at_one_past_host_width_refuses_before_dispatch() {
+    assert_write_position(OVER_HOST_MAX, None);
+}
+
+#[test]
+fn write_at_end_past_host_width_refuses_at_dispatch() {
+    assert_write_position(HOST_MAX, Some(INVALID_OFFSET));
 }
