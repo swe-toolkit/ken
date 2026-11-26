@@ -165,9 +165,11 @@ theorem {op}_uncomposed : Equal Nat
 fn assert_refuses(source: &str, declaration: &str, terminal: &str) {
     let mut env = accepted_prefix();
     let parsed = parse_decls(source).expect("the refusal parses");
-    let [SourceDecl::TheoremDecl {
-        name, span: claim, ..
-    }] = parsed.as_slice()
+    let [
+        SourceDecl::TheoremDecl {
+            name, span: claim, ..
+        },
+    ] = parsed.as_slice()
     else {
         panic!("expected exactly one refused theorem");
     };
