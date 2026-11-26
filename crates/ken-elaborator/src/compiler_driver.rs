@@ -9233,12 +9233,12 @@ mod d1b_role_c1_roster_identity {
             ("exit_code_type", "ExitCode", roles.exit_code_type),
             (
                 "monotonic_instant_constructor",
-                "MkMonotonicInstant",
+                "MonotonicInstant.MkMonotonicInstant",
                 roles.monotonic_instant_constructor,
             ),
             (
                 "deadline_constructor",
-                "MkDeadline",
+                "Deadline.MkDeadline",
                 roles.deadline_constructor,
             ),
             (
