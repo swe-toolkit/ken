@@ -3926,6 +3926,10 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         role: R::MkInstant,
         children: &[N::native_int()],
     };
+    const MONOTONIC_INSTANT: SynthesizedAggregateNode = N::Fixed {
+        role: R::MkMonotonicInstant,
+        children: &[N::native_int()],
+    };
     const CONSOLE_READ_RESULT: SynthesizedAggregateNode =
         N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
             N::Fixed {
@@ -4039,6 +4043,9 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         Op::ConsoleRead => (IO_ERRORS, CONSOLE_READ_RESULT),
         Op::ConsoleWrite | Op::ConsoleFlush => (IO_ERRORS, UNIT),
         Op::ClockWallNow => (N::Absent, INSTANT),
+        Op::ClockMonotonicNow => (N::Absent, MONOTONIC_INSTANT),
+        Op::ClockSleepUntil => (N::Absent, UNIT),
+        Op::EntropyRandomBytes => (IO_ERRORS, N::Absent),
         Op::FsReadFile => (READ_FILE_ERROR, N::Absent),
         Op::FsOpen => (READ_FILE_ERROR, N::Absent),
         // ⚠ The `ok` arm here is the emitter's `else` branch, which is `Unit`.

@@ -321,6 +321,8 @@ fn runtime_producible_constructors(
         read_eof,
         wrote,
         mk_instant,
+        mk_monotonic_instant,
+        mk_deadline,
         read_chunk,
         read_result_eof,
         unit,
@@ -395,6 +397,8 @@ fn runtime_producible_constructors(
         read_eof,
         wrote,
         mk_instant,
+        mk_monotonic_instant,
+        mk_deadline,
         read_chunk,
         read_result_eof,
         unit,
@@ -908,14 +912,20 @@ impl EffectSeatLedger {
                 open.effect_origin
             )));
         }
-        if planned.is_empty() && operation != ken_host::HostOpV1::ClockWallNow {
+        let arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .map(|row| row.4)
+            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                format!("host effect seat ledger: missing catalog arity for {operation:?}")))?;
+        if planned.is_empty() && arity != 0 {
             return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {effect_origin:?} is visited but plans no seat at all"
             )));
         }
-        if operation == ken_host::HostOpV1::ClockWallNow && !planned.is_empty() {
+        if arity == 0 && !planned.is_empty() {
             return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "host effect seat ledger: zero-arity ClockWallNow \
+                "host effect seat ledger: zero-arity {operation:?} \
                  {effect_origin:?} planned unexpected seats {planned:?}"
             )));
         }
@@ -1732,7 +1742,13 @@ impl<'a> Lowering<'a> {
         name: &'static str,
     ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
     {
-        let (_, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        let (seat, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        if seat.operation == ken_host::HostOpV1::ClockSleepUntil {
+            let deadline = seats.specialized(EffectSeatSlot::Argument(index))?;
+            let reading = self.checked_unary_effect_field(deadline, &self.process_symbols.mk_deadline)?;
+            let nanoseconds = self.checked_unary_effect_field(reading, &self.process_symbols.mk_monotonic_instant)?.clone();
+            return self.narrow_native_int_u64(builder, &nanoseconds);
+        }
         match operand {
             LoweringOperand::Specialized(value @ Lowered::Int { .. }) => {
                 let value = value.clone();
@@ -1752,6 +1768,22 @@ impl<'a> Lowering<'a> {
                 },
             ),
         }
+    }
+
+    fn checked_unary_effect_field<'v>(
+        &self,
+        value: &'v Lowered,
+        expected: &RuntimeSymbol,
+    ) -> Result<&'v Lowered, CraneliftBackendError> {
+        if let Lowered::Constructor { constructor, args, .. } = value {
+            if constructor == expected {
+                if let [field] = args.as_slice() {
+                    return field.specialized_at("a checked unary host operand field");
+                }
+            }
+        }
+        Err(unsupported(LoweringCause::Fragment, "ClockSleepUntil",
+            "deadline operand does not carry the exact checked unary constructors"))
     }
 
     pub(super) fn narrow_carried_int_u64(
@@ -3564,13 +3596,32 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(limit, request, request_offset(1));
             }
-            ken_host::HostOpV1::ClockWallNow => {
+            ken_host::HostOpV1::ClockWallNow | ken_host::HostOpV1::ClockMonotonicNow => {
                 if capability.is_some() || !args.is_empty() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
-                        "ambient ClockWallNow carried an operand",
+                        "ambient clock read carried an operand",
                     ));
                 }
+            }
+            ken_host::HostOpV1::ClockSleepUntil => {
+                let (deadline, valid) = self.narrow_positioned_int_seat(builder, &seats, 0, "deadline")?;
+                let dispatch = builder.create_block();
+                let invalid = builder.create_block();
+                builder.ins().brif(valid, dispatch, &[], invalid, &[]);
+                builder.switch_to_block(invalid);
+                let status = self.emit_current_trap(builder, &sleep_deadline_domain_trap())?;
+                builder.ins().return_(&[status]);
+                self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+                builder.switch_to_block(dispatch);
+                builder.ins().stack_store(deadline, request, request_offset(0));
+            }
+            ken_host::HostOpV1::EntropyRandomBytes => {
+                let (count, valid) = self.narrow_positioned_int_seat(builder, &seats, 0, "entropy count")?;
+                let invalid = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0);
+                let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
+                record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                builder.ins().stack_store(count, request, request_offset(0));
             }
             ken_host::HostOpV1::ConsoleWrite
             | ken_host::HostOpV1::ConsoleFlush
@@ -4431,7 +4482,20 @@ impl<'a> Lowering<'a> {
                 value: detail,
                 known: None,
             }))
-        } else if operation == ken_host::HostOpV1::ClockWallNow {
+        } else if operation == ken_host::HostOpV1::ClockSleepUntil {
+            Self::require_i64(builder, tag, wire.reply_unit_tag as i64);
+            let ok_root = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk);
+            let unit = self.synthesized_constructor(
+                static_origin,
+                &ok_root,
+                SynthesizedFixedConstructorRole::Unit,
+                self.process_symbols.unit.clone(),
+                Vec::new(),
+                &seats,
+            )?;
+            self.reconcile_host_result_root(static_origin, &ok_root, &unit)?;
+            Ok(LoweringOperand::Specialized(unit))
+        } else if matches!(operation, ken_host::HostOpV1::ClockWallNow | ken_host::HostOpV1::ClockMonotonicNow) {
             Self::require_i64(builder, tag, wire.reply_bytes_tag as i64);
             let response_pointer = builder.ins().stack_load(
                 pointer_type,
@@ -4453,11 +4517,16 @@ impl<'a> Lowering<'a> {
             let ok_root = SynthesizedAggregatePath::root(
                 SynthesizedAggregateRoot::HostResultOk,
             );
+            let (role, symbol) = if operation == ken_host::HostOpV1::ClockWallNow {
+                (SynthesizedFixedConstructorRole::MkInstant, &self.process_symbols.mk_instant)
+            } else {
+                (SynthesizedFixedConstructorRole::MkMonotonicInstant, &self.process_symbols.mk_monotonic_instant)
+            };
             let instant = self.synthesized_constructor(
                 static_origin,
                 &ok_root,
-                SynthesizedFixedConstructorRole::MkInstant,
-                self.process_symbols.mk_instant.clone(),
+                role,
+                symbol.clone(),
                 vec![SynthesizedArgument::Scalar(instant_int)],
                 &seats,
             )?;
@@ -4465,7 +4534,7 @@ impl<'a> Lowering<'a> {
             Ok(LoweringOperand::Specialized(instant))
         } else {
             let success_tag = match operation {
-                ken_host::HostOpV1::ConsoleRead => wire.reply_bytes_tag,
+                ken_host::HostOpV1::ConsoleRead | ken_host::HostOpV1::EntropyRandomBytes => wire.reply_bytes_tag,
                 ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsReadDirectoryBatch => {
                     wire.reply_bytes_tag
                 }
@@ -5255,7 +5324,7 @@ impl<'a> Lowering<'a> {
                         )?,
                     ],
                 })
-            } else if operation == ken_host::HostOpV1::FsReadFile {
+            } else if matches!(operation, ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::EntropyRandomBytes) {
                 // `D2` — self-validating span; see `masked_reply_response_bytes`.
                 masked_reply_response_bytes(
                     builder,

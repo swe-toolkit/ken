@@ -5,7 +5,45 @@
 //! They deliberately exclude descriptors, pointers, inode identities, absolute
 //! host roots, and diagnostic prose.
 
-use std::io;
+use std::io::{self, Read};
+
+/// Nanoseconds since this process first reads its monotonic clock.
+pub fn monotonic_nanoseconds_v1() -> u128 {
+    static BASELINE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    BASELINE
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_nanos()
+}
+
+/// Wait until the process-local monotonic clock reaches `deadline`.
+pub fn sleep_until_monotonic_v1(deadline: u64) {
+    loop {
+        let now = monotonic_nanoseconds_v1();
+        if now >= u128::from(deadline) {
+            return;
+        }
+        // The subtraction is bounded by the original u64 deadline.
+        let remaining = deadline - now as u64;
+        std::thread::sleep(std::time::Duration::from_nanos(remaining));
+    }
+}
+
+/// Read the full request from the kernel source, with no substitute source.
+/// The semantic dispatcher owns the request bound.
+pub fn kernel_entropy_v1(count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+    kernel_entropy_from(std::path::Path::new("/dev/urandom"), count)
+}
+
+fn kernel_entropy_from(source: &std::path::Path, count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+    let count = usize::try_from(count).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    let mut file = std::fs::File::open(source).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(count).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    bytes.resize(count, 0);
+    file.read_exact(&mut bytes).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    Ok(bytes)
+}
 
 /// The closed Program-I host operation catalog.
 ///
@@ -200,8 +238,8 @@ impl HostOpV1 {
             Self::ConsoleFlush => HostOpAvailabilityV1::NativeTested,
             Self::ConsoleIsTerminal => HostOpAvailabilityV1::NativeTested,
             Self::ClockWallNow => HostOpAvailabilityV1::NativeTested,
-            Self::ClockMonotonicNow => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::ClockSleepUntil => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ClockMonotonicNow => HostOpAvailabilityV1::NativeTested,
+            Self::ClockSleepUntil => HostOpAvailabilityV1::NativeTested,
             Self::FsReadFile => HostOpAvailabilityV1::NativeTested,
             Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
             Self::FsAppendFile => HostOpAvailabilityV1::NativeTested,
@@ -228,7 +266,7 @@ impl HostOpV1 {
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
             Self::ResourceStreamRead => HostOpAvailabilityV1::NativeTested,
             Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
-            Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::EntropyRandomBytes => HostOpAvailabilityV1::NativeTested,
             Self::ProcessPlanOpen
             | Self::ProcessPlanPush
             | Self::ProcessSpawn
@@ -327,12 +365,14 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 37] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 40] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
     HostOpV1::ConsoleIsTerminal,
     HostOpV1::ClockWallNow,
+    HostOpV1::ClockMonotonicNow,
+    HostOpV1::ClockSleepUntil,
     HostOpV1::FsReadFile,
     HostOpV1::FsWriteFile,
     HostOpV1::FsAppendFile,
@@ -359,6 +399,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 37] = [
     HostOpV1::MappingAcquireFile,
     HostOpV1::ResourceStreamRead,
     HostOpV1::ResourceStreamWrite,
+    HostOpV1::EntropyRandomBytes,
     HostOpV1::ProcessPlanOpen,
     HostOpV1::ProcessPlanPush,
     HostOpV1::ProcessSpawn,
@@ -557,9 +598,10 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal => {
             vec![checked_u32(field("stream")?)?]
         }
-        // The C record is nonzero-sized, but WallNow has no semantic request
-        // fields. Its response payload is carried in HostReplyV1::bytes.
-        HostOpV1::ClockWallNow => Vec::new(),
+        // The C record is nonzero-sized, but the clock reads have no request fields.
+        HostOpV1::ClockWallNow | HostOpV1::ClockMonotonicNow => Vec::new(),
+        HostOpV1::ClockSleepUntil => vec![checked_u32(field("deadline")?)?],
+        HostOpV1::EntropyRandomBytes => vec![checked_u32(field("count")?)?],
         HostOpV1::FsReadFile
         | HostOpV1::FsMetadata
         | HostOpV1::FsOpenDirectory
@@ -726,10 +768,7 @@ pub fn host_effect_wire_layout_v1(
         // the operations matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
-        HostOpV1::ClockMonotonicNow
-        | HostOpV1::ClockSleepUntil
-        | HostOpV1::EntropyRandomBytes
-        | HostOpV1::NetListen
+        HostOpV1::NetListen
         | HostOpV1::NetAccept
         | HostOpV1::NetConnect
         | HostOpV1::NetReceive

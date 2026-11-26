@@ -4307,35 +4307,16 @@ impl HostHandler for PosixHost {
     }
 
     fn clock_monotonic_now(&mut self) -> BigInt {
-        BigInt::from(process_monotonic_baseline().elapsed().as_nanos())
+        BigInt::from(ken_host::monotonic_nanoseconds_v1())
     }
 
     fn entropy_random_bytes(&mut self, count: u64) -> io::Result<Vec<u8>> {
-        // The kernel CSPRNG, read directly. Not a userspace PRNG, not a
-        // seeded substitute, and no fallback: if the kernel source cannot be
-        // read the error propagates and the operation reports unavailable
-        // (ABI-S3 D3).
-        use std::io::Read;
-        let mut bytes = vec![
-            0u8;
-            usize::try_from(count).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "entropy request too large")
-            })?
-        ];
-        std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-        Ok(bytes)
+        ken_host::kernel_entropy_v1(count).map_err(|_| io::ErrorKind::Unsupported.into())
     }
 
     fn clock_sleep_until(&mut self, deadline: BigInt) {
-        let now = self.clock_monotonic_now();
-        // An already-reached deadline completes immediately rather than
-        // underflowing into a very long sleep.
-        if deadline <= now {
-            return;
-        }
-        let remaining = deadline - now;
-        if let Ok(nanoseconds) = u64::try_from(remaining) {
-            std::thread::sleep(std::time::Duration::from_nanos(nanoseconds));
+        if let Ok(deadline) = u64::try_from(deadline) {
+            ken_host::sleep_until_monotonic_v1(deadline);
         }
     }
 
@@ -5831,14 +5812,6 @@ fn decode_stream(value: &EvalVal, ids: &ConsoleIds) -> Option<ConsoleStream> {
         EvalVal::Ctor { id, .. } if *id == ids.stderr_id => Some(ConsoleStream::Stderr),
         _ => None,
     }
-}
-
-/// Process-wide monotonic origin. `std::time::Instant` is monotonic by
-/// construction, so elapsed nanoseconds from a single fixed origin cannot be
-/// moved by any wall-clock adjustment.
-fn process_monotonic_baseline() -> std::time::Instant {
-    static BASELINE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    *BASELINE.get_or_init(std::time::Instant::now)
 }
 
 /// Decode the surface `Deadline` into absolute monotonic nanoseconds.
@@ -7402,7 +7375,11 @@ fn ambient_dispatch<H: HostHandler>(
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Unit) => {
             let unit = make_ctor(ids.unit_id, vec![], store);
-            Ok(make_result(true, unit, reply_slots, ids, store))
+            if operation == ken_host::HostOpV1::ClockSleepUntil {
+                Ok(unit)
+            } else {
+                Ok(make_result(true, unit, reply_slots, ids, store))
+            }
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bool(value)) => {
             Ok(make_ctor(
@@ -7778,7 +7755,18 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                 args: op_args,
                                 ..
                             } => {
-                                if let Some((clock, (operation, request))) =
+                                if clock_ids.is_some_and(|clock| {
+                                    *op_id == clock.random_bytes_id
+                                        && matches!(op_args.as_slice(), [count]
+                                            if eval_to_bigint(count).is_some_and(|n| u64::try_from(n).is_err()))
+                                }) {
+                                    // An exact Int outside the count carrier is
+                                    // rejected before dispatch in both lanes.
+                                    let error = io_error_identity_value(
+                                        ken_host::IoErrorIdentityV1::InvalidInput, ids, store,
+                                    );
+                                    make_result(false, error, reply_slots.as_deref(), ids, store)
+                                } else if let Some((clock, (operation, request))) =
                                     clock_ids.and_then(|clock| {
                                         decode_clock_request(*op_id, op_args, clock)
                                             .map(|decoded| (clock, decoded))

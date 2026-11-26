@@ -117,6 +117,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadEof,
     Wrote,
     MkInstant,
+    MkMonotonicInstant,
     ReadChunk,
     ReadResultEof,
     Unit,
@@ -163,7 +164,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 62] = [
+    pub(super) const ALL: [Self; 63] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -189,6 +190,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadEof,
         Self::Wrote,
         Self::MkInstant,
+        Self::MkMonotonicInstant,
         Self::ReadChunk,
         Self::ReadResultEof,
         Self::Unit,
@@ -256,6 +258,7 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadEof => &symbols.read_eof,
             Self::Wrote => &symbols.wrote,
             Self::MkInstant => &symbols.mk_instant,
+            Self::MkMonotonicInstant => &symbols.mk_monotonic_instant,
             Self::ReadChunk => &symbols.read_chunk,
             Self::ReadResultEof => &symbols.read_result_eof,
             Self::ExitSuccess => &symbols.exit_success,
@@ -860,6 +863,7 @@ pub(super) fn build_synthesized_constructor_inventory(
         if matches!(
             role,
             SynthesizedFixedConstructorRole::MkInstant
+                | SynthesizedFixedConstructorRole::MkMonotonicInstant
                 | SynthesizedFixedConstructorRole::ReadChunk
                 | SynthesizedFixedConstructorRole::ReadResultEof
                 | SynthesizedFixedConstructorRole::ExitSuccess
@@ -895,6 +899,7 @@ pub(super) fn build_synthesized_constructor_inventory(
         SynthesizedFixedConstructorRole::ReadResultEof,
         SynthesizedFixedConstructorRole::ExitSuccess,
         SynthesizedFixedConstructorRole::ExitFailure,
+        SynthesizedFixedConstructorRole::MkMonotonicInstant,
     ] {
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
         identities.insert(SynthesizedConstructorRole::Fixed(role), span);
