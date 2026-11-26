@@ -3046,6 +3046,33 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             value: Lowered,
         ) -> cranelift_codegen::ir::Value {
+            let status = self.decode_process_exit_status(builder, value);
+            Self::return_exit_sentinel(builder, status)
+        }
+
+        pub(super) fn return_exit_sentinel(
+            builder: &mut FunctionBuilder<'_>,
+            status: cranelift_codegen::ir::Value,
+        ) -> cranelift_codegen::ir::Value {
+            let negative = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
+                status,
+                0,
+            );
+            let sentinel = builder.create_block();
+            let decoded = builder.create_block();
+            builder.ins().brif(negative, sentinel, &[], decoded, &[]);
+            builder.switch_to_block(sentinel);
+            builder.ins().return_(&[status]);
+            builder.switch_to_block(decoded);
+            status
+        }
+
+        fn decode_process_exit_status(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            value: Lowered,
+        ) -> cranelift_codegen::ir::Value {
             let Lowered::Constructor {
                 constructor, args, ..
             } = value
@@ -3107,6 +3134,7 @@ impl<'a> Lowering<'a> {
                 value,
                 max,
             );
+            let is_zero = builder.ins().band(valid_int, is_zero);
             let valid = builder.ins().band(valid_int, positive);
             let valid = builder.ins().band(valid, within_max);
             let nonzero = builder.ins().select(valid, value, malformed);
