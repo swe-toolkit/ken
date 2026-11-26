@@ -448,9 +448,9 @@ the eight `Data.Numeric.FixedWidth` names.
   identity and complete constructor family are fixed by the spec
 - spec: `30-taxonomy §4`; `33 §3.3`; `38 §1.12`
 - given: before loading catalog source, snapshot the pre-source `GlobalId` of
-  `FileOperation` and each of its sixteen constructor identities. In a fresh
-  Strict-roots client with no `Capability.System.Error` import, use the exact
-  type and complete qualified family:
+  `FileOperation` and each of its ten remaining constructor identities. In a
+  fresh Strict-roots client with no `Capability.System.Error` import, use the
+  exact type and complete qualified family:
 
   ```ken
   fn file_operation_control (operation : FileOperation) : Bool =
@@ -464,53 +464,64 @@ the eight `Data.Numeric.FixedWidth` names.
       FileOperation.OpRemoveFile ↦ False;
       FileOperation.OpRemoveDirectory ↦ False;
       FileOperation.OpRename ↦ False;
-      FileOperation.OpChangeMode ↦ True;
-      FileOperation.OpSeek ↦ False;
-      FileOperation.OpSetLength ↦ True;
-      FileOperation.OpSync ↦ True;
-      FileOperation.OpGetInheritance ↦ True;
-      FileOperation.OpSetInheritance ↦ True;
-      FileOperation.OpDuplicate ↦ False
+      FileOperation.OpChangeMode ↦ True
     }
   ```
 
-  For each constructor `C` in that closed family, make a separate pair of
-  Strict clients with the same body and no imports. The positive expression
-  is `const operation : FileOperation = FileOperation.C`; its paired negative
-  changes only the right-hand side to bare `C`. Also compare two source
-  declaration controls: `data FileOperation = LocalFileOperation` and
-  `data LocalOperation = LocalFileOperation`. The first attempts to replace a
-  floor name; the second controls that the declaration form is otherwise
-  accepted.
+  For each of the ten remaining constructors `C`, make a separate pair of
+  Strict clients with no imports. The positive expression is
+  `const operation : FileOperation = FileOperation.C`; its paired negative
+  changes only the right-hand side to bare `C`.
+
+  For each retired handle constructor `C` in `OpSeek`, `OpSetLength`,
+  `OpSync`, `OpGetInheritance`, `OpSetInheritance`, and `OpDuplicate`,
+  make a fresh pair of Strict clients with the same single declaration and no
+  imports. The negative is `const operation : FileOperation = FileOperation.C`
+  and must refuse with `UnboundName { name: "FileOperation.C" }`. Its positive
+  changes only the constructor token `C` to `OpChangeMode` and accepts.
+
+  Also compare two source declaration controls: `data FileOperation =
+  LocalFileOperation` and `data LocalOperation = LocalFileOperation`. The
+  first attempts to replace a floor name; the second controls that the
+  declaration form is otherwise accepted.
 
   Load `Capability.System.Error` as a dependency in both clients of one
   further import pair. The accepted client uses `FileOperation` without
   importing it. Its paired client adds only
   `import Capability.System.Error (FileOperation, OpReadFile)`.
-- measured: resolution of the type and all constructor paths against the
-  pre-source snapshots; acceptance or refusal of each paired source client;
-  and the public export set of `Capability.System.Error` for this family.
+- measured: resolution of the type and ten remaining constructor paths
+  against the pre-source snapshots; acceptance or refusal of each paired
+  source client; and the public export set of `Capability.System.Error` for
+  this family.
 - claimed: `FileOperation` is an always-present scoped floor family, not a
-  package home. All sixteen qualified cases retain their original IDs and
-  parent; none of the bare cases is reserved or resolved to that family.
-  `Capability.System.Error` no longer exports or homes the family.
+  package home. All ten remaining qualified cases retain their original IDs
+  and parent; none of the bare cases is reserved or resolved to that family.
+  All six retired qualified handle cases are unbound, with no stable symbol
+  or runtime ID. `Capability.System.Error` no longer exports or homes the
+  family.
 - the gap: matching source spellings do not establish canonical identity or
   complete family registration. An unrelated failure in the negative clients
   could mimic the scoped-name or retired-home refusal; each positive keeps the
-  source body fixed and changes only the spelling/import under test.
-- expect: the no-import exhaustive match accepts and every measured ID equals
-  its pre-source snapshot. Each qualified `FileOperation.C` client accepts;
-  its bare `C` pair refuses with `UnboundName` naming `C`. The replacement
-  named `FileOperation` refuses, while the `LocalOperation` control accepts.
-  The old System.Error import refuses at import resolution; its no-import
-  control accepts. No constructor ID, parent, or native artifact leaf changes.
-- controls: the complete match and each qualified-constructor client are
-  positive controls for their paired bare-name refusals. The local-name
+  source body fixed and changes only the constructor or import under test.
+- expect (AC-1; authored, unexecuted): the no-import exhaustive match over
+  all ten cases accepts and every measured ID equals its pre-source snapshot.
+  All ten remaining qualified `FileOperation.C` clients accept; their bare
+  `C` pairs refuse with
+  `UnboundName` naming `C`. Each retired `FileOperation.C` construct refuses
+  with `UnboundName { name: "FileOperation.C" }`; changing only `C` to
+  `OpChangeMode` accepts. The replacement named `FileOperation` refuses,
+  while the `LocalOperation` control accepts. The old System.Error import
+  refuses at import resolution; its no-import control accepts. No remaining
+  constructor ID, parent, or native artifact leaf changes, and retired leaves
+  have no stable symbol or runtime ID.
+- controls: the complete ten-case match and each qualified-constructor client
+  are positive controls for their paired bare-name refusals. Each
+  `OpChangeMode` client controls its retired-case refusal. The local-name
   declaration controls the replacement refusal. The no-import client is the
   positive control for the retired Error-home import.
-- why: moving this identity from H to B must preserve the exact family while
-  making its sixteenth case usable by qualification, without leaving an old
-  package route or bare-constructor fallback.
+- why: moving this identity from H to B must preserve the exact ten-case
+  family, retire all six unproduced handle cases, and leave no old package
+  route or bare-constructor fallback.
 
 ### surface/modules/inc3a-added-scoped-floor-families
 
