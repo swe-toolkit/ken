@@ -419,6 +419,12 @@ claim with no conformance case is a claim no one can rely on
   equal-time, different-payload singleton tie: first-event-first values and
   both public equations accept; the fresh-prefix swapped insertion equation
   is refused at the kernel as `KernelRejected(TypeMismatch)`.
+- `stdlib/time-and-events/seed-trace-merge-ordered-sort.md` — §22's
+  ordered-trace merge equals the sorted append; a plain-append conclusion
+  refuses at the closing `Refl`.
+- `stdlib/time-and-events/seed-trace-merge-all-ordered-sort.md` — §23's
+  ordered-batch merge equals the sorted concatenation; a plain-concatenation
+  conclusion and a premise-free claim are refused at `Refl`.
 - `security/ifc/seed-ifc.md` — Sec1 information-flow-by-typing (the
   implicit-flow discriminator, label joins, capability-gated declassify, the
   relational by-proof mode).

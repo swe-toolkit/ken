@@ -1853,3 +1853,49 @@ establish the generic law.
 Section 22 adds one theorem (thirty-three in total) and leaves the nine
 public functions and all §§1–21 operation and law types unchanged. It
 requires no `Axiom`, new import, or change to Derived.
+
+## 23. Merging ordered batches is sorting their concatenation
+
+> **Section 23 status: DRAFT v0 (SPEC-TIME-MERGE-ALL-ORDERED-SORT-CONCAT).**
+
+`Data.Time.EventTrace` must export this public Transparent theorem immediately
+following `trace_merge_ordered_sort`:
+
+```ken
+pub theorem trace_merge_all_ordered_sort
+      (p : Type) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → Equal
+        (List (Event p))
+        (trace_merge_all p traces)
+        (sort (Event p) (event_before p) (list_concat (Event p) traces))
+```
+
+Every batch must be ordered, but batches may overlap in time. For the single
+batch with events at times 5 and 1 in that order, the merge returns the batch
+unchanged while sort puts time 1 first, so the law has no premise-free form.
+The premise is the one `trace_merge_all_ordered` takes.
+
+The conclusion is structural list equality, not just a permutation, so
+clients can transport Derived's sort properties to the merge of a list of
+batches. §21 is the case where every batch is a singleton.
+
+The proof inducts on the batches. In the step case the head batch merges with
+the ordered merge of the remaining batches, so §22 gives the sort of their
+append, and induction identifies the merged remainder with the sort of its
+concatenation. A private proof shows that appending a list to an ordered list
+equal to `sort ys` and sorting gives the same result as appending it to `ys`
+and sorting. It needs no change to Derived.
+
+The [ordered batches seed](../../conformance/stdlib/time-and-events/seed-trace-merge-all-ordered-sort.md)
+applies the law to the batches with time sequences `[1, 3]` and `[2]`, then
+checks the sort's value `[1, 2, 3]` by `Refl`. On a fresh copy of the same
+accepted prefix, the same proof with the concatenation `[1, 3, 2]` must
+refuse at the closing `Refl`. A premise row checks that the merge of the
+single batch `[5, 1]` is `[5, 1]` while the sort of its concatenation is
+`[1, 5]`, and that the premise-free equation refuses. These closed cases do
+not establish the generic law.
+
+Section 23 adds one theorem (thirty-four in total) and leaves the nine public
+functions and all §§1–22 operation and law types unchanged. It requires no
+`Axiom`, new import, or change to Derived.
