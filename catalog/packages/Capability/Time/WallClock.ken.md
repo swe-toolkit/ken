@@ -9,7 +9,7 @@ primitive.
 
 A wall clock can move in either direction when the host adjusts civil time.
 This package therefore declares no ordering or monotonicity law. Programs that
-need that guarantee require the separate session-shaped monotonic-clock design;
+need that guarantee should use [Capability.Time.Monotonic](Monotonic.ken.md);
 they must not assume it for `wall_now`.
 
 ```ken

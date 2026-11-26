@@ -3836,6 +3836,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "Coproduct",
         "ITree",
         "Instant",
+        "MonotonicInstant",
+        "Deadline",
         "IOError",
         "CreatePolicy",
         "ResourceError",
