@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-SPLIT-HULL
 title: "Spec 68 splits an enclosure so that every member lands in a half (§21) and the halves' widths sum to the whole (§22), but §21 says it does not assert that the halves contain only original members: a client bisecting an enclosure cannot conclude that a half's members are the whole's. Rule from a checked D0 at zero trust that, for lo ≤ m ≤ hi, the hull of the two halves is inside the whole and the whole is inside that hull, and state it with a seed that separates an interior split point from an exterior one"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
