@@ -125,3 +125,11 @@ counted the population at the seam: 198 top-level transfers per origin, 6
 template shapes, every one with a selection. 8 fired. A build that leaves
 the transfers inline fails AC-1's per-seat row, and AC-3 shows that the
 row detects it.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. helper installed at one define site only (ordinary unit bodies); 157 selection transfers stay inline in staged-continuation, continuation-context and response-owner bodies — keyed on body kind (define site)
+2. transfer-helper collector covers fewer template forms than the selection predicate; a selection template holding a represented boundary closure silently stays inline — keyed on template form (collector coverage vs selection predicate)
+```
