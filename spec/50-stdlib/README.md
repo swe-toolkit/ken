@@ -511,8 +511,12 @@ this base; candidate-local tests do not establish official
 conformance, CI or measured landed trust. Section 23
 (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH) specifies `substitute_fresh`:
 if a variable is absent from every replacement used by the expression,
-it is absent from the substituted expression. A sorted-list normal form
-and signed/field arithmetic remain deferred.
+it is absent from the substituted expression. Section 24
+(SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH) specifies `deriv_fresh`: syntactic
+absence of a variable is preserved by differentiation in any variable.
+The second-derivative zero result is a client composition, not another
+public law. A sorted-list normal form and signed/field arithmetic remain
+deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;

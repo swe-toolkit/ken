@@ -71,7 +71,8 @@ index where `occurs` answers `True` give the expression equal values.
 Likewise, `substitute_coincidence` gives structurally equal results when two
 substitutions produce equal expressions at every occurring index.
 `substitute_fresh` shows that a variable absent from all replacements used
-in the expression is absent from the substituted result. Three further
+in the expression is absent from the substituted result. `deriv_fresh`
+follows it and preserves absence under differentiation. Three further
 public laws state that ordered normalization is transparent to
 `poly_eq` itself, to differentiation, and to substitution. The latter two
 follow from the first and the existing `poly_eq`-preservation laws.
@@ -1470,6 +1471,36 @@ pub theorem substitute_fresh
             (λx. bool_or x (occurs v (substitute s b)))
             (substitute_fresh v s a (λw. λh. fresh w (or_left (occurs w a) (occurs w b) h))))
           (substitute_fresh v s b (λw. λh. fresh w (or_right (occurs w a) (occurs w b) h)))
+  }
+
+pub theorem deriv_fresh
+      (u : Nat) (v : Nat) (e : Expr)
+    : Equal Bool (occurs u e) False → Equal Bool (occurs u (deriv v e)) False =
+  match e {
+    EConst c ↦ λabsent. Proved;
+    EVar w ↦ λabsent. var_deriv_fresh u (nat_same v w);
+    EAdd a b ↦
+      λabsent.
+        bool_or_false_both
+          (occurs u (deriv v a))
+          (occurs u (deriv v b))
+          (deriv_fresh u v a (bool_or_false_left (occurs u a) (occurs u b) absent))
+          (deriv_fresh u v b (bool_or_false_right (occurs u a) (occurs u b) absent));
+    EMul a b ↦
+      λabsent.
+        bool_or_false_both
+          (bool_or (occurs u (deriv v a)) (occurs u b))
+          (bool_or (occurs u a) (occurs u (deriv v b)))
+          (bool_or_false_both
+            (occurs u (deriv v a))
+            (occurs u b)
+            (deriv_fresh u v a (bool_or_false_left (occurs u a) (occurs u b) absent))
+            (bool_or_false_right (occurs u a) (occurs u b) absent))
+          (bool_or_false_both
+            (occurs u a)
+            (occurs u (deriv v b))
+            (bool_or_false_left (occurs u a) (occurs u b) absent)
+            (deriv_fresh u v b (bool_or_false_right (occurs u a) (occurs u b) absent)))
   }
 
 pub theorem deriv_substitute
@@ -2980,6 +3011,20 @@ theorem deriv_var_deriv_eval
     False ↦ Proved
   }
 
+theorem var_deriv_fresh (u : Nat) (b : Bool) : Equal Bool (occurs u (var_deriv b)) False =
+  match b {
+    True ↦ Proved;
+    False ↦ Proved
+  }
+
+theorem bool_or_false_both
+      (a : Bool) (b : Bool)
+    : Equal Bool a False → Equal Bool b False → Equal Bool (bool_or a b) False =
+  match a {
+    True ↦ λnone. absurd none;
+    False ↦ λnone. λrest. rest
+  }
+
 theorem bool_or_false_left
       (a : Bool) (b : Bool)
     : Equal Bool (bool_or a b) False → Equal Bool a False =
@@ -3539,6 +3584,16 @@ the right operand's test, which the other induction hypothesis proves false.
 The resulting absence proof supplies the premise of `eval_absent` or
 `deriv_absent` on the substituted expression.
 
+`deriv_fresh` splits the absence premise at each binary constructor. For a
+sum it combines the two induction hypotheses. For a product, the product
+rule keeps both original factors as well as their derivatives, so the proof
+combines the two original absence facts with both induction hypotheses.
+The private `var_deriv_fresh` checks the two constant results of
+`var_deriv`, and the private `bool_or_false_both` combines absence facts.
+A client can pass the result to `deriv_absent` to show that a second
+derivative in the absent variable evaluates to zero. The converse need
+not hold: differentiating a lone variable produces a constant.
+
 For derivative after substitution, induction on the expression uses the two
 pointwise derivative premises on a variable. The product case reuses
 `eval_substitute` for its underived factors, then lifts the induction
@@ -3622,7 +3677,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–22 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–24 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3650,7 +3705,7 @@ specify the public surface and closed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and forty-two checked theorems; Horner, substitution and differentiation
+and forty-three checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3702,6 +3757,11 @@ The `cat_symbolic_algebra_substitute_fresh` package test compares exact trust
 identities, checks open uses with `eval_absent` and `deriv_absent`, and
 separates a fresh variable from one introduced by a replacement. The latter
 row refuses at the client's freshness premise, not at the law application.
+The differentiation-freshness package test compares exact trusted identities,
+checks the open second-derivative client, and applies `deriv_fresh` to a
+product in which variable two is absent. For variable one, the false premise
+and the independent claim about the derivative both refuse. These checks
+use package clients and do not execute the separate conformance seed.
 
 The normalization-congruence package test checks the new generic public
 law under a selective import, compares exact trusted-`GlobalId` identity
