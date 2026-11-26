@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-ALL-ORDERED-SORT-CONCAT
 title: "Spec 69 proves that merging two ordered traces is sorting their append (§22), and that merging a list of ordered traces is ordered (trace_merge_all_ordered), but no law identifies the merge of a list of ordered traces: a client holding trace_merge_all over ordered batches cannot transport Derived's perm and stable_class proofs to it. Rule from a checked D0 at zero trust that, when every trace is time-ordered, trace_merge_all equals the sort of the traces' concatenation, and state it with a seed that separates the sort from plain concatenation"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1
