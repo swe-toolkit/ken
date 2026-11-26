@@ -12355,7 +12355,7 @@ mod tests {
     /// planned record. THE GAP: the ok root's shape is not checked against the
     /// host reply.
     #[test]
-    fn every_admitted_host_effect_consumer_has_an_error_recipe() {
+    fn admitted_host_effect_error_recipes_match_the_exception_inventory() {
         use ken_host::HostOpV1 as Op;
         const NO_ERROR_RECIPE: [Op; 4] = [
             Op::ConsoleIsTerminal,
