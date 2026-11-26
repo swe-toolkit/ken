@@ -254,8 +254,6 @@ runtime_host_spine_v1! {
     read_eof,
     wrote,
     mk_instant,
-    mk_monotonic_instant,
-    mk_deadline,
     read_chunk,
     read_result_eof,
     unit,
@@ -298,6 +296,9 @@ runtime_host_spine_v1! {
     option_none,
     directory_entries,
     directory_end,
+    // Clock promotion appends checked constructor roles.
+    mk_monotonic_instant,
+    mk_deadline,
 }
 
 /// The decoded, validated checked-runtime role record.

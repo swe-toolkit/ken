@@ -6111,33 +6111,18 @@ mod tests {
         assert!(fact("SIZE_FsReadFileRequestV1") > fact("SIZE_EntropyRequestV1"));
     }
 
-    /// ABI-S3 AC-5. Every operation this WP adds is RepresentedUnavailable
-    /// (D4), and the PX5 promotion set is untouched -- asserted by CONTENTS,
-    /// not by length, so swapping a member for another cannot pass.
-    ///
-    /// ⚠ Read this together with
-    /// all_pre_resource_operations_share_one_semantic_dispatch. Availability
-    /// alone is a WEAK signal here: a new operation that were never wired at
-    /// all would also report RepresentedUnavailable, because that is the
-    /// default every unhandled operation falls to. This test therefore
-    /// establishes the D4 property but is NOT evidence that the operations
-    /// are reachable; the dispatch test is what establishes that, by driving
-    /// each one through the real semantic dispatch and requiring the backend
-    /// to have observed it.
+    /// Promotion transition sentinel: the clock and entropy roles become
+    /// NativeTested while the historical PX5 population stays exact.
     #[test]
-    fn ac5_new_operations_are_unavailable_and_the_promotion_set_is_untouched() {
+    fn clock_and_entropy_are_promoted_without_changing_the_px5_set() {
         for operation in [
             HostOpV1::ClockMonotonicNow,
             HostOpV1::ClockSleepUntil,
             HostOpV1::EntropyRandomBytes,
         ] {
-            assert_eq!(
-                operation.availability(),
-                HostOpAvailabilityV1::RepresentedUnavailable,
-                "{operation:?} must land RepresentedUnavailable per D4"
-            );
+            assert_eq!(operation.availability(), HostOpAvailabilityV1::NativeTested);
+            assert!(NATIVE_TESTED_TARGETS_V1.contains(&operation));
         }
-
         assert_eq!(
             PX5_PLANNED_NATIVE_TARGETS,
             [
@@ -6148,6 +6133,27 @@ mod tests {
                 HostOpV1::FsWriteFile,
             ]
         );
+    }
+
+    /// Durable invariant. MEASURED: the actual source reader returns exactly
+    /// the contents of a finite fixture, but no bytes on a missing source or
+    /// a short read. CLAIMED: no fallback or partial reply survives a source
+    /// failure. THE GAP: this does not measure the quality of kernel entropy.
+    #[test]
+    fn kernel_entropy_source_failure_publishes_no_bytes() {
+        let root = std::env::temp_dir().join(format!(
+            "ken-kernel-entropy-source-{}", std::process::id(),
+        ));
+        std::fs::create_dir(&root).expect("fresh entropy source fixture");
+        let source = root.join("source");
+        let missing = kernel_entropy_from(&source, 2);
+        std::fs::write(&source, [0x91]).unwrap();
+        let full = kernel_entropy_from(&source, 1);
+        let short = kernel_entropy_from(&source, 2);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(full, Ok(vec![0x91]));
+        assert_eq!(missing, Err(IoErrorIdentityV1::Unsupported));
+        assert_eq!(short, Err(IoErrorIdentityV1::Unsupported));
     }
 
     /// `AC-GATE` + `AC-PREDICATE`. Durable invariant. MEASURED: the executor

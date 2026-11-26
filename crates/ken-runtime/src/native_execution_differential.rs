@@ -3186,8 +3186,8 @@ mod tests {
         program.declarations[0].kind = RuntimeDeclarationKind::Transparent {
             body: RuntimeExpr::Effect {
                 bracket_acquire: None,
-                family: "Clock".to_string(),
-                operation: ken_host::HostOpV1::ClockMonotonicNow,
+                family: "Net".to_string(),
+                operation: ken_host::HostOpV1::NetListen,
                 capability: None,
                 args: Vec::new(),
             },
@@ -4013,12 +4013,12 @@ mod tests {
         assert!(matches!(
             report.effect_foreign_policy.status,
             NativeEffectForeignExecutableStatus::RepresentedUnavailable { ref reason }
-                if reason.contains("ClockMonotonicNow")
+                if reason.contains("NetListen")
         ));
         assert!(report
             .effect_foreign_policy
             .facts
-            .contains("runtime_expr.host_op=0202:ClockMonotonicNow"));
+            .contains("runtime_expr.host_op=0701:NetListen"));
         assert!(matches!(
             report.native,
             NativeExecutionLaneReport::Unavailable { .. }
@@ -4548,7 +4548,7 @@ mod tests {
         assert!(matches!(
             closeout.corpus.blockers[0].status,
             NativeExecutablePhaseStatus::Unavailable { ref reason }
-                if reason.contains("ClockMonotonicNow")
+                if reason.contains("NetListen")
         ));
         assert!(matches!(
             closeout_claim_status(
@@ -4557,7 +4557,7 @@ mod tests {
                 &NativeExecutableEvidenceClaim::EffectForeignExecutablePolicy
             ),
             NativeExecutablePhaseStatus::Unavailable { reason }
-                if reason.contains("ClockMonotonicNow")
+                if reason.contains("NetListen")
         ));
     }
 

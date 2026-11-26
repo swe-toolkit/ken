@@ -354,10 +354,9 @@ fn runtime_producible_constructors(
         px10_kind_symbols,
         px10_exit_symbols,
     } = symbols;
-    // The checked ITree/Coproduct spine is constructed by the program; the
-    // host never synthesizes Ret, Vis or InL as a response. Keep these three
-    // fields bound exhaustively, but outside the host-producible inventory.
-    let _ = (itree_ret, itree_vis, coproduct_in_l);
+    // The program constructs the ITree/Coproduct spine and the sleep request
+    // wrapper. These checked roles do not belong to the producer inventory.
+    let _ = (itree_ret, itree_vis, coproduct_in_l, mk_deadline);
     // The remaining roles name constructors the runtime can put in front of
     // a match: host-effect responses, process-entry inputs and primitives.
     let mut producible = [
@@ -398,7 +397,6 @@ fn runtime_producible_constructors(
         wrote,
         mk_instant,
         mk_monotonic_instant,
-        mk_deadline,
         read_chunk,
         read_result_eof,
         unit,
@@ -1490,6 +1488,10 @@ impl<'a> Lowering<'a> {
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let pointer_type = builder.func.dfg.value_type(arena);
         let output = builder.ins().stack_addr(pointer_type, output_slot, 0);
+        // The helper writes the output only when it reports success. Keep the
+        // unused failure-path word initialized; `valid` remains the authority.
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().stack_store(zero, output_slot, 0);
         let call = builder.ins().call(helper, &[arena, tag, *value, output]);
         let status = builder.inst_results(call)[0];
         Self::require_one_of_i64(builder, status, &[0, 1]);
@@ -3306,7 +3308,7 @@ impl<'a> Lowering<'a> {
             // fails the whole object emission for a lane no execution reaches --
             // the identical defect, one check earlier. The original governed
             // fixtures used the four ABI-A3 directory arms; after their
-            // promotion the retained pair uses ClockMonotonicNow.
+            // promotion the retained pair uses NetListen.
             //
             // Same fail-closed substitute for the same reason: an arm wrongly
             // proven dead HALTS rather than issuing an operation this backend
