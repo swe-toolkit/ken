@@ -230,25 +230,37 @@ fn accept4_absent_refuses_accept_without_consuming_client() {
     accept(&listener).expect("absent accept must leave the client queued");
 }
 
-/// Promise class: durable invariant. MEASURED: EMFILE stays raw, and the
-/// next real require succeeds. CLAIMED: EMFILE does not become absence.
-/// THE GAP: the fault seam shares classification but bypasses the process
-/// cache; the real cache inserts only after a successful classification.
+/// Promise class: durable invariant. MEASURED: in one cache, an EMFILE probe
+/// returns that raw error, and the next need probes again and finds Statx
+/// present: two probes. CLAIMED: an undecided probe caches nothing.
+/// THE GAP: EMFILE is scripted into the Statx probe arm's result.
 #[test]
 fn an_undecided_probe_is_not_cached() {
-    let error = with_facility_fault(Statx, libc::EMFILE, || require(Statx)).unwrap_err();
-    assert_eq!(
-        error.raw_os_error(),
-        Some(libc::EMFILE),
-        "undecided error: {error:?}"
-    );
-    require(Statx).unwrap();
+    let ((first, second), probes) = with_facility_script(Statx, &[Some(libc::EMFILE)], || {
+        (require(Statx), require(Statx))
+    });
+    assert_eq!(first.unwrap_err().raw_os_error(), Some(libc::EMFILE));
+    second.expect("the next need probes again");
+    assert_eq!(probes, 2);
+}
+
+/// Promise class: durable invariant. MEASURED: in one cache, an EPERM probe
+/// makes Statx absent, and the next need is refused from the cache although
+/// a second probe would find Statx present: one probe. CLAIMED: a decisive
+/// absence is cached. THE GAP: EPERM is scripted into the probe arm's result.
+#[test]
+fn a_decisive_absence_is_cached() {
+    let ((first, second), probes) =
+        with_facility_script(Statx, &[Some(libc::EPERM), None], || (require(Statx), require(Statx)));
+    assert_eq!(first.unwrap_err().kind(), std::io::ErrorKind::Unsupported);
+    assert_eq!(second.unwrap_err().kind(), std::io::ErrorKind::Unsupported);
+    assert_eq!(probes, 1);
 }
 
 /// Promise class: durable invariant. MEASURED: two real requires see one
 /// process-wide StreamSocketUnix probe. CLAIMED: a decisive presence is
-/// reused. THE GAP: this counts the present case; absence uses the same
-/// cache insertion path, but injected faults deliberately bypass it.
+/// reused by the process-wide cache. THE GAP: the absent and undecided
+/// cases are counted in scoped caches, which run the same code.
 #[test]
 fn a_decisive_probe_runs_once_per_process() {
     require(StreamSocketUnix).unwrap();
