@@ -12347,15 +12347,22 @@ mod tests {
 
     /// Promise class: durable invariant. MEASURED: every operation in
     /// `CRANELIFT_HOST_EFFECT_CONSUMERS_V1` has a non-Absent error root in
-    /// `host_effect_recipe_tree`, except the two whose dispatch returns before
-    /// any synthesized producer runs. CLAIMED: a consumer admitted without its
+    /// `host_effect_recipe_tree`, except operations with no synthesized error
+    /// reply: the scalar or instant reads and the Unit sleep. Sleep refuses
+    /// an invalid deadline through the trap path, not a reply recipe.
+    /// CLAIMED: a consumer admitted without its
     /// error recipe is caught here, not at native build as a seat with no
     /// planned record. THE GAP: the ok root's shape is not checked against the
     /// host reply.
     #[test]
     fn every_admitted_host_effect_consumer_has_an_error_recipe() {
         use ken_host::HostOpV1 as Op;
-        const NO_ERROR_RECIPE: [Op; 2] = [Op::ConsoleIsTerminal, Op::ClockWallNow];
+        const NO_ERROR_RECIPE: [Op; 4] = [
+            Op::ConsoleIsTerminal,
+            Op::ClockWallNow,
+            Op::ClockMonotonicNow,
+            Op::ClockSleepUntil,
+        ];
         for operation in super::super::effects::CRANELIFT_HOST_EFFECT_CONSUMERS_V1 {
             let tree = super::host_effect_recipe_tree(operation);
             assert_eq!(

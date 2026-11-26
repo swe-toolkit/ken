@@ -2218,6 +2218,10 @@ fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
         .collect()
 }
 
+/// Promise class: durable invariant. The live emitter population agrees
+/// with native availability, and an empty offset list agrees with the
+/// catalog's zero request arity. The offset mutations check layout validation,
+/// not execution of each operation.
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
@@ -2237,13 +2241,17 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.request_align_shift ^= 1;
         mutations.push(changed);
-        if layout.request_offsets.is_empty() {
-            assert_eq!(
-                operation,
-                ken_host::HostOpV1::ClockWallNow,
-                "only the zero-arity wall-clock request has no request field offset"
-            );
-        } else {
+        let request_arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .expect("live operation is catalogued")
+            .4;
+        assert_eq!(
+            layout.request_offsets.is_empty(),
+            request_arity == 0,
+            "{operation:?}: request offsets are empty exactly for zero request arity"
+        );
+        if !layout.request_offsets.is_empty() {
             let mut changed = layout.clone();
             changed.request_offsets[0] ^= 1;
             mutations.push(changed);
