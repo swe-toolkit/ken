@@ -23087,7 +23087,7 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsOpenDirectory | FsReadDirectoryBatch
         | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
         | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSetLength | FsSync
-        | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease
+        | ResourceRelease
         | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView
         | MappingWriteView | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite
         | ProcessPlanOpen | ProcessPlanPush | ProcessSpawn | ProcessTakePipe

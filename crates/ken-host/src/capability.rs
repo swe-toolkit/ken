@@ -336,9 +336,6 @@ pub enum FsCapabilityOperation {
     ChangeMode,
     SetLength,
     Sync,
-    GetInheritance,
-    SetInheritance,
-    Duplicate,
     Spawn,
 }
 
@@ -354,8 +351,6 @@ impl FsCapabilityOperation {
             Self::RenameSource | Self::RenameDestination => RightSet::WRITE.union(RightSet::DELETE),
             Self::ChangeMode => RightSet::CHANGE_MODE,
             Self::SetLength | Self::Sync => RightSet::WRITE,
-            Self::GetInheritance => RightSet::READ,
-            Self::SetInheritance | Self::Duplicate => RightSet::CHANGE_MODE,
             Self::Spawn => RightSet::EXECUTE,
         }
     }
