@@ -1873,7 +1873,7 @@ impl<'a> Lowering<'a> {
                 _ => None,
             };
             let word = if process_exit {
-                let status = self.emit_process_exit_status(builder, value.clone());
+                let status = self.emit_process_exit_status(builder, value.clone())?;
                 self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)?
             } else {
                 // The ordinary boundary walk remains fail-closed for every
@@ -2996,7 +2996,7 @@ impl<'a> Lowering<'a> {
                 let value = self.unwrap_terminal_ret(value);
                 let value = match value {
                     Lowered::ProcessExitStatus { value } => value,
-                    value => self.emit_process_exit_status(builder, value),
+                    value => self.emit_process_exit_status(builder, value)?,
                 };
                 return Ok((value, ResultDecoder::ProcessStatus));
             }
@@ -3045,15 +3045,16 @@ impl<'a> Lowering<'a> {
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             value: Lowered,
-        ) -> cranelift_codegen::ir::Value {
+        ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
             let status = self.decode_process_exit_status(builder, value);
-            Self::return_exit_sentinel(builder, status)
+            self.return_exit_sentinel(builder, status)
         }
 
         pub(super) fn return_exit_sentinel(
+            &mut self,
             builder: &mut FunctionBuilder<'_>,
             status: cranelift_codegen::ir::Value,
-        ) -> cranelift_codegen::ir::Value {
+        ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
             let negative = builder.ins().icmp_imm(
                 cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
                 status,
@@ -3064,8 +3065,9 @@ impl<'a> Lowering<'a> {
             builder.ins().brif(negative, sentinel, &[], decoded, &[]);
             builder.switch_to_block(sentinel);
             builder.ins().return_(&[status]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
             builder.switch_to_block(decoded);
-            status
+            Ok(status)
         }
 
         fn decode_process_exit_status(
