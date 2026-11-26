@@ -1,13 +1,14 @@
 # Filesystem descriptor operations — seed cases (DESCRIPTOR)
 
-Format: `../../README.md`. These cases cover the black-box behavior added by
-`spec/30-surface/38-ffi-io.md §1.7.1`: `setLength` and `sync` on a live
-filesystem resource. They use the recording-host fixture form already used by
-`behavioral/buffer-io/seed-buffer-io.md`; the assertions observe the program's
-public result and the fixture's file contents or host request, not Rust
-internals. Each `withResource` body returns its operation result(s) as data;
-its acquisition and settlement succeed. The `expect` values are the inner
-operation results, not the outer bracket result.
+Format: `../../README.md`. These cases cover `spec/30-surface/38-ffi-io.md`
+§1.7.1: `setLength` and `sync` on a live filesystem resource, plus the
+close-on-exec flag on each acquired `FsHandle`. The operation cases use the
+recording-host fixture form already used by
+`behavioral/buffer-io/seed-buffer-io.md`; the descriptor case observes
+host-boundary flags and child descriptors. Assertions use public results or
+fixture state, not Rust internals. Each operation-case `withResource` body
+returns its result(s) as data; acquisition and settlement succeed. Their
+`expect` values are the inner results, not the outer bracket result.
 
 These cases are authored but have not been run by the official conformance
 runner. No CI, publication, or landing result is claimed.
@@ -114,3 +115,40 @@ runner. No CI, publication, or landing result is claimed.
   §38 leaves it to the host kernel and filesystem.
 - why: the success and failure outcomes make the host-result mapping visible.
   Neither outcome is evidence of persistence across a machine failure.
+
+## FS-E. Every live FsHandle is close-on-exec
+
+### surface/ffi-io/fs-handle-fds-are-close-on-exec
+
+- promise class: durable invariant.
+- spec: `38 §1.3.1`, `§1.7.1`, `§1.11.1`.
+- given: under one valid FS authority rooted at a unique temporary directory,
+  acquire and keep live one `FsHandle` for every constructor of the public
+  `ResourceOpenMode` family, using distinct fixture paths and mode-appropriate
+  arguments and policies. Also keep live the private directory handle used by
+  the `withResource` path. Nest those scopes around a checked PX10 spawn of
+  `px10-held`. The body reads its readiness record, leaves stdin open, and waits
+  while the host fixture observes the parent. Release the child only after
+  observation.
+- measured: confirm one successful live acquisition per public mode and the
+  child's readiness before inspecting descriptors. Map the parent's
+  `/proc/<parent>/fd` links to each distinct fixture path and the private
+  directory. Read `fcntl(F_GETFD)` on every parent descriptor in the parent
+  process; key the `FsHandle` flag assertions to their fixture paths and track
+  the private directory descriptor separately. Read the child's
+  `/proc/<pid>/fd` links while `px10-held` is blocked on stdin.
+- claimed: every acquired `FsHandle` has `FD_CLOEXEC`. The child control has
+  exactly `{0, 1, 2}` and no acquired fixture file or directory inode.
+- the gap: the child descriptor set alone cannot prove the per-handle flag;
+  PX10 closefrom can produce `{0, 1, 2}` even when `FD_CLOEXEC` is missing.
+  The host fixture must assert the flag separately for every `FsHandle` mode,
+  keyed to its distinct fixture path, rather than infer it from the child.
+- mutation: in a separate host mutation, remove `| OFlags::CLOEXEC` from the
+  `linux::open_resource_at` open flags. This changes the `FsHandle` acquisition
+  path while leaving the child closefrom path intact.
+- expect: without mutation, every `FsHandle` flag includes `FD_CLOEXEC` and
+  the child has only `{0, 1, 2}`. Under mutation, every `FsHandle` flag
+  assertion fails; the child descriptor assertion may remain green because
+  closefrom is independent.
+- why: direct parent-side flag observations distinguish the host obligation
+  from the separately tested spawn-plan closefrom behavior.

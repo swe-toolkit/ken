@@ -1,8 +1,10 @@
 # Bytes, I/O, and the FFI
 
 > Status: **§1.1–§1.6 impl-ready (L6); §1.7 contract-pinned (PX8-T); §2–§4
-> impl-ready (L7)** — elaborated to team-ready rigor and normative for the
-> *trust and effect discipline*. **§1.1–§1.6 (`Bytes` + binary I/O, L6)** are
+> impl-ready (L7); FS descriptor retirement contract-pinned
+> (RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE)** — elaborated to team-ready rigor
+> and normative for the *trust and effect discipline*.
+> **§1.1–§1.6 (`Bytes` + binary I/O, L6)** are
 > built against the **landed** kernel/runtime (`14 §5` primitives, `41 §3a`
 > encoding, `36 §1` effect rows). **§1.7** pins the contract that PX8-R/PX8-F
 > must implement; it does not claim that substrate or surface is landed.
@@ -606,6 +608,13 @@ preserving the retained prefix and zero-filling any extension.
 sync asks the host to flush the file's data and metadata (fsync(2)) and
 returns the host's outcome. Durability after machine failure is the kernel
 and filesystem's contract and is not tested by Ken.
+
+Every FsHandle descriptor is created with close-on-exec, and no Ken operation
+clears that flag or duplicates a descriptor. Inheritance into a child is decided
+only by the spawn plan (§1.11), which starts the child with exactly {0, 1, 2};
+the plan's closefrom step and the per-descriptor flag are independent, as for
+sockets (§1.13). The host ABI has no descriptor-inheritance query, inheritance
+setter or duplication operation.
 
 Derived `readAt` admits a raw `BufferWindow` in this exact order:
 

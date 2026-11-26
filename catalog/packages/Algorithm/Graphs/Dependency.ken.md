@@ -802,6 +802,42 @@ pub theorem topo_order_reverse_vertices
         (DC.reverse q (ordered_vertices q d g order)) =
   Refl
 
+pub fn topo_order_union
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (order : TopoOrder q d g)
+      (forward_h : all_edges_forward q d h (ordered_vertices q d g order))
+    : TopoOrder q d (graph_union q g h) =
+  MkTopoOrder
+    q
+    d
+    (graph_union q g h)
+    (ordered_vertices q d g order)
+    (ordered_unique q d g order)
+    (ordered_complete q d g order)
+    (λx.
+      λy.
+        λpresent.
+          match graph_union_edge_cases q g h x y present {
+            Inl from_g ↦ ordered_forward q d g order x y from_g;
+            Inr from_h ↦ forward_h x y from_h
+          })
+
+pub theorem topo_order_union_vertices
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (order : TopoOrder q d g)
+      (forward_h : all_edges_forward q d h (ordered_vertices q d g order))
+    : Equal
+        (List q)
+        (ordered_vertices q d (graph_union q g h) (topo_order_union q d g h order forward_h))
+        (ordered_vertices q d g order) =
+  Refl
+
 pub theorem before_irreflexive
       (q : Type) (d : DecEq q) (x : q) (xs : List q)
     : Equal Bool (before q d x x xs) False =
@@ -1060,6 +1096,14 @@ when the original first endpoint is the head, it is absent from the tail
 and moves to the end; when both endpoints are in the tail, the reversed
 relation survives appending the head. `topo_order_reverse_vertices` exposes
 the exact list by conversion, even for an open order.
+
+`topo_order_union` keeps the left graph's ordered list when every edge of
+the right graph goes forward in that same list. The uniqueness and
+completeness proofs are reused. A union edge is handled by the left order
+or by the supplied right-edge proof, according to `graph_union_edge_cases`.
+`topo_order_union_vertices` reads off the unchanged list. With two orders
+whose lists are equal, a client can transport the right-edge proof along
+that equality and use the same transfer.
 
 Reachability uses the existing finite-state decision with state and alphabet
 both `q`. A candidate letter advances only on a checked edge; letters for
@@ -3434,7 +3478,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–21](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–22](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3475,15 +3519,15 @@ checks the reversed vertex list on a one-way edge and refuses the original
 list in the same proof form. The public API exports six data families (`Graph`, `Walk`, `Cycle`, `ReachWitness`,
 `TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
-`MkTopoOrder`, `HasOrder`, `HasCycle`). Its nineteen functions are `edge`,
+`MkTopoOrder`, `HasOrder`, `HasCycle`). Its twenty functions are `edge`,
 `walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
 `walk_reverse`, `graph_union`, `graph_union_edge_cases`, `contains`, `before`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
-`topo_order_edge_antitone`, `topo_order_reverse`, `dependency_order_or_cycle`,
-`graph_from_successors`, and `successors_append`. Thirty-seven kernel-checked
-theorems expose their laws, including the appended-list edge equation and
-`topo_order_reverse_vertices`. Every other helper is private to this
-package.
+`topo_order_edge_antitone`, `topo_order_reverse`, `topo_order_union`,
+`dependency_order_or_cycle`, `graph_from_successors`, and `successors_append`.
+Thirty-eight kernel-checked theorems expose their laws, including the
+appended-list edge equation, `topo_order_reverse_vertices`, and
+`topo_order_union_vertices`. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|

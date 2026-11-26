@@ -461,43 +461,6 @@ mod linux {
         );
     }
 
-    pub(super) fn resource_get_inheritance(
-        handle: &ResourceHandle,
-    ) -> io::Result<FdInheritancePolicyV1> {
-        let flags = rustix::io::fcntl_getfd(&handle.0).map_err(io::Error::from)?;
-        Ok(if flags.contains(rustix::io::FdFlags::CLOEXEC) {
-            FdInheritancePolicyV1::CloseOnExec
-        } else {
-            FdInheritancePolicyV1::Inherit
-        })
-    }
-
-    pub(super) fn resource_set_inheritance(
-        handle: &ResourceHandle,
-        policy: FdInheritancePolicyV1,
-    ) -> io::Result<()> {
-        let mut flags = rustix::io::fcntl_getfd(&handle.0).map_err(io::Error::from)?;
-        match policy {
-            FdInheritancePolicyV1::Inherit => flags.remove(rustix::io::FdFlags::CLOEXEC),
-            FdInheritancePolicyV1::CloseOnExec => flags.insert(rustix::io::FdFlags::CLOEXEC),
-        }
-        rustix::io::fcntl_setfd(&handle.0, flags).map_err(io::Error::from)
-    }
-
-    pub(super) fn resource_duplicate(
-        handle: &ResourceHandle,
-        policy: FdInheritancePolicyV1,
-    ) -> io::Result<ResourceHandle> {
-        let duplicated = match policy {
-            // rustix 1.1 exposes `dup` as the safe Linux operation with the
-            // same min-zero allocation and no-CLOEXEC semantics.
-            FdInheritancePolicyV1::Inherit => rustix::io::dup(&handle.0),
-            FdInheritancePolicyV1::CloseOnExec => rustix::io::fcntl_dupfd_cloexec(&handle.0, 0),
-        }
-        .map_err(io::Error::from)?;
-        Ok(ResourceHandle(duplicated))
-    }
-
     pub(super) fn read(handle: &Handle) -> io::Result<Vec<u8>> {
         let mut file = file(handle)?;
         file.seek(SeekFrom::Start(0))?;
@@ -1091,53 +1054,6 @@ pub fn resource_sync_v1(handle: &ResourceHandleV1, mode: FsSyncModeV1) -> HostRe
     }
 }
 
-pub fn resource_get_inheritance_v1(handle: &ResourceHandleV1) -> HostResult<FdInheritancePolicyV1> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_get_inheritance(&handle.inner).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = handle;
-        unsupported()
-    }
-}
-
-pub fn resource_set_inheritance_v1(
-    handle: &ResourceHandleV1,
-    policy: FdInheritancePolicyV1,
-) -> HostResult<()> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_set_inheritance(&handle.inner, policy).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, policy);
-        unsupported()
-    }
-}
-
-pub fn resource_duplicate_v1(
-    handle: &ResourceHandleV1,
-    policy: FdInheritancePolicyV1,
-) -> HostResult<ResourceHandleV1> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_duplicate(&handle.inner, policy)
-            .map(|inner| ResourceHandleV1 { inner })
-            .map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, policy);
-        unsupported()
-    }
-}
-
 /// Explicitly closes a unique resource owner and reports the real OS result.
 pub fn close_resource_v1(handle: ResourceHandleV1) -> HostResult<()> {
     assert_current_target_abi()?;
@@ -1329,6 +1245,76 @@ pub fn rename(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Promise class: durable invariant. MEASURED: F_GETFD on the descriptor
+    /// returned by the public resource-open path for each OpenRequest mode.
+    /// CLAIMED: each filesystem resource open creates a close-on-exec
+    /// descriptor. THE GAP: this covers Ken's Linux open path, not descriptors
+    /// created or modified by an embedding host.
+    #[cfg(target_os = "linux")]
+    fn assert_resource_open_cloexec(request: OpenRequest) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        struct TempRoot(std::path::PathBuf);
+        impl Drop for TempRoot {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "ken-resource-cloexec-{}-{request:?}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&dir).expect("create a fresh temp root");
+        let dir = TempRoot(dir);
+        let path = dir.0.join("entry");
+        match request {
+            OpenRequest::Read | OpenRequest::ReadWrite => {
+                std::fs::write(&path, b"fixture").expect("create file fixture");
+            }
+            OpenRequest::ReadDirectory => {
+                std::fs::create_dir(&path).expect("create directory fixture");
+            }
+            OpenRequest::CreateNew
+            | OpenRequest::CreateOrTruncate
+            | OpenRequest::CreateOrKeep
+            | OpenRequest::AppendOrCreate => {}
+        }
+        let root = open_root(&RootPath::new(&dir.0).unwrap()).expect("open temp root");
+        let leaf = PathComponent::new(b"entry").unwrap();
+        let handle = open_resource_at_v1(&root, &leaf, request).expect("open resource fixture");
+        let flags = rustix::io::fcntl_getfd(&handle.inner.0).expect("F_GETFD on returned resource");
+        assert!(
+            flags.contains(rustix::io::FdFlags::CLOEXEC),
+            "{request:?}: returned descriptor lacks FD_CLOEXEC"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    macro_rules! resource_open_cloexec_rows {
+        ($($name:ident => $request:ident),+ $(,)?) => {$(
+            #[test]
+            fn $name() {
+                assert_resource_open_cloexec(OpenRequest::$request);
+            }
+        )+};
+    }
+
+    #[cfg(target_os = "linux")]
+    resource_open_cloexec_rows! {
+        resource_open_cloexec_read => Read,
+        resource_open_cloexec_read_directory => ReadDirectory,
+        resource_open_cloexec_read_write => ReadWrite,
+        resource_open_cloexec_create_new => CreateNew,
+        resource_open_cloexec_create_or_truncate => CreateOrTruncate,
+        resource_open_cloexec_create_or_keep => CreateOrKeep,
+        resource_open_cloexec_append_or_create => AppendOrCreate,
+    }
 
     /// MEASURED: clearing each bit removes just that field, even if its slot
     /// still contains data. CLAIMED: absence is keyed only by the status mask.

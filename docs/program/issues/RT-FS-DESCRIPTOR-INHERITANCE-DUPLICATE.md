@@ -1,7 +1,7 @@
 ---
 id: RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE
 title: "ABI-S1 merged host implementations of FsGetInheritance, FsSetInheritance and FsDuplicate, but no Ken source can reach them and all three are RepresentedUnavailable, while PX10's spawn plan already builds child descriptor maps under deny-by-default inheritance. Rule from an AC-0 whether each operation gains a checked surface and native parity or leaves the catalog because the spawn plan subsumes it, and land the ruled result"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1
