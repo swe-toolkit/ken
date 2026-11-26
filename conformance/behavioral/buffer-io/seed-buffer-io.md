@@ -604,9 +604,11 @@ Runtime identities such as `file_r` and `buffer_r` do not.
 - engine matrix: run each R1/W1 arm independently on interpreter and native;
   each must meet the specified result and event observations directly.
 - given: use a fresh file containing `A` under valid FS authority. Acquire a
-  capacity-`8` `BufferHandle` through `withBuffer 8`. R1 uses a file handle
-  acquired through `withResource` in `ResourceOpenMode.ResourceRead` and a
-  `BufferWindow(start = 0, length = 1)`. W1 uses a file handle acquired
+  capacity-`8` `BufferHandle` through `withBuffer 8`. R1 uses
+  `fileOffset = 9223372036854775808` (`2^63`) with a file handle acquired
+  through `withResource` in `ResourceOpenMode.ResourceRead` and a
+  `BufferWindow(start = 0, length = 1)`. W1 uses
+  `fileOffset = 9223372036854775808` (`2^63`) with a file handle acquired
   through `withResource` in
   `ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep` and a
   one-byte `BufferSpan` minted by a successful `readAt` at file offset `0`
