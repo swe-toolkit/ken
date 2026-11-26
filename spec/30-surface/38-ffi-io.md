@@ -842,9 +842,11 @@ operation's effects. While the probe has found its facility absent, each
 listed operation returns `IOError.Unsupported` in its existing error
 form before using the facility, with no fallback, whatever errno the
 kernel or a policy such as seccomp gave the probe; a policy's `EPERM` is
-not `PermissionDenied` here. A probe that fails for a reason that does not
-show absence settles nothing: the operation fails as it would without
-the probe, and the next need probes again. An operation whose facility
+not `PermissionDenied` here. If a probe fails without establishing absence,
+the current operation stops at that facility check and reports the probe's
+error through the operation's existing error mapping. No availability
+verdict is cached, and the next operation that needs the facility probes
+again. An operation whose facility
 is present behaves as if no probe existed.
 
 | Facility | Needed by |
