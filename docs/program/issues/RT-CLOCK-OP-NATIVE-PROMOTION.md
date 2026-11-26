@@ -134,6 +134,13 @@ branch from main after that WP lands.
    failure was require_true's unclassified -1. Keyed on: the native lane's
    program-reachable refusal must be a planner-catalogued trap
    (`evt_2tys8csd36b58`).
+2. Ruling 3's out-of-domain comparator assumed that lane transport is
+   identical across lanes: the effect-trace reading width (i128 native,
+   minimal interpreter) and native stderr (starter report plus launcher
+   line). Keyed on: what a lane emits on its transport outside the
+   semantic observation (`evt_4630qt1rw0at9`).
+
+§1a is at 2 (next trigger 3). The §1b predicate question is not yet due.
 
 ## Stop conditions
 
