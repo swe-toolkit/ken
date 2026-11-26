@@ -3346,6 +3346,8 @@ fn emit_native_program_preparation(
                 read_eof: host_spine.read_eof.to_string(),
                 wrote: host_spine.wrote.to_string(),
                 mk_instant: host_spine.mk_instant.to_string(),
+                mk_monotonic_instant: host_spine.mk_monotonic_instant.to_string(),
+                mk_deadline: host_spine.mk_deadline.to_string(),
                 read_chunk: host_spine.read_chunk.to_string(),
                 read_result_eof: host_spine.read_result_eof.to_string(),
                 unit: host_spine.unit.to_string(),
@@ -4522,6 +4524,8 @@ fn checked_host_spine_v1(
         read_eof: resolve_id(roles.read_eof)?,
         wrote: resolve_id(roles.wrote)?,
         mk_instant: resolve_id(roles.mk_instant)?,
+        mk_monotonic_instant: resolve_id(roles.monotonic_instant_constructor)?,
+        mk_deadline: resolve_id(roles.deadline_constructor)?,
         read_chunk: resolve_id(roles.read_chunk)?,
         read_result_eof: resolve_id(roles.read_result_eof)?,
         unit: resolve_id(roles.unit)?,
@@ -4749,6 +4753,9 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S2 appends in the same order as the runtime role decoder.
         &spine.directory_entries,
         &spine.directory_end,
+        // Clock promotion appends in that same order.
+        &spine.mk_monotonic_instant,
+        &spine.mk_deadline,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
@@ -9233,12 +9240,12 @@ mod d1b_role_c1_roster_identity {
             ("exit_code_type", "ExitCode", roles.exit_code_type),
             (
                 "monotonic_instant_constructor",
-                "MkMonotonicInstant",
+                "MonotonicInstant.MkMonotonicInstant",
                 roles.monotonic_instant_constructor,
             ),
             (
                 "deadline_constructor",
-                "MkDeadline",
+                "Deadline.MkDeadline",
                 roles.deadline_constructor,
             ),
             (
@@ -9389,6 +9396,8 @@ mod d1b_role_c1_roster_identity {
             ("read_eof", record.spine.read_eof.clone()),
             ("wrote", record.spine.wrote.clone()),
             ("mk_instant", record.spine.mk_instant.clone()),
+            ("monotonic_instant_constructor", record.spine.mk_monotonic_instant.clone()),
+            ("deadline_constructor", record.spine.mk_deadline.clone()),
             ("read_chunk", record.spine.read_chunk.clone()),
             ("read_result_eof", record.spine.read_result_eof.clone()),
             ("unit", record.spine.unit.clone()),

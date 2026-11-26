@@ -695,7 +695,7 @@ unrelated `ElabEnv` does not satisfy them.
 
 - promise class: **normative compatibility vector** — the thirty pre-existing
   floor members are closed in this fixture's two directions
-- spec: `30-taxonomy §4` (current 53-name floor; this fixture tests the
+- spec: `30-taxonomy §4` (current 57-name floor; this fixture tests the
   thirty pre-existing members), `33 §3.3` (the exact floor, three Pair
   companions, and no convenience-global fallback), `39 §2.0` step 4
 - given: in a fresh harness arm, first use the ordinary non-loader elaboration
@@ -824,7 +824,7 @@ sentinel beside the current contract.
   thirty-name subset and each constructor's scope are contract values; reuse
   of checked identities, allocator accounting, and trust remain durable
   relations
-- spec: `30-taxonomy §4` (current 53-name floor; this vector covers the
+- spec: `30-taxonomy §4` (current 57-name floor; this vector covers the
   original thirty-member subset), `33 §3.3`, `39 §2.0`,
   `38 §1.11.1–§1.11.2`
 - given: create a fresh `ElabEnv` and record the `GlobalId` and declaration kind
@@ -935,7 +935,7 @@ sentinel beside the current contract.
   and unchanged `trusted_base()` identities.
   A change to these thirty identities or their constructor scopes is a
   **contract change**, not routine test maintenance. A change to the complete
-  53-name roster is also a contract change and belongs in the full inventory
+  57-name roster is also a contract change and belongs in the full inventory
   case in `minimality.md` plus the dedicated increment cases below; do not
   broaden this historical subset silently. Never refresh a roster or
   constructor table merely because the implementation reports a new value.
@@ -951,12 +951,74 @@ sentinel beside the current contract.
   FS/resource additions and their constructor dispositions. The later scoped
   families, State, Console/Char, and Inc3a additions are covered by dedicated
   route cases and
-  the exact 53-name inventory in `minimality.md`. This is a conformance
+  the exact 57-name inventory in `minimality.md`. This is a conformance
   expectation, not a
   measurement;
   no official conformance-runner result is claimed. **THE GAP:** every
   constructor must retain its recorded parent identity, and equal-shaped or
   same-spelling substitutions must not replace a floor identity.
+
+### surface/modules/abi-s2-and-rt-clock-floor-types-preserve-identities
+
+- promise class: **normative compatibility vector** — these four floor types,
+  their checked identities, and their public/private constructor paths are
+  fixed
+- spec: `30-taxonomy §4`; `33 §3.3`; `38 §1.14–§1.15`
+- given: in a fresh pre-source environment, record the exact `GlobalId` and
+  declaration kind of `DirectoryHandle`, `DirectoryProgress`,
+  `MonotonicInstant`, and `Deadline`, plus each constructor id and parent.
+  Through `elaborate_module_from_roots`,
+  `elaborate_module_from_roots_v1`, and rootless `elaborate_file_v1`, use all
+  four types without imports:
+
+  ```ken
+  fn keep_directory_handle (x : DirectoryHandle) : DirectoryHandle = x
+
+  fn directory_progress_cases (progress : DirectoryProgress) : Bool =
+    match progress {
+      DirectoryProgress.DirectoryEntries entries ↦ True;
+      DirectoryProgress.DirectoryEnd ↦ False
+    }
+
+  const instant : MonotonicInstant =
+    MonotonicInstant.MkMonotonicInstant 7
+  const deadline : Deadline = Deadline.MkDeadline instant
+  fn keep_instant (x : MonotonicInstant) : MonotonicInstant = x
+  fn keep_deadline (x : Deadline) : Deadline = x
+  ```
+
+  In separate clients, pair each qualified public constructor value with an
+  otherwise identical use of its bare leaf. Pair each same-name floor type
+  declaration with the same declaration under a fresh local type name. Also
+  attempt both qualified and bare `PrivateDirectoryHandle` construction; the
+  public `keep_directory_handle` use is its positive control. Define a local
+  family with bare constructor leaves `DirectoryEntries` and
+  `DirectoryEnd` to prove those names are not reserved.
+- measured: all four type identities before source loading, each public
+  constructor id and parent, private-constructor visibility, and every
+  client result.
+- claimed: all four types are available at their exact pre-source identities
+  with no import. `DirectoryHandle`'s constructor and raw-resource projection
+  remain private. `DirectoryProgress` has exactly its two qualified public
+  cases. `MonotonicInstant` and `Deadline` use their qualified constructors;
+  their bare leaves are not ambient names.
+- expect: all qualified clients accept and select the snapshotted identities;
+  both bare-leaf clients refuse with `UnboundName` naming the bare
+  constructor. Each same-name floor type declaration refuses, while its
+  renamed type control accepts. Both private-constructor paths refuse, and
+  local constructor spellings accept. Installing these checked floor
+  identities allocates no replacement declarations and adds no
+  `trusted_base()` entry.
+- controls: each qualified public constructor is the positive control for its
+  bare-leaf refusal; each renamed local declaration controls its same-name
+  floor refusal. The public `DirectoryHandle` type use controls its private
+  constructor refusals.
+- why: §1.14–§1.15 add these checked floor types and fix their constructor
+  visibility. Same-spelled imports, local families, or raw-resource
+  projections cannot replace the exact identities selected by the host
+  operations.
+- staging: post-promotion contract case; do not run against pre-promotion
+  main.
 
 ### surface/modules/qualified-constructor-in-type-argument
 
@@ -2459,8 +2521,8 @@ already built.
 | `pub` | eligible `pub` accepts; each named insertion rejects | eligibility is declaration-specific | unmodified production control per row; fixity row gated |
 | caller import | adding only the dependency's own import flips its verdict | a dependency cannot borrow caller imports | caller and provider sources otherwise fixed |
 | dependency import | adding only the caller's own import flips its verdict | dependency imports do not leak back | dependency source byte-identical |
-| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 53-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
-| current floor inventory | the signature traversal and internal-provision set close to 53 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 45 internal-provision identities and adds no trust; `SocketAddress` is internal-provision, and its three representation constructors are private at qualified paths with no bare names reserved | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
+| floor/global | the thirty pre-existing identities resolve to their recorded IDs; source-visible parent-derived constructors accept; bare ambient and `Empty` reject; explicit import accepts | this vector covers the original subset, not the entire current 57-name roster | actual primitive uses, exact ids/parentage, six FS/resource additions and their constructor scopes, scoped `Coproduct`/`Instant`/`ITree`, bare `MkUnit`/`MkFileError`, definitionally equal ambient type, imported control; ConsoleStream and eqChar have dedicated cases |
+| current floor inventory | the signature traversal and internal-provision set close to 57 exact identities, with parent-derived constructor inventory | the current floor is 8 signature plus 49 internal-provision identities and adds no trust; `DirectoryHandle`, `DirectoryProgress`, `SocketAddress`, `MonotonicInstant`, and `Deadline` are internal-provision, with the DirectoryHandle constructor and SocketAddress representation constructors private | `../taxonomy/minimality.md` holds the exact roster; its carried measurements remain historical and no official runner is claimed |
 | Inc3a direct-tree vocabulary | roots-loaded and rootless entry resolve ConsoleOp's four cases, response reductions, itree_bind and resp_coproduct; bare bind is unbound on every route | the scoped families and operation names are the source contract; bare constructors and bind each have same-route positive controls | same-route qualified positives, local-family controls, and captured itree_bind identity; no ambient `bind` alias is claimed |
 | State direct operations | two routes use typed state_get, state_put, and run_state references; each protected operation has a collision control and local get/put declarations remain legal | the three checked operation IDs are source-nameable; this case does not claim fold execution | exact typed direct-tree signatures and separate same-name/local-name pairs |
 | Inc3a package homes | each of 24 ordinary H names has its own import/omission pair; eight FixedWidth conversions have separate range vectors | the target home set is 96: 81 base rows minus 17 retired FileOperation rows plus 32 additions | `seed-strict-package-homes.md` covers the exact new names and ranges; the counts are normative targets, not test-run measurements |

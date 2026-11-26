@@ -144,7 +144,7 @@ pub(super) use static_transition::{
     RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
 };
 pub(super) use static_transition::{
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
     BoolMatchCaseOrdinals, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
     JoinPlanToken,
     JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,

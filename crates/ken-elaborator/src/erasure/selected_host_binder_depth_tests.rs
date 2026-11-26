@@ -166,6 +166,8 @@ fn selected_host_fixture() -> SelectedHostFixture {
         read_eof: unused.clone(),
         wrote: unused.clone(),
         mk_instant: unused.clone(),
+        mk_monotonic_instant: unused.clone(),
+        mk_deadline: unused.clone(),
         read_chunk: unused.clone(),
         read_result_eof: unused.clone(),
         unit: unused.clone(),

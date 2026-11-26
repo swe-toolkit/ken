@@ -261,13 +261,11 @@ struct FsSyncRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct ClockDeadlineRequestV1 {
     deadline: u64,
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct EntropyRequestV1 {
     count: u64,
 }
@@ -617,6 +615,21 @@ impl HostEffectBackendV1 for ProcessHost {
         // sequence, and lets generated code validate one exact
         // response layout before interning the magnitude.
         nanoseconds.to_be_bytes().to_vec()
+    }
+
+    fn clock_monotonic_now(&mut self) -> Vec<u8> {
+        i128::try_from(crate::monotonic_nanoseconds_v1())
+            .expect("an Instant duration always fits signed nanoseconds")
+            .to_be_bytes()
+            .to_vec()
+    }
+
+    fn clock_sleep_until(&mut self, deadline: u64) {
+        crate::sleep_until_monotonic_v1(deadline);
+    }
+
+    fn entropy_random_bytes(&mut self, count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+        crate::kernel_entropy_v1(count)
     }
 
     fn console_write(
@@ -1449,7 +1462,8 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         CanonicalOutcomeV1::Success(
             CanonicalReplyV1::Bytes(bytes)
             | CanonicalReplyV1::ReadChunk(bytes)
-            | CanonicalReplyV1::Instant(bytes),
+            | CanonicalReplyV1::Instant(bytes)
+            | CanonicalReplyV1::MonotonicInstant(bytes),
         ) => {
             context.response_arena.push(bytes.into_boxed_slice());
             let bytes = context
@@ -1537,9 +1551,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 data: bytes.as_ptr(),
                 len: bytes.len(),
             };
-        }
-        CanonicalOutcomeV1::Success(CanonicalReplyV1::MonotonicInstant(_)) => {
-            reply.tag = REPLY_ERROR
         }
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
             reply.tag = REPLY_RESOURCE_ERROR;
@@ -1803,14 +1814,46 @@ unsafe fn decode_native_request_v1(
                 },
             )
         }
-        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
+        HostOpV1::ClockWallNow | HostOpV1::ClockMonotonicNow
+            if request_size == std::mem::size_of::<UnitRequestV1>() =>
+        {
             if !request.cast::<UnitRequestV1>().is_aligned() {
                 return Err(-1);
             }
             (
                 None,
                 crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ClockWallNow,
+                if op == HostOpV1::ClockWallNow {
+                    CanonicalRequestV1::ClockWallNow
+                } else {
+                    CanonicalRequestV1::ClockMonotonicNow
+                },
+            )
+        }
+        HostOpV1::ClockSleepUntil
+            if request_size == std::mem::size_of::<ClockDeadlineRequestV1>() =>
+        {
+            let request = request.cast::<ClockDeadlineRequestV1>();
+            if !request.is_aligned() {
+                return Err(-1);
+            }
+            let deadline = unsafe { (*request).deadline };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ClockSleepUntil { deadline },
+            )
+        }
+        HostOpV1::EntropyRandomBytes if request_size == std::mem::size_of::<EntropyRequestV1>() => {
+            let request = request.cast::<EntropyRequestV1>();
+            if !request.is_aligned() {
+                return Err(-1);
+            }
+            let count = unsafe { (*request).count };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::EntropyRandomBytes { count },
             )
         }
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal

@@ -29,6 +29,9 @@ pub struct AmbientScript {
     pub use_real_wall_clock: bool,
     pub monotonic_clock_nanoseconds: Vec<BigInt>,
     pub entropy_bytes: Vec<Vec<u8>>,
+    pub use_real_monotonic_clock: bool,
+    pub use_real_sleep: bool,
+    pub use_real_entropy: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,6 +121,9 @@ pub struct ScriptedPosixHost {
     use_real_wall_clock: bool,
     monotonic_clock_nanoseconds: VecDeque<BigInt>,
     entropy_bytes: VecDeque<Vec<u8>>,
+    use_real_monotonic_clock: bool,
+    use_real_sleep: bool,
+    use_real_entropy: bool,
     sleep_deadlines: Vec<BigInt>,
     denials: Vec<CapabilityDenied>,
     fs_actions_after_resolve: u64,
@@ -145,6 +151,9 @@ impl ScriptedPosixHost {
             use_real_wall_clock: script.use_real_wall_clock,
             monotonic_clock_nanoseconds: script.monotonic_clock_nanoseconds.into(),
             entropy_bytes: script.entropy_bytes.into(),
+            use_real_monotonic_clock: script.use_real_monotonic_clock,
+            use_real_sleep: script.use_real_sleep,
+            use_real_entropy: script.use_real_entropy,
             sleep_deadlines: Vec::new(),
             denials: Vec::new(),
             fs_actions_after_resolve: 0,
@@ -305,18 +314,28 @@ impl HostHandler for ScriptedPosixHost {
     }
 
     fn clock_monotonic_now(&mut self) -> BigInt {
+        if self.use_real_monotonic_clock {
+            return BigInt::from(ken_host::monotonic_nanoseconds_v1());
+        }
         self.monotonic_clock_nanoseconds
             .pop_front()
             .expect("PX6 Clock.MonotonicNow requires an explicit scripted response")
     }
 
     fn clock_sleep_until(&mut self, deadline: BigInt) {
-        // A verification host never suspends; it records the deadline so a
-        // scripted expectation can bind the value the program passed.
+        if self.use_real_sleep {
+            ken_host::sleep_until_monotonic_v1(
+                u64::try_from(&deadline).expect("the dispatcher decoded a u64 deadline"),
+            );
+        }
         self.sleep_deadlines.push(deadline);
     }
 
-    fn entropy_random_bytes(&mut self, _count: u64) -> std::io::Result<Vec<u8>> {
+    fn entropy_random_bytes(&mut self, count: u64) -> std::io::Result<Vec<u8>> {
+        if self.use_real_entropy {
+            return ken_host::kernel_entropy_v1(count)
+                .map_err(|_| std::io::ErrorKind::Unsupported.into());
+        }
         // Scripted, like every other source here: an unscripted read is a
         // test authoring error, never an invented value.
         self.entropy_bytes.pop_front().ok_or_else(|| {

@@ -232,6 +232,10 @@ claim with no conformance case is a claim no one can rely on
   empty and multi-batch results, sticky `DirectoryEnd`, exactly-once names for
   an unmodified directory without an order promise, and `NotDirectory` under
   `FileOperation.OpReadDirectory` when a regular file is opened as a directory.
+- `surface/ffi-io/seed-clock-entropy.md` — RT-CLOCK `38 §1.15`: Strict
+  package-home import pairs, the two scoped clock floor families, process-local
+  monotonic readings, deadline domain and same-clock behavior, exact entropy
+  count bounds, and `Unsupported` when the kernel source is unavailable.
 - `surface/classes/seed-classes.md` — Lc typeclasses/constraints (classes-as-
   subobjects, `33 §5` + `39 §6`, ADR 0008): a `class` → a Σ+η **record**, an
   `instance` → a **record value** with real law proofs, and `where C A` → an

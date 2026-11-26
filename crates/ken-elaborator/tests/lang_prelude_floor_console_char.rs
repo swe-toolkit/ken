@@ -303,6 +303,15 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     ] {
         expected_added.insert(("Capability.Net.Stream".to_string(), name.to_string()));
     }
+    for (home, name) in [
+        ("Capability.Time.Monotonic", "monotonic_now"),
+        ("Capability.Time.Monotonic", "sleep_until"),
+        ("Capability.System.Entropy", "EntropyIO"),
+        ("Capability.System.Entropy", "random_bytes"),
+        ("Capability.Process.Exit", "host_entropy"),
+    ] {
+        expected_added.insert((home.to_string(), name.to_string()));
+    }
     let added = actual
         .difference(&PACKAGED.into_iter().collect())
         .map(|(owner, name)| ((*owner).to_string(), (*name).to_string()))

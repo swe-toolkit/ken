@@ -100,16 +100,17 @@ The loader proceeds as follows:
    every other source entry (`33 §3.3`). The exact prelude-floor name
    set is `{Auth, Bool,
    Bottom, BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream,
-   Coproduct, CreatePolicy, Decimal, DirEntry, DirectoryHandle,
+   Coproduct, CreatePolicy, Deadline, Decimal, DirEntry, DirectoryHandle,
    DirectoryProgress, Equal, ExitCode, FileError, FileKind, FileMetadata,
    FileOperation, HostIO, IOError, ITree,
-   Instant, List, MappingProt, Nat, Option, Pair, ProcessInput, Prod,
+   Instant, List, MappingProt, MonotonicInstant, Nat, Option, Pair,
+   ProcessInput, Prod,
    ProgramCaps, Prop, Proved, ReadProgress, ReadResult, ResourceError,
    ResourceKind, ResourceOpenMode, Result, SocketAddress, StateOp, Top,
    TransferCount,
    Unit, Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
    resp_coproduct, resp_state, run_state, state_get, state_put}`
-   (`30-taxonomy §4`; `33 §3.3`). These fifty-five checked identities
+   (`30-taxonomy §4`; `33 §3.3`). These fifty-seven checked identities
    are ambiently nameable in source; not all are types. `Top`
    and `Bottom` are proposition constants, `Proved` is a proof binding,
    `HostIO` is a type-level function, and `console_resp`, `eqChar`,
@@ -136,6 +137,8 @@ The loader proceeds as follows:
    but remains runner-minted and is not made public by qualification.
    `Coproduct.InL`, `Coproduct.InR`, `Instant.MkInstant`, `ITree.Ret`, and
    `ITree.Vis` use their exact scoped identities, not bare B names.
+   `MonotonicInstant.MkMonotonicInstant` and `Deadline.MkDeadline` likewise
+   resolve only at their exact qualified paths (§38 §1.15).
    `ConsoleStream`'s entire checked family is scoped:
    `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
    `ConsoleStream.Stderr` resolve to its three exact constructor IDs;
@@ -143,7 +146,7 @@ The loader proceeds as follows:
    spelling do not enter B. `ConsoleOp` is scoped as four exact paths:
    `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
    `ConsoleOp.IsTerminal`; their bare cases do not enter B. Scoped
-   constructors do not increase the fifty-five-name count. `DirectoryHandle`
+   constructors do not increase the fifty-seven-name count. `DirectoryHandle`
    keeps its constructor private under either spelling; the cases of
    `DirectoryProgress` resolve only as `DirectoryProgress.DirectoryEntries`
    and `DirectoryProgress.DirectoryEnd` (§38 §1.14). `IOError`'s
@@ -196,7 +199,7 @@ The loader proceeds as follows:
    program, with an identical `trusted_base()` delta.
 
 Installing a floor member or Pair companion is a resolution operation over
-declarations that already exist. The loader reuses all fifty-five exact
+declarations that already exist. The loader reuses all fifty-seven exact
 checked prelude-floor identities, including `Top` and `Bottom` as
 proposition constants, `Proved`'s proof-term identity, the registered
 `eqChar` comparator ID, the three prior State-operation IDs, and the

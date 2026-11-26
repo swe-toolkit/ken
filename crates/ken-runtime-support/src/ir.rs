@@ -296,6 +296,9 @@ runtime_host_spine_v1! {
     option_none,
     directory_entries,
     directory_end,
+    // Clock promotion appends checked constructor roles.
+    mk_monotonic_instant,
+    mk_deadline,
 }
 
 /// The decoded, validated checked-runtime role record.

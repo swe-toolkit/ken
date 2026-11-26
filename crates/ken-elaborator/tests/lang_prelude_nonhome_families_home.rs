@@ -122,6 +122,80 @@ fn clock_io_alias_homes_only_its_existing_checked_type() {
     unbound(&format!("import Capability.Process.Exit (host_clock)\n{lifted}"), "ClockIO");
 }
 
+/// Promise class: durable checked-identity invariant. MEASURED: each new
+/// clock and entropy export imports at its pre-source ID and is unbound when
+/// its import is omitted. CLAIMED: these homes publish the existing checked
+/// actions, not new declarations or ambient aliases. THE GAP: name resolution
+/// does not measure clock or entropy execution.
+#[test]
+fn monotonic_and_entropy_homes_use_old_ids_and_require_imports() {
+    let bootstrap = ElabEnv::new().expect("checked pre-source identities");
+    for (owner, name) in [
+        ("Capability.Time.Monotonic", "monotonic_now"),
+        ("Capability.Time.Monotonic", "sleep_until"),
+        ("Capability.System.Entropy", "EntropyIO"),
+        ("Capability.System.Entropy", "random_bytes"),
+        ("Capability.Process.Exit", "host_entropy"),
+    ] {
+        let owners = PRELUDE_PACKAGE_HOMES.iter()
+            .filter_map(|(home, member)| (*member == name).then_some(*home))
+            .collect::<Vec<_>>();
+        assert_eq!(owners, [owner], "{name}: one checked home");
+        assert!(!PRELUDE_FLOOR_NAMES.contains(&name), "{name}: not floor");
+        let client = format!("export {name}\n");
+        let imported = strict(&format!("import {owner} ({name})\n{client}"))
+            .unwrap_or_else(|error| panic!("{name}: home refused: {error:?}"));
+        assert_eq!(imported.globals[name], bootstrap.globals[name],
+            "{name}: original checked identity");
+        unbound(&client, name);
+    }
+}
+
+/// Durable checked-identity invariant. MEASURED: the Strict two-reading
+/// program checks, and the floor constructors resolve to their checked
+/// families without bare aliases. CLAIMED: the public clock types are usable
+/// without opening the constructor namespace. THE GAP: D0 does not run I/O.
+#[test]
+fn clock_floor_checks_the_strict_two_reading_program() {
+    let source = r#"program capabilities FS AFull
+import Capability.Process.Exit (host_bind, host_clock, host_pure)
+import Capability.Time.Monotonic (monotonic_now)
+proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Clock] =
+  host_bind AFull MonotonicInstant ExitCode
+    (host_clock AFull MonotonicInstant monotonic_now)
+    (\first. match first {
+      MonotonicInstant.MkMonotonicInstant a |->
+        host_bind AFull MonotonicInstant ExitCode
+          (host_clock AFull MonotonicInstant monotonic_now)
+          (\second. match second {
+            MonotonicInstant.MkMonotonicInstant b |->
+              match leq_int a b {
+                False |-> host_pure AFull ExitCode (ExitCode.Failure 32);
+                True |-> host_pure AFull ExitCode ExitCode.Success
+              }
+          })
+    })
+"#;
+    let boot = ElabEnv::new().expect("checked pre-source clock types");
+    let checked = strict(&format!(
+        "{source}\nfn deadline (reading : MonotonicInstant) : Deadline = Deadline.MkDeadline reading\n"
+    )).expect("Strict D0 and qualified deadline constructor check");
+    for (family, leaf) in [
+        ("MonotonicInstant", "MkMonotonicInstant"),
+        ("Deadline", "MkDeadline"),
+    ] {
+        let qualified = format!("{family}.{leaf}");
+        let id = boot.globals[&qualified];
+        let (parent, _) = boot.env.constructor(id).expect("checked constructor");
+        assert_eq!(parent.id, boot.globals[family]);
+        assert_eq!(checked.globals[&qualified], id);
+        assert!(!boot.globals.contains_key(leaf), "bare constructor {leaf}");
+        unbound(&format!("const escaped = {leaf}\n"), leaf);
+    }
+    assert_eq!(checked.env.trusted_base(), boot.env.trusted_base());
+}
+
 /// Promise class: durable representation-privacy invariant. MEASURED: a
 /// Strict client imports every package whose export reaches FSOp in its
 /// checked type, yet naming FSOp and AmbientOp independently still refuses
@@ -153,21 +227,12 @@ fn all_hostio_reachers_leave_fs_and_ambient_representation_private() {
 fn ruled_internal_prelude_names_are_registered_but_not_strictly_nameable() {
     let bootstrap = ElabEnv::new().expect("checked pre-source identities");
     for name in [
-        // G1: entropy remains unavailable in the reference host.
-        "EntropyIO",
-        "random_bytes",
-        "host_entropy",
+        // G1: entropy operation and response representation stay internal.
         "ambient_entropy",
         "EntropyOp",
         "RandomBytes",
         "entropy_resp",
-        // G2: monotonic clock operations remain unavailable.
-        "MonotonicInstant",
-        "MkMonotonicInstant",
-        "Deadline",
-        "MkDeadline",
-        "monotonic_now",
-        "sleep_until",
+        // G2: clock operation and response representation stay internal.
         "ClockOp",
         "WallNow",
         "MonotonicNow",

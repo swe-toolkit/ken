@@ -2218,6 +2218,10 @@ fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
         .collect()
 }
 
+/// Promise class: durable invariant. The live emitter population agrees
+/// with native availability, and an empty offset list agrees with the
+/// catalog's zero request arity. The offset mutations check layout validation,
+/// not execution of each operation.
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
@@ -2237,13 +2241,17 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.request_align_shift ^= 1;
         mutations.push(changed);
-        if layout.request_offsets.is_empty() {
-            assert_eq!(
-                operation,
-                ken_host::HostOpV1::ClockWallNow,
-                "only the zero-arity wall-clock request has no request field offset"
-            );
-        } else {
+        let request_arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .expect("live operation is catalogued")
+            .4;
+        assert_eq!(
+            layout.request_offsets.is_empty(),
+            request_arity == 0,
+            "{operation:?}: request offsets are empty exactly for zero request arity"
+        );
+        if !layout.request_offsets.is_empty() {
             let mut changed = layout.clone();
             changed.request_offsets[0] ^= 1;
             mutations.push(changed);
@@ -3854,28 +3862,21 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
                     .is_some()
             })
             .collect::<Vec<_>>();
-        if operation == ken_host::HostOpV1::ClockWallNow {
-            assert!(
-                carried.is_empty(),
-                "ClockWallNow is zero-arity and must not acquire an argument seat"
-            );
-        } else {
-            assert!(
-                !carried.is_empty(),
-                "{operation:?} is admitted but has no argument seat at all"
-            );
-        }
+        let arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .expect("catalogued consumer")
+            .4;
+        assert_eq!(carried.is_empty(), arity == 0, "{operation:?} zero-arity seat rule");
         assert_eq!(
             carried,
             (0..carried.len() as u32).collect::<Vec<_>>(),
             "{operation:?} argument seats are not a gapless 0..n range"
         );
     }
-    for operation in [
-        ken_host::HostOpV1::ClockMonotonicNow,
-        ken_host::HostOpV1::ClockSleepUntil,
-        ken_host::HostOpV1::EntropyRandomBytes,
-    ] {
+    for operation in ken_host::HostOpV1::ALL.into_iter().filter(|op|
+        op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
+    ) {
         assert!(
             !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation),
             "{operation:?} is not an unadmitted lane"
@@ -6305,7 +6306,7 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
 /// lowering can resolve statically, the unselected arm is folded and its effect
 /// is never lowered at all -- instrumenting `lower_process_host_effect` on an
 /// earlier draft showed only the `BufferAllocate` calls and no
-/// `ClockMonotonicNow` whatever. Both rows then compiled for the same trivial
+/// `NetListen` whatever. Both rows then compiled for the same trivial
 /// reason and the control proved nothing. Routing the value through a closure parameter forces
 /// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
 /// `FSOp` request handler has.
@@ -6372,8 +6373,8 @@ fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
                     binders: 0,
                     body: RuntimeExpr::Effect {
                         bracket_acquire: None,
-                        family: "Clock".to_string(),
-                        operation: ken_host::HostOpV1::ClockMonotonicNow,
+                        family: "Net".to_string(),
+                        operation: ken_host::HostOpV1::NetListen,
                         capability: None,
                         args: Vec::new(),
                     },

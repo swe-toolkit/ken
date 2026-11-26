@@ -147,9 +147,18 @@ fn run_plain_recursive_match_census() {
     // The checked zero-S invariant and linked native/interpreter parity above
     // are independent of this post-route byte-level codegen snapshot. Ignore
     // only Cranelift's trailing blank display separator when comparing IR.
-    // Constructor artifact symbols use the checked family's bare leaf, so
-    // source scoping (`T.C`) does not move this unit: it is byte-identical to
-    // the region-capacity IR reviewed before the pre-source families scoped.
+    // This flags any other emitted-byte change in this unit, not just a
+    // capacity-route change. Code changes that leave the unit unchanged do
+    // not affect the snapshot. Refresh only after measuring and reviewing
+    // the IR delta with the independent parity and zero-S checks still green.
+    // Retire the snapshot only when a structural capacity-route assertion
+    // checks both the recorder import and allocator branch and rejects a
+    // route-breaking mutation. Keep the independent parity and zero-S checks.
+    // Constructor scoping (`T.C`) did not change the reviewed capacity IR:
+    // artifact symbols still use the checked family's bare leaf.
+    // RT-CLOCK changes only the exit-code narrowing block in this fixture:
+    // the shared helper's output slot is initialized before the call, and
+    // subsequent SSA values are renumbered. Capacity routing is unchanged.
     assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
         PLAIN_MATCH_CAPACITY_IR.trim_end_matches('\n').as_bytes(),
         "the measured zero-S native unit IR differs from reviewed capacity routing");

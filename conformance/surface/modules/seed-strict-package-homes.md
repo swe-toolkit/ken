@@ -715,7 +715,7 @@ the eight `Data.Numeric.FixedWidth` names.
   cannot be inferred from a sibling name or from implementation-global
   registration.
 
-### surface/modules/abi-s2-directory-stream-homes-require-imports
+### surface/modules/abi-s2-directory-stream-operations-require-imports
 
 - promise class: **durable provider-edge invariant** — each ABI-S2 name
   resolves from its specified package home only through an explicit import
@@ -729,16 +729,15 @@ the eight `Data.Numeric.FixedWidth` names.
 
   | Name | Home |
   |---|---|
-  | `DirectoryHandle` | `Capability.Filesystem.Authority` |
   | `withDirectory` | `Capability.Filesystem.Authority` |
-  | `DirectoryProgress` | `Capability.System.IO` |
   | `readDirectoryBatch` | `Capability.System.IO` |
 
 - measured: each imported reference's provider `GlobalId`, the positive
   client's acceptance, and the exact name reported by each omission.
-- claimed: the new stream types and operations are source-visible only through
+- claimed: the directory stream operations are source-visible only through
   their stated homes; a sibling import or a flat global does not satisfy a
-  missing home edge.
+  missing home edge. `DirectoryHandle` and `DirectoryProgress` are scoped floor
+  families, not package-home names.
 - the gap: an omitted-import rejection could be caused by another missing
   dependency or an ill-formed client. Each positive and negative pair keeps
   the roots and source body fixed, varying only the selected import.
@@ -747,8 +746,8 @@ the eight `Data.Numeric.FixedWidth` names.
   selected name.
 - controls: each imported client is the positive control for its single-name
   omission; the dependency-closed roots keep both provider homes available.
-- why: the two package homes are part of the stream contract, not ambient
-  prelude names.
+- why: the two package homes are part of the stream-operation contract, not
+  ambient prelude names; the result types are covered by the floor inventory.
 
 ### surface/modules/descriptor-operations-require-system-io-imports
 

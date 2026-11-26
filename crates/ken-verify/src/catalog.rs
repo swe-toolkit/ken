@@ -63,6 +63,28 @@ impl NativeTestedEvidence {
         }
     }
 
+    pub fn from_monotonic_now_run(run: &CanonicalDifferentialRun) -> Self {
+        Self::from_projected_run(HostOpV1::ClockMonotonicNow, run, run.compare_monotonic_now().is_ok())
+    }
+
+    pub fn from_sleep_until_run(run: &CanonicalDifferentialRun, duration: u64) -> Self {
+        Self::from_projected_run(HostOpV1::ClockSleepUntil, run, run.compare_sleep_until(duration).is_ok())
+    }
+
+    pub fn from_random_bytes_run(run: &CanonicalDifferentialRun) -> Self {
+        Self::from_projected_run(HostOpV1::EntropyRandomBytes, run, run.compare_random_bytes().is_ok())
+    }
+
+    fn from_projected_run(operation: HostOpV1, run: &CanonicalDifferentialRun, equal: bool) -> Self {
+        Self {
+            exact_artifact_executed: run.exact_artifact_executed,
+            canonical_observation_equal: equal,
+            operation_observed_in_both_lanes: [&run.interpreter, &run.native]
+                .into_iter()
+                .all(|lane| lane.effect_trace.iter().any(|event| event.operation == operation)),
+        }
+    }
+
     /// ConsoleRead evidence binds both lanes to the same finite stdin fixture
     /// and retains exact reply bytes after validating Chunk/EOF discipline.
     pub fn from_console_read_run(
