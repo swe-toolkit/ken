@@ -22,7 +22,8 @@
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-ABSENT-VARIABLE §20;
 > SPEC-SYMBOLIC-ALGEBRA-EVAL-COINCIDENCE §21;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-COINCIDENCE §22;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH §23).**
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH §23;
+> SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH §24).**
 > The §1–9 catalog
 > operations, checked laws and authored seeds are present on this base;
 > historical scratch D0 and package checks do not establish official
@@ -1831,3 +1832,60 @@ input but is absent from the result, so the law applies. Changing only
 the tested variable to 2 makes the freshness premise fail at index 0:
 its replacement introduces variable 2. D0 observed refusal at the
 client's premise declaration, before the theorem application.
+
+## 24. Differentiation preserves freshness of a variable
+
+> **Section 24 status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH).**
+> Architect AC-0 `evt_vb7pp34f71n6` on `4337872ee` reports that the law
+> and its open client checked in scratch, with no added `Axiom` and
+> identical exact trusted `GlobalId` sets (114 → 114). This is not
+> assembled AC-T, official conformance, CI or landing.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export this public
+Transparent checked theorem immediately after `substitute_fresh` and
+before `deriv_substitute`:
+
+```ken
+pub theorem deriv_fresh
+      (u : Nat) (v : Nat) (e : Expr)
+    : Equal Bool (occurs u e) False → Equal Bool (occurs u (deriv v e)) False
+```
+
+The sole premise is syntactic absence of `u` from `e`. Differentiating
+with respect to any `v` preserves that absence; no distinctness premise
+on `u` and `v` is needed. The law has no converse: `EVar 1` contains
+variable 1, but its derivative with respect to 0 is a constant and does
+not contain variable 1.
+
+Induction on `e` establishes the implication without adding any trusted
+assumption. Constants and variable derivatives contain no variables. In
+a sum, absence passes to both operands and their derivatives. In a
+product, the product rule retains original operands alongside their
+derivatives; the original absence facts and the induction hypotheses
+cover both kinds of operand. The two helpers, `var_deriv_fresh` and
+`bool_or_false_both`, are private.
+
+A client can use the result as the absence premise of `deriv_absent`
+(§14) to show that a second derivative with respect to the absent
+variable evaluates to zero. The following is a client example, not a
+separate public law:
+
+```ken
+theorem second_deriv_absent
+      (u : Nat) (v : Nat) (e : Expr) (env : Nat → Nat)
+      (absent : Equal Bool (occurs u e) False)
+    : Equal Nat (eval env (deriv u (deriv v e))) Zero =
+  deriv_absent u (deriv v e) env (deriv_fresh u v e absent)
+```
+
+For `EMul (EVar 0) (EVar 1)` differentiated with respect to 0, the
+closed client proves absence of variable 2 in the input with `Proved`
+and applies the law. Changing only the queried variable to 1 makes the
+premise refuse, before the theorem application. The direct conclusion
+for variable 1 also refuses: the derivative still contains that variable.
+These closed cases distinguish the queried variables, not the generic
+contract.
+
+Section 24 raises the public theorem count from forty-two to forty-three.
+The fifteen public operations and all §§1–23 operation and law types
+are unchanged.
