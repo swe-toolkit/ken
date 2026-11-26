@@ -5,6 +5,7 @@
 > SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5;
 > SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION-COST-ORDER-INVARIANCE §1.7, §3.7;
+> SPEC-OPTIMIZATION-ARGMIN-MAP §1.9, §3.9;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-BOUND-STABILITY §2.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
@@ -73,6 +74,14 @@
 > the later status-respinned tip; neither these candidate-local checks
 > nor AC-0 scratch establish official conformance-runner execution,
 > CI, publication, landing or measured landed trust.
+>
+> On the `47ccd83b0` base, `argmin`, `argmax`, their Option selectors
+> and §4.8's `least_k_map` are already present. Sections 1.9 and 3.9
+> specify two new public theorems, not new selectors or Option laws.
+> Architect AC-0 (`evt_1f2gafx118qj2`) checked both generic proofs and
+> their open clients on that base in scratch, with no new `Axiom` and
+> identical trusted `GlobalId` sets (114 → 114). This is not assembled
+> AC-T, official conformance, CI or landing evidence for the new laws.
 
 ## 1. Least-cost candidate
 
@@ -584,6 +593,67 @@ does not assert an append-split law when either input is `Nil`, and no
 existing operation or law type changes. The Architect's AC-0 D0 is
 scratch feasibility evidence, not official conformance, CI or landed
 trust measurement; the generic laws require checked catalog bodies.
+
+### 1.9 Selection of mapped candidates
+
+`Algorithm.Optimization.Argmin` must export this public Transparent
+checked theorem directly after `argmin_append_takes_right` and before
+`argmin_option`.
+
+```ken
+pub theorem argmin_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (xs : NonEmpty a)
+    : Equal b
+        (argmin b cost (nonempty_map a b f xs))
+        (f (argmin a (comp a b Nat cost f) xs))
+```
+
+Selecting the least-cost mapped candidate equals selecting from the
+original candidates under `cost ∘ f` and then mapping the result.
+The conclusion is equality of values in `b`, not just equality of
+costs. Mapping preserves candidate order, and both routes compare the
+same costs, so both retain the earliest minimum on a tie. There is
+no premise on `f`: it may be non-injective. This is a map of candidates,
+not the change of cost with fixed candidates in §1.5. Section 4.8 gives
+the corresponding list law for `least_k`.
+
+Import `nonempty_map` into the existing `Data.Collections.NonEmpty`
+import list, bringing its attached `list_view` proof into scope. `comp`
+is the existing import from `Core.Function.Combinators`. The proof
+uses the public nonempty list views rather than matching on the private
+`NonEmpty` constructor. The shared proof transports the list induction
+through `list_view` for `nonempty_map` and `nonempty_to_list_shape`.
+The selection step compares `cost (f y)` with `cost (f x)` in both
+routes; applying `f` to the chosen branch then gives the same value.
+`select_map`, `select_from_map` and `choose_map` remain private in the
+selection block before `select`; §3.9 uses the same argument with the
+arguments to `lt_nat` reversed.
+
+There is no public Option-form law for either selector. A client can
+handle `Nil` by computation (`None` on both sides) and lift the
+nonempty law through `Some b` for `Cons`. This client checked in the
+Architect's D0; it is not a package export:
+
+```ken
+theorem option_client
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (x : a) (rest : List a)
+    : Equal (Option b)
+        (argmin_option b cost (map a b f (Cons a x rest)))
+        (Some b (f (argmin a (comp a b Nat cost f) (nonempty_cons a x rest)))) =
+  cong b (Option b)
+    (argmin b cost (nonempty_map a b f (nonempty_cons a x rest)))
+    (f (argmin a (comp a b Nat cost f) (nonempty_cons a x rest)))
+    (Some b)
+    (argmin_map a b f cost (nonempty_cons a x rest))
+```
+
+For the closed discriminator, use candidates `[0,1,2]`, identity cost,
+and `f` mapping them to `[2,1,0]`. Both routes in the law select `0`.
+Using the uncomposed identity cost on the right instead selects `0`
+before mapping, yielding `2`. Architect AC-0 accepted the composed
+law application and refused the uncomposed claim with
+`KernelRejected(TypeMismatch)`. The closed `Equal Nat` value checks
+use `Proved`, not `Refl`, because the true goals reduce to `Top`.
 
 ## 2. Least witness below a finite bound
 
@@ -1455,6 +1525,32 @@ helper is added. Neither law makes a claim for an empty input or
 changes any existing §3 operation or law type. The Architect's D0
 checks only scratch feasibility; official conformance, CI and landed
 trust remain separate gates.
+
+### 3.9 Selection of mapped candidates
+
+`Algorithm.Optimization.Argmin` must export this public Transparent
+checked theorem directly after `argmax_append_takes_right` and before
+`argmax_option`.
+
+```ken
+pub theorem argmax_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (xs : NonEmpty a)
+    : Equal b
+        (argmax b cost (nonempty_map a b f xs))
+        (f (argmax a (comp a b Nat cost f) xs))
+```
+
+Selecting the greatest-cost mapped candidate equals selecting under
+`cost ∘ f` and then mapping the result. Both sides use the same strict
+cost comparisons, keeping the earliest maximum when costs tie. As in
+§1.9, the result is equality in `b` with no premise on `f`. The proof
+reuses §1.9's private helpers. The Option form remains a client
+consequence by cases, not a public law.
+
+On §1.9's reversing fixture both sides of the law give `2`. The
+uncomposed selection on the original candidates instead gives `2`
+before mapping, yielding `0`. Architect AC-0 accepted the composed
+claim and refused the uncomposed claim with `KernelRejected(TypeMismatch)`.
 
 ## 4. Stable selection of the k least-cost candidates
 
