@@ -32,9 +32,11 @@ candidate equality.
 
 ## Definition
 
-The minimum selector and its ten laws lead, followed by its Option selector
-and seven laws. `cost_le`, `least_k` and their public laws follow before the
-maximum selector and its ten laws, then its Option selector and seven laws.
+The minimum selector and its eleven laws lead, followed by its Option
+selector and seven laws. `cost_le`, `least_k` and their public laws follow
+before the maximum selector and its eleven laws, then its Option selector
+and seven laws. Each non-empty selector's last law relates selection to
+mapping candidates.
 Private selection and least-k helpers close the definition. Natural-order
 facts come from `Data.Numeric.Nat.Order`; stable sorting, `take`, `map`,
 and their list laws come from `Data.Collections.Derived`.
@@ -81,6 +83,7 @@ import Data.Collections.NonEmpty
     nonempty_tail,
     nonempty_to_list,
     nonempty_to_list_shape,
+    nonempty_map,
     nonempty_append)
 
 pub fn argmin (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
@@ -211,6 +214,11 @@ pub theorem argmin_append_takes_right
         (argmin a cost ys)
         (argmin a cost xs)
         h)
+
+pub theorem argmin_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (xs : NonEmpty a)
+    : Equal b (argmin b cost (nonempty_map a b f xs)) (f (argmin a (comp a b Nat cost f) xs)) =
+  select_map a b f cost lt_nat xs
 
 pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
@@ -727,6 +735,11 @@ pub theorem argmax_append_takes_right
         (argmax a cost xs)
         h)
 
+pub theorem argmax_map
+      (a : Type) (b : Type) (f : a → b) (cost : b → Nat) (xs : NonEmpty a)
+    : Equal b (argmax b cost (nonempty_map a b f xs)) (f (argmax a (comp a b Nat cost f) xs)) =
+  select_map a b f cost costlier xs
+
 pub fn argmax_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
   match xs {
     Nil ↦ None a;
@@ -945,6 +958,99 @@ theorem choose_yes
   match b {
     True ↦ λh. Refl;
     False ↦ λh. absurd h
+  }
+
+theorem select_map
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (cost : b → Nat)
+      (better : Nat → Nat → Bool)
+      (xs : NonEmpty a)
+    : Equal b
+        (select b cost better (nonempty_map a b f xs))
+        (f (select a (comp a b Nat cost f) better xs)) =
+  trans
+    b
+    (select b cost better (nonempty_map a b f xs))
+    (select_view
+      b
+      cost
+      better
+      (nonempty_head b (nonempty_map a b f xs))
+      (nonempty_to_list b (nonempty_map a b f xs)))
+    (f (select a (comp a b Nat cost f) better xs))
+    (select_via_view b cost better (nonempty_map a b f xs))
+    (J
+      (λl _.
+        Equal
+          b
+          (select_view b cost better (nonempty_head b (nonempty_map a b f xs)) l)
+          (f (select a (comp a b Nat cost f) better xs)))
+      (select_from_map a b f cost better (nonempty_head a xs) (nonempty_tail a xs))
+      (sym
+        (List b)
+        (nonempty_to_list b (nonempty_map a b f xs))
+        (Cons b (f (nonempty_head a xs)) (map a b f (nonempty_tail a xs)))
+        (trans
+          (List b)
+          (nonempty_to_list b (nonempty_map a b f xs))
+          (map a b f (nonempty_to_list a xs))
+          (Cons b (f (nonempty_head a xs)) (map a b f (nonempty_tail a xs)))
+          ((proof list_view for nonempty_map) a b f xs)
+          (cong
+            (List a)
+            (List b)
+            (nonempty_to_list a xs)
+            (Cons a (nonempty_head a xs) (nonempty_tail a xs))
+            (map a b f)
+            (nonempty_to_list_shape a xs)))))
+
+theorem choose_map
+      (a : Type) (b : Type) (f : a → b) (c : Bool) (yes : a) (no : a)
+    : Equal b (choose b c (f yes) (f no)) (f (choose a c yes no)) =
+  match c {
+    True ↦ Refl;
+    False ↦ Refl
+  }
+
+theorem select_from_map
+      (a : Type)
+      (b : Type)
+      (f : a → b)
+      (cost : b → Nat)
+      (better : Nat → Nat → Bool)
+      (x : a)
+      (rest : List a)
+    : Equal b
+        (select_from b cost better (f x) (map a b f rest))
+        (f (select_from a (comp a b Nat cost f) better x rest)) =
+  match rest {
+    Nil ↦ Refl;
+    Cons y ys ↦
+      trans
+        b
+        (select_from b cost better (f x) (map a b f (Cons a y ys)))
+        (choose
+          b
+          (better (cost (f (select_from a (comp a b Nat cost f) better y ys))) (cost (f x)))
+          (f (select_from a (comp a b Nat cost f) better y ys))
+          (f x))
+        (f (select_from a (comp a b Nat cost f) better x (Cons a y ys)))
+        (cong
+          b
+          b
+          (select_from b cost better (f y) (map a b f ys))
+          (f (select_from a (comp a b Nat cost f) better y ys))
+          (λt. choose b (better (cost t) (cost (f x))) t (f x))
+          (select_from_map a b f cost better y ys))
+        (choose_map
+          a
+          b
+          f
+          (better (cost (f (select_from a (comp a b Nat cost f) better y ys))) (cost (f x)))
+          (select_from a (comp a b Nat cost f) better y ys)
+          x)
   }
 
 fn select (a : Type) (cost : a → Nat) (better : Nat → Nat → Bool) (xs : NonEmpty a) : a =
@@ -1922,6 +2028,14 @@ parts are constructed as `Cons` lists, the four corresponding Option laws
 select `Some` of the same winner without first exposing the `NonEmpty` view.
 The left law covers ties; the right law requires a strict improvement.
 
+Use `argmin_map` or `argmax_map` to select before mapping: rank each
+original candidate `x` by `cost (f x)`, then apply `f` to the chosen
+candidate. Using the original cost directly need not give the same result,
+even when both candidate types are `Nat`. No injectivity premise is needed.
+With an Option selector, a client can lift the non-empty law through `Some`
+on `Cons`; on `Nil`, the result is `None` by computation. There is no
+separate public Option map law.
+
 Call `least_k a cost k xs` on an ordinary list when several least-cost
 candidates are needed. It returns at most `k` members; `Zero` returns `Nil`,
 while a bound beyond the list length returns the entire stable cost order.
@@ -2002,6 +2116,14 @@ images. `sort::map` therefore carries the entire sorted order across the map,
 including ties, and `take::map` carries the selected prefix. The proof joins
 these equalities and reverses the result. The map need not be injective.
 
+`argmin_map` and `argmax_map` use the same proof with different strict
+comparisons. The private `select_from_map` inducts on the tail: the original
+candidate under the composed cost and the mapped candidate give the same
+comparison, so `choose_map` commutes mapping with that branch choice,
+including ties. The private `select_map` uses `select_via_view`, the
+`nonempty_map` list-view proof and `nonempty_to_list_shape` to transport
+this list induction to `NonEmpty` without exposing its constructor.
+
 `argmax_member` transports the shared private selection-membership proof to
 the public list view. `argmax_greatest` inducts over the ordered tail and
 eliminates truncated membership only into `IsTrue`, bounding every member's
@@ -2072,16 +2194,18 @@ law families (`least_k_length`, `least_k_member`, `least_k_sorted`,
 `least_k_cost_order_invariant`, `least_k_prefix`, `least_k_saturated`,
 `least_k_append_merge`, `least_k_map`);
 `argmin`, its seven §1.2 theorems,
-`argmin_cost_order_invariant`, `argmin_append_keeps_left` and
-`argmin_append_takes_right`; `argmin_option` and its seven laws:
+`argmin_cost_order_invariant`, `argmin_append_keeps_left`,
+`argmin_append_takes_right` and `argmin_map`; `argmin_option` and its seven
+laws:
 `argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`,
 `argmin_option_least`, `argmin_option_cost_order_invariant`,
 `argmin_option_append_keeps_left` and `argmin_option_append_takes_right`;
 `argmax` and the seven §3.2 laws `argmax_member`,
 `argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
 `argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`, plus
-`argmax_cost_order_invariant`, `argmax_append_keeps_left` and
-`argmax_append_takes_right`; and `argmax_option` with seven laws:
+`argmax_cost_order_invariant`, `argmax_append_keeps_left`,
+`argmax_append_takes_right` and `argmax_map`; and `argmax_option` with seven
+laws:
 `argmax_option_nil`, `argmax_option_cons`, `argmax_option_member`,
 `argmax_option_greatest`, `argmax_option_cost_order_invariant`,
 `argmax_option_append_keeps_left` and `argmax_option_append_takes_right`.
@@ -2100,8 +2224,8 @@ Nat order retain their provider identities.
 `Data.Collections.NonEmpty`; `list_elem` and its introduction lemmas by
 `Data.Collections.Derived`, along with stable `sort`, `take`, filtering and
 their checked public laws; the shared Boolean false-of-not-true lemma by
-`Core.Classes.LawfulClasses`; `nonempty_append` and its list-view proof by
-`Data.Collections.NonEmpty`; `cong`, `sym` and `trans` by
+`Core.Classes.LawfulClasses`; `nonempty_append`, `nonempty_map` and their
+list-view proofs by `Data.Collections.NonEmpty`; `cong`, `sym` and `trans` by
 `Core.Logic.Transport`; `IsTrue` and `leq_nat` by
 `Core.Classes.LawfulClasses`; `comp` by `Core.Function.Combinators`; and
 `lt_nat` with its two attached bridges and `leq_nat_add_left_bound` by
@@ -2137,6 +2261,13 @@ composed-cost result `[0]` from the uncomposed-cost result `[2]`. The
 `cat_optimization_least_k_map` package test roots-loads the public law,
 compares exact trusted-base identities, checks the accepted client, and
 rejects the uncomposed-cost equality at its law application.
+The `cat_optimization_argmin_map` package test checks exact trusted-base
+identities and clients that cite the two owned laws, including a `Some`
+lift of `argmin_map`. On `[0, 1, 2]`, `reverse_three` reverses the costs:
+the composed results are `0` for the minimum and `2` for the maximum, while
+the uncomposed routes give `2` and `0` respectively. The package test
+checks those results and rejects the uncomposed-cost law applications and
+false result claims; it does not execute the conformance seeds.
 
 [append-merge-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-append-merge.md
 [map-seed]: ../../../../conformance/stdlib/optimization/seed-least-k-map.md
