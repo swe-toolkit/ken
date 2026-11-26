@@ -127,6 +127,14 @@ branch from main after that WP lands.
   reports `Unsupported` and returns no bytes.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
 
+## Inventory
+
+1. The out-of-domain sleep refusal had no lawful native terminal carrier.
+   Ruling 4 named the class but not the seat, and the only pre-dispatch
+   failure was require_true's unclassified -1. Keyed on: the native lane's
+   program-reachable refusal must be a planner-catalogued trap
+   (`evt_2tys8csd36b58`).
+
 ## Stop conditions
 
 - A comparator that needs a host-side value the native lane cannot
