@@ -1,6 +1,6 @@
 ---
 id: RT-NATIVE-AGGREGATE-DATA-NOT-CODE
-title: "Native lowering emits a compile-time aggregate as per-node inline code at every boundary transfer: emit_carrier_transfer's Constructor arm allocates and stores each node in place, so the size of a function tracks the size of the data. PX11 Inc2's exchange reaches one function, u2:59, of about 1.49M instructions, of which transfer is 75%, and Cranelift refuses it as CodeTooLarge. Bound the code emitted at a transfer, and at any consumer of a compile-time aggregate, independently of the aggregate's node count, by materializing a large aggregate as data rather than code"
+title: "Native lowering transfers a run-time-selected value into a carrier with an inline case split over the whole alternative tree of the value's type, at every transfer site, so per-site code grows with the type's width. PX11 Inc2's exchange reaches one function, u2:59, of about 1.49M instructions, in which carrier allocation and transfer are 75% of the values, and Cranelift refuses it as CodeTooLarge. Emit a transfer whose static template contains a run-time selection once, as an out-of-line helper per (owner, seat, template), and call it from every site"
 status: ready
 owner: runtime
 size: L
@@ -9,109 +9,119 @@ gate: architect
 depends_on: []
 blocks: [PX11-NATIVE-STREAM-SOCKET-PARITY]
 github: null
-origin: "Architect recut evt_1teeny8aaxj7y (PX11 Inc2 §1b entries 13-15: data size is creating code size), after the §1a 3rd stop evt_2fktc4teb9wd0 and the research advisory evt_3c0j7pd627wvn. L1 Linux ABI program, native parity. Steward-filed per COORDINATION section 2."
+origin: "Architect recut evt_1teeny8aaxj7y (PX11 Inc2 §1b entries 13-15), corrected by the AC-0 measurement evt_2ry7fef3x4b9r and the shape ruling evt_18xe7x3rjaqj5, after research advisories evt_3c0j7pd627wvn and evt_5x0v73wpgth68. L1 Linux ABI program, native parity. Steward-filed per COORDINATION section 2. The id predates the AC-0 finding that the hot values are selected at run time."
 ---
 
-# A compile-time aggregate is data, not code
+# A carrier transfer is bounded by its site, not its type
 
 ## Objective
 
-The code that native lowering emits at a boundary transfer, or at any
-consumer of a compile-time aggregate, is bounded independently of that
-aggregate's node count. An aggregate above a small fixed node count is
-materialized as data, not as code. Below that count, inline
-materialization stays as it is.
+The code that a carrier transfer emits at a site is bounded independently
+of the width of the transferred value's type. A transfer whose static
+template contains a run-time selection is emitted once per (owner, seat,
+template) as an out-of-line helper, and every site calls it.
 
-## Settled inputs (Architect `evt_1teeny8aaxj7y`; anchors re-checked at release)
+## Settled inputs (Architect AC-0 and shape ruling; anchors re-checked at release)
 
-- **The measurement.** Probe `045cad009`, on PX11 Inc2 WIP `34cc2134f`,
-  sized every emitted function in the exchange.
-  - One function, F = `u2:59`, has 990,992 values, 1,493,949 instructions
-    and 503,733 blocks. No other function exceeds 31,052 values.
-  - Of F's values, `emit_carrier_transfer` accounts for 0.7485, Construct
-    for 0.0026, `bytes_to_list` for 0.0006 and `list_to_bytes` for 0.0009.
-  - Transfer origins 1364 and 3598 each make 3366 calls, at about 105
-    values per call. One ComputationalMatch origin, 706, makes 18 calls,
-    and 3366 is 18 times 187. Every listed origin is owned by
-    `PredeclaredFunctionId(33)`.
+- **The failing function.** On PX11 Inc2 WIP `34cc2134f`, F = `u2:59` has
+  990,992 values and 1,493,949 instructions. No other function exceeds
+  31,052 values. Carrier allocation is 0.41 of F's values and transfer
+  0.34.
 - **The cap.** `CodegenError::CodeTooLarge` on x86_64 Linux comes only from
-  `VRegAllocator::alloc` reaching regalloc2's `VReg::MAX` (2^21 - 1), so it
-  is a per-function cap (cranelift-codegen 0.113.1, regalloc2 0.10.2).
-- **The mechanism.** `emit_carrier_transfer` (`lowering/aggregates.rs:1868`)
-  materializes a `Lowered::Constructor` tree by recursing into each child.
-  Each node gets its own aggregate alloc, tag store and field stores,
-  emitted inline at the transfer site.
-- **The partition does not bound size.** `partition_function_units`
-  (`planning/static_transition/semantic_ir.rs:1312` on main) forms units by
-  structure, so nothing in it limits a unit's emitted size.
-- **The population is unmeasured.** Nothing yet shows which constructors
-  origins 1364 and 3598 carry, so the closure covers compile-time aggregates
-  in general, not lists.
-- **Prior art.** Research `evt_3c0j7pd627wvn`: constant data emitted as code
-  is the classic way to hit a per-function cap (javac's oversized static
-  initializers), and placing constant data as data is the known way out.
-- **The probe patch.** It is at `/tmp/px11-entry15-probe/probe.patch`, and
-  `/tmp` is RAM-backed. Copy it to `/workspaces/ken/tmp/` before
-  AC-0 uses it.
+  `VRegAllocator::alloc` reaching regalloc2's `VReg::MAX` (2^21 - 1). It is
+  a per-function cap (cranelift-codegen 0.113.1, regalloc2 0.10.2).
+- **The hot values are selected at run time.** At origins 1364 and 3598,
+  each of the 198 top-level transfers is a HostResult whose error is a
+  DynamicConstructor over ResourceError's 12 alternatives, with nested
+  IOError and ResourceKind alternatives: 65 to 66 branches per transfer,
+  each with its own checked allocation and stores. One transfer costs
+  about 1,700 to 2,000 values. Compile-time constructor templates cost
+  99 to 145.
+- **Two multipliers.**
+  - Each lowering of the enclosing bracket match makes 11 top-level
+    transfers per origin, one per arm.
+  - The bracket body under ComputationalMatch 706 is lowered 18 times
+    inside F, once per path through main's enclosing matches. This is
+    duplication, not an unrolled recursion, and it is out of scope here
+    (sibling `RT-NATIVE-CONTINUATION-DUPLICATION-BUDGET`).
+- **Provenance is already exact for sharing.** Each origin has 722
+  allocation occurrences and 39 constructors. Every occurrence is emitted
+  exactly 18 times, and each constructor has exactly one lane. So code
+  shared across the copies needs no re-keying.
+- **The seat.** `emit_carrier_transfer` (`lowering/aggregates.rs:1868`) and
+  its DynamicConstructor and HostResult arms. Inc2's WIP does not touch
+  `aggregates.rs`.
+- **The probe.** The patch (`ac0-probe.patch`, with `px11_size.rs`) and
+  three run logs are in `/workspaces/ken/tmp/arch-agg-ac0/`.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch; do not build around it.
 
+## Rulings (Architect `evt_18xe7x3rjaqj5`)
+
+1. **The shape.** One out-of-line transfer helper per static transfer
+   template, keyed by (owner, transfer seat origin, template signature). The
+   signature is static and planner-issued: the preorder shape, each node's
+   constructor identity and allocation occurrence, and each leaf's kind.
+   The parameters are the run-time leaves in preorder, plus the allocation
+   context the carrier choke already reads, and the helper returns the
+   carried word. Its body is the existing emitter, scoped to the helper's
+   FuncId. A descriptor-driven generic routine is rejected.
+2. **The threshold is structural.** Outline if and only if the template
+   contains a run-time selection. Other templates stay inline.
+3. **The base is main.** Inc2 rebases onto main after this lands.
+4. **Duplication is not in this WP.**
+
 ## Scope
 
-Replaced: only the per-node inline emission in `emit_carrier_transfer`'s
-Constructor arm and its callers, and the compile-time unrolling that feeds
-it, as AC-0 attributes them.
-
-Retained as proved:
-
-- the boundary screening before any transfer
-  (`boundary_transfer_admissibility`, `source_aggregate_preflight` and the
-  slot-store obligation check);
-- the static disposition table and the D2 artifact-static identity
-  authority;
-- the carried `list_to_bytes` arm and its rows at `34cc2134f`;
-- the folded literal case;
-- the RT-NATIVE-FNSPLIT activation-identity closure.
+The transfer seat in `aggregates.rs`, and where module functions are
+declared and defined. Retained as proved: the boundary screening
+(`boundary_transfer_admissibility`, `source_aggregate_preflight` and the
+slot-store obligation check), the static disposition table and the D2
+identity authority, the carried `list_to_bytes` arm, the folded literal
+case, and the RT-NATIVE-FNSPLIT activation-identity closure.
 
 ## Acceptance
 
-- **AC-0 (Architect, before code).** One detached measurement on
-  `34cc2134f`, extending probe `045cad009`. At origins 1364, 3598 and 706,
-  record the transferred `Lowered` variant and its constructor, its node
-  count and depth, and each origin's source location. Also report whether
-  the 18 ComputationalMatch calls unroll a source recursion over data fixed
-  at compile time. Call research for the specific shapes before ruling. The
-  ruling fixes:
-  - the threshold;
-  - the shape: a static node image emitted once into the object and
-    installed by one shared out-of-line helper, or one shared out-of-line
-    transfer loop over a data description;
-  - the base: main, or a stack under PX11 Inc2's WIP.
-- **AC-1.** A size row on the exchange's native build. No emitted function
-  exceeds a bound that AC-0 states, and the build passes ObjectEmission. F's
-  per-origin emitted values at 1364 and 3598 no longer scale with node
-  count.
-- **AC-2.** Paired behavior rows, built and run natively and run in the
-  interpreter. One aggregate is above the threshold and one is below; both
-  give the same observed value in both lanes. The pair differs only in the
-  aggregate's node count.
-- **AC-3.** One mutation: force the inline path above the threshold. AC-1's
-  size row reddens.
+- **AC-0.** Done: `evt_2ry7fef3x4b9r` and `evt_18xe7x3rjaqj5`.
+- **AC-1, size.** Measure on a detached merge of the candidate with
+  `34cc2134f`, running the exchange once (cap 1800 s, with the probe patch
+  applied for measurement only).
+  - The build passes ObjectEmission.
+  - The largest emitted function is at most 400,000 values.
+  - At origins 1364 and 3598, every top-level transfer in the calling
+    function is charged at most 100 values.
+  - Report the number of helpers and the largest helper's values.
+- **AC-2, behavior.** A native root transfers a run-time-selected host
+  result through the helper. It runs twice, once with an Ok outcome and
+  once with an Err carrying an IOError alternative, and each run is paired
+  with the interpreter on the same root. The exit code distinguishes the
+  selected alternative, and the two lanes agree. The runtime-leader picks
+  the fixture, and AC-3 shows that it reaches a helper.
+- **AC-3, mutation.** Force the inline path for selection templates. AC-1's
+  per-seat row reddens, at about 1,700 values or more per transfer. Restore
+  byte-identically.
 - **AC-4.** Full-workspace CI is green on the exact candidate.
 
 ## Stop conditions
 
-- AC-0 finds that the hot aggregates are not fixed at compile time.
+- **H-dup.** The per-seat bound holds, but ObjectEmission still fails or
+  the largest function exceeds 400,000 values. The duplication sibling
+  then blocks Inc2.
+- **H-ledger.** The D7 relation, the ownership check or the event scoping
+  refuses an allocation made in a helper's FuncId for an owner-33
+  occurrence.
+- **H-context.** The allocation choke needs caller state that cannot be
+  passed as a helper parameter.
 - The repair needs a change to the boundary screening, the disposition
   table or the identity authority.
-- An emitted static image needs a new relocation or object-format class
-  that AC-0 did not rule.
+- An emitted helper needs a new relocation or object-format class that the
+  Architect did not rule.
 
 Checks: 4 fired. I read `emit_carrier_transfer`,
 `boundary_transfer_admissibility`, `source_aggregate_preflight` and
-`partition_function_units` on main `200c0124c` and at `34cc2134f`. 6 fired.
-The probe sized every emitted function, and only F is large. The aggregate
-population behind it is left to AC-0. 8 fired. AC-2's pair differs only in
-node count, so a fix that changes behavior above the threshold fails it.
-AC-3 shows that AC-1 detects the inline path.
+`partition_function_units` on main and at `34cc2134f`. 6 fired. AC-0
+counted the population at the seam: 198 top-level transfers per origin, 6
+template shapes, every one with a selection. 8 fired. A build that leaves
+the transfers inline fails AC-1's per-seat row, and AC-3 shows that the
+row detects it.
