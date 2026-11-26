@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-TOPO-ORDER-UNION
 title: "Spec 62 carries a dependency order across edge removal (§13) and reversal (§21), and builds the union of two graphs (§15), but no law orders a union: a client holding a TopoOrder for g whose list also orders every edge of h cannot obtain a TopoOrder for graph_union g h without rerunning the pair scan. Rule from a checked D0 at zero trust that such an order orders the union with the same list, and state it with a seed that separates an h the list orders from one it does not"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

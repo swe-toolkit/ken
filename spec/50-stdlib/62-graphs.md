@@ -20,7 +20,8 @@
 > SPEC-GRAPHS-REACHABLE-REVERSE-SWAP §18;
 > SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19;
 > SPEC-GRAPHS-SUCCESSOR-APPEND-UNION §20;
-> SPEC-GRAPHS-TOPO-ORDER-REVERSE §21).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-TOPO-ORDER-REVERSE §21;
+> SPEC-GRAPHS-TOPO-ORDER-UNION §22).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -1934,3 +1935,62 @@ pair does not replace checking the generic types or the exact trust identities.
 
 The current Dependency roster is **19 public functions and 37 public
 theorems**. The §§1–20 types and the historical §20 roster are unchanged.
+
+## 22. Ordering a union with one order
+
+> **Section 22 status: DRAFT v0 (SPEC-GRAPHS-TOPO-ORDER-UNION).**
+> Architect AC-0 `evt_20ymjsn275ey6` on `d7d99f1ba` reports successful
+> scratch checking and formatting, accepted open clients, and unchanged
+> exact trusted `GlobalId` identities (114 → 114) in the existing
+> reverse-order package test. No `Axiom` or primitive was added. These
+> scratch results do not establish assembled AC-T, official conformance,
+> CI or landing.
+
+`Algorithm.Graphs.Dependency` must export these Transparent checked
+public declarations in the order shown, immediately after
+`topo_order_reverse_vertices` and before `before_irreflexive`:
+
+```ken
+pub fn topo_order_union
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (order : TopoOrder q d g)
+      (forward_h : all_edges_forward q d h (ordered_vertices q d g order))
+    : TopoOrder q d (graph_union q g h)
+
+pub theorem topo_order_union_vertices
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (h : Graph q)
+      (order : TopoOrder q d g)
+      (forward_h : all_edges_forward q d h (ordered_vertices q d g order))
+    : Equal
+        (List q)
+        (ordered_vertices q d (graph_union q g h) (topo_order_union q d g h order forward_h))
+        (ordered_vertices q d g order)
+```
+
+The extra argument supplies forwardness for `h` on the exact list from
+`order`, not on another list or on the union. The transfer keeps that
+list and reuses its uniqueness and completeness evidence, which depend
+on the carrier and list, not on the edges. For each union edge,
+`graph_union_edge_cases` gives either an edge of `g`, handled by
+`ordered_forward`, or an edge of `h`, handled by `forward_h`. The transfer
+does not rerun the order search, and the list equality follows by
+conversion even with an open `order`. No new helper, import, kernel rule
+or surface form is needed, and §§1–21 operation and law types are unchanged.
+
+The two-order form is client-derived by transporting the second order's
+`ordered_forward` along equality of the two lists and applying
+`topo_order_union`; it is not a separate export.
+
+With list `[V0,V1,V2]`, the edge `V0 → V1` in `g` and `V1 → V2` in `h`
+are both forward. The accepted fixture reads off both edges and the
+unchanged list from the union order. Reversing only `h`'s edge makes
+`before V2 V1` false on that list, so the `forward_h` declaration
+refuses before the transfer is used. That refusal tests the premise,
+not the transfer itself; the open client distinguishes the stated type
+from one that wrongly asks for forwardness over the whole union.

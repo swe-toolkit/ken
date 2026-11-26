@@ -85,6 +85,30 @@ and comparators, package homes if AC-0 rules any, and spec 38's status
 lines. No change to `ClockWallNow`, to the Deadline type, or to ABI-S3's
 no-substitute entropy rule (no userspace PRNG, no fallback).
 
+**Scope amendment** (Architect AC-0 `evt_4zbmaff96r9wv`; Steward
+`evt_6wykpd3k24pj6`, `evt_5bpcsk6h7z1hp`, `evt_12dr33x85kn5r`). The
+settled inputs on the native host, the C reply, package homes and the
+verify host did not hold on `b9c1853d6`. The following are admitted as
+enablers:
+
+- **Spec child.** A spec 38 §1.15 for the clock, sleep and entropy
+  contract, with its status beside it. It adds the `MonotonicInstant` and
+  `Deadline` floor rows in 30-taxonomy and 30-intrinsic-ledger, and the
+  55 to 57 floor sync in 33-declarations §33.3.3 and 39-elaboration.
+- **Catalog child.** `Capability.Time.Monotonic`, `Capability.System.Entropy`,
+  `host_entropy` added to `Capability.Process.Exit`, and the WallClock
+  pointer. It also carries their elaborator registration and floor
+  sentinels.
+- **Host and verify.** `ken-host`'s three shared functions and the
+  `set_reply` carrier, and `ken-verify`'s real-source modes and three
+  comparators.
+- **Mechanical consumers.** A mechanical consumer of an admitted item is
+  in scope when its paths are disjoint from INHERITANCE-DUPLICATE's. It
+  is named in the handoff.
+
+Entropy stays in this WP. Children touching INHERITANCE-DUPLICATE's paths
+branch from main after that WP lands.
+
 ## Acceptance
 
 - **AC-0 (Architect, before code).** Rule the package home of each
@@ -102,6 +126,21 @@ no-substitute entropy rule (no userspace PRNG, no fallback).
   exactly `n`. Two reads of 32 bytes differ. An unavailable kernel source
   reports `Unsupported` and returns no bytes.
 - **AC-3.** Full-workspace CI is green on the exact candidate.
+
+## Inventory
+
+1. The out-of-domain sleep refusal had no lawful native terminal carrier.
+   Ruling 4 named the class but not the seat, and the only pre-dispatch
+   failure was require_true's unclassified -1. Keyed on: the native lane's
+   program-reachable refusal must be a planner-catalogued trap
+   (`evt_2tys8csd36b58`).
+2. Ruling 3's out-of-domain comparator assumed that lane transport is
+   identical across lanes: the effect-trace reading width (i128 native,
+   minimal interpreter) and native stderr (starter report plus launcher
+   line). Keyed on: what a lane emits on its transport outside the
+   semantic observation (`evt_4630qt1rw0at9`).
+
+§1a is at 2 (next trigger 3). The §1b predicate question is not yet due.
 
 ## Stop conditions
 
