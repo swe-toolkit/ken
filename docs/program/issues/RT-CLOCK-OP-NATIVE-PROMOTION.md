@@ -85,6 +85,30 @@ and comparators, package homes if AC-0 rules any, and spec 38's status
 lines. No change to `ClockWallNow`, to the Deadline type, or to ABI-S3's
 no-substitute entropy rule (no userspace PRNG, no fallback).
 
+**Scope amendment** (Architect AC-0 `evt_4zbmaff96r9wv`; Steward
+`evt_6wykpd3k24pj6`, `evt_5bpcsk6h7z1hp`, `evt_12dr33x85kn5r`). The
+settled inputs on the native host, the C reply, package homes and the
+verify host did not hold on `b9c1853d6`. The following are admitted as
+enablers:
+
+- **Spec child.** A spec 38 §1.15 for the clock, sleep and entropy
+  contract, with its status beside it. It adds the `MonotonicInstant` and
+  `Deadline` floor rows in 30-taxonomy and 30-intrinsic-ledger, and the
+  55 to 57 floor sync in 33-declarations §33.3.3 and 39-elaboration.
+- **Catalog child.** `Capability.Time.Monotonic`, `Capability.System.Entropy`,
+  `host_entropy` added to `Capability.Process.Exit`, and the WallClock
+  pointer. It also carries their elaborator registration and floor
+  sentinels.
+- **Host and verify.** `ken-host`'s three shared functions and the
+  `set_reply` carrier, and `ken-verify`'s real-source modes and three
+  comparators.
+- **Mechanical consumers.** A mechanical consumer of an admitted item is
+  in scope when its paths are disjoint from INHERITANCE-DUPLICATE's. It
+  is named in the handoff.
+
+Entropy stays in this WP. Children touching INHERITANCE-DUPLICATE's paths
+branch from main after that WP lands.
+
 ## Acceptance
 
 - **AC-0 (Architect, before code).** Rule the package home of each
