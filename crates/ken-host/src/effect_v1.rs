@@ -3641,10 +3641,14 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             ) {
                 Ok((handle, identity)) => {
                     resource_bindings.push((ResourceBindingRole::Target, identity));
-                    backend
-                        .fs_resource_set_length(handle, *length)
-                        .map(|()| CanonicalReplyV1::Unit)
-                        .map_err(SemanticErrorV1::Io)
+                    if *length > FILE_POSITION_MAX_V1 {
+                        Err(SemanticErrorV1::Resource(ResourceErrorV1::InvalidOffset))
+                    } else {
+                        backend
+                            .fs_resource_set_length(handle, *length)
+                            .map(|()| CanonicalReplyV1::Unit)
+                            .map_err(SemanticErrorV1::Io)
+                    }
                 }
                 Err(error) => Err(SemanticErrorV1::Resource(error)),
             }
@@ -3853,6 +3857,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                             .map_err(SemanticErrorV1::Resource)?;
                     file_offset
                         .checked_add(effective as u64)
+                        .filter(|end| *end <= FILE_POSITION_MAX_V1)
                         .ok_or(ResourceErrorV1::InvalidOffset)
                         .map_err(SemanticErrorV1::Resource)?;
                     region.clear_window();
@@ -3916,6 +3921,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                             .map_err(SemanticErrorV1::Resource)?;
                     file_offset
                         .checked_add(effective as u64)
+                        .filter(|end| *end <= FILE_POSITION_MAX_V1)
                         .ok_or(ResourceErrorV1::InvalidOffset)
                         .map_err(SemanticErrorV1::Resource)?;
                     if let Err(error) = checked_span_origin(target_buffer, span_origin) {
@@ -4234,6 +4240,12 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         consumed_settlements,
     })
 }
+
+/// The largest file position or length the reference host can represent.
+/// Linux `off_t`/`loff_t` is signed 64-bit. The bound applies to a
+/// `setLength` length, a `readAt` or `writeAt` offset, and that offset plus
+/// the effective transfer length (spec 38 §1.7.1).
+pub const FILE_POSITION_MAX_V1: u64 = i64::MAX as u64;
 
 fn checked_buffer_range(
     capacity: usize,
@@ -9345,6 +9357,40 @@ mod tests {
                 FsSyncModeV1::SyncData => 904,
             }))
         }
+    }
+
+    /// Promise class: durable invariant. MEASURED: dispatch on a live writable
+    /// handle returns InvalidOffset and makes zero backend calls for 2^63.
+    /// CLAIMED: direct dispatch cannot bypass the setLength width check.
+    /// THE GAP: this exercises the shared executor, not either lane's seat.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn set_length_host_width_refuses_before_backend() {
+        let (root, owner) = resource_fixture("set-length-host-width");
+        let mut resources = ResourceTableV1::default();
+        let mut revocation = RevocationDomain::default();
+        let lineage = revocation.mint_root();
+        let (token, _) = resources.insert_fs_handle(owner, crate::RightSet::WRITE, lineage);
+        let mut backend = DescriptorErrorBackend::default();
+        let reply = dispatch_host_op_v1(
+            &mut backend,
+            &CapabilityTableV1::default(),
+            &revocation,
+            &mut resources,
+            HostOpV1::FsSetLength,
+            None,
+            ResourceInputsV1::Target(token),
+            &CanonicalRequestV1::FsSetLength { length: 1 << 63 },
+        )
+        .unwrap();
+        drop(resources);
+        std::fs::remove_dir_all(root).unwrap();
+
+        assert_eq!(
+            (reply.outcome, backend.set_length_calls),
+            (CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::InvalidOffset)), 0),
+            "dispatch outcome and backend setLength calls"
+        );
     }
 
     /// Promise class: durable invariant. MEASURED: distinct injected I/O

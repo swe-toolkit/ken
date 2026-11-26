@@ -41,29 +41,33 @@ runner. No CI, publication, or landing result is claimed.
 
 ### file-io/set-length-invalid-length-refuses-before-host
 
+- promise class: durable invariant.
+- status: **RED-UNTIL-RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION**; the new
+  `2^63` arm is not run against the pre-promotion base.
 - spec: `38 §1.3.1`, `§1.7.1`
 - given: seed each fresh host file with bytes `ABCDEFGH`. Acquire a writable
   handle through `withResource` in
   `ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep`. Each
   checked client imports `setLength` from `Capability.System.IO`, declares
-  `visits [FS]`, and receives valid FS authority. The invalid clients differ
-  from a valid control only in the `setLength` argument: `-1` or the positive
-  integer `18446744073709551616` on a 64-bit host. The positive control uses
-  `4` on the same initial bytes and handle mode.
+  `visits [FS]`, and receives valid FS authority. The invalid lengths are `-1`,
+  `9223372036854775808` (`2^63`), and `18446744073709551616` (`2^64`). The
+  `2^63` value exceeds the Linux host-width bound in §1.7.1. The positive
+  control uses `4` on the same initial bytes and handle mode; each invalid
+  client differs from it only in the `setLength` argument.
 - measured: the exact public result, any host set-length request, and the
   fixture file contents after the call.
 - claimed: a negative or host-width-unrepresentable length returns
   `InvalidOffset` before dispatch.
-- the gap: the result alone cannot distinguish an early refusal from a host
-  call that returns the same error; the recorder must observe the actual host
-  boundary, and the file state is checked independently.
-- expect: both invalid arms return
-  `Err (ResourceError.InvalidOffset)`, leave the original bytes unchanged,
-  and produce no host set-length request. The control returns `Ok Unit`,
-  changes the file to four bytes, and reaches the host fixture.
-- why: the accepted control proves the handle and recorder are live. The
-  exact error plus zero host requests distinguishes pre-dispatch range
-  admission from a host-side rejection or a wrapped length.
+- the gap: an `InvalidOffset` result alone does not show where it was
+  produced. The recorder must observe whether a host request was sent, and the
+  file state is checked independently.
+- expect: all invalid arms return `Err (ResourceError.InvalidOffset)`, leave
+  the original bytes unchanged, and produce no host set-length request. The
+  control returns `Ok Unit`, changes the file to four bytes, and reaches the
+  host fixture.
+- why: the accepted control proves the handle and recorder are live. For
+  `2^63`, `InvalidOffset` must precede host access; a host-side refusal after
+  a set-length request is not equivalent.
 
 ## FS-C. A read-only handle cannot change the extent
 

@@ -139,12 +139,106 @@ proc denied_sync (file : Resource ResourceKind.FsHandle)
 proc invalid_length (file : Resource ResourceKind.FsHandle)
   : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
   host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
-    (setLength AFull file INVALID_DESCRIPTOR_LENGTH)
+    (setLength AFull file DESCRIPTOR_POSITION)
     (\outcome. match outcome {
       Err ResourceError.InvalidOffset |-> body_result True;
       Err other |-> body_result False;
       Ok value |-> body_result False
     })
+
+-- The first setLength may succeed on tmpfs or be refused by another
+-- filesystem; its outcome is observed in the trace, not here, so the body
+-- succeeds either way and the shrink below always follows it.
+proc dispatch_length (length : Int) (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (setLength AFull file length) (\outcome. body_result True)
+
+proc length_bracket (cap : Cap AFull) (length : Int)
+  : HostIO AFull (Result FileError (ResourceBracketResult Unit Unit)) visits [FS] =
+  withResource AFull Unit Unit cap (bytes_encode "subject")
+    (ResourceOpenMode.ResourceWriteCreate CreatePolicy.CreateOrKeep) (dispatch_length length)
+
+-- Restore a small extent before either real-root observer reads it. Only a
+-- failed open skips it, and then no first setLength was dispatched.
+proc shrink_after_max (cap : Cap AFull) (first : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match file_ok first {
+    False |-> host_pure AFull ExitCode (ExitCode.Failure 77);
+    True |-> host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+      (length_bracket cap 4) final_exit
+  }
+
+proc max_length_then_shrink (cap : Cap AFull) : HostIO AFull ExitCode visits [FS] =
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+    (length_bracket cap DESCRIPTOR_POSITION) (shrink_after_max cap)
+
+-- Each read body accepts exactly one outcome class, so exit 0 witnesses the
+-- returned value and not only the trace: a refusal row cannot pass on EOF,
+-- and the EOF row cannot pass on a refusal.
+proc width_read_refused_buffer (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file DESCRIPTOR_POSITION buffer (MkBufferWindow 0 1))
+    (\outcome. match outcome {
+      Err ResourceError.InvalidOffset |-> body_result True;
+      Err other |-> body_result False;
+      Ok progress |-> body_result False
+    })
+
+proc width_read_refused (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit 1 (width_read_refused_buffer file))
+    (\outcome. body_result (buffer_ok outcome))
+
+proc width_read_eof_buffer (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file DESCRIPTOR_POSITION buffer (MkBufferWindow 0 1))
+    (\outcome. match outcome {
+      Ok ReadProgress.ReadEof |-> body_result True;
+      Ok other |-> body_result False;
+      Err error |-> body_result False
+    })
+
+proc width_read_eof (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit 1 (width_read_eof_buffer file))
+    (\outcome. body_result (buffer_ok outcome))
+
+proc width_write_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle) (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Ok (ReadProgress.ReadSome span count) |->
+      host_bind AFull (Result ResourceError WriteProgress) (ResourceBodyResult Unit Unit)
+        (writeAt AFull file DESCRIPTOR_POSITION buffer span)
+        (\written. match written {
+          Err ResourceError.InvalidOffset |-> body_result True;
+          Err other |-> body_result False;
+          Ok progress |-> body_result False
+        });
+    Ok ReadProgress.ReadEof |-> body_result False;
+    Err error |-> body_result False
+  }
+
+proc width_write_buffer (file : Resource ResourceKind.FsHandle) (source : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull source 0 buffer (MkBufferWindow 0 1)) (width_write_read file buffer)
+
+proc width_write_source (file : Resource ResourceKind.FsHandle) (source : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit 1 (width_write_buffer file source))
+    (\outcome. body_result (buffer_ok outcome))
+
+proc width_write (cap : Cap AFull) (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) (ResourceBodyResult Unit Unit)
+    (withResource AFull Unit Unit cap (bytes_encode "source") ResourceOpenMode.ResourceRead (width_write_source file))
+    (\outcome. body_result (file_ok outcome))
 
 proc main (_input : ProcessInput) (caps : ProgramCaps AFull) : HostIO AFull ExitCode visits [FS] =
   match caps {
