@@ -353,7 +353,7 @@ impl<'a> Lowering<'a> {
                                     || constructor == &self.process_symbols.exit_failure
                         );
                     if terminal_exit {
-                        let status = self.emit_process_exit_status(builder, lowered);
+                        let status = self.emit_process_exit_status(builder, lowered)?;
                         self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)
                     } else {
                         // `CarrierWord` is planner-selected before emission. A
@@ -2814,7 +2814,7 @@ impl<'a> Lowering<'a> {
                     lowered if self.process_object => Ok((
                         NativeScalarPairV1 {
                             tag: zero_tag,
-                            payload: self.emit_process_exit_status(builder, lowered),
+                            payload: self.emit_process_exit_status(builder, lowered)?,
                         },
                         ScalarMergeKind::ExitCode,
                     )),
@@ -2934,7 +2934,7 @@ impl<'a> Lowering<'a> {
                     Ok((
                         NativeScalarPairV1 {
                             tag: zero_tag,
-                            payload: self.emit_process_exit_status(builder, lowered),
+                            payload: self.emit_process_exit_status(builder, lowered)?,
                         },
                         ScalarMergeKind::ExitCode,
                     ))
