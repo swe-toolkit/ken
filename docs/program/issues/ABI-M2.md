@@ -92,8 +92,12 @@ scope: entropy (CLOCK), new operations, fallbacks, kernel version checks.
    carrier's production backend, and the X-scope arm forbade the one
    module that can. Keyed on: whether the named entry is visible from the
    assigned test module (`evt_1htz9vm367ck3`).
+2. The fault seam injected its outcome before the production probe arm and
+   the cache, so the AC-3 mutations for probe selection and undecided
+   caching could not redden. Keyed on: where an injected outcome enters,
+   relative to the code path the claim is about (`evt_1qec20y6nx9dz`).
 
-§1a is at 1 (next trigger 3).
+§1a is at 2 (next trigger 3: research hold and the §1b question).
 
 ## Stop conditions
 
