@@ -1,7 +1,7 @@
 ---
 id: RT-CLOCK-OP-NATIVE-PROMOTION
 title: "ABI-S3 merged the monotonic clock, deadline sleep and kernel entropy as host operations, but ClockMonotonicNow, ClockSleepUntil and EntropyRandomBytes are still RepresentedUnavailable, so neither the interpreter nor a native build runs them and PX12's deadlines have no clock to read. Promote all three to NativeTested with interpreter parity, carrying by name the two clock properties RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE retired"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1
