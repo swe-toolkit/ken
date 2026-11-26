@@ -4712,8 +4712,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.read_eof,
         &spine.wrote,
         &spine.mk_instant,
-        &spine.mk_monotonic_instant,
-        &spine.mk_deadline,
         &spine.read_chunk,
         &spine.read_result_eof,
         &spine.unit,
@@ -4755,6 +4753,9 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S2 appends in the same order as the runtime role decoder.
         &spine.directory_entries,
         &spine.directory_end,
+        // Clock promotion appends in that same order.
+        &spine.mk_monotonic_instant,
+        &spine.mk_deadline,
     ] {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
