@@ -4324,6 +4324,90 @@ mod tests {
         std::fs::remove_dir_all(directory).unwrap();
     }
 
+    /// Promise class: durable invariant.
+    /// MEASURED: with the statx facility absent (its probe reports EPERM
+    /// through the facility seam), raw FsMetadata on an existing file replies
+    /// REPLY_ERROR whose detail decodes to Unsupported, and its trace event is
+    /// the FileError carrier for FsMetadata, the path and Io(Unsupported).
+    /// Without the seam the same dispatch replies REPLY_METADATA.
+    /// CLAIMED: ProcessHost::fs_metadata, host_error, file_error and set_reply
+    /// carry the refusal unchanged; EPERM is not PermissionDenied here.
+    /// THE GAP: the seam replaces the probe's syscall result; no real host
+    /// lacking statx is exercised.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_metadata_raw_dispatch_refuses_unsupported_while_statx_is_absent() {
+        let directory = std::env::temp_dir()
+            .join(format!("ken-fs-metadata-statx-absent-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("known.bin"), b"five!").unwrap();
+        let initialized = context(&directory);
+        let path = b"known.bin".as_slice();
+        let request = FsPathRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: path.as_ptr(),
+                len: path.len(),
+            },
+        };
+        let dispatch = |reply: &mut HostReplyV1| unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsMetadata as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsPathRequestV1>(),
+                std::ptr::from_mut(reply).cast(),
+            )
+        };
+        let blank = || HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
+        };
+
+        let mut absent = blank();
+        let status = crate::facility_v1::with_facility_fault(
+            crate::facility_v1::HostFacilityV1::Statx,
+            libc::EPERM,
+            || dispatch(&mut absent),
+        );
+        assert_eq!(status, 0, "the refusal is a typed reply, not a fallback");
+        assert_eq!(absent.tag, REPLY_ERROR);
+        assert_eq!(
+            io_error_from_tag(absent.detail),
+            Some(crate::IoErrorIdentityV1::Unsupported)
+        );
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(context.effect_trace.len(), 1);
+        assert_eq!(context.effect_trace[0].operation, HostOpV1::FsMetadata);
+        assert_eq!(
+            context.effect_trace[0].outcome,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(
+                crate::FileErrorIdentityV1 {
+                    operation: HostOpV1::FsMetadata,
+                    relative_path: path.to_vec(),
+                    cause: FileErrorCauseV1::Io(crate::IoErrorIdentityV1::Unsupported),
+                }
+            ))
+        );
+
+        let mut present = blank();
+        assert_eq!(dispatch(&mut present), 0);
+        assert_eq!(present.tag, REPLY_METADATA);
+        assert_eq!(present.metadata.size, 5);
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(context.effect_trace.len(), 2);
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     /// Promise class: normative compatibility vector for the existing raw
     /// boundary.
     ///
