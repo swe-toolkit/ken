@@ -1,7 +1,7 @@
 ---
 id: RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC
 title: "ABI-S1 merged host implementations of FsSeek, FsSetLength and FsSync, but no Ken source can reach them and all three are RepresentedUnavailable, so a Ken program cannot truncate a file or make a write durable. Rule from an AC-0 whether each operation gains a checked surface and native parity or leaves the catalog, as positional reads and writes may already subsume seek, and land the ruled result"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1
