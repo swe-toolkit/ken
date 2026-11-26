@@ -86,6 +86,15 @@ scope: entropy (CLOCK), new operations, fallbacks, kernel version checks.
   reddens that facility's AC-1 row.
 - **AC-4.** Full-workspace CI is green on the exact candidate.
 
+## Inventory
+
+1. AC-1 placed a carrier row in a test module that cannot see the
+   carrier's production backend, and the X-scope arm forbade the one
+   module that can. Keyed on: whether the named entry is visible from the
+   assigned test module (`evt_1htz9vm367ck3`).
+
+§1a is at 1 (next trigger 3).
+
 ## Stop conditions
 
 - A facility cannot be probed without performing the operation's effect.
