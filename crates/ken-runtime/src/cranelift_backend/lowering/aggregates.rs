@@ -7378,7 +7378,14 @@ impl<'a> Lowering<'a> {
             )
             .is_none()
             {
-                return Ok(None);
+                // Every selection template the collector cannot rebuild is
+                // refused here, rather than left to a silent inline transfer
+                // (Architect evt_1zy2ge7kdz0qc, arm (b)).
+                return Err(unsupported(
+                    LoweringCause::PlannerInvariant,
+                    "TransferHelper",
+                    "a run-time-selected transfer template holds a form the transfer helper does not rebuild",
+                ));
             }
             let pointer = builder.func.dfg.value_type(services);
             for leaf in &leaves {

@@ -10694,3 +10694,66 @@ mod ac10_evasion_probe {
         Lowered::ResponseBytes(SafeByteSpan::for_control(pointer, len))
     }
 }
+
+/// Durable invariant (RT-NATIVE-AGGREGATE-DATA-NOT-CODE, ruling (b1)): a
+/// run-time-selected transfer template whose form the transfer helper does not
+/// rebuild is refused at the dispatcher with a named refusal, never left to a
+/// silent inline transfer. The template is a HostResult whose error arm is a
+/// represented boundary closure, the one collector-refused form the inline
+/// emitter would otherwise transfer. The refusal is decided before any plan
+/// lookup of that closure's record.
+#[test]
+fn selection_template_with_boundary_closure_is_refused_not_inlined() {
+    let fixture = RuntimeExpr::Construct {
+        constructor: "fixture::Holder".into(),
+        args: vec![RuntimeExpr::Value(RuntimeValue::Int(1.into()))],
+    };
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let record = plan
+        .aggregate_ownership_records()
+        .first()
+        .map(|record| record.id)
+        .expect("the fixture's source aggregate has an ownership record");
+    let unit = plan
+        .emittable_units()
+        .expect("the fixture exposes emittable units")
+        .first()
+        .copied()
+        .expect("the fixture has an emittable unit")
+        .function();
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let result = ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, params| {
+        compiler.function_local.services_pointer = Some(params[0]);
+        compiler.defining_emission_owner = Some(ContinuationEmissionOwner::Predeclared(unit));
+        compiler.defining_unit = Some(unit);
+        compiler.begin_transfer_helpers(builder.func.name.clone());
+        let success = builder.ins().iconst(types::I64, 0);
+        let ok = builder.ins().iconst(types::I64, 0);
+        let template = Lowered::HostResult {
+            success,
+            error: Box::new(Lowered::Closure {
+                captures: Vec::new(),
+                params: Vec::new(),
+                body: root,
+                boundary_environment: Some(record),
+            }),
+            ok: Box::new(Lowered::Int { value: ok, known: Some(0) }),
+            err_constructor: "ctor:fixture::Err".into(),
+            ok_constructor: "ctor:fixture::Ok".into(),
+        };
+        let word = compiler.emit_carrier_transfer(builder, root, &template)?;
+        Ok(word.word)
+    });
+    let error = match result {
+        Err(CraneliftBackendError::Unsupported(error)) => error,
+        Err(other) => panic!("expected the dispatcher's refusal, got {other:?}"),
+        Ok(_) => panic!("a collector-refused selection template was transferred, not refused"),
+    };
+    assert_eq!(error.construct, "TransferHelper", "{error:?}");
+    assert_eq!(error.cause, LoweringCause::PlannerInvariant);
+    assert_eq!(
+        error.reason,
+        "a run-time-selected transfer template holds a form the transfer helper does not rebuild"
+    );
+}
