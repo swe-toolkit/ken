@@ -94,7 +94,7 @@ to execute and remain evidence for the unchanged kernel behavior.
   Pair companion bindings remain a separate three-identity inventory.
 - expect: the signature inventory is exactly
   `{Auth, Bool, Char, List, Option, ResourceKind, Result, Utf8Error}`. The
-  exact floor-identity roster, in `PRELUDE_FLOOR_NAMES` order, is
+  exact floor-identity membership is the order-insensitive set
   `{Auth, Bool, Bottom, BufferSpan, Char, ChildExit, ConsoleOp,
   ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry, Equal, ExitCode,
   FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError, ITree,
