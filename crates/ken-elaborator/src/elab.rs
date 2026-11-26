@@ -23086,7 +23086,7 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         EntropyRandomBytes => RowSummand::Entropy,
         FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsOpenDirectory | FsReadDirectoryBatch
         | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
-        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
+        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSetLength | FsSync
         | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease
         | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView
         | MappingWriteView | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite

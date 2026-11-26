@@ -3801,7 +3801,11 @@ impl<'a> Lowering<'a> {
                     builder.ins().stack_store(mode, request, request_offset(3));
                 }
             }
-            ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::ResourceRelease => {
+            ken_host::HostOpV1::FsHandleMetadata
+            | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength
+            | ken_host::HostOpV1::FsSync
+            | ken_host::HostOpV1::ResourceRelease => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
@@ -3841,6 +3845,20 @@ impl<'a> Lowering<'a> {
                 builder
                     .ins()
                     .stack_store(token, request, request_offset(0));
+                if operation == ken_host::HostOpV1::FsSetLength {
+                    let (length, valid) = self.narrow_positioned_int_seat(
+                        builder, &seats, 1, "setLength length",
+                    )?;
+                    let invalid = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0,
+                    );
+                    let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_OFFSET);
+                    record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                    builder.ins().stack_store(length, request, request_offset(1));
+                } else if operation == ken_host::HostOpV1::FsSync {
+                    let full = builder.ins().iconst(types::I64, 0);
+                    builder.ins().stack_store(full, request, request_offset(1));
+                }
             }
             ken_host::HostOpV1::BufferAllocate => {
                 if capability.is_some() {
@@ -4498,6 +4516,8 @@ impl<'a> Lowering<'a> {
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
                 | ken_host::HostOpV1::ProcessSignal
+                | ken_host::HostOpV1::FsSetLength
+                | ken_host::HostOpV1::FsSync
                 | ken_host::HostOpV1::ResourceStreamRead
                 | ken_host::HostOpV1::ResourceStreamWrite
                 | ken_host::HostOpV1::MappingAllocate
@@ -4778,6 +4798,8 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::ProcessTakePipe
                     | ken_host::HostOpV1::ProcessWait
                     | ken_host::HostOpV1::ProcessSignal
+                    | ken_host::HostOpV1::FsSetLength
+                    | ken_host::HostOpV1::FsSync
                     | ken_host::HostOpV1::ResourceStreamRead
                     | ken_host::HostOpV1::ResourceStreamWrite
                     | ken_host::HostOpV1::ProcessPlanOpen

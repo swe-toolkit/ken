@@ -43,7 +43,7 @@ fn ruled_h_names_import_at_the_original_checked_ids_only() {
                 "file_metadata",
             ],
         ),
-        ("Capability.System.IO", &["writeAt", "writeAll"]),
+        ("Capability.System.IO", &["writeAt", "writeAll", "setLength", "sync"]),
         ("Capability.System.Buffer", &["freeze"]),
         ("Capability.System.Resource", &["resourceMetadata"]),
         ("Capability.Console.Text", &["read", "flush", "is_terminal"]),

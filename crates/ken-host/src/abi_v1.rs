@@ -249,22 +249,12 @@ struct FsWriteAtRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsSeekRequestV1 {
-    resource: u64,
-    origin: u64,
-    offset: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsSetLengthRequestV1 {
     resource: u64,
     length: u64,
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsSyncRequestV1 {
     resource: u64,
     mode: u64,
@@ -1570,7 +1560,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         }
         CanonicalOutcomeV1::Success(
             CanonicalReplyV1::MonotonicInstant(_)
-            | CanonicalReplyV1::FilePosition(_)
             | CanonicalReplyV1::FdInheritancePolicy(_),
         ) => reply.tag = REPLY_ERROR,
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
@@ -2084,6 +2073,37 @@ unsafe fn decode_native_request_v1(
                     wire.resource,
                 )),
                 request,
+            )
+        }
+        HostOpV1::FsSetLength if request_size == std::mem::size_of::<FsSetLengthRequestV1>() => {
+            if !request.cast::<FsSetLengthRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<FsSetLengthRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                CanonicalRequestV1::FsSetLength { length: wire.length },
+            )
+        }
+        HostOpV1::FsSync if request_size == std::mem::size_of::<FsSyncRequestV1>() => {
+            if !request.cast::<FsSyncRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<FsSyncRequestV1>() };
+            let mode = match wire.mode {
+                0 => crate::FsSyncModeV1::SyncFull,
+                1 => crate::FsSyncModeV1::SyncData,
+                _ => return Err(-1),
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                CanonicalRequestV1::FsSync { mode },
             )
         }
         HostOpV1::FsReadAt if request_size == std::mem::size_of::<FsPositionedRequestV1>() => {
@@ -2860,7 +2880,6 @@ mod tests {
         size_align!("ResourceRequestV1", ResourceRequestV1);
         size_align!("FsPositionedRequestV1", FsPositionedRequestV1);
         size_align!("FsWriteAtRequestV1", FsWriteAtRequestV1);
-        size_align!("FsSeekRequestV1", FsSeekRequestV1);
         size_align!("FsSetLengthRequestV1", FsSetLengthRequestV1);
         size_align!("FsSyncRequestV1", FsSyncRequestV1);
         size_align!("FsGetInheritanceRequestV1", FsGetInheritanceRequestV1);
@@ -2930,9 +2949,6 @@ mod tests {
         offset!("FsOpenRequestV1", FsOpenRequestV1, path);
         offset!("FsOpenRequestV1", FsOpenRequestV1, mode);
         offset!("ResourceRequestV1", ResourceRequestV1, resource);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, resource);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, origin);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, offset);
         offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, resource);
         offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, length);
         offset!("FsSyncRequestV1", FsSyncRequestV1, resource);

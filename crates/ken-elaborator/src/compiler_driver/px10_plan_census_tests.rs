@@ -398,7 +398,7 @@ fn assert_region_exit_owners(
 /// PX10-NATIVE-BRANCH-ALTERNATIVES. MEASURED: the smoke plan completes,
 /// recording one feasibility diagnostic with no returned-Vis protocol error,
 /// and builds an artifact beneath the separate Process admission gate. Its
-/// settlement 698 resumes through fold 12 and is returned by Vis 733.
+/// current settlement 723 resumes through fold 12 and is returned by Vis 758.
 /// MEASURED (B1a D0-7, D0-1-to-D0-7-attribution.txt): region-0 acquire
 /// 710→686, body-entry Construct 682→658, outcome merge 641→617, and
 /// settlement Construct 647→623 preserved producer and order before I2.
@@ -409,7 +409,8 @@ fn assert_region_exit_owners(
 /// the smoke exit and returned owner origins by 66. Retiring the checked
 /// `create_directory` operand then shifts both origins back by one.
 /// The ABI-S2 FS dispatch adds eight nodes before the settlement and
-/// returned owner; fold 12 is unchanged.
+/// returned owner. DESCRIPTOR's checked FS dispatch change adds another 17
+/// before both; fold 12 is unchanged.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -436,7 +437,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 706, 12), (ReturnedVisSettlement, 706, 741)],
+            &[(ReturnFold, 723, 12), (ReturnedVisSettlement, 723, 758)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -458,7 +459,9 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
 /// CaseTest) with directory acquisition (9) and batch read (8). Each
 /// preceding copy of that dispatch adds 8 graph nodes: two for argv's
 /// exits and all but its first fold owner, one for that owner and for
-/// live's exits and non-fold-12 owners. The checked fixture paths are unchanged.
+/// live's exits and non-fold-12 owners. DESCRIPTOR adds 17 per preceding
+/// dispatch copy, moving the same origins by 34 or 17. The checked fixture
+/// paths, owner planes, and detached-result observations are unchanged.
 #[test]
 fn px10_argv_and_live_emit_below_process_gate() {
     use ken_runtime::RegionExitPlane::{ReturnFold, ReturnedVisSettlement};
@@ -467,10 +470,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1326, 654),
-                (ReturnFold, 1571, 1331),
-                (ReturnedVisSettlement, 1326, 1949),
-                (ReturnedVisSettlement, 1571, 1666),
+                (ReturnFold, 1360, 671),
+                (ReturnFold, 1605, 1365),
+                (ReturnedVisSettlement, 1360, 1983),
+                (ReturnedVisSettlement, 1605, 1700),
             ][..],
             None,
         ),
@@ -478,10 +481,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 684, 12),
-                (ReturnFold, 929, 689),
-                (ReturnedVisSettlement, 684, 1383),
-                (ReturnedVisSettlement, 929, 1102),
+                (ReturnFold, 701, 12),
+                (ReturnFold, 946, 706),
+                (ReturnedVisSettlement, 701, 1400),
+                (ReturnedVisSettlement, 946, 1119),
             ][..],
             None,
         ),
@@ -600,50 +603,22 @@ fn px10_g_erasure_null_has_unowned_self_transports_and_routed_relays() {
     assert_b1a_g_erasure("px10_g_erasure_null", null);
 }
 
-/// Promise class: transition sentinel for PX10 B-closure AC-2. It pins the
-/// exact plan origins for the fixed argv/live fixtures so a moved origin
-/// forces review of the owner, member and resume correspondence. Retire the
-/// absolute pins at the next approved prelude or planner change that moves
-/// these origins; replace them with checks keyed on the corresponding
-/// producer roles. Review the sibling argv/live return-fold and settlement
-/// census at the same transition.
-/// MEASURED: argv's relays 1389 and 1158 and live's relays 747 and 516 are
-/// members of their owners' returned-Vis protocols. Each emitting copy is
-/// numbered with a distinct nonzero discriminant rather than a response
-/// row, and kept in the settled member set. Copies of 1389 and 747 resume at the rows
-/// whose Vis are 1614 and 991; copies of 1158 and 516 resume by their planned
-/// named trap. CLAIMED: each named relay has a numbered copy with the
-/// expected resume, and copies retain separate discriminants. THE GAP: this
-/// census does not prove that every emitting owner minted a copy or that
-/// other copies' resumes agree with their issuers; the artifact is not run,
-/// the expected seat is read from the plane that chose it, and a trap's
-/// reason text is not projected. These origin pins are re-derived by producer
-/// and order on the B1a tree against `B-attribution-r2-structural-comparison.txt`
-/// (SHA256 2b45cce5e87da7f616767ea12772d28abdbb74143000f014853e907546babc06),
-/// which found equal owner/relay/resume/successor structure under that mapping.
-/// I2's checked ChildSignal prelude shifts argv origins by 18 and live origins
-/// by nine; F2's extra take_stdin operand shifts the argv origins by two and
-/// live origins by one more. The returned-Vis protocols and settled relays were
-/// re-observed on the F2 tree before repinning their identities. PX11's
-/// checked Net prelude shifts argv's relay, owner and resume origins by 132
-/// and live's by 66. Retiring the checked `create_directory` operand then
-/// moves argv's pins back by two and live's by one. Comparing both plans
-/// preserved member order, discriminants and trap/resume roles. ABI-S2 adds
-/// eight nodes per preceding FS dispatch: two copies precede argv's pins,
-/// one precedes live's. Numbering and trap/resume roles do not move.
+/// Promise class: durable invariant on the two fixed PX10 B-closure AC-2
+/// fixtures. MEASURED: the response-row census identifies the producing Vis
+/// by its unique operation role, before looking up any settled relay. The
+/// ProcessPlanOpen and ProcessPlanPush protocols each have a relay without a
+/// successor row. Each keeps that member after settlement, with distinct
+/// nonzero discriminants. Open's copy traps; Push's copies trap or resume at
+/// the independent ProcessWait row. CLAIMED: these roles retain numbered
+/// relays and their expected resumes when unrelated plan origins move.
+/// THE GAP: the member is identified by its producer and unique relay role,
+/// not separately by source location; this does not judge other protocols,
+/// trap reason text, or execution of the emitted artifact.
 #[test]
 fn px10_relays_are_numbered_protocol_members() {
-    for (name, source, relays) in [
-        (
-            "px10_census_relay_argv_env_pipe",
-            ARGV_ENV_PIPE,
-            [(1389, 1853, Some(1614)), (1158, 1949, None)],
-        ),
-        (
-            "px10_census_relay_live_child",
-            LIVE_CHILD,
-            [(747, 1287, Some(991)), (516, 1383, None)],
-        ),
+    for (name, source) in [
+        ("px10_census_relay_argv_env_pipe", ARGV_ENV_PIPE),
+        ("px10_census_relay_live_child", LIVE_CHILD),
     ] {
         in_census_thread(name, move || {
             let (built, diagnostics) =
@@ -653,8 +628,27 @@ fn px10_relays_are_numbered_protocol_members() {
             let _built = built.expect("px10 program emits an artifact with Process authority");
             assert_eq!(diagnostics.len(), 1, "{name}: one completed plan");
             let plan = &diagnostics[0];
+            let vis_for = |operation: &str| {
+                let mut rows = plan
+                    .all_static_response_rows
+                    .iter()
+                    .filter(|row| row.operation == operation);
+                let row = rows
+                    .next()
+                    .unwrap_or_else(|| panic!("{name}: missing {operation} producer"));
+                assert!(
+                    rows.next().is_none(),
+                    "{name}: ambiguous {operation} producer"
+                );
+                row.vis_origin
+            };
+            let wait = vis_for("ProcessWait");
             let mut discriminants = std::collections::BTreeSet::new();
-            for (relay, owner, resume_vis) in relays {
+            for (operation, expected_resumes) in [
+                ("ProcessPlanOpen", &[None][..]),
+                ("ProcessPlanPush", &[None, Some(wait)][..]),
+            ] {
+                let owner = vis_for(operation);
                 let protocol = plan
                     .returned_vis_protocols
                     .iter()
@@ -665,20 +659,16 @@ fn px10_relays_are_numbered_protocol_members() {
                     .contexts
                     .iter()
                     .flat_map(|(_, members)| members)
-                    .filter(|member| member.origin == relay)
+                    .filter(|member| member.relay)
                     .collect::<Vec<_>>();
+                let [member] = members.as_slice() else {
+                    panic!(
+                        "{name}: {operation} owner {owner} must have exactly one relay: {members:?}"
+                    );
+                };
+                let relay = member.origin;
                 assert_eq!(
-                    members.len(),
-                    1,
-                    "{name}: relay {relay} is one member of {owner}"
-                );
-                assert!(
-                    members[0].relay,
-                    "{name}: {relay} is a relay member: {:?}",
-                    members[0]
-                );
-                assert_eq!(
-                    members[0].successor_id, None,
+                    member.successor_id, None,
                     "{name}: relay {relay} is numbered by its own origin, not a response row"
                 );
                 assert!(
@@ -692,19 +682,19 @@ fn px10_relays_are_numbered_protocol_members() {
                     .iter()
                     .filter(|(origin, _, _)| *origin == relay)
                     .collect::<Vec<_>>();
-                assert!(!numbered.is_empty(), "{name}: relay {relay} is numbered");
-                for (_, discriminant, _) in &numbered {
+                let mut resumes = Vec::new();
+                for (_, discriminant, resume) in &numbered {
+                    resumes.push(resume.map(|(_, row_vis)| row_vis));
                     assert_ne!(*discriminant, 0, "{name}: zero is never a Vis member");
                     assert!(
                         discriminants.insert(*discriminant),
                         "{name}: relay {relay} shares discriminant {discriminant}"
                     );
                 }
-                assert!(
-                    numbered
-                        .iter()
-                        .any(|(_, _, resume)| resume.map(|(_, row_vis)| row_vis) == resume_vis),
-                    "{name}: relay {relay} has a copy resuming at {resume_vis:?} (None is a planned named trap): {numbered:?}"
+                resumes.sort_unstable();
+                assert_eq!(
+                    resumes, expected_resumes,
+                    "{name}: {operation} relay {relay} resumes (None is a planned named trap): {numbered:?}"
                 );
             }
         });

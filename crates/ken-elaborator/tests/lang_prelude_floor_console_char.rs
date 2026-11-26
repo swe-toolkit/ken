@@ -12,7 +12,7 @@ use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{GlobalId, Term};
 
 const MODES: [&str; 3] = ["strict-roots", "legacy-roots", "legacy-file"];
-const PACKAGED: [(&str, &str); 109] = [
+const PACKAGED: [(&str, &str); 111] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -57,6 +57,8 @@ const PACKAGED: [(&str, &str); 109] = [
     ("Capability.System.Buffer", "transfer_count_predecessor"),
     ("Capability.System.Buffer", "transfer_count_nat_succ"),
     ("Capability.System.IO", "writeAt"),
+    ("Capability.System.IO", "setLength"),
+    ("Capability.System.IO", "sync"),
     ("Capability.System.IO", "writeAll"),
     ("Capability.System.IO", "write_all_exact_prefix_prop"),
     (

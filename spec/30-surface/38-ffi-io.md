@@ -523,6 +523,12 @@ proc writeAt (a : Auth) (file : Resource ResourceKind.FsHandle) (fileOffset : In
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError WriteProgress) visits [FS]
 
+proc setLength (a : Auth) (file : Resource ResourceKind.FsHandle) (length : Int)
+  : HostIO a (Result ResourceError Unit) visits [FS]
+
+proc sync (a : Auth) (file : Resource ResourceKind.FsHandle)
+  : HostIO a (Result ResourceError Unit) visits [FS]
+
 proc spanBytes (a : Auth) (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Bytes) visits [FS]
 
@@ -586,8 +592,20 @@ checked handle does not replace those checks.
 `fileOffset` is nonnegative, and target offset-plus-length arithmetic is checked
 for overflow before host I/O. Neither operation mutates a file-description
 cursor. Sequential reads, writes, copies, and seek-like state are derived code
-that explicitly threads `fileOffset + transferred`; PX8 adds neither a seek
-primitive nor vectored I/O.
+that explicitly threads `fileOffset + transferred`. There is no seek
+primitive or relative file I/O, and PX8 adds no vectored I/O.
+
+`setLength` and `sync` are explicit imports from `Capability.System.IO`.
+Both operate on a live `ResourceWriteCreate` handle (any creation policy),
+require `WRITE`, and report host I/O failures as `ResourceHostIO` in
+`ResourceError`. Other handle modes are refused with `RightNotHeld` before
+backend access. `setLength` rejects a negative or host-width-unrepresentable
+length with `InvalidOffset` before dispatch. It sets the extent to `length`,
+preserving the retained prefix and zero-filling any extension.
+
+sync asks the host to flush the file's data and metadata (fsync(2)) and
+returns the host's outcome. Durability after machine failure is the kernel
+and filesystem's contract and is not tested by Ken.
 
 Derived `readAt` admits a raw `BufferWindow` in this exact order:
 
@@ -1428,9 +1446,8 @@ The existing exact checked FS result carriers `FileKind` (`KFile`,
 metadata and directory replies select their checked constructors;
 source uses only `FileKind.KFile` and its three sibling qualified
 cases, `FileMetadata.MkFileMetadata` and `DirEntry.MkDirEntry`.
-`FileOperation` has sixteen exact checked operation cases selected by
-native FileError production and already named by source in
-`Capability.System.Error` (§33 §3.3). It moves from that package home
+`FileOperation` has sixteen exact checked operation cases and is already
+named by source in `Capability.System.Error` (§33 §3.3). It moves from that package home
 to the scoped floor, with its complete cases available as
 `FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
 `FileOperation.OpAppendFile`, `FileOperation.OpMetadata`,
@@ -1440,6 +1457,8 @@ to the scoped floor, with its complete cases available as
 `FileOperation.OpSeek`, `FileOperation.OpSetLength`,
 `FileOperation.OpSync`, `FileOperation.OpGetInheritance`,
 `FileOperation.OpSetInheritance` and `FileOperation.OpDuplicate`.
+The six handle-operation cases (OpSeek through OpDuplicate) are not selected
+by any current producer; handle operations report through ResourceError.
 Only these five I/O family names enter the counted floor from this
 paragraph; none of their constructor leaves joins bare protected B.
 `StateOp.Get` and `StateOp.Put` are likewise scoped (§36 §4.2).

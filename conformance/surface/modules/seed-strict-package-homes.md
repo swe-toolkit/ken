@@ -750,6 +750,39 @@ the eight `Data.Numeric.FixedWidth` names.
 - why: the two package homes are part of the stream contract, not ambient
   prelude names.
 
+### surface/modules/descriptor-operations-require-system-io-imports
+
+- promise class: **durable provider-edge invariant**
+- spec: `38 §1.7.1`, `30-taxonomy §4`, `33 §3.3`
+- given: in a fresh pre-source environment, record the `GlobalId` of each
+  listed name before loading any catalog source. Then load the
+  dependency-closed catalog and, for each row, create a fresh Strict client
+  with a selective import and `export name`. Keep the client body and roots
+  fixed in the paired omission.
+
+  | Name | Home |
+  |---|---|
+  | `setLength` | `Capability.System.IO` |
+  | `sync` | `Capability.System.IO` |
+
+- measured: the independent pre-source `GlobalId` snapshots, each imported
+  reference's checked provider identity, and the diagnostic name when the
+  same import is omitted.
+- claimed: each operation retains its pre-source identity at its explicit
+  home, and neither operation is admitted through the implicit floor.
+- the gap: an imported identity read without the pre-source snapshot could be
+  a copied provider declaration. The omission pair distinguishes the home
+  edge from ambient name availability.
+- expect: each import resolves to the corresponding pre-source `GlobalId`.
+  Its paired omission refuses with `UnboundName` naming only the missing
+  operation.
+- controls: the independent pre-source snapshot is the identity oracle; for
+  each omission, restore only the named import and require the same client
+  to accept.
+- why: the snapshot distinguishes the existing checked identity from a
+  same-spelled replacement, while the paired omission proves that its home
+  edge is explicit.
+
 ### surface/modules/abi-s2-retired-read-directory-is-not-exported
 
 - promise class: **durable invariant** — the retired whole-list binding is not

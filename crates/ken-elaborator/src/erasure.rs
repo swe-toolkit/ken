@@ -4998,6 +4998,8 @@ const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1
             operation,
             ken_host::HostOpV1::FsHandleMetadata
                 | ken_host::HostOpV1::FsReadDirectoryBatch
+                | ken_host::HostOpV1::FsSetLength
+                | ken_host::HostOpV1::FsSync
                 | ken_host::HostOpV1::BufferAllocate
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
@@ -5025,6 +5027,8 @@ const fn runtime_selected_host_operation_requires_capability(
             operation,
             ken_host::HostOpV1::FsHandleMetadata
                 | ken_host::HostOpV1::FsReadDirectoryBatch
+                | ken_host::HostOpV1::FsSetLength
+                | ken_host::HostOpV1::FsSync
                 | ken_host::HostOpV1::BufferAllocate
                 | ken_host::HostOpV1::FsReadAt
                 | ken_host::HostOpV1::FsWriteAt
@@ -10001,6 +10005,8 @@ mod px7l_tests {
                     operation,
                     ken_host::HostOpV1::FsHandleMetadata
                         | ken_host::HostOpV1::FsReadDirectoryBatch
+                        | ken_host::HostOpV1::FsSetLength
+                        | ken_host::HostOpV1::FsSync
                         | ken_host::HostOpV1::BufferAllocate
                         | ken_host::HostOpV1::FsReadAt
                         | ken_host::HostOpV1::FsWriteAt

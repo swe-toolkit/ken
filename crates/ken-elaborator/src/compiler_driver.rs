@@ -4363,6 +4363,8 @@ fn checked_host_spine_v1(
         (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (prelude.private_fs_open_directory_id, ken_host::HostOpV1::FsOpenDirectory),
         (prelude.private_fs_read_directory_batch_id, ken_host::HostOpV1::FsReadDirectoryBatch),
+        (prelude.private_fs_set_length_id, ken_host::HostOpV1::FsSetLength),
+        (prelude.private_fs_sync_id, ken_host::HostOpV1::FsSync),
         (
             prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
