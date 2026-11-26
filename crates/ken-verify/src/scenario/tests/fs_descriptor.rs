@@ -400,8 +400,10 @@ fn set_length_host_max_dispatches_before_small_shrink() {
     assert_position_result(&run, b"0123");
 }
 
-fn assert_read_position(offset: u64, outcome: Option<CanonicalOutcomeV1>) {
-    let run = run_position(READ, "width_read", offset);
+fn assert_read_position(body: &str, offset: u64, outcome: Option<CanonicalOutcomeV1>) {
+    // `body` accepts exactly one returned class (see the fixture), so the
+    // exit-0 check below pins the value as well as the trace.
+    let run = run_position(READ, body, offset);
     let request = CanonicalRequestV1::FsReadAt {
         file_offset: offset,
         buffer_start: 0,
@@ -420,23 +422,25 @@ fn assert_read_position(offset: u64, outcome: Option<CanonicalOutcomeV1>) {
     assert_position_result(&run, BEFORE);
 }
 
-// Durable invariant (R1–R3). MEASURED: checked refusal without an event,
-// dispatched InvalidOffset, and EOF at the inclusive end bound. The offset
-// alone varies. CLAIMED: width is checked at the seat and the effective end
+// Durable invariant (R1–R3). MEASURED: a returned InvalidOffset without an
+// event, a dispatched InvalidOffset, and a returned EOF event at the inclusive
+// end bound; each body exits 0 only on its one expected class. The offset and
+// the accepting body vary. CLAIMED: width is checked at the seat and the effective end
 // before host I/O. THE GAP: one-byte windows; no claim about larger reads.
 #[test]
 fn read_at_one_past_host_width_refuses_before_dispatch() {
-    assert_read_position(OVER_HOST_MAX, None);
+    assert_read_position("width_read_refused", OVER_HOST_MAX, None);
 }
 
 #[test]
 fn read_at_end_past_host_width_refuses_at_dispatch() {
-    assert_read_position(HOST_MAX, Some(INVALID_OFFSET));
+    assert_read_position("width_read_refused", HOST_MAX, Some(INVALID_OFFSET));
 }
 
 #[test]
 fn read_at_end_at_host_max_dispatches_to_eof() {
     assert_read_position(
+        "width_read_eof",
         HOST_MAX - 1,
         Some(CanonicalOutcomeV1::Success(CanonicalReplyV1::ReadProgress(
             ken_host::ReadProgressV1::ReadEof,
