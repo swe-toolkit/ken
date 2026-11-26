@@ -10601,38 +10601,188 @@ fn list_to_bytes_literal_spine_folds_without_allocating() {
     assert_eq!(store.image().0.node_count(), before);
 }
 
-/// Durable invariant: the static-template route refuses a carried operand
-/// during lowering, before it could inspect the runtime list.
-#[test]
-fn list_to_bytes_carried_spine_refuses_during_lowering() {
-    let fixture = list_to_bytes_fixture(RuntimeExpr::Var(0));
+use super::super::primitive::ListToBytesSeam;
+
+/// Lower `list_to_bytes (bytes_to_list "PX11")` and observe the result's
+/// length and the octets at 0 and 3 through the real `bytes_length` and
+/// `bytes_at` consumers. `bytes_to_list` builds its list at run time, so
+/// `list_to_bytes` receives a carried word whose tags are the synthesized
+/// ListNil/ListCons identities. The packed answer is `len << 16 | b0 << 8 | b3`;
+/// a carried-arm refusal is `-1` and a seam failure
+/// `LIST_TO_BYTES_SEAM_FAILED`.
+fn list_to_bytes_carried_round_trip(seam: Option<ListToBytesSeam>) -> i64 {
+    use super::super::primitive::with_list_to_bytes_seam;
+    let none = "ctor:prelude::Option::None";
+    let some = "ctor:prelude::Option::Some";
+    let byte_at = |index: i64| RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "bytes_at".into(),
+            partiality: RuntimePartiality::SafeOption {
+                none: none.into(),
+                some: some.into(),
+                obligation: None,
+            },
+        },
+        args: vec![
+            RuntimeExpr::Var(0),
+            RuntimeExpr::Value(RuntimeValue::Int(index.into())),
+        ],
+    };
+    let list = RuntimeExpr::PrimitiveCall {
+        primitive: RuntimePrimitive {
+            symbol: "bytes_to_list".into(),
+            partiality: RuntimePartiality::Total,
+        },
+        args: vec![RuntimeExpr::Value(RuntimeValue::Bytes(b"PX11".to_vec()))],
+    };
+    let args = vec![
+        list_to_bytes_fixture(list),
+        RuntimeExpr::PrimitiveCall {
+            primitive: RuntimePrimitive {
+                symbol: "bytes_length".into(),
+                partiality: RuntimePartiality::Total,
+            },
+            args: vec![RuntimeExpr::Var(0)],
+        },
+        byte_at(0),
+        byte_at(3),
+    ];
+    let fixture = RuntimeExpr::Construct {
+        constructor: "fixture::Observations".into(),
+        args,
+    };
+    let RuntimeExpr::Construct { args, .. } = &fixture else {
+        unreachable!()
+    };
     let (plan, root) = planned_root_occurrence(&fixture);
+    let units = plan
+        .emittable_units()
+        .expect("the fixture exposes emittable units")
+        .into_iter()
+        .map(|unit| unit.function())
+        .collect::<Vec<_>>();
     let seed_env =
         NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
-    let result =
-        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, params| {
-            let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
-                CarriedBoundaryWord { word: params[0] },
-            ))];
-            compiler.lower_expr(
-                builder,
-                SourceOccurrence {
-                    expr: &fixture,
-                    static_origin: root,
-                },
-                &env,
-            )?;
-            Ok(builder.ins().iconst(types::I64, 0))
-        });
-    let Err(CraneliftBackendError::Unsupported(error)) = result else {
-        panic!("expected a list-shape refusal");
+    let compile = || {
+        ac_c7_try_compile_edge_with_operands(&seed_env, plan, 1, |compiler, builder, _| {
+            // The owner is the unit that holds the bytes_to_list seat's
+            // synthesized List records, found by asking the plan.
+            let convert = compiler.child_occurrence(root, 0, &args[0])?;
+            let RuntimeExpr::PrimitiveCall { args: list, .. } = &args[0] else {
+                unreachable!()
+            };
+            let seat = compiler
+                .child_occurrence(convert.static_origin, 0, &list[0])?
+                .static_origin;
+            let nil_path = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::PrimitiveResult)
+                .alternative(0);
+            let holding = units
+                .iter()
+                .copied()
+                .filter(|unit| {
+                    compiler
+                        .static_transition_plan
+                        .synthesized_aggregate_occurrence(
+                            ContinuationEmissionOwner::Predeclared(*unit),
+                            seat,
+                            &nil_path,
+                            SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ListNil),
+                        )
+                        .is_ok()
+                })
+                .collect::<Vec<_>>();
+            let [owner] = holding.as_slice() else {
+                panic!("exactly one unit must hold the bytes_to_list records, got {holding:?}");
+            };
+            compiler.defining_emission_owner = Some(ContinuationEmissionOwner::Predeclared(*owner));
+            let arena = compiler.carrier_arena()?;
+            let pointer_type = builder.func.dfg.value_type(arena);
+            compiler.function_local.native_int_arena = Some(builder.ins().load(
+                pointer_type,
+                MemFlags::trusted(),
+                arena,
+                crate::boundary_value::ARENA_NATIVE_INT,
+            ));
+            let bytes = compiler.lower_expr(builder, convert, &[])?;
+            assert!(
+                matches!(bytes, LoweringOperand::Carried(_)),
+                "a carried list must emit Bytes"
+            );
+            let env = [LoweringEnvironmentBinding::Value(bytes)];
+            let length = compiler.child_occurrence(root, 1, &args[1])?;
+            let LoweringOperand::Specialized(Lowered::Int { value: length, .. }) =
+                compiler.lower_expr(builder, length, &env)?
+            else {
+                panic!("bytes_length must return an Int");
+            };
+            let mut answer = length;
+            for (index, expr) in args.iter().enumerate().skip(2) {
+                let occurrence = compiler.child_occurrence(root, index, expr)?;
+                let LoweringOperand::Specialized(Lowered::BorrowedOption {
+                    present, value, ..
+                }) = compiler.lower_expr(builder, occurrence, &env)?
+                else {
+                    panic!("bytes_at must observe the emitted span");
+                };
+                Lowering::require_i64(builder, present, 1);
+                let shifted = builder.ins().ishl_imm(answer, 8);
+                answer = builder.ins().bor(shifted, value);
+            }
+            Ok(answer)
+        })
     };
-    assert_eq!(error.construct, "PrimitiveCall");
-    assert_eq!(error.cause, LoweringCause::Fragment);
+    let (_module, code) = match seam {
+        Some(seam) => with_list_to_bytes_seam(seam, compile),
+        None => compile(),
+    }
+    .expect("the carried list and byte observers emit");
+    let function: extern "C" fn(*const u64, i64) -> i64 = unsafe { std::mem::transmute(code) };
+    let native = crate::native_int::NativeIntArenaV1::default();
+    let mut store = crate::boundary_value::BoundaryValueStore::new();
+    let (_arena, base) = b2f_d9_bind_wide_arena(&mut store, &native);
+    function(base, 0)
+}
+
+/// Durable invariant (A3): a run-time `List UInt8` word converts in list
+/// order; its tags come from the synthesized producer side.
+#[test]
+fn list_to_bytes_carried_list_preserves_length_and_order() {
+    let answer = list_to_bytes_carried_round_trip(None);
     assert_eq!(
-        error.reason,
-        "list_to_bytes requires a statically shaped List UInt8 in native lowering"
+        [answer >> 16, (answer >> 8) & 255, answer & 255],
+        [4, i64::from(b'P'), i64::from(b'1')]
     );
+}
+
+/// Durable invariant (A5): a cyclic spine fails closed and terminates. The
+/// seam stores the first node as the last Cons's tail before pass 1.
+#[test]
+fn list_to_bytes_carried_cycle_fails_closed() {
+    assert_eq!(list_to_bytes_carried_round_trip(Some(ListToBytesSeam::Cycle)), -1);
+}
+
+/// Durable invariant (A6): a boxed (non-immediate) Int head fails closed
+/// rather than having its slot read as an octet.
+#[test]
+fn list_to_bytes_carried_boxed_head_fails_closed() {
+    assert_eq!(list_to_bytes_carried_round_trip(Some(ListToBytesSeam::BoxedHead)), -1);
+}
+
+/// Durable invariant (A7): a tail word that names an invocation-region
+/// Constructor node under a tag its class does not admit (InvocationBorrowed)
+/// fails closed before it is followed. The persistent region admits only
+/// PersistentGround, so an alias there cannot be stored or resolved at all.
+#[test]
+fn list_to_bytes_carried_alias_tail_fails_closed() {
+    use crate::boundary_value::BoundaryTag;
+    let tags = list_to_bytes_carried_round_trip(Some(ListToBytesSeam::ReportTailTag));
+    eprintln!("A7 n0 tag: {}, alias tag: {}", tags >> 8, tags & 255);
+    assert_eq!(
+        [tags >> 8, tags & 255],
+        [BoundaryTag::InvocationAggregate as i64, BoundaryTag::InvocationBorrowed as i64],
+        "the fixture must reach the invocation region"
+    );
+    assert_eq!(list_to_bytes_carried_round_trip(Some(ListToBytesSeam::AliasTail)), -1);
 }
 
 /// Transfer `literal` into the carrier, observe it through the `D4` observer,
