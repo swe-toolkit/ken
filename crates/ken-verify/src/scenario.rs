@@ -2271,13 +2271,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     FileOperation.OpReadDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpRemoveFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpRemoveDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSeek |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetLength |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSync |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpGetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpDuplicate |-> host_pure AFull ExitCode (ExitCode.Failure 199)
+                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_pure AFull ExitCode ExitCode.Success
@@ -2329,13 +2323,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     FileOperation.OpReadDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpCreateDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpRemoveDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSeek |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetLength |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSync |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpGetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpDuplicate |-> host_pure AFull ExitCode (ExitCode.Failure 199)
+                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_pure AFull ExitCode ExitCode.Success
@@ -2388,13 +2376,7 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     FileOperation.OpReadDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpCreateDirectory |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
                     FileOperation.OpRemoveFile |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSeek |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetLength |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSync |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpGetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpSetInheritance |-> host_pure AFull ExitCode (ExitCode.Failure 199) ;
-                    FileOperation.OpDuplicate |-> host_pure AFull ExitCode (ExitCode.Failure 199)
+                    FileOperation.OpRename |-> host_pure AFull ExitCode (ExitCode.Failure 199)
                   }
                 } ;
                 Ok _ |-> host_pure AFull ExitCode ExitCode.Success

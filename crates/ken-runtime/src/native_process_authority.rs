@@ -673,12 +673,6 @@ fn native_process_symbols_from_record(
         dir_entry: spine.dir_entry.clone(),
         directory_entries: spine.directory_entries.clone(),
         directory_end: spine.directory_end.clone(),
-        file_operation_seek: spine.file_operation_seek.clone(),
-        file_operation_set_length: spine.file_operation_set_length.clone(),
-        file_operation_sync: spine.file_operation_sync.clone(),
-        file_operation_get_inheritance: spine.file_operation_get_inheritance.clone(),
-        file_operation_set_inheritance: spine.file_operation_set_inheritance.clone(),
-        file_operation_duplicate: spine.file_operation_duplicate.clone(),
         resource_mapping_limit: spine.resource_mapping_limit.clone(),
         resource_kind_mapping: spine.resource_kind_mapping.clone(),
         px10_kind_symbols: [
