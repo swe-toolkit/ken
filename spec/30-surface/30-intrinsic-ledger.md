@@ -1,7 +1,7 @@
 # Open intrinsic and package-surface ledger
 
 > Status: **open evidence ledger, not a floor-membership witness**. The
-> normative fifty-five-identity prelude and its exact
+> normative fifty-seven-identity prelude and its exact
 > constructor/companion closure are `30-taxonomy §4`; resolution and
 > protected names are `33 §3.3`.
 > This ledger alone cannot admit another member or change `trusted_base()`.
@@ -46,7 +46,7 @@ earlier FS/resource families, the five scoped
 progress/acquisition/mapping/child-result families, the five
 Increment 3a scoped families (`ReadResult`, `FileMetadata`, `FileKind`,
 `DirEntry`, `FileOperation`), the two scoped ABI-S2 directory families,
-scoped `StateOp` and checked `resp_state`,
+the two scoped monotonic clock types, scoped `StateOp` and checked `resp_state`,
 the four direct-ITree floor identities (`ConsoleOp`, `console_resp`,
 `itree_bind`, `resp_coproduct`), `ConsoleStream`, `eqChar`, `Decimal`,
 and the three earlier State operations below, the other names in this table are
@@ -104,6 +104,8 @@ constructor still has the same checked parent and `GlobalId`.
 | `StateOp` (floor) | Yes | The exact checked State operation carrier resolves as `StateOp.Get` and `StateOp.Put`; neither generic leaf is bare-reserved. `State s` is its signature label, not a separate source type (§36 §4.2). |
 | `ResourceBodyResult`, `ResourceBracketResult` (package) | Yes if later admitted | Both are source-promised and unkeyed: they stay outside B; qualification here is not an admission. |
 | `Instant` (current floor) | Yes | `Instant.MkInstant` names the exact checked clock constructor without reserving bare `MkInstant`. |
+| `MonotonicInstant` (floor) | Yes | The checked reading constructor resolves only as `MonotonicInstant.MkMonotonicInstant`, not bare `MkMonotonicInstant`. |
+| `Deadline` (floor) | Yes | The checked deadline constructor resolves only as `Deadline.MkDeadline`, not bare `MkDeadline`. |
 | `ITree` (current floor) | Yes | The whole checked `Ret`/`Vis` family is reachable as `ITree.Ret`/`ITree.Vis`; bare `Ret`/`Vis` are free for source declarations, not reserved or renamed. |
 | `ConsoleStream` (floor) | Yes | The complete checked console-selector family uses only `ConsoleStream.Stdin`, `ConsoleStream.Stdout` and `ConsoleStream.Stderr` in source; bare leaves and generic `Stream` are not reserved. |
 | `CreatePolicy` (floor) | Yes | The three cases use `CreatePolicy.C`, retaining their unchanged native artifact leaves. |
@@ -233,6 +235,8 @@ alone reserves a name.
 | `Unsupported` (qualified floor constructor) | `CanonicalRuntimeRoles::io_error_unsupported`; parent `IOError`; source `IOError.Unsupported`, not bare. |
 | `Instant` (floor, scoped) | Source names the canonical clock-response result (`36 §1.1`); the native clock response keys its checked `MkInstant` constructor and exact `Instant` parent. |
 | `MkInstant` (qualified floor constructor) | `CanonicalRuntimeRoles::mk_instant` selects the checked `Instant` constructor; only `Instant.MkInstant` resolves, not bare `MkInstant`. |
+| `MonotonicInstant` (floor, scoped) | Source names and inspects the reading (§38 §1.15). Native response construction and the deadline operand reader key the exact checked `MonotonicInstant.MkMonotonicInstant` and its parent. |
+| `Deadline` (floor, scoped) | Source constructs the sleep operand (§38 §1.15). Native seat lowering keys the exact checked `Deadline.MkDeadline` and its parent. |
 | `CreatePolicy` (floor, scoped) | Source selects public `WriteFile` creation semantics (`38 §1.3.1`); the native interpreter reads its three exact constructor IDs. Source cases use `CreatePolicy.C`, with no type rename. |
 | `CreateNew` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateNew`, not bare. The native suffix reader still sees the unchanged `CreatePolicy::CreateNew` artifact leaf. |
 | `CreateOrTruncate` (qualified floor constructor) | Exact-ID native policy reader; source `CreatePolicy.CreateOrTruncate`, not bare; retain its native artifact leaf. |
@@ -322,8 +326,9 @@ and `resp_coproduct` marked floor above join B alongside the original
 fifteen; the checked transparent `Decimal` joins that earlier
 fifty-one, giving fifty-two counted identities; PX11's `SocketAddress`
 (`38 §1.13`) then gives fifty-three. ABI-S2's `DirectoryHandle` and
-`DirectoryProgress` (`38 §1.14`) give fifty-five. Their floor spellings
-are protected; scoped case leaves and bare `get`, `put` and `bind` do not
+`DirectoryProgress` (`38 §1.14`) give fifty-five. `MonotonicInstant` and
+`Deadline` (`38 §1.15`) give fifty-seven. Their floor spellings are
+protected; scoped case leaves and bare `get`, `put` and `bind` do not
 enter B through the checked operations. The package-home roster's
 Increment 3a target has ninety-six rows: the eighty-one at its base,
 minus seventeen retired FileOperation family rows, plus thirty-two

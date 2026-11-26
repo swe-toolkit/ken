@@ -170,7 +170,10 @@ resolves its specificity probe. The Console carrier is source-renamed
 from generic `Stream` to `ConsoleStream`; its `Stdout` case resolves
 only as `ConsoleStream.Stdout`, not as a bare reservation.
 `Instant` passes specificity as a type with a scoped `Instant.MkInstant`
-constructor, not a bare `MkInstant` reservation.
+constructor, not a bare `MkInstant` reservation. The clock promotion adds
+two scoped types by the same rule: `MonotonicInstant` with
+`MonotonicInstant.MkMonotonicInstant`, and `Deadline` with
+`Deadline.MkDeadline`. Neither constructor leaf is a bare reservation.
 `Success` and `Failure` have passed it as the qualified paths
 `ExitCode.Success` and `ExitCode.Failure`; neither bare spelling joins B.
 A per-type scoped-constructors choice supplies specificity
@@ -354,13 +357,13 @@ These four admissions allocate no new checked identity and add no
 checked `host_bind` and related wrappers without admitting their
 `FSOp`, `AmbientOp`, `fs_resp` or `ambient_resp` internals.
 
-Thus the closed **floor-identity roster** has fifty-five names: the exact
+Thus the closed **floor-identity roster** has fifty-seven names: the exact
 checked identities source may name without an import, not a type
 roster. **`{Auth, Bool, Bottom, BufferSpan, Char, ChildExit,
-ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Decimal, DirEntry,
-DirectoryHandle, DirectoryProgress, Equal, ExitCode, FileError, FileKind,
+ConsoleOp, ConsoleStream, Coproduct, CreatePolicy, Deadline, Decimal,
+DirEntry, DirectoryHandle, DirectoryProgress, Equal, ExitCode, FileError, FileKind,
 FileMetadata, FileOperation, HostIO,
-IOError, ITree, Instant, List, MappingProt, Nat, Option, Pair,
+IOError, ITree, Instant, List, MappingProt, MonotonicInstant, Nat, Option, Pair,
 ProcessInput, Prod, ProgramCaps, Prop, Proved, ReadProgress,
 ReadResult, ResourceError, ResourceKind, ResourceOpenMode, Result,
 SocketAddress, StateOp, Top, TransferCount, Unit, Utf8Error, WriteProgress,
@@ -369,7 +372,7 @@ run_state, state_get, state_put}`**. The prior forty-seven identities,
 `ConsoleOp`, `console_resp`, `itree_bind` and `resp_coproduct` are
 re-checked; floor admission alone adds no postulate or `trusted_base()`
 entry. Their qualified constructors and the Pair companions are
-separate from this 55-name count. These identities are not all types:
+separate from this 57-name count. These identities are not all types:
 `Top` and `Bottom` are proposition constants, `Proved` is a proof
 binding, `HostIO` a type-level function, and `console_resp`, `eqChar`,
 `itree_bind`, `resp_coproduct`, `resp_state`, `run_state`, `state_get`
@@ -415,7 +418,10 @@ qualified path `ProgramCaps.MkProgramCaps`. Its existing visibility is
 unchanged. `Coproduct` and `Instant` are scoped:
 `Coproduct.InL`, `Coproduct.InR`, and `Instant.MkInstant` resolve to
 their exact checked constructor IDs, whereas bare `InL`, `InR` and
-`MkInstant` do not enter B. `ITree` is scoped as a complete family:
+`MkInstant` do not enter B. `MonotonicInstant` and `Deadline` likewise
+admit only `MonotonicInstant.MkMonotonicInstant` and `Deadline.MkDeadline`
+at their exact checked IDs; bare `MkMonotonicInstant` and `MkDeadline`
+do not enter B. `ITree` is scoped as a complete family:
 `ITree.Ret` and `ITree.Vis` retain their exact constructor IDs, while
 bare `Ret` and `Vis` do not enter B and may be bound by source.
 `ConsoleStream` is scoped as a complete family: only the type name
@@ -470,8 +476,12 @@ companion is re-checked and **out** of `trusted_base()`.
 internal-provision arm can be applied to identities the effect reifier, erasure,
 or host runner keys, but only when the independent source-naming requirement
 also holds. `Unit`, `Coproduct`, `Instant` and `ITree` are admitted on exact-ID
-keying and independent `36` source needs; the six earlier FS/resource
-families and the five earlier scoped families above are admitted on
+keying and independent `36` source needs. The monotonic reply selects the
+checked `MonotonicInstant` constructor and the sleep operand reader selects
+the exact constructors of `Deadline` and `MonotonicInstant`. Source needs
+these types independently to inspect readings and construct deadlines
+(§38 §1.15). The six earlier FS/resource families and the five earlier
+scoped families above are admitted on
 exact-ID keying and independent `38` source needs. Increment 3a adds
 `ReadResult`, `FileMetadata`, `FileKind`, `DirEntry` and
 `FileOperation`: the interpreter and native lowering construct or read
@@ -529,8 +539,9 @@ information, not submitted for per-name permission. No compiler-provided
 intrinsic import module exists as an alternative route: a keyed identity that
 source must name cannot be made optional without surprising shadowing.
 
-With both witnesses established for `Decimal`, `SocketAddress` and the
-two directory families, the floor is the fifty-five-identity set above.
+With both witnesses established for `Decimal`, `SocketAddress`, the two
+directory families and the two monotonic clock types, the floor is the
+fifty-seven-identity set above.
 Until D0 proves both witness clauses for another candidate, that candidate
 has no new ambient availability.
 `BufferWindow`, `ResourceBodyResult`, `ResourceBracketResult`, the `FS`
@@ -783,6 +794,8 @@ fifty-one-identity floor and Pair's three checked companions. This
 later node adds `Decimal` to the floor, yielding fifty-two identities.
 PX11 then adds `SocketAddress` (`38 §1.13`), yielding fifty-three.
 ABI-S2 adds the two directory families (`38 §1.14`), yielding fifty-five.
+RT-CLOCK-OP-NATIVE-PROMOTION adds `MonotonicInstant` and `Deadline`
+(`38 §1.15`), yielding fifty-seven.
 The prior forty were delivered before Increment 3a; `ReadResult`,
 `FileMetadata`, `FileKind`, `DirEntry`, `FileOperation`, `StateOp` and
 `ConsoleOp` require complete scoped constructor families and source-path

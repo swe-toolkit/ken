@@ -430,18 +430,19 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `Eq`/`J`, and reserved `Refl`/`Axiom`/`absurd`/`trunc_intro`) plus the exact
   checked prelude members of `30-taxonomy §4`: `{Auth, Bool, Bottom,
   BufferSpan, Char, ChildExit, ConsoleOp, ConsoleStream, Coproduct,
-  CreatePolicy, Decimal, DirEntry, DirectoryHandle, DirectoryProgress, Equal,
-  ExitCode, FileError, FileKind, FileMetadata, FileOperation, HostIO, IOError,
-  ITree, Instant, List,
-  MappingProt, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
+  CreatePolicy, Deadline, Decimal, DirEntry, DirectoryHandle,
+  DirectoryProgress, Equal, ExitCode, FileError, FileKind, FileMetadata,
+  FileOperation, HostIO, IOError, ITree, Instant, List, MappingProt,
+  MonotonicInstant, Nat, Option, Pair, ProcessInput, Prod, ProgramCaps,
   Prop, Proved, ReadProgress, ReadResult, ResourceError, ResourceKind,
   ResourceOpenMode, Result, SocketAddress, StateOp, Top, TransferCount, Unit,
   Utf8Error, WriteProgress, console_resp, eqChar, itree_bind,
   resp_coproduct, resp_state, run_state, state_get, state_put}`.
-  This floor subset contains fifty-five exact identities: the historical
+  This floor subset contains fifty-seven exact identities: the historical
   Increment 3a fifty-one (the prior forty-seven plus `ConsoleOp`,
   `console_resp`, `itree_bind` and `resp_coproduct`), `Decimal`, `SocketAddress`,
-  and the two scoped directory types (`30-taxonomy §4`). `DirectoryHandle`
+  the two scoped directory types, and the two scoped monotonic clock types
+  (`30-taxonomy §4`). `DirectoryHandle`
   keeps its constructor private; `DirectoryProgress` exposes only qualified
   cases (§38 §1.14). This is the ambiently nameable checked-identity roster,
   not a roster of types. `Top`
@@ -473,6 +474,8 @@ is a **surface error** (`24`) — it never reaches the kernel:
   scoped: only `Coproduct.InL`, `Coproduct.InR`, and
   `Instant.MkInstant` reach their exact checked constructor identities;
   bare `InL`, `InR`, and `MkInstant` are not reserved by those families.
+  `MonotonicInstant.MkMonotonicInstant` and `Deadline.MkDeadline` likewise
+  resolve at their exact checked IDs, not as bare B names (§38 §1.15).
   `ITree` is scoped: `ITree.Ret` and `ITree.Vis` resolve to the unchanged
   checked constructor IDs; bare `Ret` and `Vis` are not reserved and
   may be bound by other source declarations under ordinary non-B rules.
