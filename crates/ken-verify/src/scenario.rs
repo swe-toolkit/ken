@@ -10,6 +10,9 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 
 use ken_elaborator::capabilities::{Authority, RightSet, SymlinkPolicy, AUTH_FULL};
 use ken_host::EffectObservation;
+
+mod clock_promotion;
+pub use clock_promotion::*;
 use ken_runtime::{
     BoundProcessExecutableArtifact, NativeEffectRunErrorV1, NativeEffectRunOptionsV1,
 };
@@ -135,6 +138,8 @@ pub struct CanonicalDifferentialRun {
     shared_metadata_root: Option<std::path::PathBuf>,
     interpreter_wall_window: WallClockWindow,
     native_wall_window: WallClockWindow,
+    interpreter_monotonic_window: clock_promotion::MonotonicWindow,
+    native_monotonic_window: clock_promotion::MonotonicWindow,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -891,6 +896,7 @@ fn execute_scenario_on_compiler_stack(
     )
     .map_err(|error| HarnessError::Interpreter(error.to_string()))?;
     let interpreter_window_start = wall_clock_nanoseconds();
+    let interpreter_monotonic_start = ken_host::monotonic_nanoseconds_v1();
     let mut interpreter = ken_cli::run_program_effect_observation(
         &scenario.entry.source,
         ken_cli::SourceFormat::Ken,
@@ -901,6 +907,7 @@ fn execute_scenario_on_compiler_stack(
         &mut host,
     )
     .map_err(|error| HarnessError::Interpreter(format!("{error:?}")))?;
+    let interpreter_monotonic_end = ken_host::monotonic_nanoseconds_v1();
     let interpreter_window_end = wall_clock_nanoseconds();
     let interpreter_after = observe_root(interpreter_root)?;
     host.finish_assertions()
@@ -935,6 +942,7 @@ fn execute_scenario_on_compiler_stack(
         plan_hash: build.plan_transport_hash,
     };
     let native_window_start = wall_clock_nanoseconds();
+    let native_monotonic_start = std::time::Instant::now();
     let native = if metadata_only {
         ken_runtime::run_bound_process_metadata_observation(
             &build.artifact,
@@ -949,6 +957,7 @@ fn execute_scenario_on_compiler_stack(
         )
     }
     .map_err(HarnessError::NativeRun)?;
+    let native_duration = native_monotonic_start.elapsed();
     let native_window_end = wall_clock_nanoseconds();
     let native_after = observe_root(native_root)?;
     let native_actions = LaneActionEvidence {
@@ -971,6 +980,14 @@ fn execute_scenario_on_compiler_stack(
         plan_hash: build.plan_transport_hash,
         roots,
         shared_metadata_root: shared_root,
+        interpreter_monotonic_window: clock_promotion::MonotonicWindow {
+            start: interpreter_monotonic_start,
+            end: interpreter_monotonic_end,
+        },
+        native_monotonic_window: clock_promotion::MonotonicWindow {
+            start: 0,
+            end: native_duration.as_nanos(),
+        },
         interpreter_wall_window: WallClockWindow {
             start_nanoseconds: interpreter_window_start,
             end_nanoseconds: interpreter_window_end,

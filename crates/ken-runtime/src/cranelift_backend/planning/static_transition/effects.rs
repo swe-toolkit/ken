@@ -347,7 +347,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 37] = [
+    [ken_host::HostOpV1; 40] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
@@ -361,6 +361,9 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ConsoleFlush,
     ken_host::HostOpV1::ConsoleIsTerminal,
     ken_host::HostOpV1::ClockWallNow,
+    ken_host::HostOpV1::ClockMonotonicNow,
+    ken_host::HostOpV1::ClockSleepUntil,
+    ken_host::HostOpV1::EntropyRandomBytes,
     ken_host::HostOpV1::FsReadFile,
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsAppendFile,
@@ -517,7 +520,10 @@ fn host_effect_seat_contract(
         | (Op::ConsoleWrite, 0)
         | (Op::ConsoleFlush, 0)
         | (Op::ConsoleIsTerminal, 0) => Some(tag),
-        (Op::ConsoleRead, 1) => Some(exact_int),
+        (Op::ConsoleRead, 1) | (Op::EntropyRandomBytes, 0) => Some(exact_int),
+        // A single constructor seat, projected through both checked wrappers
+        // before the positioned Int reader narrows the deadline.
+        (Op::ClockSleepUntil, 0) => Some(tag),
         // PROVED carried, per seat: the real-artifact measurements observed a
         // carried word reaching each and the existing span observer consuming
         // it. These are direct operation consumers, not site-bound uses.
@@ -654,6 +660,9 @@ fn host_effect_seat_contract(
             | Op::ConsoleFlush
             | Op::ConsoleIsTerminal
             | Op::ClockWallNow
+            | Op::ClockMonotonicNow
+            | Op::ClockSleepUntil
+            | Op::EntropyRandomBytes
             | Op::FsReadFile
             | Op::FsWriteFile
             | Op::FsAppendFile
@@ -694,10 +703,7 @@ fn host_effect_seat_contract(
         // admitted set a compile error here rather than an operation whose
         // seats silently answer `None`.
         (
-            Op::ClockMonotonicNow
-            | Op::ClockSleepUntil
-            | Op::EntropyRandomBytes
-            | Op::NetListen | Op::NetAccept | Op::NetConnect
+            Op::NetListen | Op::NetAccept | Op::NetConnect
             | Op::NetReceive | Op::NetSend | Op::NetShutdown
             | Op::NetLocalAddress,
             _,

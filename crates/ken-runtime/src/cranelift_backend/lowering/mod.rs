@@ -465,7 +465,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     RecursiveCarrierSlot, RecursiveCarrierVariant,
     RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
     StaticResponseContinuation, StaticResponseContinuationId, RelayHostResponseArm,
     StaticResponseEffectInput, StaticResponseEnvironmentBinding,

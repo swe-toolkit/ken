@@ -309,7 +309,7 @@ pub(in crate::cranelift_backend) use effects::{set_effect_seat_plan_mutation, Ef
 // reach these through this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use joins_traps::{
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
     JoinPlanToken, JoinResultRepresentation,
 };
 use joins_traps::PlannedJoinResult;

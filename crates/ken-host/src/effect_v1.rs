@@ -5,7 +5,45 @@
 //! They deliberately exclude descriptors, pointers, inode identities, absolute
 //! host roots, and diagnostic prose.
 
-use std::io;
+use std::io::{self, Read};
+
+/// Nanoseconds since this process first reads its monotonic clock.
+pub fn monotonic_nanoseconds_v1() -> u128 {
+    static BASELINE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    BASELINE
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_nanos()
+}
+
+/// Wait until the process-local monotonic clock reaches `deadline`.
+pub fn sleep_until_monotonic_v1(deadline: u64) {
+    loop {
+        let now = monotonic_nanoseconds_v1();
+        if now >= u128::from(deadline) {
+            return;
+        }
+        // The subtraction is bounded by the original u64 deadline.
+        let remaining = deadline - now as u64;
+        std::thread::sleep(std::time::Duration::from_nanos(remaining));
+    }
+}
+
+/// Read the full request from the kernel source, with no substitute source.
+/// The semantic dispatcher owns the request bound.
+pub fn kernel_entropy_v1(count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+    kernel_entropy_from(std::path::Path::new("/dev/urandom"), count)
+}
+
+fn kernel_entropy_from(source: &std::path::Path, count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+    let count = usize::try_from(count).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    let mut file = std::fs::File::open(source).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(count).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    bytes.resize(count, 0);
+    file.read_exact(&mut bytes).map_err(|_| IoErrorIdentityV1::Unsupported)?;
+    Ok(bytes)
+}
 
 /// The closed Program-I host operation catalog.
 ///
@@ -200,8 +238,8 @@ impl HostOpV1 {
             Self::ConsoleFlush => HostOpAvailabilityV1::NativeTested,
             Self::ConsoleIsTerminal => HostOpAvailabilityV1::NativeTested,
             Self::ClockWallNow => HostOpAvailabilityV1::NativeTested,
-            Self::ClockMonotonicNow => HostOpAvailabilityV1::RepresentedUnavailable,
-            Self::ClockSleepUntil => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::ClockMonotonicNow => HostOpAvailabilityV1::NativeTested,
+            Self::ClockSleepUntil => HostOpAvailabilityV1::NativeTested,
             Self::FsReadFile => HostOpAvailabilityV1::NativeTested,
             Self::FsWriteFile => HostOpAvailabilityV1::NativeTested,
             Self::FsAppendFile => HostOpAvailabilityV1::NativeTested,
@@ -228,7 +266,7 @@ impl HostOpV1 {
             Self::MappingAcquireFile => HostOpAvailabilityV1::NativeTested,
             Self::ResourceStreamRead => HostOpAvailabilityV1::NativeTested,
             Self::ResourceStreamWrite => HostOpAvailabilityV1::NativeTested,
-            Self::EntropyRandomBytes => HostOpAvailabilityV1::RepresentedUnavailable,
+            Self::EntropyRandomBytes => HostOpAvailabilityV1::NativeTested,
             Self::ProcessPlanOpen
             | Self::ProcessPlanPush
             | Self::ProcessSpawn
@@ -327,12 +365,14 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 37] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 40] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
     HostOpV1::ConsoleIsTerminal,
     HostOpV1::ClockWallNow,
+    HostOpV1::ClockMonotonicNow,
+    HostOpV1::ClockSleepUntil,
     HostOpV1::FsReadFile,
     HostOpV1::FsWriteFile,
     HostOpV1::FsAppendFile,
@@ -359,6 +399,7 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 37] = [
     HostOpV1::MappingAcquireFile,
     HostOpV1::ResourceStreamRead,
     HostOpV1::ResourceStreamWrite,
+    HostOpV1::EntropyRandomBytes,
     HostOpV1::ProcessPlanOpen,
     HostOpV1::ProcessPlanPush,
     HostOpV1::ProcessSpawn,
@@ -557,9 +598,10 @@ pub fn host_effect_wire_layout_v1(
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal => {
             vec![checked_u32(field("stream")?)?]
         }
-        // The C record is nonzero-sized, but WallNow has no semantic request
-        // fields. Its response payload is carried in HostReplyV1::bytes.
-        HostOpV1::ClockWallNow => Vec::new(),
+        // The C record is nonzero-sized, but the clock reads have no request fields.
+        HostOpV1::ClockWallNow | HostOpV1::ClockMonotonicNow => Vec::new(),
+        HostOpV1::ClockSleepUntil => vec![checked_u32(field("deadline")?)?],
+        HostOpV1::EntropyRandomBytes => vec![checked_u32(field("count")?)?],
         HostOpV1::FsReadFile
         | HostOpV1::FsMetadata
         | HostOpV1::FsOpenDirectory
@@ -726,10 +768,7 @@ pub fn host_effect_wire_layout_v1(
         // the operations matched above are exactly the `NativeTested` set. That
         // correspondence is asserted by name in the tests rather than left as
         // a coincidence of two lists.
-        HostOpV1::ClockMonotonicNow
-        | HostOpV1::ClockSleepUntil
-        | HostOpV1::EntropyRandomBytes
-        | HostOpV1::NetListen
+        HostOpV1::NetListen
         | HostOpV1::NetAccept
         | HostOpV1::NetConnect
         | HostOpV1::NetReceive
@@ -3050,6 +3089,10 @@ impl HostOpV1 {
 /// in-crate differential-evidence tests can reach the implemented arms of
 /// operations that are not yet promoted. Out-of-crate callers cannot, and do
 /// not need to.
+///
+/// The gate is `dispatch_host_op_v1_admitted_by`, parameterised by its predicate
+/// so the refusal can be witnessed when the production predicate admits every
+/// operation.
 pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     backend: &mut B,
     capabilities: &CapabilityTableV1,
@@ -3060,7 +3103,35 @@ pub fn dispatch_host_op_v1<B: HostEffectBackendV1>(
     resource: ResourceInputsV1,
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
-    if !operation.executor_admits() {
+    dispatch_host_op_v1_admitted_by(
+        HostOpV1::executor_admits,
+        backend,
+        capabilities,
+        revocation,
+        resources,
+        operation,
+        capability,
+        resource,
+        request,
+    )
+}
+
+/// The executor entry's gate. Production passes exactly
+/// [`HostOpV1::executor_admits`]; the parameter exists so the refusal's
+/// position (before validation and before any backend leaf) stays observable
+/// when that predicate admits every operation in the inventory.
+fn dispatch_host_op_v1_admitted_by<B: HostEffectBackendV1>(
+    admits: fn(HostOpV1) -> bool,
+    backend: &mut B,
+    capabilities: &CapabilityTableV1,
+    revocation: &crate::RevocationDomain,
+    resources: &mut ResourceTableV1,
+    operation: HostOpV1,
+    capability: Option<CapabilityTokenV1>,
+    resource: ResourceInputsV1,
+    request: &CanonicalRequestV1,
+) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
+    if !admits(operation) {
         return Err(TerminalErrorV1::OperationUnavailable(operation));
     }
     dispatch_host_op_v1_for_promotion_evidence(
@@ -6040,33 +6111,18 @@ mod tests {
         assert!(fact("SIZE_FsReadFileRequestV1") > fact("SIZE_EntropyRequestV1"));
     }
 
-    /// ABI-S3 AC-5. Every operation this WP adds is RepresentedUnavailable
-    /// (D4), and the PX5 promotion set is untouched -- asserted by CONTENTS,
-    /// not by length, so swapping a member for another cannot pass.
-    ///
-    /// ⚠ Read this together with
-    /// all_pre_resource_operations_share_one_semantic_dispatch. Availability
-    /// alone is a WEAK signal here: a new operation that were never wired at
-    /// all would also report RepresentedUnavailable, because that is the
-    /// default every unhandled operation falls to. This test therefore
-    /// establishes the D4 property but is NOT evidence that the operations
-    /// are reachable; the dispatch test is what establishes that, by driving
-    /// each one through the real semantic dispatch and requiring the backend
-    /// to have observed it.
+    /// Promotion transition sentinel: the clock and entropy roles become
+    /// NativeTested while the historical PX5 population stays exact.
     #[test]
-    fn ac5_new_operations_are_unavailable_and_the_promotion_set_is_untouched() {
+    fn clock_and_entropy_are_promoted_without_changing_the_px5_set() {
         for operation in [
             HostOpV1::ClockMonotonicNow,
             HostOpV1::ClockSleepUntil,
             HostOpV1::EntropyRandomBytes,
         ] {
-            assert_eq!(
-                operation.availability(),
-                HostOpAvailabilityV1::RepresentedUnavailable,
-                "{operation:?} must land RepresentedUnavailable per D4"
-            );
+            assert_eq!(operation.availability(), HostOpAvailabilityV1::NativeTested);
+            assert!(NATIVE_TESTED_TARGETS_V1.contains(&operation));
         }
-
         assert_eq!(
             PX5_PLANNED_NATIVE_TARGETS,
             [
@@ -6079,8 +6135,34 @@ mod tests {
         );
     }
 
-    /// `AC-GATE` + `AC-PREDICATE`. Every `RepresentedUnavailable` operation is
-    /// refused by the executor entry.
+    /// Durable invariant. MEASURED: the actual source reader returns exactly
+    /// the contents of a finite fixture, but no bytes on a missing source or
+    /// a short read. CLAIMED: no fallback or partial reply survives a source
+    /// failure. THE GAP: this does not measure the quality of kernel entropy.
+    #[test]
+    fn kernel_entropy_source_failure_publishes_no_bytes() {
+        let root = std::env::temp_dir().join(format!(
+            "ken-kernel-entropy-source-{}", std::process::id(),
+        ));
+        std::fs::create_dir(&root).expect("fresh entropy source fixture");
+        let source = root.join("source");
+        let missing = kernel_entropy_from(&source, 2);
+        std::fs::write(&source, [0x91]).unwrap();
+        let full = kernel_entropy_from(&source, 1);
+        let short = kernel_entropy_from(&source, 2);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(full, Ok(vec![0x91]));
+        assert_eq!(missing, Err(IoErrorIdentityV1::Unsupported));
+        assert_eq!(short, Err(IoErrorIdentityV1::Unsupported));
+    }
+
+    /// `AC-GATE` + `AC-PREDICATE`. Durable invariant. MEASURED: the executor
+    /// entry refuses each production-unadmitted operation, and the gate refuses
+    /// every operation under a deny-all predicate without touching the backend.
+    /// CLAIMED: refusal precedes validation and dispatch.
+    /// THE GAP: bypassing the helper in the public entry is observationally
+    /// equivalent when all operations are admitted. P1 turns red for such a
+    /// bypass once an operation is unadmitted.
     ///
     /// **The population is DERIVED from `availability()`, never named.** An
     /// eleventh unavailable operation is covered by this test with zero edits;
@@ -6101,8 +6183,11 @@ mod tests {
         let capabilities = CapabilityTableV1::default();
         let revocation = RevocationDomain::default();
         let mut backend = AllOpsBackend::default();
-        let mut refused = 0usize;
 
+        // P1. This population is derived and may be empty: after
+        // RT-CLOCK-OP-NATIVE-PROMOTION every operation is executor-admitted.
+        // It is kept so that a future unadmitted operation is covered with
+        // zero edits; the mechanism is witnessed by the loop below.
         for operation in HostOpV1::ALL {
             if operation.executor_admits() {
                 continue;
@@ -6124,16 +6209,34 @@ mod tests {
                 "{operation:?} is not executor-admitted, so dispatch_host_op_v1 \
                  must refuse it before any other check"
             );
-            refused += 1;
         }
 
-        // Vacuity control: a predicate that selects nothing passes without
-        // asserting anything. This is the only line that may name a number,
-        // and it is a floor on the population rather than a pin on it.
-        assert!(
-            refused > 0,
-            "the predicate selected an empty set, so this test proved nothing"
-        );
+        // P2. Witness the refusal mechanism independently of the production
+        // population, using real operations and the same uniform request.
+        let mut refused_by_gate = 0;
+        for operation in HostOpV1::ALL {
+            let mut resources = ResourceTableV1::default();
+            let result = dispatch_host_op_v1_admitted_by(
+                |_| false,
+                &mut backend,
+                &capabilities,
+                &revocation,
+                &mut resources,
+                operation,
+                None,
+                ResourceInputsV1::None,
+                &CanonicalRequestV1::ClockMonotonicNow,
+            );
+            assert_eq!(
+                result,
+                Err(TerminalErrorV1::OperationUnavailable(operation)),
+                "P2: the gate must refuse {operation:?} before validation"
+            );
+            refused_by_gate += 1;
+        }
+
+        // Vacuity control: P2 must witness the entire inventory.
+        assert_eq!(refused_by_gate, HostOpV1::ALL.len());
 
         // The refusal happens ABOVE the backend, not inside it. AllOpsBackend
         // records every leaf it is asked to perform; the gate must mean it was
