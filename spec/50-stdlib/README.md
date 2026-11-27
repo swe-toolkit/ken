@@ -515,8 +515,11 @@ if a variable is absent from every replacement used by the expression,
 it is absent from the substituted expression. Section 24
 (SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH) specifies `deriv_fresh`: syntactic
 absence of a variable is preserved by differentiation in any variable.
-The second-derivative zero result is a client composition, not another
-public law. A sorted-list normal form and signed/field arithmetic remain
+Section 25 (SPEC-SYMBOLIC-ALGEBRA-DERIV-ABSENT-FACTOR) specifies
+`deriv_absent_factor`: a left factor in which the variable does not occur
+leaves the derivative, up to `poly_eq`; `deriv_const_factor` becomes its
+literal case. The second-derivative zero result is a client composition,
+not another public law. A sorted-list normal form and signed/field arithmetic remain
 deferred.
 
 The **exact natural-geometry contract** is pinned in
