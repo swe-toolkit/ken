@@ -1489,8 +1489,9 @@ right. It does not claim that reachability splits into either input's
 reachability: the §15 three-vertex chain needs an edge from each
 operand to reach V2 from V0.
 
-The checked route uses two new **private** Dependency helpers, in
-order after the private `bool_or_true_cases` and before `named`.
+The checked route uses one new **private** Dependency helper,
+`graph_union_edge_swap`, after the private `bool_or_true_cases` and before
+`named`.
 `graph_union_edge_swap q g h u v` turns a checked true edge of
 `union g h` into a checked true edge of `union h g`. It eliminates
 §15's public `graph_union_edge_cases`: the left witness enters the
