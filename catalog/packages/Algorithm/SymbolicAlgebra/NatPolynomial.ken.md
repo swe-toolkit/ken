@@ -72,8 +72,10 @@ Likewise, `substitute_coincidence` gives structurally equal results when two
 substitutions produce equal expressions at every occurring index.
 `substitute_fresh` shows that a variable absent from all replacements used
 in the expression is absent from the substituted result. `deriv_fresh`
-follows it and preserves absence under differentiation. Three further
-public laws state that ordered normalization is transparent to
+follows it and preserves absence under differentiation.
+`deriv_absent_factor` pulls a factor in which the variable does not occur
+out of a derivative, up to `poly_eq`; `deriv_const_factor` is its literal case.
+Three further public laws state that ordered normalization is transparent to
 `poly_eq` itself, to differentiation, and to substitution. The latter two
 follow from the first and the existing `poly_eq`-preservation laws.
 `expr_pow` gives the unit constant at Zero and
@@ -1566,23 +1568,42 @@ pub theorem deriv_substitute
 pub theorem deriv_const_factor
       (v : Nat) (k : Nat) (e : Expr)
     : IsTrue (poly_eq (deriv v (EMul (EConst k) e)) (EMul (EConst k) (deriv v e))) =
+  deriv_absent_factor v (EConst k) e Proved
+
+pub theorem deriv_absent_factor
+      (v : Nat) (c : Expr) (e : Expr) (absent : Equal Bool (occurs v c) False)
+    : IsTrue (poly_eq (deriv v (EMul c e)) (EMul c (deriv v e))) =
   poly_eq_complete
-    (deriv v (EMul (EConst k) e))
-    (EMul (EConst k) (deriv v e))
+    (deriv v (EMul c e))
+    (EMul c (deriv v e))
     (λenv.
       trans
         Nat
-        (add (mul Zero (eval env e)) (mul k (eval env (deriv v e))))
-        (add Zero (mul k (eval env (deriv v e))))
-        (mul k (eval env (deriv v e)))
+        (add
+          (mul (eval env (deriv v c)) (eval env e))
+          (mul (eval env c) (eval env (deriv v e))))
+        (add Zero (mul (eval env c) (eval env (deriv v e))))
+        (mul (eval env c) (eval env (deriv v e)))
         (cong
           Nat
           Nat
-          (mul Zero (eval env e))
+          (mul (eval env (deriv v c)) (eval env e))
           Zero
-          (λt. add t (mul k (eval env (deriv v e))))
-          ((proof zero_l for mul) (eval env e)))
-        ((proof zero_l for add) (mul k (eval env (deriv v e)))))
+          (λt. add t (mul (eval env c) (eval env (deriv v e))))
+          (trans
+            Nat
+            (mul (eval env (deriv v c)) (eval env e))
+            (mul Zero (eval env e))
+            Zero
+            (cong
+              Nat
+              Nat
+              (eval env (deriv v c))
+              Zero
+              (λt. mul t (eval env e))
+              (deriv_absent v c env absent))
+            ((proof zero_l for mul) (eval env e))))
+        ((proof zero_l for add) (mul (eval env c) (eval env (deriv v e)))))
 
 pub theorem normalize_poly_eq (e : Expr) : IsTrue (poly_eq (normalize e) e) =
   poly_eq_complete (normalize e) e (λenv. normalize_sound env e)
@@ -3601,11 +3622,14 @@ hypotheses through multiplication and addition
 congruence. Both new comparison helpers remain private; no equality of
 expression trees or every-environment substitution claim follows.
 
-`deriv_const_factor` proves canonical equality of a left constant factor and
-its derivative by applying `poly_eq_complete` to their evaluations. The product
-rule leaves a zero-left product that does not reduce for a variable environment;
-`zero_l for mul` removes it under `cong`, and `zero_l for add` finishes the
-`trans` chain. The right-constant-factor form is a one-call consequence of
+`deriv_absent_factor` proves canonical equality of a left factor without the
+variable and its derivative by applying `poly_eq_complete` to their evaluations.
+`deriv_absent` sends the factor's derivative to zero under `cong`, which leaves
+a zero-left product that does not reduce for a variable environment;
+`zero_l for mul` removes it, and `zero_l for add` finishes the `trans` chain.
+`deriv_const_factor` is its literal case: `occurs v (EConst k)` computes to
+`False`, so its premise is `Proved`.
+The right-constant-factor form is a one-call consequence of
 `poly_eq_complete` with a reflexive evaluation, not a separate export: its
 zero-right product and sum reduce definitionally. Neither form claims that the
 expression trees are structurally equal.
@@ -3677,7 +3701,7 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–24 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–25 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
@@ -3692,6 +3716,7 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [substitution-coincidence seed](../../../../conformance/stdlib/symbolic-algebra/seed-substitute-coincidence.md),
 [derivative-substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-substitution.md),
 [constant-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-constant-factor.md),
+[absent-factor seed](../../../../conformance/stdlib/symbolic-algebra/seed-derivative-absent-factor.md),
 [expression-power seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power.md),
 [expression-power multiplication seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-multiplication.md),
 [expression-power congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-expression-power-congruence.md),
@@ -3701,11 +3726,11 @@ its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-
 [normalization-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-normalize-congruence.md),
 [congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-congruence.md), and
 [pointwise-congruence seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-pointwise-congruence.md)
-specify the public surface and closed observations. The equivalence seed is
+specify the public surface and the seed observations. The equivalence seed is
 authored but has not been Ken-checked or executed by the official conformance
 runner. The public API comprises
 `Expr`, `Monomial`, `Poly`, their exported constructors, fifteen operations,
-and forty-three checked theorems; Horner, substitution and differentiation
+and forty-four checked theorems; Horner, substitution and differentiation
 expose no additional helper beyond those named operations and laws. Definition
 locates the implementations and law statements; Using it gives client idioms;
 Laws & proofs traces the proof families; Design notes separates their
@@ -3726,7 +3751,10 @@ premise-free generic law under a selective import, checks its owner, checked
 body and unchanged trusted-`GlobalId` identities, then checks the actual
 constant-factor seed's complete accepted client before its isolated
 `Proved` refusal. The accepted control retains the derivative on the right;
-the refused claim drops it.
+the refused claim drops it. The §25 package test applies the generic
+absence-only law under a selective import, checks its owner, Transparent
+body and exact trusted identities, and checks both accepted rows of the
+actual absent-factor seed before its isolated refusal.
 
 The §13 package test applies the pointwise law under a selective import at
 arbitrary substitutions and expression, checks its owner and unchanged
