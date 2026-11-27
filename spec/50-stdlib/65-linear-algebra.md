@@ -23,7 +23,8 @@
 > SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21;
 > SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO §22;
 > SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS §23;
-> SPEC-LINEAR-ALGEBRA-TRACE-ZERO §24).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-TRACE-ZERO §24;
+> SPEC-LINEAR-ALGEBRA-GRAM-KERNEL §25).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -2062,3 +2063,46 @@ with result `Zero` and refuses the otherwise identical claim with result
 `n`. The closed dimension-three controls give `Zero` on the zero matrix
 and `3` on the identity. These are scratch results, not assembled AC-T,
 official conformance, CI or landing evidence.
+
+## 25. A Gram-kernel vector is in the kernel of the matrix
+
+`Algorithm.LinearAlgebra.NatMatrix` must export this public Transparent
+checked theorem immediately after `transpose_gram`, as the last public
+law before the private `matrix_add_assoc_cons`:
+
+```ken
+pub theorem matrix_vector_zero_of_gram_vector_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (v : Vec Nat n)
+    : Equal
+        (Vec Nat n)
+        (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+        (vector_zero n)
+      → Equal (Vec Nat m) (matrix_vector m n a v) (vector_zero m)
+```
+
+For an `m × n` matrix `a`, the sole premise says that the `n × n` product
+`transpose a × a` sends `v` to zero. The conclusion says that `a` sends
+`v` to zero, not that `v` is zero. This is distinct from §22, which
+uses the `m × m` product `a × transpose a`; no kernel law for that
+product is added here. There is no square-input or nonzero-dimension
+premise.
+
+Use `matrix_vector_product` in reverse to rewrite the premise as the
+transpose applied to `a v` being zero. `transpose_adjoint` equates the
+self-dot of `a v` with the dot of `v` and that transposed result.
+Congruence through `dot n v` and `dot_zero_right` make the self-dot zero,
+and `vector_zero_of_dot_self_zero` gives the conclusion. The proof adds
+no helper or import.
+
+Architect AC-0 (`evt_51w8rbr649att`) checked the Transparent body and
+open client in detached scratch on `3c2b7066d`, with no added `Axiom`
+and identical exact trusted `GlobalId` sets (109 → 109) after preloading
+the three providers. At `a = [[1, 0]]`, the client open in `v` needs the
+law: neither `Proved` nor `Refl` closes its conclusion under the
+premise. The twin claiming that `v` itself is zero refuses. The closed
+vector `[0, 1]` meets the premise but has self-dot one, so it is not the
+zero vector. These scratch results do not establish assembled AC-T,
+official seed execution, CI or landing.
+
+The §§1–25 roster is twelve operations, sixty-eight laws and eighty
+public names. No operation or law type from §§1–24 changes.
