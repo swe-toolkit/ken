@@ -22,7 +22,8 @@
 > SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20;
 > SPEC-GEOMETRY-ORIENT-TRANSLATE §21;
 > SPEC-GEOMETRY-ORIENT-SCALE §22;
-> SPEC-GEOMETRY-ORIENT-REFLECT-DIAGONAL §23).** Sections 1–4,
+> SPEC-GEOMETRY-ORIENT-REFLECT-DIAGONAL §23;
+> SPEC-GEOMETRY-AREA-SPLIT-X-SUM §24).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1859,3 +1860,48 @@ The open client with an original `Gt` derives `Lt` after reflection; the
 twin claiming `Gt` refuses. Unlike a closed computation, that pair
 requires the law to carry the flip. These are scratch results, not
 assembled AC-T, official conformance, CI or landing evidence.
+
+## 24. Splitting a box along x preserves the sum of its areas
+
+> **Section 24 status: DRAFT v0 (SPEC-GEOMETRY-AREA-SPLIT-X-SUM).**
+> Architect AC-0 (`evt_79khh3r4s38df`) checked the law and an open client
+> in detached scratch on `a6b760ed0`, with no added `Axiom` and unchanged
+> exact trusted `GlobalId` identities (114 → 114). This is not assembled
+> AC-T, official conformance, CI, publication, landing or measured
+> landed trust.
+
+`Algorithm.Geometry.NatBox` must export this public Transparent checked
+theorem immediately after `area_positive_contains_lo_corner` and before
+the private `axis_within`:
+
+```ken
+pub theorem area_split_x
+      (lx : Nat) (ly : Nat) (m : Nat) (hx : Nat) (hy : Nat)
+    : IsTrue (leq_nat lx (Suc m))
+      → IsTrue (leq_nat m hx)
+      → Equal
+          Nat
+          (add
+            (area (MkBox (MkPoint lx ly) (MkPoint m hy)))
+            (area (MkBox (MkPoint (Suc m) ly) (MkPoint hx hy))))
+          (area (MkBox (MkPoint lx ly) (MkPoint hx hy)))
+```
+
+The left box ends at column `m` and the right box starts at `Suc m`.
+The two premises, in order, require `lx ≤ Suc m` and `m ≤ hx`. They
+admit an empty left part at `lx = Suc m` or an empty right part at
+`m = hx`. No y-order or positive-area premise is required. Neither
+comparison can be dropped in general: with y span one, taking
+`(lx, m, hx) = (5, 0, 3)` gives sum 3 and whole area 0; taking
+`(lx, m, hx) = (0, 5, 2)` gives sum 6 and whole area 3.
+
+The private NatBox helper `sub_chain_add` splits the inclusive x span
+under the two premises. It is applied to `lx`, `Suc m` and `Suc hx`:
+`leq_nat m hx` converts to `leq_nat (Suc m) (Suc hx)`. The x span is
+the left factor of `area`, so `mul_add_distrib_l` distributes the x-span
+sum over the shared y span. The theorem uses that equality in reverse
+and then rewrites the summed x span to the full span. No public helper
+or horizontal split law is added.
+
+NatBox's public checked-theorem count grows from forty-three to
+forty-four. No operation or law type from §§1–23 changes.

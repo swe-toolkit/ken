@@ -5,8 +5,8 @@ geometry operations. Six box-and-distance laws, ten structural
 commutativity, associativity, absorption, idempotence and distribution laws,
 three metric
 laws, two corner-membership laws, seven corner-wise containment laws, eight
-inclusion-order laws, three area laws, and three point-box laws carry
-kernel-checked generic proofs.
+inclusion-order laws, three area laws, a column-split area law, and three
+point-box laws carry kernel-checked generic proofs.
 
 ## Contents
 
@@ -36,9 +36,9 @@ intersection and hull, ahead of the three metric laws. The two corner-membership
 follow the three metric laws, and `contains_point_box` and
 `contains_point_box_equal` follow them. The corner-wise `inside` operation
 and its seven laws come next, then the eight
-inclusion-order laws, followed by `area`, its three laws, `area_point_box`
-and `area_positive_contains_lo_corner`. Per-axis proof helpers and distance
-helpers stay private.
+inclusion-order laws, followed by `area`, its three laws, `area_point_box`,
+`area_positive_contains_lo_corner` and `area_split_x`. Per-axis proof
+helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -53,7 +53,7 @@ import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
 
 import Core.Classes.LawfulClasses (IsTrue, leq_nat, bool_and)
 
-import Data.Numeric.Nat.Arithmetic (add, mul)
+import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
 
 import Data.Numeric.Nat.Order
   (min, max, sub, leq_nat_add_left_bound, leq_nat_weaken_right, leq_nat_mul_right_mono)
@@ -2276,6 +2276,39 @@ pub theorem area_positive_contains_lo_corner
       }
   }
 
+pub theorem area_split_x
+      (lx : Nat) (ly : Nat) (m : Nat) (hx : Nat) (hy : Nat)
+    : IsTrue (leq_nat lx (Suc m))
+      → IsTrue (leq_nat m hx)
+      → Equal Nat
+        (add
+          (area (MkBox (MkPoint lx ly) (MkPoint m hy)))
+          (area (MkBox (MkPoint (Suc m) ly) (MkPoint hx hy))))
+        (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) =
+  λhl.
+    λhh.
+      trans
+        Nat
+        (add
+          (mul (axis_span lx m) (axis_span ly hy))
+          (mul (axis_span (Suc m) hx) (axis_span ly hy)))
+        (mul (add (axis_span lx m) (axis_span (Suc m) hx)) (axis_span ly hy))
+        (mul (axis_span lx hx) (axis_span ly hy))
+        (sym
+          Nat
+          (mul (add (axis_span lx m) (axis_span (Suc m) hx)) (axis_span ly hy))
+          (add
+            (mul (axis_span lx m) (axis_span ly hy))
+            (mul (axis_span (Suc m) hx) (axis_span ly hy)))
+          (mul_add_distrib_l (axis_span lx m) (axis_span (Suc m) hx) (axis_span ly hy)))
+        (cong
+          Nat
+          Nat
+          (add (axis_span lx m) (axis_span (Suc m) hx))
+          (axis_span lx hx)
+          (λw. mul w (axis_span ly hy))
+          (sub_chain_add lx (Suc m) (Suc hx) hl hh))
+
 fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
   bool_and (leq_nat l2 l1) (leq_nat h1 h2)
 
@@ -2506,6 +2539,39 @@ theorem axis_span_inverted
     : IsTrue (leq_nat (Suc hi) lo) → Equal Nat (axis_span lo hi) Zero =
   λh. (proof saturates for sub) (Suc hi) lo h
 
+theorem sub_chain_add
+      (a : Nat)
+    : (b : Nat)
+      → (c : Nat)
+      → IsTrue (leq_nat a b)
+      → IsTrue (leq_nat b c)
+      → Equal Nat (add (sub b a) (sub c b)) (sub c a) =
+  match a {
+    Zero ↦
+      λb.
+        λc.
+          λhab.
+            λhbc.
+              trans
+                Nat
+                (add b (sub c b))
+                (add (sub c b) b)
+                c
+                ((proof comm for add) b (sub c b))
+                ((proof add_cancel for sub) b c hbc);
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λc. λhab. absurd hab;
+          Suc b2 ↦
+            λc.
+              match c {
+                Zero ↦ λhab. λhbc. absurd hbc;
+                Suc c2 ↦ λhab. λhbc. sub_chain_add a2 b2 c2 hab hbc
+              }
+        }
+  }
+
 theorem axis_span_point (n : Nat) : Equal Nat (axis_span n n) (Suc Zero) =
   match n {
     Zero ↦ Proved;
@@ -2719,9 +2785,11 @@ rewrites each factor with the private `axis_span_point`; the closed product
 `area_positive_contains_lo_corner`, positive area gives a positive span on
 each axis through the private product lemmas. Induction on the lower and
 upper endpoints shows a positive span orders them; checked `leq_nat`
-reflexivity supplies each corner's remaining comparison. The private
-intersection-area bounds apply `area_inside` to the existing
-`intersect_inside_left` and `intersect_inside_right` laws.
+reflexivity supplies each corner's remaining comparison. For `area_split_x`,
+the private subtraction chain lemma splits the inclusive x span under the
+two bounds, and `mul_add_distrib_l` distributes multiplication by the shared
+y span. The private intersection-area bounds apply `area_inside` to the
+existing `intersect_inside_left` and `intersect_inside_right` laws.
 
 `intersect_hull_distrib` uses `max::distrib` for each lower coordinate and
 `min::distrib` for each upper coordinate. `hull_intersect_distrib` reverses
@@ -2770,8 +2838,8 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–17 and §20](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and forty-three public checked law types,
+1. **Contract.** [Exact geometry, §§1–17, §20 and §24](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and forty-four public checked law types,
    including the two structural distribution, two corner-membership,
    inside-antisymmetry and three point-box laws.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
@@ -2789,12 +2857,13 @@ this interface.
    `inside_antisym`, `intersect_greatest`, `hull_least`,
    `intersect_eq_of_inside`, `hull_eq_of_inside`, `intersect_monotone`,
    `hull_monotone`, `area`, `area_inside`,
-   `area_inverted_x`, `area_inverted_y`, `area_point_box`, and
-   `area_positive_contains_lo_corner`.
+   `area_inverted_x`, `area_inverted_y`, `area_point_box`,
+   `area_positive_contains_lo_corner`, and `area_split_x`.
    `axis_point_equal`, `axis_within`, `axis_span`, `box_with_lo`,
    `box_with_hi`, `box_equal`, generic multiplication bounds, per-axis
-   lemmas and proof transport helpers remain private. Generic subtraction
-   bounds are checked exports of `Data.Numeric.Nat.Order`.
+   lemmas, proof transport helpers and the subtraction chain helper stay
+   private. Generic subtraction bounds are checked exports of
+   `Data.Numeric.Nat.Order`.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
    closed examples and generic metric, containment, inclusion order and area
@@ -2881,7 +2950,12 @@ this interface.
    [monotonicity seed](../../../../conformance/stdlib/geometry/seed-box-intersect-hull-monotone.md)
    records separate accepted and refused clients; the package test does not
    execute that seed or establish an official conformance result.
-   All seventeen authored seeds supplement rather than replace the checked
+   The [column-split seed](../../../../conformance/stdlib/geometry/seed-area-split-x.md)
+   supplies the open application and closed counterexample controls; its
+   [package test](../../../../crates/ken-elaborator/tests/cat_geometry_box_area_split_x.rs)
+   checks the open application, computation-only refusals and the false
+   missing-premise claim without running the official conformance runner.
+   All eighteen authored seeds supplement rather than replace the checked
    generic law bodies.
 
 [id]: ../../../../conformance/stdlib/geometry/seed-box-intersect-hull-idempotence.md
