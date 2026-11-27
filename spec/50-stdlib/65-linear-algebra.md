@@ -22,7 +22,8 @@
 > SPEC-LINEAR-ALGEBRA-ADD-CANCEL §20;
 > SPEC-LINEAR-ALGEBRA-SCALE-CANCEL §21;
 > SPEC-LINEAR-ALGEBRA-GRAM-TRACE-ZERO §22;
-> SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS §23).** Sections 1–6 and their
+> SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS §23;
+> SPEC-LINEAR-ALGEBRA-TRACE-ZERO §24).** Sections 1–6 and their
 > twenty public checked laws are present in the catalog. Package-owned
 > tests check the authored §4–6 seeds against root-loaded exports; they
 > are not official conformance-runner runs or landed trust measurements.
@@ -2028,3 +2029,36 @@ the left conclusion true but makes the sum `[1,0]`, so `Refl` refuses
 at the premise. The scratch clients also measured that refusal when
 changing only the left vector and when changing one entry of the left
 2 × 2 matrix.
+
+## 24. The trace of the zero matrix is zero
+
+`Algorithm.LinearAlgebra.NatMatrix` must export this public Transparent
+checked theorem directly after `trace_identity` and before
+`trace_product_comm`:
+
+```ken
+pub theorem trace_zero (n : Nat) : Equal Nat (trace n (matrix_zero n n)) Zero
+```
+
+The law has no premise and holds for every square dimension, including
+zero. It gives the trace of `matrix_zero n n`, not `identity n`, whose
+trace is `n` by §18. No earlier operation or law type changes. The
+§§1–24 roster is twelve operations, sixty-seven laws and seventy-nine
+public names.
+
+Apply `matrix_scale_zero` in reverse to rewrite the zero matrix as its
+own scaling by `Zero`, then lift the equality through `trace n`.
+`trace_scale` brings the factor out, yielding `mul Zero` applied to the
+original trace. The public Nat Arithmetic proof `zero_l for mul`
+closes that equality: multiplication recurses on its second argument,
+so `mul Zero` of this open trace does not reduce to `Zero` by conversion.
+No new helper, import or induction is needed.
+
+Architect AC-0 (`evt_4cc69yznrxcpn`) checked the Transparent body in
+scratch on `206d4cc53`, with no new `Axiom`, foreign declaration or
+primitive and with identical exact trusted `GlobalId` sets (109 → 109)
+after loading the providers. Applying `trace_zero` to an open `n` checks
+with result `Zero` and refuses the otherwise identical claim with result
+`n`. The closed dimension-three controls give `Zero` on the zero matrix
+and `3` on the identity. These are scratch results, not assembled AC-T,
+official conformance, CI or landing evidence.
