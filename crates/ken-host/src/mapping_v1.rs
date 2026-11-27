@@ -169,21 +169,121 @@ mod tests {
         )));
     }
 
+    /// Exit codes of the single-threaded unmap observer. Each failure mode has
+    /// its own code so a red row names the step that went wrong.
+    #[cfg(target_os = "linux")]
+    mod unmap_observer {
+        pub(super) const RELEASED: i32 = 0;
+        pub(super) const MAP_FAILED: i32 = 10;
+        pub(super) const LIVE_PROBE_REFUSED: i32 = 11;
+        pub(super) const UNMAP_FAILED: i32 = 12;
+        pub(super) const RANGE_STILL_MAPPED: i32 = 13;
+        pub(super) const WRONG_REFUSAL: i32 = 14;
+    }
+
+    /// Runs in the forked child, which has exactly one thread. Every step is
+    /// a raw system call or allocation-free code, so nothing in the child can
+    /// take a lock another parent thread held at fork time, and nothing in
+    /// the child maps memory except `map_anonymous_v1` itself.
+    ///
+    /// The body has no panic site: every fallible step returns a `Result` or
+    /// a status integer that is matched here, and nothing indexes, unwraps or
+    /// does arithmetic. That matters because Rust's panic machinery is not
+    /// safe after `fork` in a multithreaded process (the panic count lives in
+    /// TLS, whose first access may allocate), so the child handles no panic.
+    /// The `extern "C"` ABI cannot unwind: if a later edit introduced a panic,
+    /// the child would abort or hang (the parent's `WIFEXITED` assertion or
+    /// the test timeout then reddens the row) instead of unwinding back into
+    /// the child's copy of the test harness. Neither outcome can pass.
+    #[cfg(target_os = "linux")]
+    extern "C" fn observe_unmap_in_single_threaded_child() -> i32 {
+        let Ok(region) = map_anonymous_v1(1, MappingProtectionV1::ReadOnly) else {
+            return unmap_observer::MAP_FAILED;
+        };
+        let address = region.address.as_ptr();
+        let mut residency = [0_u8; 1];
+        // SAFETY: `mincore` only inspects the virtual-address range. The range
+        // is the live one-page mapping `region` owns.
+        let live = unsafe { libc::mincore(address.cast(), 1, residency.as_mut_ptr()) };
+        if live != 0 {
+            return unmap_observer::LIVE_PROBE_REFUSED;
+        }
+        if unmap_v1(region).is_err() {
+            return unmap_observer::UNMAP_FAILED;
+        }
+        // SAFETY: as above; the range is no longer owned by anything, and
+        // `mincore` reads no memory in it.
+        let freed = unsafe { libc::mincore(address.cast(), 1, residency.as_mut_ptr()) };
+        if freed == 0 {
+            return unmap_observer::RANGE_STILL_MAPPED;
+        }
+        match std::io::Error::last_os_error().raw_os_error() {
+            Some(code) if code == libc::ENOMEM => unmap_observer::RELEASED,
+            _ => unmap_observer::WRONG_REFUSAL,
+        }
+    }
+
+    /// Promise class: durable invariant (`unmap_v1` consumes the mapping and
+    /// releases its range).
+    /// MEASURED: in a forked child that has exactly one thread, `mincore` on
+    /// the page `map_anonymous_v1` returned succeeds while the mapping is
+    /// live, and fails with ENOMEM immediately after `unmap_v1` returns Ok;
+    /// the parent asserts the child exited normally with code 0.
+    /// CLAIMED: `unmap_v1` released the range. The child's address space has
+    /// no other thread, and between `unmap_v1` and the second `mincore` the
+    /// child makes no call that maps memory, so no mapper can occupy the
+    /// freed page: ENOMEM holds if and only if the range was released. The
+    /// parent's other libtest threads map into the parent's address space,
+    /// which the child stopped sharing at fork. No outcome is inconclusive:
+    /// a still-mapped range is code 13 and fails the row, never retried.
+    /// The live probe first pins that `mincore` sees this mapping at all, so a
+    /// probe that always failed could not pass the row.
+    /// THE GAP: this proves release of a one-page read-only mapping on Linux
+    /// only; it says nothing about multi-page lengths or writable mappings.
     #[cfg(target_os = "linux")]
     #[test]
     fn consumed_mapping_is_actually_unmapped() {
-        let region =
-            map_anonymous_v1(1, MappingProtectionV1::ReadOnly).expect("one-byte anonymous mapping");
-        let address = region.address.as_ptr();
-        unmap_v1(region).expect("munmap succeeds exactly once");
-        let mut residency = [0_u8; 1];
-        // SAFETY: `mincore` only inspects the virtual-address range; the test
-        // expects the just-unmapped range to be rejected with ENOMEM.
-        let status = unsafe { libc::mincore(address.cast(), 1, residency.as_mut_ptr()) };
-        assert_eq!(status, -1);
+        // SAFETY: the child runs only `observe_unmap_in_single_threaded_child`,
+        // which allocates nothing, takes no lock and cannot panic, then leaves
+        // with `_exit`, so it never returns into the test harness or runs
+        // atexit handlers.
+        let child = unsafe { libc::fork() };
+        assert!(
+            child >= 0,
+            "fork failed: {}",
+            std::io::Error::last_os_error()
+        );
+        if child == 0 {
+            let code = observe_unmap_in_single_threaded_child();
+            // SAFETY: `_exit` ends the child immediately without unwinding.
+            unsafe { libc::_exit(code) };
+        }
+        let mut status: libc::c_int = 0;
+        loop {
+            // SAFETY: `child` is this process's own child, and `status` is a
+            // valid out-pointer for the wait status.
+            let waited = unsafe { libc::waitpid(child, &mut status, 0) };
+            if waited == child {
+                break;
+            }
+            let error = std::io::Error::last_os_error();
+            // EINTR restarts the wait for the same child; it does not rerun
+            // the observation.
+            assert_eq!(
+                error.raw_os_error(),
+                Some(libc::EINTR),
+                "waitpid failed: {error}"
+            );
+        }
+        assert!(
+            libc::WIFEXITED(status),
+            "unmap observer did not exit normally: wait status {status:#x}"
+        );
         assert_eq!(
-            std::io::Error::last_os_error().raw_os_error(),
-            Some(libc::ENOMEM)
+            libc::WEXITSTATUS(status),
+            unmap_observer::RELEASED,
+            "unmap observer exit code (10 map failed, 11 live probe refused, \
+             12 unmap failed, 13 range still mapped, 14 refusal not ENOMEM)"
         );
     }
 
