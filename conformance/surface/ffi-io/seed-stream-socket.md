@@ -703,29 +703,12 @@ bound.
   operation returns could miss the interval; an observer that closes
   inherited descriptors would also mask it.
 
-### surface/ffi-io/socket-declared-native-refusal
-
-- promise class: transition sentinel, retired by the native-parity successor.
-- spec: §1.13 native boundary.
-- given: native-build the accepted exchange program with a resource profile
-  and an empty output directory. Separately build a checked program declaring
-  `Net Loopback` whose socket operation sits only in a branch known not to
-  execute: the interpreter takes the non-socket branch and returns the known
-  result. Also build a Net-declared program with the same Net-free body as the
-  positive control below, so declaration alone is the only changed input.
-  Give each native attempt a fresh empty output directory.
-- expect: each Net-declared native build returns the typed
-  `host_effect_lowering_unavailable` reason before object emission. The
-  reason identifies `RepresentedUnavailable` for **each** of `NetListen`,
-  `NetAccept`, `NetConnect`, `NetReceive`, `NetSend`, `NetShutdown` and
-  `NetLocalAddress`; the exact set is seven, with no other operation named.
-  Every negative output directory remains empty. Interpreter acceptance of
-  the dormant-branch program is checked independently; a failure before
-  native admission does not count as this refusal.
-- why: a live socket call alone cannot prove that the declaration gate
-  refuses a program whose socket branch is dormant, or a program that
-  declares Net but contains no socket call at all. The named unavailable
-  set distinguishes this transition from an arbitrary build failure.
+The transition sentinel `surface/ffi-io/socket-declared-native-refusal` is
+retired by PX11 Inc2: AC-4's native-refusal case is replaced by AC-1's
+positive rows. Its successor is
+`px11_all_three_families_exchange_exact_bytes_and_observe_eof` (Inc2 AC-1
+on candidate `61e05cfbb1bd115cf58b3b36d6a07cf834f98a20`). The durable
+`surface/ffi-io/socket-net-free-native-build-accepts` row below remains.
 
 ### surface/ffi-io/socket-net-free-native-build-accepts
 
