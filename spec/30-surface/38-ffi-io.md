@@ -1570,15 +1570,12 @@ signature is homed by analogy.
 
 ### 1.13 Typed stream sockets (PX11 first slice)
 
-> **PX11 status: specified, not implemented or trust-measured here.**
-> Seven `Net` host operations are admitted on the checked interpreter
-> under an exact enumerated exception set, but remain
-> `RepresentedUnavailable` for native. A declared `Net` grant refuses
-> native build before object emission; native parity is the immediate
-> successor and closes that exception set. This interpreter-only slice
-> does not count as practical PX11 value under the native-lane bar.
-> No seed execution, official conformance, CI, publication, landing or
-> trusted-base measurement is claimed by this Spec addition.
+> **PX11 status: specified; stream-socket native parity is PX11 Inc2.**
+> The seven `Net` host operations are `NativeTested`: they execute on
+> the checked interpreter and on the native lane, and a declared `Net`
+> grant no longer refuses a native build. No seed execution, official
+> conformance, CI, publication, landing or trusted-base measurement is
+> claimed by this Spec addition.
 
 `SocketAddress` is a closed, opaque three-arm type: IPv4 carries four
 `UInt8` octets and a `UInt16` port; IPv6 carries sixteen `UInt8`
@@ -1768,18 +1765,12 @@ The seven new host operations are `NetListen`, `NetAccept`, `NetConnect`,
 host-family codes are `0x0701` through `0x0707` in that order.
 `ResourceKind.SocketListener` and `ResourceKind.SocketStream` are new
 opaque resource kinds; resource release uses the existing operation.
-These seven operations, **and no others**, form the named
-interpreter-admission exception while each remains
-`RepresentedUnavailable` for the native lane. A native build of a
-program **declaring Net**, even one whose branch does not take a socket
-operation at runtime, refuses before object emission with the typed
-`host_effect_lowering_unavailable` reason naming the unavailable Net
-operations. No artifact is emitted. The immediate PX11 native-parity
-successor closes this interpreter-only set; datagrams, typed option
-families, an injected resolver and DNS boundary, nonblocking/readiness
-and abstract Unix names remain subsequent work. No new kernel rule or
-trusted postulate is authorized. Any required trust growth is an
-operator stop.
+All seven operations are `NativeTested` and execute on both the interpreter
+and native lanes. A declared Net grant no longer triggers a native-build
+refusal. Datagrams, typed option families, an injected resolver and DNS
+boundary, nonblocking/readiness and abstract Unix names remain subsequent work.
+No new kernel rule or trusted postulate is authorized. Any required trust
+growth is an operator stop.
 
 ### 1.14 Bracketed directory batches (ABI-S2)
 

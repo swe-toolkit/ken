@@ -7,9 +7,7 @@ Spec: `spec/30-surface/38-ffi-io.md` §1.13 and
 These acceptance cases are not seed execution or official conformance
 execution. Targeted interpreter and host tests are implementation evidence
 only; they do not execute this seed. Full-workspace CI, publication, landing,
-native parity and trusted-base measurement are not claimed by this seed. The
-first slice deliberately refuses native execution for a Net-declared program
-before object emission.
+native parity and trusted-base measurement are not claimed by this seed.
 
 The root-scope rows follow the ruled RT-NET-UNIX-PATH-FS-ROOT-SCOPE AC-0.
 For existing valid Unix addresses, the harness uses a fresh short canonical
@@ -703,45 +701,26 @@ bound.
   operation returns could miss the interval; an observer that closes
   inherited descriptors would also mask it.
 
-### surface/ffi-io/socket-declared-native-refusal
-
-- promise class: transition sentinel, retired by the native-parity successor.
-- spec: §1.13 native boundary.
-- given: native-build the accepted exchange program with a resource profile
-  and an empty output directory. Separately build a checked program declaring
-  `Net Loopback` whose socket operation sits only in a branch known not to
-  execute: the interpreter takes the non-socket branch and returns the known
-  result. Also build a Net-declared program with the same Net-free body as the
-  positive control below, so declaration alone is the only changed input.
-  Give each native attempt a fresh empty output directory.
-- expect: each Net-declared native build returns the typed
-  `host_effect_lowering_unavailable` reason before object emission. The
-  reason identifies `RepresentedUnavailable` for **each** of `NetListen`,
-  `NetAccept`, `NetConnect`, `NetReceive`, `NetSend`, `NetShutdown` and
-  `NetLocalAddress`; the exact set is seven, with no other operation named.
-  Every negative output directory remains empty. Interpreter acceptance of
-  the dormant-branch program is checked independently; a failure before
-  native admission does not count as this refusal.
-- why: a live socket call alone cannot prove that the declaration gate
-  refuses a program whose socket branch is dormant, or a program that
-  declares Net but contains no socket call at all. The named unavailable
-  set distinguishes this transition from an arbitrary build failure.
+The transition sentinel `surface/ffi-io/socket-declared-native-refusal` is
+retired by PX11 Inc2: AC-4's native-refusal case is replaced by AC-1's
+positive rows. Its successor is
+`px11_all_three_families_exchange_exact_bytes_and_observe_eof` (Inc2 AC-1
+on candidate `61e05cfbb1bd115cf58b3b36d6a07cf834f98a20`). The durable
+`surface/ffi-io/socket-net-free-native-build-accepts` row below remains.
 
 ### surface/ffi-io/socket-net-free-native-build-accepts
 
 - promise class: durable invariant.
 - spec: §1.13 native boundary and `45 §4` checked host entrypoint.
-- given: use the same checked Net-free body, FS authority and resource
-  profile as the declaration-only negative above, in a fresh output
-  directory. The only program difference is the absence of `Net Loopback`
-  in its capability header. Its main returns
-  a known ground exit result without a socket effect.
+- given: use a checked program with a `Net`-free capability header, an FS
+  authority and a resource profile. Its main returns a known ground exit
+  result without a socket effect. Build it in a fresh output directory.
 - expect: native build succeeds, emits a runnable artifact and its invocation
   returns the known exit result. It does not merely fail with a different
   diagnostic. Interpreter execution of that same source gives the same
   result.
-- why: rejecting every native build satisfies a negative-only refusal case;
-  this paired positive case would reject such an implementation.
+- why: this positive case requires a Net-free native build to produce and
+  execute a working artifact; blanket native-build rejection would fail it.
 
 Clean-room provenance: no external references were consulted. This amendment
 is grounded in §1.13, the settled AC-0 ruling and first-principles behavior.

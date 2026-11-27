@@ -409,18 +409,24 @@ proc file_body
         Err _ ↦ failed
       })
 
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
 proc main
       (input : ProcessInput) (caps : ProgramCaps AFull)
     : HostIO AFull ExitCode
     visits [FS, Net] =
   match input {
     MkProcessInput arguments _ _ ↦
-      match arguments {
+      match reversed_arguments arguments (Nil Bytes) {
         Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
-        Cons selector rest ↦
+        Cons unix_path rest ↦
           match rest {
             Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
-            Cons unix_path _ ↦
+            Cons selector _ ↦
               match select_address selector unix_path {
                 Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
                 Ok address ↦

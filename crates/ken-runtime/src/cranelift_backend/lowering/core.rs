@@ -17548,6 +17548,67 @@ impl<'a> Lowering<'a> {
         occurrence: SourceOccurrence<'_>,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        // Entry 17: a unit-answer Call in a K context's own result walk yields
+        // the unit's direct-style answer; the K result seat needs an ITree
+        // carrier, so this occurrence is wrapped as `ITree::Ret answer`.
+        if matches!(occurrence.expr, RuntimeExpr::Call { .. }) {
+            if let Some(&(record, identity)) =
+                self.function_local.k_unit_answer_wraps.get(&occurrence.static_origin)
+            {
+                let answer = self.lower_expr_occurrence(builder, occurrence, env)?;
+                return self.wrap_k_unit_answer(builder, record, identity, answer);
+            }
+        }
+        self.lower_expr_occurrence(builder, occurrence, env)
+    }
+
+    /// Entry 17: allocate the planned `ITree::Ret` node around one unit
+    /// answer. A trap passes through unchanged; any operand that is not a
+    /// carried answer is refused rather than reinterpreted.
+    fn wrap_k_unit_answer(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        record: AggregateOccurrenceId,
+        identity: ConstructorIdentity,
+        answer: LoweringOperand,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let child = match answer {
+            LoweringOperand::Carried(word) => word,
+            LoweringOperand::Residual(residual) => self.decode_residual_child(builder, residual)?,
+            LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(trap)));
+            }
+            LoweringOperand::Specialized(value) => {
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    format!(
+                        "a K context unit-answer Call lowered to a specialized {} rather than a \
+                         carried answer",
+                        lowered_value_kind(&value),
+                    ),
+                ));
+            }
+        };
+        let word = self.emit_checked_aggregate_alloc(
+            builder,
+            GovernedAllocationSite::CarriedConstructor,
+            record,
+            PlannedAggregateShape::Constructor,
+            BoundaryClass::Constructor,
+            1,
+        )?;
+        self.emit_carrier_store_tag_id(builder, word, identity.tag_abi_word()?)?;
+        self.emit_carrier_store_field(builder, word, 0, child)?;
+        self.register_generated_constructor_authority(identity, word)?;
+        Ok(LoweringOperand::Carried(word))
+    }
+
+    fn lower_expr_occurrence(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        occurrence: SourceOccurrence<'_>,
+        env: &[LoweringEnvironmentBinding],
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
         let SourceOccurrence {
             expr,
             static_origin,

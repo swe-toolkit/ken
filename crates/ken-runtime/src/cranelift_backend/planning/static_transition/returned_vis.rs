@@ -57,6 +57,17 @@ pub(in crate::cranelift_backend) struct ReturnedVisContext {
     pub(in crate::cranelift_backend) returning_units: BTreeSet<PredeclaredFunctionId>,
 }
 
+/// Entry 17: one K context's unit-answer Call occurrences and the Ret identity
+/// its K row names. Lowering wraps each such occurrence's answer as
+/// `ITree::Ret answer` inside this context only.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct KContextUnitAnswerCalls {
+    pub(in crate::cranelift_backend) context: ContinuationContextId,
+    pub(in crate::cranelift_backend) enclosing: ContinuationSpecializationId,
+    pub(in crate::cranelift_backend) k_ret_identity: super::semantic_ir::ConstructorIdentity,
+    pub(in crate::cranelift_backend) calls: BTreeSet<StaticOriginId>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
     pub(in crate::cranelift_backend) owner: StaticOriginId,
@@ -600,6 +611,156 @@ impl StaticTransitionPlan<'_> {
             }
         }
         Ok((returned, returning_units))
+    }
+
+    /// Entry 17 (Architect evt_2m88vn1w3d9na): the unit/K protocol boundary,
+    /// stated as a plan fact. A predeclared unit publishes its direct-style
+    /// answer, while a K context's result seat publishes an ITree carrier. For
+    /// every planned context that is the K context of at least one installed
+    /// response row, this returns the Call occurrences in the context's OWN
+    /// result walk whose checked call edge is a `Declaration` edge into a unit.
+    /// The walk never descends into a unit body: a Call found inside a unit
+    /// body is that unit's own answer, not this context's result.
+    ///
+    /// The Ret identity is the one the K row names (`row.k_ret_identity()`);
+    /// rows that share a K context and disagree on it are a planner failure.
+    pub(in crate::cranelift_backend) fn k_context_unit_answer_calls(
+        &self,
+    ) -> Result<Vec<KContextUnitAnswerCalls>, CraneliftBackendError> {
+        let contexts = self.continuation_contexts()?;
+        let edges = self.emittable_call_edges()?;
+        let binders = build_checked_binder_provenance(self)?;
+        let mut answers = Vec::new();
+        for context in &contexts {
+            let identities = self
+                .static_response_continuations
+                .iter()
+                .filter(|row| row.k_context() == context.id())
+                .map(|row| row.k_ret_identity())
+                .collect::<Vec<_>>();
+            let Some(k_ret_identity) = identities.first().copied() else {
+                continue;
+            };
+            if identities.iter().any(|identity| *identity != k_ret_identity) {
+                return Err(planner_error(format!(
+                    "K context {:?} is named by response rows with distinct Ret identities",
+                    context.id(),
+                )));
+            }
+            let calls = self.k_context_own_unit_calls(
+                context.worker_body_origin(),
+                &edges,
+                &binders,
+            )?;
+            if calls.is_empty() {
+                continue;
+            }
+            answers.push(KContextUnitAnswerCalls {
+                context: context.id(),
+                enclosing: context.enclosing_specialization(),
+                k_ret_identity,
+                calls,
+            });
+        }
+        Ok(answers)
+    }
+
+    /// The context's own result walk: the same result positions
+    /// `returned_vis_in_context` follows, stopping at every Call. A Call whose
+    /// checked edge is a `Declaration` into a unit is recorded; any other
+    /// result occurrence is not a unit answer and is left as it is.
+    fn k_context_own_unit_calls(
+        &self,
+        body: StaticOriginId,
+        edges: &[EmittableCallEdge],
+        binders: &BTreeMap<StaticOriginId, CheckedBinderResolution>,
+    ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        let mut pending = vec![body];
+        let mut seen = BTreeSet::new();
+        let mut calls = BTreeSet::new();
+        while let Some(origin) = pending.pop() {
+            if !seen.insert(origin) {
+                continue;
+            }
+            let child = |position| self.child_static_origin(origin, position);
+            match self.source_occurrence(origin)? {
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                | RuntimeExpr::CheckedRecursiveInvocation { .. }
+                | RuntimeExpr::CheckedComputationalIHSlots { .. } => pending.push(child(0)?),
+                RuntimeExpr::CheckedComputationalIHInvocation { .. } => {
+                    let call = child(0)?;
+                    let binding = match self.source_occurrence(call)? {
+                        RuntimeExpr::Call { .. } => binders
+                            .get(&self.child_static_origin(call, 0)?)
+                            .and_then(|resolution| match resolution.provenance {
+                                CheckedBinderProvenance::InductionHypothesis(binding) => {
+                                    Some(binding)
+                                }
+                                _ => None,
+                            }),
+                        _ => None,
+                    };
+                    let Some(binding) = binding else {
+                        pending.push(call);
+                        continue;
+                    };
+                    let frame = binding.frame_origin();
+                    if let RuntimeExpr::ComputationalMatch { cases, .. } =
+                        self.source_occurrence(frame)?
+                    {
+                        for index in 0..cases.len() {
+                            pending.push(self.child_static_origin(frame, 1 + index)?);
+                        }
+                    }
+                }
+                RuntimeExpr::Let { .. } => pending.push(child(1)?),
+                RuntimeExpr::If { .. } => {
+                    pending.push(child(1)?);
+                    pending.push(child(2)?);
+                }
+                RuntimeExpr::Match { cases, .. } => {
+                    for index in 0..cases.len() {
+                        pending.push(child(1 + index)?);
+                    }
+                }
+                RuntimeExpr::ComputationalMatch { cases, .. } => {
+                    let possible = self.returned_vis_scrutinee_constructors(child(0)?)?;
+                    for (index, case) in cases.iter().enumerate() {
+                        if possible
+                            .as_ref()
+                            .is_none_or(|names| names.contains(case.constructor.as_str()))
+                        {
+                            pending.push(child(1 + index)?);
+                        }
+                    }
+                }
+                RuntimeExpr::Call { .. } => {
+                    let callee = child(0)?;
+                    let declared = edges.iter().any(|edge| {
+                        edge.call_site_origin() == callee
+                            && edge.kind() == EmittableCallKind::Declaration
+                    });
+                    if declared {
+                        calls.insert(origin);
+                    }
+                }
+                RuntimeExpr::Construct { .. }
+                | RuntimeExpr::Trap(_)
+                | RuntimeExpr::Value(_)
+                | RuntimeExpr::Var(_)
+                | RuntimeExpr::Effect { .. }
+                | RuntimeExpr::PrimitiveCall { .. }
+                | RuntimeExpr::Record { .. }
+                | RuntimeExpr::Project { .. }
+                | RuntimeExpr::Closure { .. }
+                | RuntimeExpr::LexicalClosure { .. }
+                | RuntimeExpr::DeclarationRef { .. }
+                | RuntimeExpr::ImportedDeclarationRef { .. } => {}
+            }
+        }
+        Ok(calls)
     }
 
     /// A returned Vis with no ordinary successor row is the plane's T1 edge

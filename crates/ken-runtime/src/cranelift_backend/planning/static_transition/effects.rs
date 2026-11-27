@@ -172,6 +172,13 @@ pub(in crate::cranelift_backend) enum EffectSeatConstructorPath {
         field_count: u32,
         wire_tag: i64,
     },
+    /// A constructor whose wire operands are authorized field by field.
+    RootFields {
+        identity: ConstructorIdentity,
+        field_count: u32,
+        wire_tag: i64,
+        fields: EffectSeatFieldContracts,
+    },
     /// A constructor whose one positional field contains the discriminant that
     /// completes the host-wire tag. `ResourceWriteCreate(CreatePolicy)` is the
     /// current instance.
@@ -185,12 +192,53 @@ pub(in crate::cranelift_backend) enum EffectSeatConstructorPath {
     },
 }
 
+/// Fixed-capacity field contracts for one exact operation/slot/path.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct EffectSeatFieldContracts {
+    operation: ken_host::HostOpV1,
+    slot: EffectSeatSlot,
+    fields: [Option<(u32, EffectSeatNeed)>; 2],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PlannedEffectSeatField {
+    seat: PlannedEffectSeat,
+    root: ConstructorIdentity,
+    position: u32,
+    need: EffectSeatNeed,
+}
+
+impl PlannedEffectSeatField {
+    pub(in crate::cranelift_backend) fn need(self) -> EffectSeatNeed { self.need }
+}
+
+impl EffectSeatConstructorPath {
+    pub(in crate::cranelift_backend) fn field_authority(
+        self,
+        seat: PlannedEffectSeat,
+        position: u32,
+    ) -> Option<PlannedEffectSeatField> {
+        let Self::RootFields { identity: root, field_count, fields, .. } = self else {
+            return None;
+        };
+        if (fields.operation, fields.slot) != (seat.operation, seat.slot)
+            || seat.need != EffectSeatNeed::ConstructorTag
+            || usize::try_from(field_count).ok()? != fields.fields.into_iter().flatten().count()
+            || position >= field_count
+        {
+            return None;
+        }
+        let (actual_position, need) = fields.fields.get(position as usize).copied().flatten()?;
+        (actual_position == position).then_some(PlannedEffectSeatField { seat, root, position, need })
+    }
+}
+
 /// The closed source-constructor roles a host seat may dispatch.
 ///
 /// Kept planner-private so lowering cannot submit a spelling and mint a second
 /// identity authority. Lowering receives only [`EffectSeatConstructorPath`]
 /// values resolved from the semantic plane.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 enum EffectSeatConstructorRole {
     StreamStdin,
     StreamStdout,
@@ -203,6 +251,14 @@ enum EffectSeatConstructorRole {
     ResourceWriteCreate,
     MappingReadOnly,
     MappingWritable,
+    SocketIPv4,
+    SocketIPv6,
+    SocketUnix,
+    ListeningSocket,
+    ConnectedSocket,
+    ShutdownRead,
+    ShutdownWrite,
+    ShutdownBoth,
 }
 
 impl EffectSeatConstructorRole {
@@ -219,7 +275,55 @@ impl EffectSeatConstructorRole {
             Self::ResourceWriteCreate => "::ResourceOpenMode::ResourceWriteCreate",
             Self::MappingReadOnly => "::MappingProt::ReadOnly",
             Self::MappingWritable => "::MappingProt::ReadWrite",
+            Self::SocketIPv4 => "::SocketAddress::PrivateSocketIPv4",
+            Self::SocketIPv6 => "::SocketAddress::PrivateSocketIPv6",
+            Self::SocketUnix => "::SocketAddress::PrivateSocketUnix",
+            Self::ListeningSocket => "::SocketTarget::ListeningSocket",
+            Self::ConnectedSocket => "::SocketTarget::ConnectedSocket",
+            Self::ShutdownRead => "::SocketShutdown::ShutdownRead",
+            Self::ShutdownWrite => "::SocketShutdown::ShutdownWrite",
+            Self::ShutdownBoth => "::SocketShutdown::ShutdownBoth",
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct FieldPathContract {
+    role: EffectSeatConstructorRole,
+    wire_tag: i64,
+    fields: EffectSeatFieldContracts,
+}
+
+type FieldPathContracts = [Option<FieldPathContract>; 3];
+
+/// The sole field contract table. Derive both the planned seat inventory and
+/// the constructor dispatcher from the exact operation/slot and role.
+fn field_path_contracts(operation: ken_host::HostOpV1, slot: EffectSeatSlot) -> FieldPathContracts {
+    use ken_host::HostOpV1 as Op;
+    use EffectSeatConstructorRole as Role;
+    use EffectSeatNeed::{BytesPointerLength, ExactIntU64, ResourceScalar};
+    let path = |role, wire_tag, first, second: Option<EffectSeatNeed>| Some(FieldPathContract {
+        role,
+        wire_tag,
+        fields: EffectSeatFieldContracts {
+            operation,
+            slot,
+            fields: [Some((0, first)), second.map(|need| (1, need))],
+        },
+    });
+    match (operation, slot) {
+        (Op::NetListen | Op::NetConnect, EffectSeatSlot::Argument(0)) => [
+            path(Role::SocketIPv4, 0, BytesPointerLength, Some(ExactIntU64)),
+            path(Role::SocketIPv6, 1, BytesPointerLength, Some(ExactIntU64)),
+            path(Role::SocketUnix, 2, BytesPointerLength, None),
+        ],
+        (Op::NetLocalAddress, EffectSeatSlot::Argument(0)) => [
+            // NetLocalAddress writes only the resource, never this tag.
+            path(Role::ListeningSocket, 0, ResourceScalar, None),
+            path(Role::ConnectedSocket, 1, ResourceScalar, None),
+            None,
+        ],
+        _ => [None; 3],
     }
 }
 
@@ -259,6 +363,7 @@ pub(in crate::cranelift_backend) struct PlannedEffectSeat {
     pub(in crate::cranelift_backend) consumer_owner: PredeclaredFunctionId,
     pub(in crate::cranelift_backend) semantic_operation: EffectSeatOperation,
     pub(in crate::cranelift_backend) need: EffectSeatNeed,
+    field_paths: FieldPathContracts,
     pub(in crate::cranelift_backend) avail: EffectSeatAvail,
 }
 
@@ -270,8 +375,11 @@ pub(in crate::cranelift_backend) struct PlannedEffectSeat {
 /// `#[derive]`, capturing the attribute and shipping that enum into
 /// production builds. The `--lib` test profile cannot observe that, which
 /// is why the repair is validated by a production build.
-#[cfg(test)]
 impl PlannedEffectSeat {
+    pub(in crate::cranelift_backend) fn field_contracts_match(self) -> bool {
+        self.field_paths == field_path_contracts(self.operation, self.slot)
+    }
+
     /// A seat record for a control, with a caller-chosen `need`.
     ///
     /// ⚠ Test-only scaffolding for `RT-CARRIER-BYTESPAN-OBSERVE` `D4`, whose
@@ -295,6 +403,7 @@ impl PlannedEffectSeat {
             consumer_owner: PredeclaredFunctionId(0),
             semantic_operation: EffectSeatOperation::ProjectBytesSpan,
             need,
+            field_paths: [None; 3],
             avail: EffectSeatAvail::SPECIALIZED_ONLY,
         }
     }
@@ -347,7 +456,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 40] = [
+    [ken_host::HostOpV1; 47] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
@@ -356,6 +465,13 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ProcessSignal,
     ken_host::HostOpV1::ResourceStreamRead,
     ken_host::HostOpV1::ResourceStreamWrite,
+    ken_host::HostOpV1::NetListen,
+    ken_host::HostOpV1::NetAccept,
+    ken_host::HostOpV1::NetConnect,
+    ken_host::HostOpV1::NetReceive,
+    ken_host::HostOpV1::NetSend,
+    ken_host::HostOpV1::NetShutdown,
+    ken_host::HostOpV1::NetLocalAddress,
     ken_host::HostOpV1::ConsoleRead,
     ken_host::HostOpV1::ConsoleWrite,
     ken_host::HostOpV1::ConsoleFlush,
@@ -409,11 +525,9 @@ fn host_effect_seat_contract(
     use EffectSeatAvail as Avail;
     use EffectSeatNeed as Need;
     use EffectSeatOperation as Semantic;
-    // ⭐ The CAPABILITY half, kept ahead of the argument table because its
-    // population is the exact complement: the eleven FS-path operations require
-    // one, and every other admitted operation refuses one outright. A `None`
-    // here is therefore not an arity gap but a capability the operation does
-    // not admit, and the caller refuses it with the seat's own coordinates.
+    // The capability-bearing set agrees with HostOpV1::takes_capability_operand,
+    // as checked by the consumer inventory test. A `None` here means that the
+    // operation does not admit a capability seat.
     let ordinal = match slot {
         EffectSeatSlot::Capability => {
             return match operation {
@@ -428,7 +542,9 @@ fn host_effect_seat_contract(
                 | Op::FsRename
                 | Op::FsChangeMode
                 | Op::FsOpen
-                | Op::ProcessPlanOpen => Some((
+                | Op::ProcessPlanOpen
+                | Op::NetListen
+                | Op::NetConnect => Some((
                     Semantic::ObserveCapabilityToken,
                     Need::CapabilityTokenScalar,
                     // Both phases: the emitter reads a specialized
@@ -464,7 +580,7 @@ fn host_effect_seat_contract(
                 | Op::ClockMonotonicNow
                 | Op::ClockSleepUntil
                 | Op::EntropyRandomBytes
-                | Op::NetListen | Op::NetAccept | Op::NetConnect
+                | Op::NetAccept
                 | Op::NetReceive | Op::NetSend | Op::NetShutdown
                 | Op::NetLocalAddress => None,
             };
@@ -516,6 +632,9 @@ fn host_effect_seat_contract(
         Avail::EITHER_PHASE,
     );
     match (operation, ordinal) {
+        (Op::NetListen | Op::NetConnect | Op::NetLocalAddress, 0)
+        | (Op::NetShutdown, 1) => Some(tag),
+        (Op::NetAccept | Op::NetShutdown, 0) => Some(phase_bearing_resource),
         (Op::ConsoleRead, 0)
         | (Op::ConsoleWrite, 0)
         | (Op::ConsoleFlush, 0)
@@ -577,19 +696,19 @@ fn host_effect_seat_contract(
         | (Op::ProcessTakePipe, 0)
         | (Op::ProcessWait, 0)
         | (Op::ProcessSignal, 0)
-        | (Op::ResourceStreamRead, 0)
-        | (Op::ResourceStreamRead, 1)
-        | (Op::ResourceStreamWrite, 0)
-        | (Op::ResourceStreamWrite, 1)
-        | (Op::ResourceStreamWrite, 4) => Some(phase_bearing_resource),
+        | (Op::ResourceStreamRead | Op::NetReceive, 0)
+        | (Op::ResourceStreamRead | Op::NetReceive, 1)
+        | (Op::ResourceStreamWrite | Op::NetSend, 0)
+        | (Op::ResourceStreamWrite | Op::NetSend, 1)
+        | (Op::ResourceStreamWrite | Op::NetSend, 4) => Some(phase_bearing_resource),
         (Op::ProcessPlanPush, 1)
         | (Op::ProcessPlanPush, 4)
         | (Op::ProcessTakePipe, 1)
         | (Op::ProcessSignal, 1)
-        | (Op::ResourceStreamRead, 2)
-        | (Op::ResourceStreamRead, 3)
-        | (Op::ResourceStreamWrite, 2)
-        | (Op::ResourceStreamWrite, 3) => Some(carried_exact_int),
+        | (Op::ResourceStreamRead | Op::NetReceive, 2)
+        | (Op::ResourceStreamRead | Op::NetReceive, 3)
+        | (Op::ResourceStreamWrite | Op::NetSend, 2)
+        | (Op::ResourceStreamWrite | Op::NetSend, 3) => Some(carried_exact_int),
         // PROVED carried, per seat (PX10 B2): narrowing Push Argument(2)
         // or Argument(3) independently makes the native smoke, operation-pair,
         // and F argv/null/live rows refuse precisely that BytesPointerLength
@@ -694,17 +813,13 @@ fn host_effect_seat_contract(
             | Op::ProcessSpawn
             | Op::ProcessTakePipe
             | Op::ProcessWait
-            | Op::ProcessSignal,
-            _,
-        ) => None,
-        // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.
-        // They are refused before any seat is derived, so they have no seat
-        // contract at all -- and naming them is what makes promoting one to the
-        // admitted set a compile error here rather than an operation whose
-        // seats silently answer `None`.
-        (
-            Op::NetListen | Op::NetAccept | Op::NetConnect
-            | Op::NetReceive | Op::NetSend | Op::NetShutdown
+            | Op::ProcessSignal
+            | Op::NetListen
+            | Op::NetAccept
+            | Op::NetConnect
+            | Op::NetReceive
+            | Op::NetSend
+            | Op::NetShutdown
             | Op::NetLocalAddress,
             _,
         ) => None,
@@ -788,6 +903,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_host_effe
                 consumer_owner,
                 semantic_operation,
                 need,
+                field_paths: field_path_contracts(*operation, slot),
                 avail,
             };
             #[cfg(test)]
@@ -799,8 +915,24 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_host_effe
     Ok(records)
 }
 
+/// Promise class: durable invariant. MEASURED: every native consumer's
+/// Capability seat agrees with host admission. CLAIMED: the seat inventory
+/// tracks the host's explicit operand shape. THE GAP: no seat is emitted here.
+#[test]
+fn native_capability_seats_agree_with_host_operands() {
+    let consumers = CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
+    for &op in &consumers {
+        assert_eq!(
+            host_effect_seat_contract(op, EffectSeatSlot::Capability).is_some(),
+            op.takes_capability_operand(),
+            "{op:?}",
+        );
+    }
+    eprintln!("Cranelift host-effect consumers: {}", consumers.len());
+}
+
 #[cfg(test)]
-fn mutate_planned_effect_seat(record: PlannedEffectSeat) -> PlannedEffectSeat {
+fn mutate_planned_effect_seat(mut record: PlannedEffectSeat) -> PlannedEffectSeat {
     let tag = (
         EffectSeatOperation::SelectClosedTag,
         EffectSeatNeed::ConstructorTag,
@@ -819,9 +951,14 @@ fn mutate_planned_effect_seat(record: PlannedEffectSeat) -> PlannedEffectSeat {
             },
             ..record
         },
-        EffectSeatPlanMutation::EraseNeed => PlannedEffectSeat {
-            need: EffectSeatNeed::ConstructorTag,
-            ..record
+        EffectSeatPlanMutation::EraseNeed => {
+            record.need = EffectSeatNeed::ConstructorTag;
+            for path in record.field_paths.iter_mut().flatten() {
+                for (_, need) in path.fields.fields.iter_mut().flatten() {
+                    *need = EffectSeatNeed::ConstructorTag;
+                }
+            }
+            record
         },
         EffectSeatPlanMutation::CollapseContract => PlannedEffectSeat {
             semantic_operation: tag.0,
@@ -915,7 +1052,27 @@ impl<'src> StaticTransitionPlan<'src> {
             Ok(paths)
         };
 
+        let field_paths = field_path_contracts(operation, slot);
+        if field_paths.iter().any(Option::is_some) {
+            let mut paths = Vec::new();
+            for contract in field_paths.into_iter().flatten() {
+                if let Some(identity) = identity(contract.role)? {
+                    paths.push(EffectSeatConstructorPath::RootFields {
+                        identity,
+                        field_count: contract.fields.fields.into_iter().flatten().count() as u32,
+                        wire_tag: contract.wire_tag,
+                        fields: contract.fields,
+                    });
+                }
+            }
+            return Ok(Some(paths));
+        }
         let paths = match (operation, slot) {
+            (Op::NetShutdown, EffectSeatSlot::Argument(1)) => roots(&[
+                (Role::ShutdownRead, 0),
+                (Role::ShutdownWrite, 1),
+                (Role::ShutdownBoth, 2),
+            ])?,
             (
                 Op::ConsoleWrite | Op::ConsoleFlush | Op::ConsoleIsTerminal,
                 EffectSeatSlot::Argument(0),

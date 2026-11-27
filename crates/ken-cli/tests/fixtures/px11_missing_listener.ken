@@ -41,15 +41,25 @@ fn typed_missing_address (address : SocketAddress) (identity : IOError) : Bool =
     MkSystemError _ _ _ _ ↦ False
   }
 
+fn last_argument (arguments : List Bytes) : Option Bytes =
+  match arguments {
+    Nil ↦ None Bytes;
+    Cons first rest ↦
+      match last_argument rest {
+        None ↦ Some Bytes first;
+        Some last ↦ Some Bytes last
+      }
+  }
+
 proc main
       (input : ProcessInput) (caps : ProgramCaps AFull)
     : HostIO AFull ExitCode
     visits [Net] =
   match input {
     MkProcessInput arguments _ _ ↦
-      match arguments {
-        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
-        Cons path _ ↦
+      match last_argument arguments {
+        None ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Some path ↦
           match socket_unix_path path {
             Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
             Ok address ↦
