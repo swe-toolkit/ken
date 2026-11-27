@@ -205,11 +205,26 @@ fn assert_native_refusal(name: &str) {
     let (output, build_dir) = native_build(name, work.path());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_ne!(output.status.code(), Some(0), "{name}: {}", describe(&output));
-    assert!(stderr.contains("N0001"), "{name}: {stderr}");
-    assert!(stderr.contains("is a represented unavailable lane"), "{name}: {stderr}");
+    let refusal = stderr
+        .lines()
+        .find(|line| line.starts_with("error["))
+        .unwrap_or_else(|| panic!("{name}: no diagnostic: {stderr}"));
+    assert!(refusal.starts_with("error[N0001]"), "{name}: typed lowering code: {refusal}");
+    let reason = refusal
+        .split_once("unsupported runtime-IR lowering: Effect: effect ")
+        .unwrap_or_else(|| panic!("{name}: construct Effect: {refusal}"))
+        .1;
+    let named = reason
+        .strip_suffix(" is a represented unavailable lane")
+        .unwrap_or_else(|| panic!("{name}: represented-unavailable reason: {refusal}"));
+    // The family spelling is incidental; the operation is its host-family code.
+    let code = named
+        .rsplit_once('.')
+        .and_then(|(_, code)| code.parse::<u16>().ok())
+        .unwrap_or_else(|| panic!("{name}: no operation code: {refusal}"));
     assert!(
-        (1800..=1803).any(|code| stderr.contains(&format!("FSOp.{code} "))),
-        "{name}: the refusal names a datagram host-family code: {stderr}"
+        (0x0708..=0x070B).contains(&code),
+        "{name}: the refusal names a datagram operation, 1800 to 1803: {refusal}"
     );
     let produced = std::fs::read_dir(&build_dir)
         .map(|entries| entries.count())

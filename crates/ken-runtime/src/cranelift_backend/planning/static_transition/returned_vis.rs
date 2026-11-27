@@ -143,6 +143,29 @@ pub(in crate::cranelift_backend) enum ExcludedSettlement {
     Underived(String),
 }
 
+/// Why a returned-Vis protocol was not derived. `Unavailable` is a typed
+/// verdict on the program and ends planning unchanged; every other failure
+/// is an `Underived` owner, as before.
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) enum ReturnedVisRefusal {
+    Unavailable(CraneliftBackendError),
+    Underived(CraneliftBackendError),
+}
+
+impl From<CraneliftBackendError> for ReturnedVisRefusal {
+    fn from(error: CraneliftBackendError) -> Self {
+        Self::Underived(error)
+    }
+}
+
+impl ReturnedVisRefusal {
+    pub(in crate::cranelift_backend) fn into_error(self) -> CraneliftBackendError {
+        match self {
+            Self::Unavailable(error) | Self::Underived(error) => error,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisSettlements {
     pub(in crate::cranelift_backend) protocol: Option<PendingVisRecordProtocol>,
@@ -282,7 +305,8 @@ impl StaticTransitionPlan<'_> {
         for owner in &self.static_response_continuations {
             let protocol = match self.returned_vis_protocol(owner.vis_origin()) {
                 Ok(protocol) => protocol,
-                Err(error) => {
+                Err(ReturnedVisRefusal::Unavailable(error)) => return Err(error),
+                Err(ReturnedVisRefusal::Underived(error)) => {
                     settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
                         reason: ExcludedSettlement::Underived(error.to_string()),
                     });
@@ -799,7 +823,7 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn returned_vis_protocol(
         &self,
         owner_vis: StaticOriginId,
-    ) -> Result<ReturnedVisProtocol, CraneliftBackendError> {
+    ) -> Result<ReturnedVisProtocol, ReturnedVisRefusal> {
         let owner = self
             .static_response_continuations
             .iter()
@@ -809,7 +833,7 @@ impl StaticTransitionPlan<'_> {
         if FORCED_UNDERIVED_OWNER_VIS.with(std::cell::Cell::get) == Some(owner_vis.0) {
             return Err(planner_error(
                 "test-forced underivable returned-Vis protocol",
-            ));
+            ).into());
         }
         let candidate_rows = self.return_protocol_candidate_rows()?;
         let contexts = self.continuation_contexts()?;
@@ -841,12 +865,12 @@ impl StaticTransitionPlan<'_> {
             let mut members = Vec::new();
             for origin in origins {
                 let RuntimeExpr::Construct { args, .. } = self.source_occurrence(origin)? else {
-                    return Err(planner_error("returned-Vis origin is not a constructor"));
+                    return Err(planner_error("returned-Vis origin is not a constructor").into());
                 };
                 if args.len() != 2 {
                     return Err(planner_error(
                         "returned-Vis construct does not have two fields",
-                    ));
+                    ).into());
                 }
                 let operation = self.child_static_origin(origin, 0)?;
                 let relay = matches!(self.source_occurrence(operation)?, RuntimeExpr::Var(_));
@@ -864,7 +888,7 @@ impl StaticTransitionPlan<'_> {
                 if matches.len() > 1 {
                     return Err(planner_error(
                         "returned Vis has ambiguous successor response rows",
-                    ));
+                    ).into());
                 }
                 let successor = matches.first().map(|row| (*row).clone());
                 let bracket = if relay || successor.is_some() { None } else {
@@ -877,7 +901,7 @@ impl StaticTransitionPlan<'_> {
                     ) {
                         return Err(planner_error(format!(
                             "returned Vis {origin:?} has no static operation constructor",
-                        )));
+                        )).into());
                     }
                     let row = successor.as_ref().ok_or_else(|| {
                         planner_error(format!(
@@ -898,18 +922,18 @@ impl StaticTransitionPlan<'_> {
                             else {
                                 return Err(planner_error(format!(
                                     "returned Vis {origin:?} successor row names no host effect",
-                                )));
+                                )).into());
                             };
                             if *operation != row.operation() {
                                 return Err(planner_error(format!(
                                     "returned Vis {origin:?} successor row disagrees with its effect",
-                                )));
+                                )).into());
                             }
-                            return Err(represented_unavailable_lane(family, *operation));
+                            return Err(ReturnedVisRefusal::Unavailable(represented_unavailable_lane(family, *operation)));
                         }
                         return Err(planner_error(format!(
                             "returned Vis {origin:?} has no planned host effect seat",
-                        )));
+                        )).into());
                     }
                     pending.push((row.k_context(), row.vis_origin()));
                 }

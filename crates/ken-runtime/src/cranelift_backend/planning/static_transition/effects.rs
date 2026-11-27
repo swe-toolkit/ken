@@ -448,13 +448,6 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
     EFFECT_SEAT_PLAN_MUTATION.with(|cell| cell.set(mutation));
 }
 
-/// **The host operations this backend represents as consumers.**
-///
-/// ⛔ It lives in PLANNING because the seat population is derived here and the
-/// emitter's admission check reads the same list. A second copy on the lowering
-/// side would be a second authority: the two could disagree about whether an
-/// operation is admitted, and the disagreement would show up as a seat with no
-/// planned record rather than as a contradiction anyone stated.
 /// The typed refusal for a represented host operation that has no native
 /// emitter. Both the planner's returned-Vis seat check and object emission
 /// refuse with this one value.
@@ -469,6 +462,13 @@ pub(in crate::cranelift_backend) fn represented_unavailable_lane(
     )
 }
 
+/// **The host operations this backend represents as consumers.**
+///
+/// ⛔ It lives in PLANNING because the seat population is derived here and the
+/// emitter's admission check reads the same list. A second copy on the lowering
+/// side would be a second authority: the two could disagree about whether an
+/// operation is admitted, and the disagreement would show up as a seat with no
+/// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     [ken_host::HostOpV1; 47] = [
     ken_host::HostOpV1::ProcessPlanOpen,

@@ -1614,11 +1614,11 @@ fn record_static_response_feasibility_diagnostic(
                     excluded_by_relay: protocol.excluded_by_relay,
                     error: None,
                 },
-                Err(error) => ReturnedVisProtocolObservation {
+                Err(refusal) => ReturnedVisProtocolObservation {
                     owner_origin,
                     contexts: Vec::new(),
                     excluded_by_relay: false,
-                    error: Some(error.to_string()),
+                    error: Some(refusal.into_error().to_string()),
                 },
             }
         }).collect()
