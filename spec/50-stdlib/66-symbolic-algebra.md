@@ -1089,13 +1089,14 @@ that summand evaluates to `mul Zero (eval env e)` inside
 `add (mul Zero (eval env e)) (mul k (eval env (deriv v e)))`.
 Nat `mul` and `add` recurse on their **second** arguments, so the
 zero-left multiplication and subsequent `add Zero _` do not reduce
-for arbitrary `e`. The checked proof uses the public
-`(proof zero_l for mul)` under `cong`, then
-`(proof zero_l for add)` under `trans` to show the two evaluations
-are equal at every environment. Public `poly_eq_complete` returns
-the theorem's `IsTrue` decision. No new private helper, import,
-axiom, kernel rule or surface form is needed; all §§1–11 operations
-and law types remain unchanged.
+for arbitrary `e`. Its checked body is §25's
+`deriv_absent_factor v (EConst k) e Proved`: `occurs v (EConst k)` computes
+to `False`, and §25's proof shows the two evaluations equal at every
+environment with `(proof zero_l for mul)` under `cong` and
+`(proof zero_l for add)` under `trans`, returning the decision through
+public `poly_eq_complete`. No new private helper, import, axiom, kernel
+rule or surface form is needed; all §§1–11 operations and law types
+remain unchanged.
 
 **Right-factor corollary, not an export.** The analogous expression
 `deriv v (EMul e (EConst k))` is canonically equal to
@@ -1889,3 +1890,51 @@ contract.
 Section 24 raises the public theorem count from forty-two to forty-three.
 The fifteen public operations and all §§1–23 operation and law types
 are unchanged.
+
+## 25. A factor without the variable leaves the derivative
+
+> **Section 25 status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-DERIV-ABSENT-FACTOR).**
+> Architect AC-0 `evt_35sf9zt19dpsm` on `e71c0c52a` checked the law in
+> scratch with no added `Axiom` and unchanged exact trusted `GlobalId`
+> sets (114 → 114). This is not assembled AC-T, official conformance,
+> CI or landing.
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` must export this public
+Transparent theorem immediately after `deriv_const_factor` and before
+`normalize_poly_eq`:
+
+```ken
+pub theorem deriv_absent_factor
+      (v : Nat) (c : Expr) (e : Expr) (absent : Equal Bool (occurs v c) False)
+    : IsTrue (poly_eq (deriv v (EMul c e)) (EMul c (deriv v e)))
+```
+
+The sole premise is syntactic absence of `v` from the left factor `c`.
+The factor need not be a literal and may contain other variables. There
+is no occurrence restriction on `e` and no nonzero premise. The result
+is equality as decided by `poly_eq`, not structural `Equal Expr`.
+
+The proof applies `poly_eq_complete` to equality of evaluations at every
+environment. In the product rule's first summand, `deriv_absent` under
+`cong` takes the evaluation of `deriv v c` to `Zero`. Then
+`(proof zero_l for mul)` eliminates the zero-left product and
+`(proof zero_l for add)` removes the zero summand. No new helper, import,
+`Axiom`, kernel rule or surface form is needed. Section 12's
+`deriv_const_factor` is the literal case, with its type unchanged:
+`occurs v (EConst k)` computes to `False`, so the premise is `Proved`.
+
+The [absent-factor seed][absent-factor-seed] applies the law at `v = Zero`
+and `c = EVar (Suc Zero)` with `e` open, supplying `Proved` for absence.
+On a fresh accepted prefix, the same form with `c = EVar Zero` must
+refuse at its absence argument with `KernelRejected(TypeMismatch)`.
+A separate accepted row sets `e = EConst (Suc Zero)` in the twin and
+checks `Equal Bool (poly_eq …) False` by `Proved`, showing that the
+conclusion is false in that case. This closed row computes without the
+law; the open application is the witness. These authored seed rows do
+not claim official runner execution.
+
+[absent-factor-seed]: ../../conformance/stdlib/symbolic-algebra/seed-derivative-absent-factor.md
+
+Section 25 raises the public theorem count from forty-three to forty-four.
+The fifteen public operations and all §§1–24 operation and law types are
+unchanged.
