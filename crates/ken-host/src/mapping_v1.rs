@@ -179,15 +179,24 @@ mod tests {
         pub(super) const UNMAP_FAILED: i32 = 12;
         pub(super) const RANGE_STILL_MAPPED: i32 = 13;
         pub(super) const WRONG_REFUSAL: i32 = 14;
-        pub(super) const PANICKED: i32 = 15;
     }
 
     /// Runs in the forked child, which has exactly one thread. Every step is
     /// a raw system call or allocation-free code, so nothing in the child can
     /// take a lock another parent thread held at fork time, and nothing in
     /// the child maps memory except `map_anonymous_v1` itself.
+    ///
+    /// The body has no panic site: every fallible step returns a `Result` or
+    /// a status integer that is matched here, and nothing indexes, unwraps or
+    /// does arithmetic. That matters because Rust's panic machinery is not
+    /// safe after `fork` in a multithreaded process (the panic count lives in
+    /// TLS, whose first access may allocate), so the child handles no panic.
+    /// The `extern "C"` ABI cannot unwind: if a later edit introduced a panic,
+    /// the child would abort or hang (the parent's `WIFEXITED` assertion or
+    /// the test timeout then reddens the row) instead of unwinding back into
+    /// the child's copy of the test harness. Neither outcome can pass.
     #[cfg(target_os = "linux")]
-    fn observe_unmap_in_single_threaded_child() -> i32 {
+    extern "C" fn observe_unmap_in_single_threaded_child() -> i32 {
         let Ok(region) = map_anonymous_v1(1, MappingProtectionV1::ReadOnly) else {
             return unmap_observer::MAP_FAILED;
         };
@@ -235,8 +244,9 @@ mod tests {
     #[test]
     fn consumed_mapping_is_actually_unmapped() {
         // SAFETY: the child runs only `observe_unmap_in_single_threaded_child`,
-        // which allocates nothing and takes no lock, then leaves with `_exit`,
-        // so it never returns into the test harness or runs atexit handlers.
+        // which allocates nothing, takes no lock and cannot panic, then leaves
+        // with `_exit`, so it never returns into the test harness or runs
+        // atexit handlers.
         let child = unsafe { libc::fork() };
         assert!(
             child >= 0,
@@ -244,8 +254,7 @@ mod tests {
             std::io::Error::last_os_error()
         );
         if child == 0 {
-            let code = std::panic::catch_unwind(observe_unmap_in_single_threaded_child)
-                .unwrap_or(unmap_observer::PANICKED);
+            let code = observe_unmap_in_single_threaded_child();
             // SAFETY: `_exit` ends the child immediately without unwinding.
             unsafe { libc::_exit(code) };
         }
@@ -274,8 +283,7 @@ mod tests {
             libc::WEXITSTATUS(status),
             unmap_observer::RELEASED,
             "unmap observer exit code (10 map failed, 11 live probe refused, \
-             12 unmap failed, 13 range still mapped, 14 refusal not ENOMEM, \
-             15 panicked)"
+             12 unmap failed, 13 range still mapped, 14 refusal not ENOMEM)"
         );
     }
 
