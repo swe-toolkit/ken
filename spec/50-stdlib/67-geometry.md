@@ -21,7 +21,8 @@
 > SPEC-GEOMETRY-ORIENT-AXIS-COLLINEAR §19;
 > SPEC-GEOMETRY-BOX-AREA-POSITIVE-CONTAINS-CORNER §20;
 > SPEC-GEOMETRY-ORIENT-TRANSLATE §21;
-> SPEC-GEOMETRY-ORIENT-SCALE §22).** Sections 1–4,
+> SPEC-GEOMETRY-ORIENT-SCALE §22;
+> SPEC-GEOMETRY-ORIENT-REFLECT-DIAGONAL §23).** Sections 1–4,
 > their catalog operations and checked laws, and their seeds are present
 > on main.
 > Section 4's package-owned roots-loader test executes its positive
@@ -1821,3 +1822,40 @@ stronger test compares the law's equation at the two factors directly:
 `Proved` checks the doubled equation but refuses the zero-factor equation,
 which compares `Eq` with `Gt`. These closed outcomes distinguish the
 factor restriction from a mismatch in the application alone.
+
+## 23. Diagonal reflection flips orientation
+
+`Algorithm.Geometry.NatOrientation` must export this public Transparent
+checked theorem directly after `orient_scale_product` and before
+`orient_reorder`, which stays last:
+
+```ken
+pub theorem orient_reflect_diagonal
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc))
+        (ord_result_flip (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)))
+```
+
+Reflection across `x = y` exchanges the coordinates of each point, not
+any two points in the triple. The reflected turn equals the original
+turn with `Lt` and `Gt` exchanged and `Eq` unchanged. The theorem has
+no premise and is stated directly over `MkPoint`. It adds no point
+operation and changes no earlier operation or law type. The
+NatOrientation public law roster grows from eight to nine.
+
+Let `L` and `R` be the original left and right cross sums in §18.
+Exchanging each point's coordinates exchanges those sums term for term,
+so the reflected turn reduces to `compare R L`. The existing Nat Order
+proof `swap for compare`, applied to `L` then `R`, equates that result
+with `ord_result_flip (compare L R)`. Conversion recovers the original
+turn on the right. No new helper or import is needed.
+
+Architect AC-0 (`evt_5mmyq8n4hjj3e`) checked the Transparent body on
+`90fe15d2a` in scratch. It cites `Data.Numeric.Nat.Order.compare::swap`,
+adds no `Axiom`, foreign declaration or primitive, and leaves the exact
+trusted `GlobalId` set unchanged (114 → 114) after loading the providers.
+The open client with an original `Gt` derives `Lt` after reflection; the
+twin claiming `Gt` refuses. Unlike a closed computation, that pair
+requires the law to carry the flip. These are scratch results, not
+assembled AC-T, official conformance, CI or landing evidence.

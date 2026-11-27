@@ -1,13 +1,15 @@
 # Natural-point orientation
 
 Three natural points determine an exact turn by comparing two cross sums.
-The eight public laws include `orient_shared_x` and `orient_shared_y`: each
+The nine public laws include `orient_shared_x` and `orient_shared_y`: each
 returns `Eq` when all three points share the named coordinate. They do not
 state a general collinearity theorem for arbitrary distinct points.
 `orient_translate` preserves the turn when the same natural offset is added
 to all three points on each axis. It does not apply to moving just one point.
 `orient_scale` preserves the turn when all six coordinates are multiplied by
 one positive factor.
+`orient_reflect_diagonal` flips the turn when each point's coordinates are
+exchanged, swapping `Lt` and `Gt` and leaving `Eq` unchanged.
 
 ## Definition
 
@@ -839,6 +841,15 @@ theorem orient_scale_product
           (cong Nat Nat (mul s y) (mul y s) (mul x) ((proof comm for mul) s y))
           ((proof assoc for mul) x y s))))
 
+pub theorem orient_reflect_diagonal
+      (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat)
+    : Equal OrdResult
+        (orient (MkPoint ya xa) (MkPoint yb xb) (MkPoint yc xc))
+        (ord_result_flip (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc))) =
+  (proof swap for compare)
+    (add (add (mul xa yb) (mul xb yc)) (mul xc ya))
+    (add (add (mul ya xb) (mul yb xc)) (mul yc xa))
+
 theorem orient_reorder
       (p : Nat) (q : Nat) (r : Nat)
     : Equal Nat (add (add p q) r) (add (add p r) q) =
@@ -873,3 +884,9 @@ to `1` and `5`, giving `Lt`.
 `orient_scale` realizes the geometry spec's §22 scaling law using the checked
 Nat Order positive-factor cancellation proof. Its four helper proofs are
 private, and the scaling proof adds no trusted declaration.
+
+`orient_reflect_diagonal` realizes §23 of the geometry spec. Exchanging
+coordinates interchanges the two cross sums term for term, so the reflected
+turn compares the original right sum against the original left sum. The
+checked Nat Order law `compare::swap` gives the flipped comparison result.
+The proof adds no trusted declaration.
