@@ -1,9 +1,15 @@
-# Test scheduling hints for cargo-nextest (priority needs nextest >= 0.9.91).
+# Test run settings and scheduling hints for cargo-nextest (priority needs
+# nextest >= 0.9.91).
 #
 # Priority changes only the order in which selected tests start, never which
 # tests run, so the duration-balanced shard selection and its exact-once
 # union check (scripts/check-ci-shard-union.py) are unaffected.
-#
+
+# A CI shard runs every selected test even after one fails, so a red run
+# reports every failing test in the shard rather than only the first.
+[profile.default]
+fail-fast = false
+
 # These catalog tests each run for several minutes on a CI runner. In run
 # 40190674778 shard 1 started the census about 530s into a 1,904s Test step
 # and it finished last (1,375s), with the frontier test second to last. Start
