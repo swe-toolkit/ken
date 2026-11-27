@@ -683,7 +683,7 @@ fn scale_b_record_unit_body(function: &Function) {
 // population is derived from it there. This is a namespace re-export so both
 // the emitter's admission check and the planner's population read the same
 // list; a local copy could disagree with it silently.
-use crate::cranelift_backend::planning::CRANELIFT_HOST_EFFECT_CONSUMERS_V1;
+use crate::cranelift_backend::planning::{represented_unavailable_lane, CRANELIFT_HOST_EFFECT_CONSUMERS_V1};
 
 
 

@@ -3526,13 +3526,7 @@ impl<'a> Lowering<'a> {
                     dead_arm_effect_trap(family, operation),
                 )));
             }
-            return Err(unsupported(LoweringCause::Fragment,
-                "Effect",
-                format!(
-                    "effect {family}.{} is a represented unavailable lane",
-                    operation as u16
-                ),
-            ));
+            return Err(represented_unavailable_lane(family, operation));
         }
         // `RT-DEAD-ARM-EFFECT-LOWERING` completion: admission changes whether
         // the host operation has a native emitter, never whether the enclosing

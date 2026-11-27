@@ -16,6 +16,7 @@ use super::continuations::{
 };
 use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
 use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId};
+use super::effects::{represented_unavailable_lane, CRANELIFT_HOST_EFFECT_CONSUMERS_V1};
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
@@ -887,6 +888,25 @@ impl StaticTransitionPlan<'_> {
                         seat.effect_origin == row.effect_origin()
                             && seat.operation == row.operation()
                     }) {
+                        // A represented operation with no native emitter has
+                        // no seat by construction: refuse it by the typed
+                        // lowering cause, keyed on its checked identity. A
+                        // missing seat for a consumer stays an invariant.
+                        if !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&row.operation()) {
+                            let RuntimeExpr::Effect { family, operation, .. } =
+                                self.source_occurrence(row.effect_origin())?
+                            else {
+                                return Err(planner_error(format!(
+                                    "returned Vis {origin:?} successor row names no host effect",
+                                )));
+                            };
+                            if *operation != row.operation() {
+                                return Err(planner_error(format!(
+                                    "returned Vis {origin:?} successor row disagrees with its effect",
+                                )));
+                            }
+                            return Err(represented_unavailable_lane(family, *operation));
+                        }
                         return Err(planner_error(format!(
                             "returned Vis {origin:?} has no planned host effect seat",
                         )));

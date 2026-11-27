@@ -455,6 +455,20 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// side would be a second authority: the two could disagree about whether an
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
+/// The typed refusal for a represented host operation that has no native
+/// emitter. Both the planner's returned-Vis seat check and object emission
+/// refuse with this one value.
+pub(in crate::cranelift_backend) fn represented_unavailable_lane(
+    family: &str,
+    operation: ken_host::HostOpV1,
+) -> CraneliftBackendError {
+    crate::cranelift_backend::surface::unsupported(
+        crate::cranelift_backend::surface::LoweringCause::Fragment,
+        "Effect",
+        format!("effect {family}.{} is a represented unavailable lane", operation as u16),
+    )
+}
+
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     [ken_host::HostOpV1; 47] = [
     ken_host::HostOpV1::ProcessPlanOpen,
