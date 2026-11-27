@@ -145,6 +145,22 @@ impl Datagrams {
         .outcome
     }
 
+    /// Writes `pattern` over the whole buffer and installs it as the
+    /// initialized window, so a send's refusal can only come from the guard
+    /// under test and never from an uninitialized span.
+    fn fill(&mut self, buffer: ResourceTokenV1, pattern: impl Fn(usize) -> u8) {
+        let ResourceSlotStateV1::Live { owner: ResourceOwnerV1::Buffer(region), .. } =
+            &mut self.resources.slots[buffer.slot as usize].state
+        else {
+            panic!("fresh buffer has a live buffer owner")
+        };
+        let capacity = region.capacity();
+        for (index, byte) in region.bytes.iter_mut().enumerate() {
+            *byte = pattern(index);
+        }
+        region.install_window(0, capacity);
+    }
+
     fn send(&mut self, socket: ResourceTokenV1, buffer: ResourceTokenV1, length: u64,
         peer: SocketAddressV1) -> CanonicalOutcomeV1 {
         self.dispatch(
@@ -220,9 +236,14 @@ fn datagram_dispatch_reports_receipts_fit_and_exact_sender() {
 /// (CapabilityDenied), a peer of another family (InvalidInput), an effective
 /// span over 65507 bytes (InvalidInput), an empty span and a zero window
 /// (InvalidBounds) each return their typed refusal while the backend's send
-/// and receive leaves stay at zero calls; a 65507-byte span reaches the leaf.
-/// CLAIMED: every send refusal precedes any syscall. THE GAP: the leaf count
-/// is the backend boundary, not a syscall trace.
+/// and receive leaves stay at zero calls, the 65508-byte refusal on a fully
+/// initialized buffer; then a fully initialized 65507-byte span is sent as
+/// Unit with exactly one send-leaf call, and an external socket receives
+/// exactly those 65507 bytes from the socket's own address. CLAIMED: every
+/// send refusal precedes any syscall, and 65507 is the largest accepted
+/// payload, not merely the largest unrefused one. THE GAP: the leaf count is
+/// the backend boundary, not a syscall trace; the bound is pinned for IPv4
+/// loopback only.
 #[test]
 fn datagram_send_refusals_precede_the_backend() {
     let mut fixture = Datagrams::new();
@@ -251,12 +272,29 @@ fn datagram_send_refusals_precede_the_backend() {
         CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
     );
     assert_eq!((fixture.backend.sends, fixture.backend.receives), (0, 0));
-    // At the bound the refusal is the buffer's own initialized-window check,
-    // after the payload bound admitted the span: the bound is not off by one.
+    // With every byte initialized, one byte over the bound is still refused
+    // by the payload bound alone, before the leaf.
+    let pattern = |index: usize| (index % 251) as u8;
+    fixture.fill(buffer, pattern);
+    assert_eq!(fixture.send(socket, buffer, 65_508, peer.clone()), denied(IoErrorIdentityV1::InvalidInput));
+    assert_eq!(fixture.backend.sends, 0);
+    // At the bound the fully initialized span is accepted and sent whole.
+    let external = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    external.set_read_timeout(Some(std::time::Duration::from_secs(10))).unwrap();
+    let external_address = SocketAddressV1::Inet4 {
+        octets: [127, 0, 0, 1],
+        port: external.local_addr().unwrap().port(),
+    };
     assert_eq!(
-        fixture.send(socket, buffer, 65_507, peer),
-        CanonicalOutcomeV1::Error(SemanticErrorV1::Resource(ResourceErrorV1::InvalidBounds))
+        fixture.send(socket, buffer, 65_507, external_address),
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::Unit)
     );
+    assert_eq!(fixture.backend.sends, 1);
+    let mut observed = vec![0u8; 65_536];
+    let (count, from) = external.recv_from(&mut observed).expect("the maximum datagram arrives");
+    assert_eq!(count, 65_507);
+    assert_eq!(from, udp_address(&peer));
+    assert!(observed[..count].iter().enumerate().all(|(index, byte)| *byte == pattern(index)));
 }
 
 /// Promise class: durable invariant. MEASURED: a grant without Net, and a
