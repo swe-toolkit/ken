@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-11-26 21:06:56Z — from 1349 issue file(s) in `docs/program/issues/`.
+2026-11-27 00:36:41Z — from 1350 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -1320,6 +1320,7 @@ the committed file matches the generator's output.
 | `SURF-gadt-parser-ast` | Tracker node for the landed dependent-constructor parser/AST slice (`34 §8`): points at `docs/program/wp/SURF-gadt-parser-ast.md`, filed retroactively because `gen-progress.sh` generates the tracker from `docs/program/issues/` and this slice landed with a frame but no issue node | merged | language | S | none | — |
 | `TEST-CHAR-CONSTRUCTION-ROUTES-SCALAR` | Pin that every surface route that builds a Char refuses a surrogate: a Char literal, an integer literal at an expected Char, and an Int-typed expression at Char. Two rows no test pins today; a route that admits D800 stops to the Architect as a Language design fork | merged | verify | S | architect | — |
 | `TEST-ENVIRONMENT-PIN-LINT` | Tests pin values that are functions of the whole compiler prelude (absolute GlobalId and vis_origin numbers, absolute semantic-hash literals, whole-environment member counts), so every lawful prelude extension breaks pins outside the extending WP and they surface one CI round at a time: PX10 hit three such stops. Re-key the latent pins by role or relative equality, and add a test-source lint over the three value shapes with an allowed inventory and a seeded-positive control | merged | verify | M | architect | — |
+| `TEST-MAPPING-UNMAP-OBSERVATION-RACE` | consumed_mapping_is_actually_unmapped unmaps a page and then asserts that mincore on the freed address fails with ENOMEM, but libtest runs tests on parallel threads and any concurrent mmap can be handed the freed page first, so the row reddens with no product change. Make the observation race-free, so it proves the range was released rather than that nobody reused it | ready | language | S | language-qa | — |
 | `TEST-NATIVE-STACK-PROVISIONING-STANDARD` | Record the stated-stack standard where a candidate author will read it -- the governing property is that a test's stack is STATED, not that it is large, and the tree already derives both halves including the RUST_MIN_STACK / stack_size split | merged | doc | S | none | — |
 | `TEST-PX10-SIGNAL-PID-MARKER-RACE` | revoked_child_signal_dispatch_reifies_without_delivery reads its child's PID marker while the child's shell has created the file but not yet written it, so the parse of an empty file panics and a CI shard is red with no product change. Make the marker read wait for the whole PID, so the row is deterministic | merged | runtime | S | runtime-qa | — |
 | `TEST-SOURCE-TEXT-ORACLE-RETIRE` | Retire the remaining source-text test oracles: 22 test functions in 16 files read Rust source with include_str! and assert on its text, so behaviour-neutral edits redden them; the Architect disposes each function first, then each is dropped, replaced by a behavioural control, or retired to review | merged | verify | M | architect | — |
@@ -1427,6 +1428,7 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `SPEC-45-CLOSURE-IN-CONSTRUCTOR-EXCEPTION` — Does 45 section 3's 'functions lower to ordinary closures' admit an exception for a function value held in a constructor field with no statically visible consumer -- if not, the native backend's current refusal is a defect against AC3 rather than a permitted narrowing
 - `SPEC-GEOMETRY-ORIENT-REFLECT-DIAGONAL` — Spec 67 proves that orientation survives a shared translation (§21) and a shared positive scaling (§22), and flips under swapping two points (§18), but no law says what reflection does: a client that mirrors three points across the diagonal, exchanging each point's coordinates, cannot rewrite the mirrored turn to the original one. Rule from a checked D0 at zero trust that the turn of the three reflected points is ord_result_flip of the original turn, and state it with a seed that separates the flip from preservation
 - `SPEC-LINEAR-ALGEBRA-TRACE-ZERO` — Spec 65 gives the trace of the identity (§18, trace_identity) and the transpose of the zero matrix (§13, transpose_zero), and §22 concludes a zero matrix from a zero Gram trace, but no law gives the trace of the zero matrix itself: a client that sums a diagonal of zeros cannot rewrite it to Zero without unfolding trace by induction. Rule from a checked D0 at zero trust that trace n (matrix_zero n n) is Zero for every n, and state it with an open seed that separates Zero from the dimension
+- `TEST-MAPPING-UNMAP-OBSERVATION-RACE` — consumed_mapping_is_actually_unmapped unmaps a page and then asserts that mincore on the freed address fails with ENOMEM, but libtest runs tests on parallel threads and any concurrent mmap can be handed the freed page first, so the row reddens with no product change. Make the observation race-free, so it proves the range was released rather than that nobody reused it
 - `TEST-STATED-STACK-SITE-RECONCILE` — Reconcile the 15 stated-stack sites to the ruling -- and the first deliverable is CLASSIFYING each into one of the three acts, because the twelve 256 MiB sites need a measured peak that nobody has ever taken
 - `VERIFY-SORT-CONGRUENCE-STACK-HEADROOM` — The ken-elaborator test discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion has less than 8 KiB of headroom on the 2 MiB default test thread: it overflows at 2040 KiB and passes at 2048 KiB on main. Any change that adds a frame on the declaration-elaboration path reddens it in CI, as LANG-STRICT-ISOLATED-ROUTES Increment 1 did. Either reduce the frames on its deep path or give it a stated stack, as the D0 rules
 
@@ -1463,6 +1465,7 @@ for every item, gated or not):
 - **kernel**: `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` (merged)
 - **lang-qa+architect**: `LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE` (merged) `LANG-DEPENDENT-MATCH-MOTIVE-REBASE` (merged)
 - **language**: `LANG-ELAB-NESTED-FORMER-RECURSION` (merged)
+- **language-qa**: `TEST-MAPPING-UNMAP-OBSERVATION-RACE` (ready)
 - **operator**: `KERNEL-RECURSOR-UNUSED-IH-REDUCTION` (merged) `KERNEL-SCT-TELESCOPE-CANON` (merged) `LANG-RECORD-INDEX-REFINEMENT` (merged)
 - **runtime**: `RT-MAPPING-MULTIOP-DISPATCH` (merged)
 - **runtime-qa**: `TEST-PX10-SIGNAL-PID-MARKER-RACE` (merged)
