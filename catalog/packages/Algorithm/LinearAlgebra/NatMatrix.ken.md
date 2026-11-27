@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and sixty-seven algebraic laws have checked proofs.
+all arithmetic is exact, and sixty-eight algebraic laws have checked proofs.
 
 ## Contents
 
@@ -2320,6 +2320,47 @@ pub theorem transpose_gram
       a
       (λrows. matrix_product m n m rows (transpose m n a))
       (transpose_invol m n a))
+
+pub theorem matrix_vector_zero_of_gram_vector_zero
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (v : Vec Nat n)
+    : Equal
+        (Vec Nat n)
+        (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+        (vector_zero n)
+      → Equal (Vec Nat m) (matrix_vector m n a v) (vector_zero m) =
+  λgram_zero.
+    vector_zero_of_dot_self_zero
+      m
+      (matrix_vector m n a v)
+      (trans
+        Nat
+        (dot m (matrix_vector m n a v) (matrix_vector m n a v))
+        (dot n v (matrix_vector n m (transpose m n a) (matrix_vector m n a v)))
+        Zero
+        (transpose_adjoint m n a v (matrix_vector m n a v))
+        (trans
+          Nat
+          (dot n v (matrix_vector n m (transpose m n a) (matrix_vector m n a v)))
+          (dot n v (vector_zero n))
+          Zero
+          (cong
+            (Vec Nat n)
+            Nat
+            (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
+            (vector_zero n)
+            (dot n v)
+            (trans
+              (Vec Nat n)
+              (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
+              (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+              (vector_zero n)
+              (sym
+                (Vec Nat n)
+                (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+                (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
+                (matrix_vector_product n m n (transpose m n a) a v))
+              gram_zero))
+          (dot_zero_right n v)))
 
 theorem matrix_add_assoc_cons
       (k : Nat)
@@ -5212,8 +5253,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–24 owns
-seventy-nine public names across twelve operations and sixty-seven laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–25 owns
+eighty public names across twelve operations and sixty-eight laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -5250,15 +5291,21 @@ uses `dot_scale` for its row step and adds no private helper. `trace` follows
 `matrix_scale`, and its public law family follows `matrix_vector_scale`.
 `trace_zero` follows `trace_identity` and adds no helper;
 `trace_product_comm` follows `trace_zero`, and its nine row-pairing helpers
-stay private. The final two public laws are
-`matrix_zero_of_trace_gram_zero` and `transpose_gram`. The first uses
+stay private. The final three public laws are
+`matrix_zero_of_trace_gram_zero`, `transpose_gram` and
+`matrix_vector_zero_of_gram_vector_zero`. The first uses
 `trace_row_dot_sum` and `transpose_invol` to rewrite the Gram trace as a
 sum of row self-dots. The private `row_dot_sum_self_zero` splits the zero
 sum using the two Nat Arithmetic laws and applies
 `vector_zero_of_dot_self_zero` to each row. The second uses
 `transpose_product` and `transpose_invol` to prove symmetry of the product.
-Neither law requires a square input or introduces a Gram operation. The trace helpers
-for the corner entry, the minor and their transport steps also stay private.
+The third rewrites its premise with `matrix_vector_product`, uses
+`transpose_adjoint` and `dot_zero_right` to make the self-dot of `a v` zero,
+and concludes `a v = 0` with `vector_zero_of_dot_self_zero`. It uses
+`transpose a × a`, not `a × transpose a`, and adds no helper. None of the
+three laws requires a square input or introduces a Gram operation. The
+trace helpers for the corner entry, the minor and their transport steps
+also stay private.
 `vector_add_cancel_right` follows `vector_add_zero_right`, and
 `matrix_add_cancel_right` follows `matrix_add_zero_right`; their private
 projection, cons-view and eta proofs use the public Nat `add_cancel_r` and
@@ -5268,7 +5315,7 @@ private `vector_add_eq_zero_cons` and `matrix_add_eq_zero_cons` follow
 `matrix_add_cancel_cons`. `vector_scale_cancel` follows
 `vector_add_eq_zero_right`, and `matrix_scale_cancel` follows
 `matrix_add_eq_zero_right`. The scaling proofs' `map_injective`, `map_view`
-and `mul_cancel_left` helpers remain private. All sixty-seven laws have
+and `mul_cancel_left` helpers remain private. All sixty-eight laws have
 checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
@@ -5325,8 +5372,13 @@ same-form factor-zero vector and matrix claims on fresh accepted prefixes.
 The [Gram trace seed][gram-seed] checks the trace boundary on zero and
 one-entry inputs, a rectangular zero input, and symmetry of the Gram product
 of a non-symmetric matrix. The package test checks these clients and their
-isolated refusals. These tests use root-loaded exports and are not official
-conformance-runner runs or claims of CI, publication or landing.
+isolated refusals. The [Gram kernel seed][gram-kernel-seed] is authored,
+not officially conformance-run. Its package test checks an open client and
+closed counterexample controls, then isolates the compute-only refusals
+and the false claim that the input vector is zero. These tests use
+root-loaded exports and are not official conformance-runner runs or
+claims of CI, publication or landing.
 
 [gram-seed]: ../../../../conformance/stdlib/linear-algebra/seed-gram-trace-zero.md
+[gram-kernel-seed]: ../../../../conformance/stdlib/linear-algebra/seed-gram-kernel.md
 [trace-zero-seed]: ../../../../conformance/stdlib/linear-algebra/seed-trace-zero.md
