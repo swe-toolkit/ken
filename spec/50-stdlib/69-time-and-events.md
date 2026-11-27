@@ -1899,3 +1899,47 @@ not establish the generic law.
 Section 23 adds one theorem (thirty-four in total) and leaves the nine public
 functions and all §§1–22 operation and law types unchanged. It requires no
 `Axiom`, new import, or change to Derived.
+
+## 24. Windowing commutes with stable time sort
+
+> **Section 24 status: DRAFT v0 (SPEC-TIME-WINDOW-SORT-COMMUTE).**
+
+`Data.Time.EventTrace` must export this public Transparent checked theorem
+immediately after `trace_merge_all_ordered_sort` and before the private
+`trace_merge_single_insert_cons`:
+
+```ken
+pub theorem trace_window_sort
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo hi (sort (Event p) (event_before p) tr))
+        (sort (Event p) (event_before p) (trace_window p lo hi tr))
+```
+
+The equality is structural: the same events occur in the same order,
+including the original order of retained events with tied timestamps.
+There is no premise on the trace order or the window bounds. Both sides
+use the same half-open window; the right side still sorts, so this does
+not state that windowing an arbitrary trace produces an ordered trace.
+
+The proof inducts on `tr`. In the `Cons` case, a private filter-over-insert
+law rewrites the window of inserting the head into the sorted tail. If
+the head is kept, congruence lifts the induction hypothesis through the
+insertion; if it is dropped, the induction hypothesis suffices. The
+filter-over-insert proof needs the tail to be sorted. It uses transitivity
+to keep an inserted head before the first retained tail event when the
+original tail head is filtered out. All nine helpers stay private in
+EventTrace; no new import, `Axiom`, or change to Derived is required.
+
+Architect AC-0 (`evt_1pd1r18qcewg`) checked the theorem on `d7e8ca4b0` in
+scratch with unchanged exact trusted `GlobalId` sets (114 → 114). Its
+open trace client cites the law; neither `Refl` nor `Proved` closes that
+statement alone. The twin that drops the sort on the right refuses with
+`KernelRejected(TypeMismatch)`. Windowing `[3, 1, 5]` at `[1, 4)` and
+sorting gives `[1, 3]`; that closed example also computes without the
+law and is not the discriminator. These scratch checks do not establish
+assembled AC-T, official conformance, CI or landing.
+
+Section 24 adds one theorem (thirty-five in total) and leaves the nine public
+functions and all §§1–23 operation and law types unchanged.
