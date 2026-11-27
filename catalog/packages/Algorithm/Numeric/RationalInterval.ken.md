@@ -60,7 +60,7 @@ zero and vice versa, including for inverted intervals.
 ```ken
 import Core.Logic.Conjunction (And, and_intro)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_and, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_eq_from_iff, leq_nat)
 
 import Data.Numeric.Nat.Arithmetic (mul)
 
@@ -2006,27 +2006,6 @@ theorem rational_zero_leq (a : Rational) : IsTrue (rational_leq rational_zero a)
         Proved
   }
 
-theorem bool_eq_from_iff
-      (p : Bool)
-    : (q : Bool)
-      → (Equal Bool p True → Equal Bool q True)
-      → (Equal Bool q True → Equal Bool p True)
-      → Equal Bool p q =
-  match p {
-    True ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. Proved;
-          False ↦ λforward. λbackward. absurd (forward Proved)
-        };
-    False ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. absurd (backward Proved);
-          False ↦ λforward. λbackward. Proved
-        }
-  }
-
 theorem rational_distrib_r
       (x : Rational) (y : Rational) (z : Rational)
     : rational_equiv
@@ -2363,8 +2342,8 @@ interval subtraction are not.
    member-equivalence and split-width proofs.
    [Shifting by a point](#shifting-by-a-point-24) explains the exact
    membership law. The definition places the law between `interval_mul_point`
-   and `interval_width_point`, and groups its six helpers from
-   `rational_add_leq_shift` through `bool_eq_from_iff` before
+   and `interval_width_point`, and groups its five helpers from
+   `rational_add_leq_shift` through `rational_zero_leq` before
    `rational_distrib_r`. The helpers are not part of the public API.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
@@ -2412,8 +2391,9 @@ interval subtraction are not.
    both results along `rational_add_sub_cancel`. For that cancellation,
    `rational_leq_add_left` supplies the premise that prevents truncation,
    using `rational_zero_leq` and Nat multiplication's left-zero law.
-   `bool_eq_from_iff` joins the two implications. Those six helpers are
-   not part of the public API; no new import or Rational export is needed.
+   LawfulClasses' public `bool_eq_from_iff` joins the two implications.
+   The five helpers are not part of the public API, and no Rational export
+   is needed.
 4. **Trusted-base delta.** Zero: all sixty-four theorems and the split cover
    function have checked bodies, and the package declares no `Axiom` or new
    primitive. Imported rational, natural-number and logical providers retain

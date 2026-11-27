@@ -39,7 +39,7 @@ import Data.Finite.Finite (Finite, MkFinite, elements, covers)
 import Core.Logic.Transport (cong, sym, trans)
 
 import Core.Classes.LawfulClasses
-  (DecEq, bool_or, bool_and, leq_nat, bool_cases, or_cases, or_left, or_right)
+  (DecEq, bool_or, bool_and, leq_nat, bool_cases, bool_eq_from_iff, or_cases, or_left, or_right)
 
 import Data.Collections.Derived (is_sorted)
 
@@ -1181,8 +1181,8 @@ The private Boolean case split constructs an untruncated `Or` for
 only into Omega. Both reachability laws reuse graph monotonicity with the
 corresponding inclusion law as its edge-inclusion premise. Commutation applies
 graph monotonicity in both directions, using the private
-`graph_union_edge_swap` as each edge-inclusion premise; the private
-`bool_eq_from_iff` closes the resulting Boolean equality.
+`graph_union_edge_swap` as each edge-inclusion premise; LawfulClasses'
+public `bool_eq_from_iff` closes the resulting Boolean equality.
 `graph_union_reachable_assoc` follows the same left/right inclusion route:
 private `graph_union_edge_regroup_right` and `graph_union_edge_regroup_left`
 each split the outer and then the inner union with `graph_union_edge_cases`,
@@ -1703,27 +1703,6 @@ theorem edgeless_walk_start
   match walk {
     WalkHere ↦ λhit. hit;
     WalkStep u v e prefix ↦ λhit. absurd e
-  }
-
-theorem bool_eq_from_iff
-      (b : Bool)
-    : (c : Bool)
-      → (Equal Bool b True → Equal Bool c True)
-      → (Equal Bool c True → Equal Bool b True)
-      → Equal Bool b c =
-  match b {
-    True ↦
-      λc.
-        match c {
-          True ↦ λforward. λbackward. Proved;
-          False ↦ λforward. λbackward. absurd (forward Proved)
-        };
-    False ↦
-      λc.
-        match c {
-          True ↦ λforward. λbackward. absurd (backward Proved);
-          False ↦ λforward. λbackward. Proved
-        }
   }
 
 fn named (q : Type) (d : DecEq q) (x : q) (v : q) : Bool = d.eq v x

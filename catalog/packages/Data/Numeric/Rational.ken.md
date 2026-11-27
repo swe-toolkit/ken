@@ -37,7 +37,7 @@ product denominator.
 ```ken
 import Core.Logic.Transport (sym, trans, cong)
 
-import Core.Classes.LawfulClasses (IsTrue, bool_or, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_eq_from_iff, bool_or, leq_nat)
 
 import Data.Numeric.Nat.Arithmetic
   (add, mul, mul_add_distrib_l, mul_add_distrib_r, add_cancel_r)
@@ -1451,27 +1451,6 @@ theorem leq_cong_two
     (leq_nat ap bp)
     (cong Nat Bool a ap (λv. leq_nat v b) ha)
     (cong Nat Bool b bp (leq_nat ap) hb)
-
-theorem bool_eq_from_iff
-      (p : Bool)
-    : (q : Bool)
-      → (Equal Bool p True → Equal Bool q True)
-      → (Equal Bool q True → Equal Bool p True)
-      → Equal Bool p q =
-  match p {
-    True ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. Proved;
-          False ↦ λforward. λbackward. absurd (forward Proved)
-        };
-    False ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. absurd (backward Proved);
-          False ↦ λforward. λbackward. Proved
-        }
-  }
 
 theorem add_assoc_cross
       (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)

@@ -435,3 +435,46 @@ law-less dictionary** net + `../../conformance/surface/modules/seed-modules.md`
 **QA (build):** producer-grep the instance law fields for
 `declare_postulate`/holes — their **absence** is the check
 ([[kernel-backed-claim-grep-the-emission-not-the-name]]).
+
+## 9. Boolean equality from mutual implication
+
+> **Section 9 status: DRAFT v0 (SPEC-CORE-BOOL-EQ-FROM-IFF-PUBLIC).**
+
+`Core.Classes.LawfulClasses` must export the following Transparent theorem
+in its §4.2 Boolean declarations, immediately after `bool_false_of_not_true`
+and before the private `compare_bool_cases`:
+
+```ken
+pub theorem bool_eq_from_iff
+      (p : Bool)
+    : (q : Bool)
+      → (Equal Bool p True → Equal Bool q True)
+      → (Equal Bool q True → Equal Bool p True)
+      → Equal Bool p q =
+  match p {
+    True ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. Proved;
+          False ↦ λforward. λbackward. absurd (forward Proved)
+        };
+    False ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. absurd (backward Proved);
+          False ↦ λforward. λbackward. Proved
+        }
+  }
+```
+
+The theorem needs no premise beyond the two displayed implications. The
+staged binders let both Boolean matches refine the implication types before
+the proofs of those implications are bound. Callers apply the theorem as
+`bool_eq_from_iff p q forward backward`.
+
+The theorem requires no new import in LawfulClasses, `Axiom`, or kernel
+change. `Data.Numeric.Rational`, `Algorithm.Graphs.Dependency`, and
+`Algorithm.Numeric.RationalInterval` each name it in their existing
+selective LawfulClasses import and remove their local copy. Their call
+sites and public types do not change. A `bool_or` commutation law is
+outside this section's scope.
