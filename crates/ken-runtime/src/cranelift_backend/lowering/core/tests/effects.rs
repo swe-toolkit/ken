@@ -3793,13 +3793,14 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// This is a static table check, not an execution case. Every native-tested
-/// operation, not the interpreter-only Net family, needs a Cranelift seat.
+/// operation needs a Cranelift seat.
 ///
 /// MEASURED: for each native-tested operation the ordinals with a contract
 /// are exactly `0..n`; ClockWallNow alone is zero-arity, other native-tested
-/// operations have `n >= 1`, and only the eleven FS-path operations and
-/// ProcessPlanOpen carry a capability slot. No native-unavailable lane has
-/// a seat contract.
+/// operations have `n >= 1`, and only the eleven FS-path operations,
+/// ProcessPlanOpen, NetListen and NetConnect carry a capability slot. A
+/// represented-unavailable operation, if any, has no seat contract; since
+/// PX11 Inc2 there is none, so that loop is vacuous until one exists.
 ///
 /// CLAIMED: no native-tested operation is missing a seat contract.
 /// THE GAP: the ledger's per-body occurrence completeness law, not this
@@ -3824,6 +3825,8 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
         ken_host::HostOpV1::ProcessPlanOpen,
+        ken_host::HostOpV1::NetListen,
+        ken_host::HostOpV1::NetConnect,
     ];
     assert_eq!(
         host_effect_seat_contract_of(
@@ -3933,6 +3936,9 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
             "{operation:?} argument seats are not a gapless 0..n range"
         );
     }
+    // Vacuous while every operation is NativeTested (PX11 Inc2); the
+    // emptiness row in this module names that. Keyed on availability, so
+    // it regains a population without an edit.
     for operation in ken_host::HostOpV1::ALL.into_iter().filter(|op|
         op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
     ) {
