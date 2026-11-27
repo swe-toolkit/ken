@@ -24,10 +24,10 @@ table proves nothing):
 
 **Method and evidence boundary.** The historical primitive, Pair, and early
 floor claims retain their grounded witnesses against landed code
-(`prelude.rs`/`numbers.rs`/`bytes.rs` @ `b97ca5c`, the kernel). The final
-51-name roster is a normative Increment 3a target with source-resolution
-expectations; its new identities and `trusted_base()` relation are not measured
-by this authored, unexecuted seed. The full *elaboration* witness (each
+(`prelude.rs`/`numbers.rs`/`bytes.rs` @ `b97ca5c`, the kernel). The exact
+current floor is a normative 57-name target with source-resolution
+expectations; its newer identities and `trusted_base()` relation are not
+measured by this authored, unexecuted seed. The full *elaboration* witness (each
 demoted definition kernel-checks in the stated sort and `trusted_base()`
 shrinks by exactly the named ids) is **ES2's build-verification**, a separate
 `trusted_base()`-delta assertion. The sort-analysis below remains its own
@@ -76,6 +76,10 @@ Neither arm is a catch-all (`64 §1`).
 | **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping \| SpawnPlan \| ChildProcess \| PipeRead \| PipeWrite \| SocketListener \| SocketStream`; the opaque primitive former needs this exact parameter identity. Source uses the nine scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and `ResourceKind.SocketStream`. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`SocketAddress`** | internal provision: the checked Net operations and System.Error envelope require one source identity from both homes, without an import edge | keyed pre-source type identity; Stream re-exports the same identity. `PrivateSocketIPv4`, `PrivateSocketIPv6`, and `PrivateSocketUnix` are private at their qualified paths, and none is bare-reserved. |
+| **`MonotonicInstant`** | internal provision: the `monotonic_now` result and native response use the exact checked floor type (`38 §1.15`) | exact checked type identity; `MonotonicInstant.MkMonotonicInstant` is its only public qualified constructor path. |
+| **`Deadline`** | internal provision: `sleep_until` input and native operand reader use the exact checked floor type (`38 §1.15`) | exact checked type identity; `Deadline.MkDeadline` is its only public qualified constructor path. |
+| **`DirectoryHandle`** | internal provision: `withDirectory` produces the exact scoped handle consumed by batch reads (`38 §1.14`) | exact checked type identity; its constructor and raw-resource projection are private under bare and qualified source paths. |
+| **`DirectoryProgress`** | internal provision: `readDirectoryBatch` returns the exact batch/end family (`38 §1.14`) | exact checked type identity; the complete family is `DirectoryProgress.DirectoryEntries` and `DirectoryProgress.DirectoryEnd`. |
 | **`Utf8Error`** | signature: the error argument of `bytes_decode`'s result | ordinary checked `data Utf8Error = InvalidUtf8`; no replacement family can inhabit the primitive result. |
 | **`Nat`** | internal provision, kernel origin: source must reach the canonical natural/index family | ordinary checked `data Nat = Zero \| Suc Nat`; strict-floor installation reuses those exact ids and allocates none. |
 | **`Pair`** | internal provision, compiler-bootstrap origin: source must reach the one transparent non-dependent Sigma family | ordinary checked transparent definition; floor installation reuses its exact id. Its exact companions `mk_pair`/`pair_fst`/`pair_snd` are bindings, not type members. |
@@ -107,7 +111,7 @@ Neither arm is a catch-all (`64 §1`).
 | **`FileMetadata`** | internal provision: native metadata reply and source result use (`38 §1.12`) | exact checked scoped family with `FileMetadata.MkFileMetadata`. |
 | **`FileKind`** | internal provision: native metadata and directory reply kind (`38 §1.12`) | exact checked scoped family with all four `FileKind.C` cases. |
 | **`DirEntry`** | internal provision: native directory reply (`38 §1.12`) | exact checked scoped family with `DirEntry.MkDirEntry`. |
-| **`FileOperation`** | internal provision: native FileError operation and source case analysis (`33 §3.3`, `38 §1.12`) | exact checked scoped family with all sixteen `FileOperation.Op*` cases; its former home retires. |
+| **`FileOperation`** | internal provision: native FileError operation and source case analysis (`33 §3.3`, `38 §1.12`) | exact checked scoped family with ten path-operation `FileOperation.Op*` cases; its former home retires. |
 | **`StateOp`** | internal provision: direct State tree carrier (`36 §4.2`) | exact checked scoped `StateOp.Get`/`StateOp.Put` family; `State` is the effect label, not this type. |
 | **`ConsoleOp`** | internal provision: effect reifier and direct Console trees (`36 §2.1`) | exact checked scoped four-case family, preserving its constructor IDs. |
 | **`resp_state`** | internal provision: dependent State response required by direct trees (`36 §4.2`) | exact checked operation, reducing to `s` on `Get` and `Unit` on `Put`. |
@@ -117,10 +121,11 @@ Neither arm is a catch-all (`64 §1`).
 | **`Ω` (kernel-only)** | kernel syntax: no-overflow propositions land in `Ω₀` | **kernel-provided** (the strict-prop universe, `16 §1`) — a kernel built-in referenced directly, not a surface prelude binding. |
 
 The signature arm closes to exactly **`{Auth, Bool, Char, List, Option,
-ResourceKind, Result, Utf8Error}`**. The current 53-name target has these eight
-signature identities and 45 internally provisioned identities, including
-`SocketAddress`, operations and scoped families; the exact roster and
-membership witnesses are listed in the AC2 case below. The earlier
+ResourceKind, Result, Utf8Error}`**. The current 57-name target has these eight
+signature identities and 49 internally provisioned identities, including
+`DirectoryHandle`, `DirectoryProgress`, `SocketAddress`, `MonotonicInstant`,
+`Deadline`, operations and scoped families; the exact roster and membership
+witnesses are listed in the AC2 case below. The earlier
 32-name table is a superseded snapshot, not a current
 measurement. Its milestones remain historical: the original fifteen were
 realized at
@@ -175,13 +180,14 @@ possession.
 - given: in a fresh `ElabEnv`, walk the type term of **every**
   `Decl::Primitive`, collecting each referenced `GlobalId` whose declaration is
   `Decl::Inductive` or checked `Decl::Transparent`. Independently record the
-  `GlobalId` and actual declaration kind for each name in the 53-name
+  `GlobalId` and actual declaration kind for each name in the 57-name
   floor-identity roster, keeping type-forming identities distinct from the
   `Top`/`Bottom` proposition constants, the `Proved : Top` proof binding, and
   the `eqChar` comparator operation. Record `eqChar`'s exact ID and checked
   type. Also record each constructor id and parent, including the complete
   `ConsoleStream` family, the three `SocketAddress` representation
-  constructors, and every other scoped family. Attempt the qualified paths
+  constructors, `MonotonicInstant.MkMonotonicInstant`,
+  `Deadline.MkDeadline`, and every other scoped family. Attempt the qualified paths
   `SocketAddress.PrivateSocketIPv4`, `SocketAddress.PrivateSocketIPv6`, and
   `SocketAddress.PrivateSocketUnix`, plus their bare leaves; pair the refusals
   with public smart-constructor controls. Record the three Pair companion ids
@@ -211,8 +217,9 @@ possession.
   Instant, MappingProt, Nat, Pair, ProcessInput, Prod, ProgramCaps, Prop,
   Proved, ReadProgress, ReadResult, ResourceError, ResourceOpenMode,
   StateOp, Top, TransferCount, Unit, WriteProgress, console_resp, eqChar,
-  itree_bind, resp_coproduct, resp_state, run_state, state_get, state_put}`
-  closes the exact 53-name floor roster. `ConsoleStream` is an inductive
+  itree_bind, resp_coproduct, resp_state, run_state, state_get, state_put,
+  DirectoryHandle, DirectoryProgress, MonotonicInstant, Deadline}
+  closes the exact 57-name floor roster. `ConsoleStream` is an inductive
   type; `eqChar` is an operation, and `Decimal` is a checked transparent
   compiler-bootstrap type. None is a primitive-signature type. `Proved` has
   type `Top` and is a proof binding, not a type former.
@@ -221,7 +228,12 @@ possession.
   thirteen `IOError` causes, the three `CreatePolicy` cases, and all twelve
   `ResourceError` cases are scoped; the `BufferSpan` and `TransferCount`
   constructors retain private visibility. The additional scoped families are
-  complete at these exact paths: `ReadProgress.ReadSome`,
+  complete at these exact paths: `DirectoryProgress.DirectoryEntries` and
+  `DirectoryProgress.DirectoryEnd`; `DirectoryHandle`'s constructor and
+  raw-resource projection remain private. `MonotonicInstant.MkMonotonicInstant`
+  and `Deadline.MkDeadline` are the full constructor paths for their types;
+  bare `MkMonotonicInstant` and `MkDeadline` are not reserved.
+  `ReadProgress.ReadSome`,
   `ReadProgress.ReadEof`, `WriteProgress.Wrote`,
   `ResourceOpenMode.ResourceRead`, `ResourceOpenMode.ResourceMetadata`,
   `ResourceOpenMode.ResourceWriteCreate`, `MappingProt.ReadOnly`,
@@ -233,10 +245,7 @@ possession.
   `FileOperation.OpMetadata`, `FileOperation.OpReadDirectory`,
   `FileOperation.OpCreateDirectory`, `FileOperation.OpRemoveFile`,
   `FileOperation.OpRemoveDirectory`, `FileOperation.OpRename`,
-  `FileOperation.OpChangeMode`, `FileOperation.OpSeek`,
-  `FileOperation.OpSetLength`, `FileOperation.OpSync`,
-  `FileOperation.OpGetInheritance`, `FileOperation.OpSetInheritance`,
-  `FileOperation.OpDuplicate`, `StateOp.Get`, `StateOp.Put`,
+  `FileOperation.OpChangeMode`, `StateOp.Get`, `StateOp.Put`,
   `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
   `ConsoleOp.IsTerminal`. These retain their exact parents and do not reserve
   bare scoped leaves. `ResourceKind` contributes exactly
@@ -253,7 +262,7 @@ possession.
   `ConsoleStream.Stderr`; each bare leaf is refused against its qualified
   control, and only the `ConsoleStream` type name enters the roster.
   Unqualified `SpawnPlan` remains the separate pure plan type, outside the
-  53-name floor roster and not a bare constructor. Its type use accepts on all
+  57-name floor roster and not a bare constructor. Its type use accepts on all
   roots entrypoints only through the explicit selective `SpawnPlan` import;
   omitting it while retaining the qualified module import refuses with
   `UnboundName(SpawnPlan)`. The value-position pair in
@@ -266,8 +275,9 @@ possession.
   parent qualifies. The separate companion set is exactly
   `{mk_pair, pair_fst, pair_snd}`, and every companion type references the exact
   Pair id. Installing the floor changes neither the declaration count nor
-  allocator position. None of the 53 roster identities, constructor identities,
-  or Pair-companion identities enters `trusted_base()`.
+  allocator position. None of the 57 roster identities, constructor identities,
+  or Pair-companion identities enters `trusted_base()`. The two directory
+  types and two clock types reuse their exact checked pre-source identities.
 - controls: prove both equality directions with compile-preserving mutations.
   For under-inclusion, install a checked `Extra` type and a real test-only
   primitive whose signature names `Extra`, leaving the configured floor
@@ -282,7 +292,7 @@ possession.
   source-need witness; a selected `reg_*` grep omits primitive signatures
   registered by another helper, and spelling cannot establish constructor
   parentage.
-- **TARGET, not measured here:** the current floor is the exact 53-name set
+- **TARGET, not measured here:** the current floor is the exact 57-name set
   above with its complete parent-derived constructor closure. The Increment 3a
   source cases are authored in companion seeds; this artifact makes no local
   test or official conformance-runner claim for them.
@@ -413,14 +423,14 @@ ordinary data representation.
   hidden-built-in (§C, none found; the floor named).
 - **AC2** (prelude closed by the two-arm rule): §B specifies the traversal of
   every primitive type and the exact identity/origin witnesses. Its current
-  roster has eight signature identities and 45 internal-provision identities:
+  roster has eight signature identities and 49 internal-provision identities:
   `{Nat, Pair, Decimal}`, five proposition/equality names,
   five entrypoint-ABI names, three effect/clock names, `ITree`,
   `ConsoleStream`, `eqChar`, six original FS/resource names, `SocketAddress`,
   five earlier scoped families, three State operations, seven additional scoped
-  families, and four checked operations. This is the 53-name target, including
-  Pair's separate three companion bindings and the full constructor
-  closure. These are corpus expectations, not execution results for the
+  families, four checked operations, `DirectoryHandle`, `DirectoryProgress`,
+  `MonotonicInstant` and `Deadline`. This is the 57-name target, including
+  Pair's separate three companion bindings and the full constructor closure. These are corpus expectations, not execution results for the
   Increment 3a additions; source-route controls are specified
   in `seed-modules.md` and `seed-strict-package-homes.md`. The `OrdResult`
   bloat finding proves the opposite direction (ruled remove; `Ordering`→package,

@@ -91,7 +91,9 @@ pub(super) use static_transition::build_static_continuation_fusion_plan;
 /// Fixture re-export so the lowering-side reconcile controls can plan a real
 /// checked-IH captured environment instead of duplicating its fixture.
 #[cfg(test)]
-pub(in crate::cranelift_backend) use static_transition::contspec_activation_owned_worker_captures_fixture;
+pub(in crate::cranelift_backend) use static_transition::{
+    contspec_activation_owned_worker_captures_fixture, statically_unselected_if_fixture,
+};
 pub(in crate::cranelift_backend) use static_transition::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
     ProducerAlternativeSet, ProducerResultResolution,
@@ -142,7 +144,7 @@ pub(super) use static_transition::{
     RequiredConsumerProjectionDisposition, ScaleBPlanCensus,
 };
 pub(super) use static_transition::{
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
     BoolMatchCaseOrdinals, CaseEmissionStatus, ConstructorIdentity, DeclarationCallTargetClass,
     JoinPlanToken,
     JoinResultRepresentation, StaticOriginId, StaticTransitionPlan, SynthesizedConstructorRole,

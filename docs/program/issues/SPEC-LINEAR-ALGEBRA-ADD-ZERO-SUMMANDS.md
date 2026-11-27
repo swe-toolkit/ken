@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-ADD-ZERO-SUMMANDS
 title: "Spec 65 cancels a common summand (§20) and characterizes the zero vector by its self-dot (§14), but says nothing about a sum that is zero: over Nat there are no additive inverses, so a vector or matrix sum is zero only when both summands are, and a client cannot use that. Rule from a checked D0 at zero trust that vector_add n xs ys = vector_zero n gives xs = vector_zero n, with the matrix analogue, and state it with a seed that separates a zero summand from a nonzero one"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

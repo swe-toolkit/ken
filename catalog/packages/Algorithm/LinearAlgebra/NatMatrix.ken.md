@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and sixty algebraic laws have checked proofs.
+all arithmetic is exact, and sixty-six algebraic laws have checked proofs.
 
 ## Contents
 
@@ -25,9 +25,11 @@ zero-row and zero-column matrices use the same operations as nonempty ones.
 The canonical operations follow their contract: componentwise addition,
 scaling, the zero vector and dot product, followed by matrix-vector
 multiplication, transpose, matrix product and diagonal identity. Row-wise
-matrix addition and its seven public laws follow those operations and laws,
-alongside three vector sum laws, four vector-scaling laws and a
-vector scale-cancellation law, four zero-vector unit laws and three
+matrix addition follows those operations and laws. Vector and matrix sum
+laws cover commutativity, associativity and right cancellation. The zero-sum
+laws show that each summand of a zero vector or matrix sum is itself zero.
+The vector laws also cover four scaling identities, successor-scale
+cancellation, four zero-vector unit laws and three
 zero-annihilation laws, followed by the zero matrix,
 its two unit laws for matrix addition and its action on every vector.
 Three further laws establish that the zero matrix absorbs products on
@@ -985,6 +987,43 @@ pub theorem vector_add_cancel_right
             (vec_tail Nat k zs))
   }
 
+pub theorem vector_add_eq_zero_left
+      (n : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n)
+      → Equal (Vec Nat n) xs (vector_zero n) =
+  match n {
+    Zero ↦ λxs ys sum_zero. vec_zero_length_eq Nat xs (vector_zero Zero);
+    Suc k ↦
+      λxs ys sum_zero.
+        vector_add_eq_zero_cons
+          k
+          xs
+          ys
+          sum_zero
+          (vector_add_eq_zero_left k (vec_tail Nat k xs) (vec_tail Nat k ys))
+  }
+
+pub theorem vector_add_eq_zero_right
+      (n : Nat)
+    : (xs : Vec Nat n)
+      → (ys : Vec Nat n)
+      → Equal (Vec Nat n) (vector_add n xs ys) (vector_zero n)
+      → Equal (Vec Nat n) ys (vector_zero n) =
+  λxs ys sum_zero.
+    vector_add_eq_zero_left
+      n
+      ys
+      xs
+      (trans
+        (Vec Nat n)
+        (vector_add n ys xs)
+        (vector_add n xs ys)
+        (vector_zero n)
+        (vector_add_comm n ys xs)
+        sum_zero)
+
 pub theorem vector_scale_cancel
       (n : Nat) (k : Nat)
     : (xs : Vec Nat n)
@@ -1176,6 +1215,45 @@ pub theorem matrix_add_cancel_right
             (vec_tail (Vec Nat n) k b)
             (vec_tail (Vec Nat n) k c))
   }
+
+pub theorem matrix_add_eq_zero_left
+      (m : Nat) (n : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n)
+      → Equal (Vec (Vec Nat n) m) a (matrix_zero m n) =
+  match m {
+    Zero ↦ λa b sum_zero. vec_zero_length_eq (Vec Nat n) a (matrix_zero Zero n);
+    Suc k ↦
+      λa b sum_zero.
+        matrix_add_eq_zero_cons
+          k
+          n
+          a
+          b
+          sum_zero
+          (matrix_add_eq_zero_left k n (vec_tail (Vec Nat n) k a) (vec_tail (Vec Nat n) k b))
+  }
+
+pub theorem matrix_add_eq_zero_right
+      (m : Nat) (n : Nat)
+    : (a : Vec (Vec Nat n) m)
+      → (b : Vec (Vec Nat n) m)
+      → Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_zero m n)
+      → Equal (Vec (Vec Nat n) m) b (matrix_zero m n) =
+  λa b sum_zero.
+    matrix_add_eq_zero_left
+      m
+      n
+      b
+      a
+      (trans
+        (Vec (Vec Nat n) m)
+        (matrix_add m n b a)
+        (matrix_add m n a b)
+        (matrix_zero m n)
+        (matrix_add_comm m n b a)
+        sum_zero)
 
 pub theorem matrix_scale_cancel
       (m : Nat) (n : Nat) (k : Nat)
@@ -4428,6 +4506,119 @@ theorem matrix_add_cancel_cons
         (vec_tail (Vec Nat n) k)
         (matrix_add_cons_sums k n a b c sum_eq)))
 
+theorem vector_add_eq_zero_cons
+      (k : Nat)
+      (xs : Vec Nat (Suc k))
+      (ys : Vec Nat (Suc k))
+      (sum_zero : Equal (Vec Nat (Suc k)) (vector_add (Suc k) xs ys) (vector_zero (Suc k)))
+      (tail_zero : Equal
+        (Vec Nat k)
+        (vector_add k (vec_tail Nat k xs) (vec_tail Nat k ys))
+        (vector_zero k)
+        → Equal
+        (Vec Nat k)
+        (vec_tail Nat k xs)
+        (vector_zero k))
+    : Equal (Vec Nat (Suc k)) xs (vector_zero (Suc k)) =
+  let
+    head_sum = add (vec_head Nat k xs) (vec_head Nat k ys);
+    tail_sum = vector_add k (vec_tail Nat k xs) (vec_tail Nat k ys);
+    cons_zero =
+      trans
+        (Vec Nat (Suc k))
+        (VCons Nat k head_sum tail_sum)
+        (vector_add (Suc k) xs ys)
+        (vector_zero (Suc k))
+        (sym
+          (Vec Nat (Suc k))
+          (vector_add (Suc k) xs ys)
+          (VCons Nat k head_sum tail_sum)
+          (vector_add_view k xs ys))
+        sum_zero
+  in
+    vec_cons_eq_eta
+      Nat
+      k
+      xs
+      (vector_zero (Suc k))
+      ((proof eq_zero_l for add)
+        (vec_head Nat k xs)
+        (vec_head Nat k ys)
+        (cong
+          (Vec Nat (Suc k))
+          Nat
+          (VCons Nat k head_sum tail_sum)
+          (vector_zero (Suc k))
+          (vec_head Nat k)
+          cons_zero))
+      (tail_zero
+        (cong
+          (Vec Nat (Suc k))
+          (Vec Nat k)
+          (VCons Nat k head_sum tail_sum)
+          (vector_zero (Suc k))
+          (vec_tail Nat k)
+          cons_zero))
+
+theorem matrix_add_eq_zero_cons
+      (k : Nat)
+      (n : Nat)
+      (a : Vec (Vec Nat n) (Suc k))
+      (b : Vec (Vec Nat n) (Suc k))
+      (sum_zero : Equal
+        (Vec (Vec Nat n) (Suc k))
+        (matrix_add (Suc k) n a b)
+        (matrix_zero (Suc k) n))
+      (tail_zero : Equal
+        (Vec (Vec Nat n) k)
+        (matrix_add k n (vec_tail (Vec Nat n) k a) (vec_tail (Vec Nat n) k b))
+        (matrix_zero k n)
+        → Equal
+        (Vec (Vec Nat n) k)
+        (vec_tail (Vec Nat n) k a)
+        (matrix_zero k n))
+    : Equal (Vec (Vec Nat n) (Suc k)) a (matrix_zero (Suc k) n) =
+  let
+    head_sum = vector_add n (vec_head (Vec Nat n) k a) (vec_head (Vec Nat n) k b);
+    tail_sum = matrix_add k n (vec_tail (Vec Nat n) k a) (vec_tail (Vec Nat n) k b);
+    cons_zero =
+      trans
+        (Vec (Vec Nat n) (Suc k))
+        (VCons (Vec Nat n) k head_sum tail_sum)
+        (matrix_add (Suc k) n a b)
+        (matrix_zero (Suc k) n)
+        (sym
+          (Vec (Vec Nat n) (Suc k))
+          (matrix_add (Suc k) n a b)
+          (VCons (Vec Nat n) k head_sum tail_sum)
+          (matrix_add_view k n a b))
+        sum_zero
+  in
+    vec_cons_eq_eta
+      (Vec Nat n)
+      k
+      a
+      (matrix_zero (Suc k) n)
+      (vector_add_eq_zero_left
+        n
+        (vec_head (Vec Nat n) k a)
+        (vec_head (Vec Nat n) k b)
+        (cong
+          (Vec (Vec Nat n) (Suc k))
+          (Vec Nat n)
+          (VCons (Vec Nat n) k head_sum tail_sum)
+          (matrix_zero (Suc k) n)
+          (vec_head (Vec Nat n) k)
+          cons_zero))
+      (tail_zero
+        (cong
+          (Vec (Vec Nat n) (Suc k))
+          (Vec (Vec Nat n) k)
+          (VCons (Vec Nat n) k head_sum tail_sum)
+          (matrix_zero (Suc k) n)
+          (vec_tail (Vec Nat n) k)
+          cons_zero))
+
 theorem vec_zero_length_eq
       (a : Type) (xs : Vec a Zero) (ys : Vec a Zero)
     : Equal (Vec a Zero) xs ys =
@@ -4854,6 +5045,13 @@ cancellation for matrix addition applies the vector law to each head row
 and recurses on the remaining rows. Both proofs cover zero dimensions;
 left cancellation follows from the existing commutativity laws.
 
+The left zero-sum laws use the same cons views. For vectors, `add::eq_zero_l`
+extracts a zero head and induction extracts a zero tail; the private eta
+bridge combines them. For matrices, the vector law extracts a zero head row
+and induction handles the remaining rows. The right forms commute the
+operands and apply the left laws without a second induction. These laws
+also hold for zero dimensions.
+
 Scaling by a successor is injective, entry by entry. The private
 `map_injective` lifts an injective entry function through vector `map` by
 recursion on the dimension. The private `mul_cancel_left` commutes both
@@ -4952,9 +5150,10 @@ distinct generic proofs from right identity. Matrix-vector compatibility and
 transposed-product reversal connect the same operations without adding a new
 matrix carrier; the row, empty-width and prepend proof stages stay private.
 `matrix_add` adds rows with `vector_add`; it neither truncates nor broadcasts,
-and its seven matrix sum laws hold for arbitrary well-typed dimensions. Three
-vector sum laws supply commutativity, associativity and right cancellation. Matrix-
-vector application also preserves a sum or scaling in its vector argument;
+and the matrix sum laws hold for arbitrary well-typed dimensions. The
+vector sum laws supply commutativity, associativity and right cancellation,
+plus a zero-sum law for each summand. Matrix-vector application also
+preserves a sum or scaling in its vector argument;
 this differs from adding matrices while keeping the vector fixed. Vector
 scaling acts on an indexed sum, distributes a sum of factors, composes
 factors and leaves a vector unchanged when its factor is one. The zero
@@ -4984,8 +5183,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–22 owns
-seventy-four public names across twelve operations and sixty-two laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–23 owns
+seventy-eight public names across twelve operations and sixty-six laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -5033,11 +5232,14 @@ for the corner entry, the minor and their transport steps also stay private.
 `vector_add_cancel_right` follows `vector_add_zero_right`, and
 `matrix_add_cancel_right` follows `matrix_add_zero_right`; their private
 projection, cons-view and eta proofs use the public Nat `add_cancel_r` and
-cancel each matrix row by the checked vector law. `vector_scale_cancel`
-follows its §20 vector cancellation sibling, and `matrix_scale_cancel`
-follows its §20 matrix cancellation sibling. Their `map_injective`,
-`map_view` and `mul_cancel_left` helpers remain private. All sixty-two
-laws have checked bodies.
+cancel each matrix row by the checked vector law. Each §23 zero-sum pair
+follows the corresponding right-cancellation law, left form first. Their
+private `vector_add_eq_zero_cons` and `matrix_add_eq_zero_cons` follow
+`matrix_add_cancel_cons`. `vector_scale_cancel` follows
+`vector_add_eq_zero_right`, and `matrix_scale_cancel` follows
+`matrix_add_eq_zero_right`. The scaling proofs' `map_injective`, `map_view`
+and `mul_cancel_left` helpers remain private. All sixty-six laws have
+checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
 tests check generic imports, closed values and indexed relations,

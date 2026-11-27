@@ -352,6 +352,41 @@ pub fn with_plain_native_unit_ir_observations<T>(body: impl FnOnce() -> T) -> (T
     (result, ir)
 }
 
+/// RT-NATIVE-AGGREGATE-DATA-NOT-CODE: one row per defined transfer helper.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferHelperObservation {
+    /// The transfer seat, rendered.
+    pub seat: String,
+    /// The helper body's SSA value count.
+    pub values: usize,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+std::thread_local! {
+    static TRANSFER_HELPER_OBSERVATIONS: std::cell::RefCell<Vec<TransferHelperObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Run `body` and return every transfer helper it defined, in order.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_transfer_helper_observations<T>(
+    body: impl FnOnce() -> T,
+) -> (T, Vec<TransferHelperObservation>) {
+    TRANSFER_HELPER_OBSERVATIONS.with(|cell| cell.borrow_mut().clear());
+    let result = body();
+    let rows = TRANSFER_HELPER_OBSERVATIONS.with(|cell| std::mem::take(&mut *cell.borrow_mut()));
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_transfer_helper_definition(seat: StaticOriginId, func: &Function) {
+    TRANSFER_HELPER_OBSERVATIONS.with(|cell| cell.borrow_mut().push(TransferHelperObservation {
+        seat: format!("{seat:?}"),
+        values: func.dfg.num_values(),
+    }));
+}
+
 #[cfg(feature = "px8-ds-test-support")]
 fn record_plain_native_unit_ir(id: FuncId, func: &Function) {
     PLAIN_NATIVE_UNIT_IR_OBSERVATIONS.with(|cell| cell.borrow_mut().push(
@@ -466,7 +501,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     RecursiveCarrierSlot, RecursiveCarrierVariant,
     RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
     StaticResponseContinuation, StaticResponseContinuationId, RelayHostResponseArm,
     StaticResponseEffectInput, StaticResponseEnvironmentBinding,
@@ -1185,6 +1220,10 @@ impl ArtifactHelpers<'_> {
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
+            statically_unselected_roots: BTreeMap::new(),
+            unselected_calls_settled: false,
+            lowered_construct_origins: BTreeSet::new(),
+            statically_unselected_calls: BTreeSet::new(),
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
             checked_ih_transport_emissions: Vec::new(),
@@ -1516,6 +1555,13 @@ struct FunctionLocalRefs {
         BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
     /// Each generated call's exact finished status/Trap/Result obligation.
     pending_call_result_obligations: Vec<PendingCallResultObligation>,
+    /// Source subtree roots explicitly excluded in this function.
+    statically_unselected_roots: BTreeMap<StaticOriginId, joins::UnselectedRootSeat>,
+    unselected_calls_settled: bool,
+    /// Construct occurrences reached in this function, not across the artifact.
+    lowered_construct_origins: BTreeSet<StaticOriginId>,
+    /// Ordinary calls this function settled without emission at join closeout.
+    statically_unselected_calls: BTreeSet<ContinuationCallIdentity>,
     /// **`RT-CONTSPEC-ACTIVATE` `D3`** -- this Function's own `FuncRef` per
     /// causal token it owns, keyed by the complete four-field identity.
     /// Minted into this `Function`; never passed across functions.
@@ -3530,6 +3576,8 @@ struct Lowering<'a> {
     /// this names the module definition the events belong to. One
     /// `PredeclaredFunctionId` can be built as more than one `FuncId` body.
     defining_function_id: Option<FuncId>,
+    /// RT-NATIVE-AGGREGATE-DATA-NOT-CODE: out-of-line transfer helpers.
+    transfer_helpers: aggregates::TransferHelperState,
     /// **`RT-DECL-CLOSURE-PORT` `D7`** — the aggregate-allocation event ledger,
     /// held across the whole emission pass.
     ///

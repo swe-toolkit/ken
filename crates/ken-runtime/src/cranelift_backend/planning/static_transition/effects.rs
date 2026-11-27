@@ -456,7 +456,7 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
 /// operation is admitted, and the disagreement would show up as a seat with no
 /// planned record rather than as a contradiction anyone stated.
 pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
-    [ken_host::HostOpV1; 42] = [
+    [ken_host::HostOpV1; 47] = [
     ken_host::HostOpV1::ProcessPlanOpen,
     ken_host::HostOpV1::ProcessPlanPush,
     ken_host::HostOpV1::ProcessSpawn,
@@ -477,6 +477,9 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::ConsoleFlush,
     ken_host::HostOpV1::ConsoleIsTerminal,
     ken_host::HostOpV1::ClockWallNow,
+    ken_host::HostOpV1::ClockMonotonicNow,
+    ken_host::HostOpV1::ClockSleepUntil,
+    ken_host::HostOpV1::EntropyRandomBytes,
     ken_host::HostOpV1::FsReadFile,
     ken_host::HostOpV1::FsWriteFile,
     ken_host::HostOpV1::FsAppendFile,
@@ -491,6 +494,8 @@ pub(in crate::cranelift_backend) const CRANELIFT_HOST_EFFECT_CONSUMERS_V1:
     ken_host::HostOpV1::FsHandleMetadata,
     ken_host::HostOpV1::FsReadAt,
     ken_host::HostOpV1::FsReadDirectoryBatch,
+    ken_host::HostOpV1::FsSetLength,
+    ken_host::HostOpV1::FsSync,
     ken_host::HostOpV1::FsWriteAt,
     ken_host::HostOpV1::ResourceRelease,
     ken_host::HostOpV1::BufferAllocate,
@@ -554,12 +559,8 @@ fn host_effect_seat_contract(
                 | Op::FsHandleMetadata
                 | Op::FsReadAt
                 | Op::FsWriteAt
-                | Op::FsSeek
                 | Op::FsSetLength
                 | Op::FsSync
-                | Op::FsGetInheritance
-                | Op::FsSetInheritance
-                | Op::FsDuplicate
                 | Op::ResourceRelease
                 | Op::BufferAllocate
                 | Op::BufferFreeze
@@ -638,7 +639,10 @@ fn host_effect_seat_contract(
         | (Op::ConsoleWrite, 0)
         | (Op::ConsoleFlush, 0)
         | (Op::ConsoleIsTerminal, 0) => Some(tag),
-        (Op::ConsoleRead, 1) => Some(exact_int),
+        (Op::ConsoleRead, 1) | (Op::EntropyRandomBytes, 0) => Some(exact_int),
+        // A single constructor seat, projected through both checked wrappers
+        // before the positioned Int reader narrows the deadline.
+        (Op::ClockSleepUntil, 0) => Some(tag),
         // PROVED carried, per seat: the real-artifact measurements observed a
         // carried word reaching each and the existing span observer consuming
         // it. These are direct operation consumers, not site-bound uses.
@@ -673,13 +677,15 @@ fn host_effect_seat_contract(
         (Op::FsChangeMode, 1) => Some(exact_int),
         (Op::FsReadDirectoryBatch, 0)
         | (Op::FsHandleMetadata, 0)
+        | (Op::FsSetLength, 0)
+        | (Op::FsSync, 0)
         | (Op::ResourceRelease, 0)
         | (Op::MappingAcquireFile, 0) => Some(resource),
         // The file-backed differential reaches this exact ordinal carried:
         // "seat Argument(1) of MappingAcquireFile needs ExactIntU64, which it
         // cannot observe in CarriedWord". The existing fail-closed carried
         // Int decoder and bounds lane handle the widened seat.
-        (Op::MappingAcquireFile, 1) => Some(carried_exact_int),
+        (Op::MappingAcquireFile, 1) | (Op::FsSetLength, 1) => Some(carried_exact_int),
         (Op::MappingAcquireFile, 2) => Some(tag),
         // PROVED carried, per seat (PX10 B2): narrowing only Open Argument(0)
         // to SPECIALIZED_ONLY makes F argv/null/live and R-NODES refuse
@@ -773,6 +779,9 @@ fn host_effect_seat_contract(
             | Op::ConsoleFlush
             | Op::ConsoleIsTerminal
             | Op::ClockWallNow
+            | Op::ClockMonotonicNow
+            | Op::ClockSleepUntil
+            | Op::EntropyRandomBytes
             | Op::FsReadFile
             | Op::FsWriteFile
             | Op::FsAppendFile
@@ -788,6 +797,8 @@ fn host_effect_seat_contract(
                 | Op::FsHandleMetadata
             | Op::FsReadAt
             | Op::FsWriteAt
+            | Op::FsSetLength
+            | Op::FsSync
             | Op::ResourceRelease
             | Op::BufferAllocate
             | Op::BufferFreeze
@@ -810,23 +821,6 @@ fn host_effect_seat_contract(
             | Op::NetSend
             | Op::NetShutdown
             | Op::NetLocalAddress,
-            _,
-        ) => None,
-        // ⛔ The represented-UNAVAILABLE lanes, named rather than wildcarded.
-        // They are refused before any seat is derived, so they have no seat
-        // contract at all -- and naming them is what makes promoting one to the
-        // admitted set a compile error here rather than an operation whose
-        // seats silently answer `None`.
-        (
-            Op::ClockMonotonicNow
-            | Op::ClockSleepUntil
-            | Op::FsSeek
-            | Op::FsSetLength
-            | Op::FsSync
-            | Op::FsGetInheritance
-            | Op::FsSetInheritance
-            | Op::FsDuplicate
-            | Op::EntropyRandomBytes,
             _,
         ) => None,
     }

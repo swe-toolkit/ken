@@ -35,7 +35,9 @@ pub use per_emitter_availability::{
 /// `planning.rs`. Test-only, and deliberately re-exporting the one fixture
 /// rather than opening the module.
 #[cfg(test)]
-pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_owned_worker_captures_fixture;
+pub(in crate::cranelift_backend) use continuations::tests::{
+    contspec_activation_owned_worker_captures_fixture, statically_unselected_if_fixture,
+};
 mod effects;
 mod immediate_bridge;
 mod joins_traps;
@@ -308,7 +310,7 @@ pub(in crate::cranelift_backend) use effects::{set_effect_seat_plan_mutation, Ef
 // reach these through this module, unchanged from before the move.
 #[allow(unused_imports)]
 pub(in crate::cranelift_backend) use joins_traps::{
-    dead_arm_effect_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
+    dead_arm_effect_trap, sleep_deadline_domain_trap, malformed_dynamic_constructor_trap, planned_partiality_trap,
     JoinPlanToken, JoinResultRepresentation,
 };
 use joins_traps::PlannedJoinResult;

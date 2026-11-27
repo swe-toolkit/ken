@@ -149,9 +149,8 @@ fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
         EntropyRandomBytes => (HostTree::Entropy, HostTree::Console),
         FsReadFile | FsWriteFile | FsAppendFile | FsMetadata | FsOpenDirectory | FsReadDirectoryBatch
         | FsCreateDirectory | FsRemoveFile | FsRemoveDirectory | FsRename | FsChangeMode
-        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSeek | FsSetLength | FsSync
-        | FsGetInheritance | FsSetInheritance | FsDuplicate | ResourceRelease | BufferAllocate
-        | BufferFreeze | MappingAllocate | MappingReadView | MappingWriteView
+        | FsOpen | FsHandleMetadata | FsReadAt | FsWriteAt | FsSetLength | FsSync
+        | ResourceRelease | BufferAllocate | BufferFreeze | MappingAllocate | MappingReadView | MappingWriteView
         | MappingAcquireFile | ResourceStreamRead | ResourceStreamWrite | ProcessPlanOpen
         | ProcessPlanPush | ProcessSpawn | ProcessTakePipe | ProcessWait | ProcessSignal
         | NetListen | NetAccept | NetConnect | NetReceive | NetSend | NetShutdown

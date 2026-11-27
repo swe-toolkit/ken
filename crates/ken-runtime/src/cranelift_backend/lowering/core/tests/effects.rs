@@ -104,6 +104,7 @@ fn run_checked_bounded_nat_fixture(
         defining_emission_owner: None,
         emitting_function_owner: None,
         defining_function_id: None,
+        transfer_helpers: Default::default(),
         aggregate_allocations: None,
         host_effect_seats: None,
         process_object: false,
@@ -133,6 +134,10 @@ fn run_checked_bounded_nat_fixture(
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
+            statically_unselected_roots: BTreeMap::new(),
+            lowered_construct_origins: BTreeSet::new(),
+            statically_unselected_calls: BTreeSet::new(),
+            unselected_calls_settled: false,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
             selected_call_issue: None,
@@ -2261,8 +2266,8 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
 }
 
 /// The native-tested host operations this Cranelift lowering represents,
-/// read from the closed host inventory. PX11's seven interpreter-admitted Net
-/// operations remain RepresentedUnavailable and have no native seat contract.
+/// read from the closed host inventory. Since PX11 Inc2 every operation is
+/// NativeTested, so none lacks a native seat contract.
 /// Native F rows and ResourceStreamWrite tests, not this set, prove execution.
 fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
     ken_host::HostOpV1::ALL
@@ -2273,6 +2278,10 @@ fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
         .collect()
 }
 
+/// Promise class: durable invariant. The live emitter population agrees
+/// with native availability, and an empty offset list agrees with the
+/// catalog's zero request arity. The offset mutations check layout validation,
+/// not execution of each operation.
 #[test]
 fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
     assert_eq!(
@@ -2292,13 +2301,17 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.request_align_shift ^= 1;
         mutations.push(changed);
-        if layout.request_offsets.is_empty() {
-            assert_eq!(
-                operation,
-                ken_host::HostOpV1::ClockWallNow,
-                "only the zero-arity wall-clock request has no request field offset"
-            );
-        } else {
+        let request_arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .expect("live operation is catalogued")
+            .4;
+        assert_eq!(
+            layout.request_offsets.is_empty(),
+            request_arity == 0,
+            "{operation:?}: request offsets are empty exactly for zero request arity"
+        );
+        if !layout.request_offsets.is_empty() {
             let mut changed = layout.clone();
             changed.request_offsets[0] ^= 1;
             mutations.push(changed);
@@ -3908,28 +3921,21 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
                     .is_some()
             })
             .collect::<Vec<_>>();
-        if operation == ken_host::HostOpV1::ClockWallNow {
-            assert!(
-                carried.is_empty(),
-                "ClockWallNow is zero-arity and must not acquire an argument seat"
-            );
-        } else {
-            assert!(
-                !carried.is_empty(),
-                "{operation:?} is admitted but has no argument seat at all"
-            );
-        }
+        let arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .expect("catalogued consumer")
+            .4;
+        assert_eq!(carried.is_empty(), arity == 0, "{operation:?} zero-arity seat rule");
         assert_eq!(
             carried,
             (0..carried.len() as u32).collect::<Vec<_>>(),
             "{operation:?} argument seats are not a gapless 0..n range"
         );
     }
-    for operation in [
-        ken_host::HostOpV1::ClockMonotonicNow,
-        ken_host::HostOpV1::ClockSleepUntil,
-        ken_host::HostOpV1::EntropyRandomBytes,
-    ] {
+    for operation in ken_host::HostOpV1::ALL.into_iter().filter(|op|
+        op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
+    ) {
         assert!(
             !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(&operation),
             "{operation:?} is not an unadmitted lane"
@@ -6338,144 +6344,25 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     );
 }
 
-/// **`RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` -- the MANDATORY negative control, as
-/// a non-degenerate PAIR.**
-///
-/// The pair is the whole point. One fixture showing "a dead arm compiles" is
-/// green-vs-green under the mutation this exists to catch: a predicate that
-/// answered DEAD for everything would pass it. These two programs are
-/// **structurally identical and differ in exactly one constructor SYMBOL** --
-/// the `Let` value in the sibling arm names either the refusing arm's own
-/// constructor or an unrelated one -- so a predicate that stopped
-/// discriminating inverts BOTH rows rather than neither.
-///
-/// The refusing arm holds a represented-unavailable-lane effect. That is one of
-/// the two sites this node gates, and both consult the identical
-/// `effect_arm_is_provably_dead`, so this pair exercises the predicate that
-/// governs both.
-///
-/// **Dispatched through a CALLED CLOSURE, and that is a measured necessity
-/// rather than a stylistic choice.** With the match applied to a scrutinee
-/// lowering can resolve statically, the unselected arm is folded and its effect
-/// is never lowered at all -- instrumenting `lower_process_host_effect` on an
-/// earlier draft showed only the `BufferAllocate` calls and no
-/// `ClockMonotonicNow` whatever. Both rows then compiled for the same trivial
-/// reason and the control proved nothing. Routing the value through a closure parameter forces
-/// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
-/// `FSOp` request handler has.
-#[cfg(test)]
-fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
-    let symbols = crate::NativeProcessSymbols::legacy_prelude();
-    const REQUEST: &str = "ctor:fixture::DeadArmRequest::ReadDirectory";
-    // Only these two answer identities change; the request and the arm's
-    // unavailable-lane effect remain the deadness discriminator.
-    const SIBLING: &str = crate::EXIT_SUCCESS_CONSTRUCTOR;
-    const UNRELATED: &str = crate::EXIT_FAILURE_CONSTRUCTOR;
-    let exit_success = || RuntimeExpr::Construct {
-        constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
-        args: Vec::new(),
-    };
-    let trap = || RuntimeTrap {
-        code: RuntimeTrapCode::PatternMatchFailure,
-        message: "dead-arm pair default".to_string(),
-    };
-    // THE ONE DIFFERENCE between the two programs.
-    let constructed = RuntimeExpr::Construct {
-        constructor: if request_is_constructed {
-            REQUEST.to_string()
-        } else {
-            UNRELATED.to_string()
-        },
-        args: Vec::new(),
-    };
-    // A runtime-chosen request. Neither branch names `REQUEST`, which is what
-    // leaves its arm dead in the baseline while the arm is still lowered.
-    let dynamic_request = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Effect {
-            bracket_acquire: None,
-            family: "FS".to_string(),
-            operation: ken_host::HostOpV1::BufferAllocate,
-            capability: None,
-            args: vec![RuntimeExpr::Value(RuntimeValue::Int((4).into()))],
-        }),
-        cases: vec![
-            RuntimeMatchCase {
-                constructor: symbols.result_err.clone(),
-                binders: 1,
-                body: RuntimeExpr::Construct {
-                    constructor: SIBLING.to_string(),
-                    args: Vec::new(),
-                },
-            },
-            RuntimeMatchCase {
-                constructor: symbols.result_ok.clone(),
-                binders: 1,
-                body: RuntimeExpr::Construct {
-                    constructor: UNRELATED.to_string(),
-                    args: Vec::new(),
-                },
-            },
-        ],
-        default: trap(),
-    };
-    RuntimeExpr::Call {
-        callee: Box::new(ordinary_match_closure(
-            vec![
-                RuntimeMatchCase {
-                    constructor: REQUEST.to_string(),
-                    binders: 0,
-                    body: RuntimeExpr::Effect {
-                        bracket_acquire: None,
-                        family: "Clock".to_string(),
-                        operation: ken_host::HostOpV1::ClockMonotonicNow,
-                        capability: None,
-                        args: Vec::new(),
-                    },
-                },
-                RuntimeMatchCase {
-                    constructor: SIBLING.to_string(),
-                    binders: 0,
-                    body: RuntimeExpr::Let {
-                        value: Box::new(constructed),
-                        body: Box::new(exit_success()),
-                    },
-                },
-                RuntimeMatchCase {
-                    constructor: UNRELATED.to_string(),
-                    binders: 0,
-                    body: exit_success(),
-                },
-            ],
-            trap(),
-        )),
-        args: vec![dynamic_request],
-    }
-}
-
-/// `AC-4`: the trap fires ONLY on a provably-dead arm, and the strict refusal
-/// SURVIVES the moment the same arm becomes reachable.
+/// The represented-unavailable population is empty: every host operation is
+/// NativeTested and every one is a Cranelift consumer. The rows whose subject
+/// had to be an unavailable or non-consumer operation, including the
+/// `RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` dead-arm pair, were retired at PX11
+/// Inc2 when that population emptied. The refusal paths stay, fail-closed for
+/// the next operation, and are unexercised while the population is empty.
 #[test]
-fn a_dead_arm_traps_while_the_same_arm_constructed_still_refuses_strictly() {
-    // LIVE: the program constructs the request, so the arm can be selected and
-    // the unavailable-lane refusal must stand, loud and unchanged.
-    let refusal = match recursive_port_process_compiles(&dead_arm_pair_program(true)) {
-        Ok(()) => panic!(
-            "a reachable arm was trapped into a false pass: constructing the request must leave \
-             the strict refusal in place, or the deadness analysis has stopped discriminating"
-        ),
-        Err(error) => error.to_string(),
-    };
+fn represented_unavailable_and_non_consumer_host_operation_populations_are_empty() {
     assert!(
-        refusal.contains("represented unavailable lane"),
-        "the surviving refusal must be the ORIGINAL one, naming the lane rather than some later \
-         failure that would mask a lost refusal: {refusal}"
+        ken_host::HostOpV1::ALL
+            .iter()
+            .all(|op| op.availability() == ken_host::HostOpAvailabilityV1::NativeTested),
+        "the unavailable-lane rows were retired at PX11 Inc2 because their population is \
+         empty; restore them with a real subject when it is not"
     );
-
-    // DEAD: the identical program, differing only in which constructor the
-    // sibling arm's `Let` names, lowers -- the arm is proven unreachable, so its
-    // refusing effect becomes a trap instead of failing object emission.
-    recursive_port_process_compiles(&dead_arm_pair_program(false)).expect(
-        "the same program with the request never constructed must lower: its arm is provably \
-         dead, so its refusing effect is a trap rather than an emission failure",
+    assert_eq!(
+        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.len(),
+        ken_host::HostOpV1::ALL.len(),
+        "the non-consumer rows were retired at PX11 Inc2 because their population is empty; \
+         restore them with a real subject when it is not"
     );
 }

@@ -58,13 +58,13 @@ fn abi_s3_the_deadline_type_carries_exactly_its_reading_and_no_cancellation_fiel
     // THE PROPERTY — one argument each, so there is no second position for a
     // cancellation token, status, or reserved field to occupy.
     assert_eq!(
-        constructor_arity(&env, "MkDeadline"),
+        constructor_arity(&env, "Deadline.MkDeadline"),
         1,
         "Deadline wraps exactly one monotonic reading; a second argument would \
          be the cancellation surface D2 forbids"
     );
     assert_eq!(
-        constructor_arity(&env, "MkMonotonicInstant"),
+        constructor_arity(&env, "MonotonicInstant.MkMonotonicInstant"),
         1,
         "a monotonic instant is exactly its reading"
     );
@@ -80,7 +80,7 @@ fn abi_s3_the_deadline_type_carries_exactly_its_reading_and_no_cancellation_fiel
     let deadline = *env.globals.get("Deadline").expect("Deadline is registered");
     let admitted = env
         .env
-        .constructor(*env.globals.get("MkDeadline").expect("MkDeadline"))
+        .constructor(*env.globals.get("Deadline.MkDeadline").expect("MkDeadline"))
         .expect("MkDeadline is a constructor")
         .0;
     assert_eq!(

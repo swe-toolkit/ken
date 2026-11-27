@@ -126,7 +126,7 @@ operations, and each one is a chance for a hand-maintained list to drift.
 | **ABI-A3** | Promote `FsReadDirectory`, `FsCreateDirectory`, `FsRemoveFile`, `FsRemoveDirectory`. | Runtime | M |
 | **RT-CLOCK-OP-NATIVE-PROMOTION** | Promote ABI-S3's `ClockMonotonicNow`, `ClockSleepUntil` and `EntropyRandomBytes`, with non-exact comparators. Precedes PX12, whose deadlines read the monotonic clock. | Runtime | L |
 | **RT-FS-DESCRIPTOR-SEEK-LENGTH-SYNC** | ABI-S1's `FsSeek`, `FsSetLength`, `FsSync`: AC-0 rules a checked surface and promotion, or retirement, per operation. | Runtime | L |
-| **RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE** | ABI-S1's `FsGetInheritance`, `FsSetInheritance`, `FsDuplicate`: the same ruling, against PX10's spawn-plan descriptor map. | Runtime | L |
+| **RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE** | ABI-S1's `FsGetInheritance`, `FsSetInheritance`, `FsDuplicate`: the same ruling, against PX10's spawn-plan descriptor map. Merged `2b88e30e1`: all three retired, host-op IDs `0x0312`-`0x0314` left as holes, and every FsHandle is close-on-exec (spec 38 §1.7.1). | Runtime | L |
 
 Split by evidence shape rather than by count: ABI-A1 is
 console/clock (nondeterministic observation, needs normalized comparison), ABI-A2

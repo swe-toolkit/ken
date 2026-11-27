@@ -45,7 +45,6 @@ ALLOWED: tuple[tuple[str, str, str, str], ...] = (
     ("crates/ken-runtime-support/src/activation_abi.rs", "0x8000000000000001", "fixture input value", "hand-built rendered activation limb"),
     ("crates/ken-runtime-support/src/activation_abi.rs", "0x0000_0000_0000_00ab", "fixture input value", "hand-built activation limb"),
     ("crates/ken-runtime-support/src/activation_abi.rs", "0x100000000000000ab", "fixture input value", "hand-built rendered activation limb"),
-    ("crates/ken-host/src/effect_wire.rs", "0x1020_3040_5060_7080", "fixture input value", "hand-built effect wire payload"),
     ("crates/ken-host/src/abi_v1.rs", "0xfedc_ba98_7654_3210", "fixture input value", "hand-built trace identity"),
     # The floor and H-family counts are specified inventories, not prelude ID ordinals.
     ("crates/ken-elaborator/tests/lang_prelude_nonhome_families_home.rs", "55", "spec-anchored count", "spec 30 section 4 H operations and scalar families excluding ClockIO"),

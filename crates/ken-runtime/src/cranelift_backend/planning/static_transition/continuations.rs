@@ -8595,6 +8595,58 @@ pub(in crate::cranelift_backend) mod tests {
     #[allow(unused_imports)]
     use crate::{RuntimeComputationalMatchCase, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
+    pub(in crate::cranelift_backend) fn statically_unselected_if_fixture() -> RuntimeExpr {
+        let ret = |value: i64| RuntimeExpr::Construct {
+            constructor: "ctor:prelude::ITree::Ret".into(),
+            args: vec![RuntimeExpr::Value(RuntimeValue::Int(value.into()))],
+        };
+        let vis = RuntimeExpr::Construct {
+            constructor: "ctor:prelude::ITree::Vis".into(),
+            args: vec![
+                unit(),
+                RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["response".into()],
+                    body: Box::new(ret(7_i64)),
+                },
+            ],
+        };
+        RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::If {
+                scrutinee: Box::new(RuntimeExpr::PrimitiveCall {
+                    primitive: crate::RuntimePrimitive {
+                        symbol: "and_bool".into(),
+                        partiality: crate::RuntimePartiality::Total,
+                    },
+                    args: vec![
+                        RuntimeExpr::Value(RuntimeValue::Bool(true)),
+                        RuntimeExpr::Value(RuntimeValue::Bool(false)),
+                    ],
+                }),
+                then_expr: Box::new(vis),
+                else_expr: Box::new(ret(23_i64)),
+            }),
+            cases: vec![
+                RuntimeComputationalMatchCase {
+                    constructor: "ctor:prelude::ITree::Ret".into(),
+                    argument_binders: 1,
+                    recursive_positions: Vec::new(),
+                    body: RuntimeExpr::Var(0),
+                },
+                RuntimeComputationalMatchCase {
+                    constructor: "ctor:prelude::ITree::Vis".into(),
+                    argument_binders: 2,
+                    recursive_positions: vec![1],
+                    body: RuntimeExpr::Call {
+                        callee: Box::new(RuntimeExpr::Var(0)),
+                        args: vec![unit()],
+                    },
+                },
+            ],
+            default: trap("statically unselected If"),
+        }
+    }
+
     /// Supplementary local resolution law. The governing discriminator is the
     /// population-side `Let` insertion exercised through the full planner.
     #[test]

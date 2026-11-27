@@ -334,12 +334,8 @@ pub enum FsCapabilityOperation {
     RenameSource,
     RenameDestination,
     ChangeMode,
-    Seek,
     SetLength,
     Sync,
-    GetInheritance,
-    SetInheritance,
-    Duplicate,
     Spawn,
 }
 
@@ -354,10 +350,7 @@ impl FsCapabilityOperation {
             Self::RemoveFile | Self::RemoveDirectory => RightSet::DELETE,
             Self::RenameSource | Self::RenameDestination => RightSet::WRITE.union(RightSet::DELETE),
             Self::ChangeMode => RightSet::CHANGE_MODE,
-            Self::Seek => RightSet::READ,
             Self::SetLength | Self::Sync => RightSet::WRITE,
-            Self::GetInheritance => RightSet::READ,
-            Self::SetInheritance | Self::Duplicate => RightSet::CHANGE_MODE,
             Self::Spawn => RightSet::EXECUTE,
         }
     }

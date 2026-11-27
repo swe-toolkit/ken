@@ -5522,6 +5522,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         compiler.open_aggregate_events(id)?;
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(5, id.as_u32()), sig);
+        compiler.begin_transfer_helpers(func.name.clone());
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
         function_local.grafted_spine_scope =
             Some(GraftedSpineFunctionScope::Response(emission.owner.id()));
@@ -6349,6 +6350,9 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
         compiler.validate_materialized_dead_join_cfg_for(&required, &func)?;
+        let transfer_helpers = compiler.take_transfer_helpers();
+        let transfer_helper_ids =
+            Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
         verify_cranelift_function(&func, module.isa())?;
         // The test-only Vis ingress bypasses finished-body verification as a
         // layer, whichever owner arm is emitted. No production build has this
@@ -6414,6 +6418,7 @@ pub(super) fn stage_static_response_owner_bodies<M: Module>(
         #[cfg(not(feature = "px8-ds-test-support"))]
         verify_finished_body()?;
         compiler.commit_aggregate_events()?;
+        define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
         #[cfg(feature = "px8-ds-test-support")]
         if body_mutation == Some(StaticResponseOwnerBodyMutation::OmitOwnerDefinition) {
             continue;
@@ -6738,6 +6743,7 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         compiler.open_aggregate_events(id)?;
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(0, id.as_u32()), sig);
+        compiler.begin_transfer_helpers(func.name.clone());
         // Set by the retarget below; `None` means this specialization calls the
         // raw worker unit directly, which is every pre-`D5a` case.
         let mut retargeted_worker_body: Option<StaticOriginId> = None;
@@ -7130,8 +7136,12 @@ pub(super) fn stage_continuation_bodies<M: Module>(
         frame_scope.close(compiler, &func)?;
         token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
+        let transfer_helpers = compiler.take_transfer_helpers();
+        let transfer_helper_ids =
+            Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
+        define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
         staged.push(stage_result_body(
             compiler,
             ExistingResultUnitIdentity::Continuation(unit.id),
@@ -7454,6 +7464,7 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
 
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(3, id.as_u32()), sig);
+        compiler.begin_transfer_helpers(func.name.clone());
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
         function_local.grafted_spine_scope =
             Some(GraftedSpineFunctionScope::ContinuationContext(context.id));
@@ -7890,8 +7901,12 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             ledger.record_response_owner_calls(response_owner_calls);
         }
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
+        let transfer_helpers = compiler.take_transfer_helpers();
+        let transfer_helper_ids =
+            Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
+        define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
         staged.push(stage_result_body(
             compiler,
             ExistingResultUnitIdentity::Context(context.id),
@@ -8121,6 +8136,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
 
         let sig = unit_signature(module);
         let mut func = Function::with_name_signature(UserFuncName::user(4, id.as_u32()), sig);
+        compiler.begin_transfer_helpers(func.name.clone());
         let mut function_local = helpers.declare_in_func(module, &mut func, None);
         function_local.grafted_spine_scope = Some(GraftedSpineFunctionScope::Fusion(fusion.id));
         // The PRODUCER's own call edges, declared into this function. This is
@@ -8557,8 +8573,12 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             ledger.record_response_owner_calls(response_owner_calls);
         }
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
+        let transfer_helpers = compiler.take_transfer_helpers();
+        let transfer_helper_ids =
+            Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
         verify_cranelift_function(&func, module.isa())?;
         compiler.commit_aggregate_events()?;
+        define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
         if let Some(ledger) = compiler.fusion_claims.as_mut() {
             ledger.record_defined(fusion.id)?;
         }
@@ -8844,6 +8864,7 @@ pub(super) fn define_root_adapter<M: Module>(
     );
 
     let mut func_ctx = FunctionBuilderContext::new();
+    compiler.begin_transfer_helpers(func.name.clone());
     {
         let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
         let entry = builder.create_block();
@@ -8938,8 +8959,12 @@ pub(super) fn define_root_adapter<M: Module>(
         builder.seal_all_blocks();
         builder.finalize();
     }
+    let transfer_helpers = compiler.take_transfer_helpers();
+    let transfer_helper_ids =
+        Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
     verify_cranelift_function(&func, module.isa())?;
     compiler.commit_aggregate_events()?;
+    define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
     #[cfg(test)]
     scale_b_record_functionized_root_adapter(&func);
     let mut ctx = module.make_context();
@@ -9242,15 +9267,9 @@ pub(in crate::cranelift_backend) fn d3_mutation() -> D3Mutation {
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — what lowering settled a binding
 /// candidate to.**
 ///
-/// The three are settled at three different seats, each of which knows
-/// something the other two do not, and none of them is a discharge on its own:
-/// a discharge is what [`ContinuationClaimLedger`] records, and this enum sits
-/// in front of it.
-///
-/// `InlineNoCall` is deliberately **not** a third arm of the discharge
-/// partition. A third arm would let a program that made no call satisfy a law
-/// whose entire purpose is to say a call was answered. It never enters the
-/// equality, and `D2` derives the call-obligation subset from the other two.
+/// Only direct and composed calls enter the `D2` call-obligation subset.
+/// A disposition without a call is not a discharge: a program that made no
+/// call must not satisfy a law whose purpose is to say a call was answered.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// The verified direct producer/call seat claimed and emitted.
@@ -9264,6 +9283,9 @@ pub(in crate::cranelift_backend) enum CandidateDisposition {
     /// source, but no emitted runtime branch used it in this artifact. The edge
     /// has its own verifier and is not a causal-call obligation.
     TransportDormant,
+    /// The producer Construct lies in a subtree lowering statically excluded
+    /// in its emission owner; the call is never emitted and is not an obligation.
+    StaticallyUnselected,
 }
 
 /// **`RT-CONTINUATION-EDGE-DISPOSITION` `D1` — the binding-candidate ledger, a
@@ -9411,16 +9433,15 @@ impl ContinuationCandidateLedger {
                 ),
             ));
         }
-        // The call-obligation subset. `InlineNoCall` is deliberately absent: it
-        // is not a discharge and never enters the equality below.
+        // Only dispositions that actually call enter the obligation subset.
         Ok(self
             .settled
             .into_iter()
             .filter(|(_, disposition)| match disposition {
                 CandidateDisposition::DirectCall | CandidateDisposition::ComposedCall => true,
-                CandidateDisposition::InlineNoCall | CandidateDisposition::TransportDormant => {
-                    false
-                }
+                CandidateDisposition::InlineNoCall
+                | CandidateDisposition::TransportDormant
+                | CandidateDisposition::StaticallyUnselected => false,
             })
             .map(|(identity, _)| identity)
             .collect())
@@ -9818,12 +9839,14 @@ impl ContinuationClaimLedger {
                             "response owner has no installed response row".to_string(),
                         )
                     })?;
-                // Only a relay-promoted owner may be unentered, and only when
-                // no evaluator lowered its source Construct in ANY Function.
-                // `disposition=None` alone proves neither of those facts.
-                if !plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
-                    || lowered_construct_origins.contains(&source)
-                {
+                // A relay-promoted owner or one with a statically unselected
+                // caller may be unentered, but only when no evaluator lowered
+                // its source Construct in any function.
+                let unentered = (plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
+                    || dispositions.get(owner.selected_caller())
+                        == Some(&CandidateDisposition::StaticallyUnselected))
+                    && !lowered_construct_origins.contains(&source);
+                if !unentered {
                     #[cfg(feature = "px8-ds-test-support")]
                     if plan.has_pre_schema_relay_promotion(source, owner.selected_caller()) {
                         RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
@@ -11075,6 +11098,53 @@ pub(in crate::cranelift_backend) fn source_body_binding_order(
     })
 }
 
+/// RT-NATIVE-AGGREGATE-DATA-NOT-CODE: define each transfer helper a unit
+/// body requested, after that body is defined. Each helper is its own
+/// Function with its own FuncId, carrier refs and aggregate-event scope, and
+/// runs under the requesting body's owner and unit.
+fn define_transfer_helper_bodies<M: Module>(
+    module: &mut M,
+    compiler: &mut Lowering<'_>,
+    helpers: ArtifactHelpers<'_>,
+    pending: &[aggregates::PendingTransferHelper],
+    ids: &[FuncId],
+) -> Result<(), CraneliftBackendError> {
+    let pointer_type = module.target_config().pointer_type();
+    for (helper, &id) in pending.iter().zip(ids) {
+        let mut func = Function::with_name_signature(
+            UserFuncName::user(6, id.as_u32()),
+            helper.signature.clone(),
+        );
+        let local = helpers.declare_in_func(module, &mut func, None);
+        let caller_local = std::mem::replace(&mut compiler.function_local, local);
+        compiler.open_aggregate_events(id)?;
+        let ambient = AmbientBodyAuthority::bind_body(compiler, helper.owner, helper.unit);
+        let mut func_ctx = FunctionBuilderContext::new();
+        let emitted = {
+            let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
+            let emitted = compiler.emit_transfer_helper_body(&mut builder, pointer_type, helper);
+            if emitted.is_ok() {
+                builder.seal_all_blocks();
+                builder.finalize();
+            }
+            emitted
+        };
+        ambient.release(compiler);
+        compiler.function_local = caller_local;
+        emitted?;
+        verify_cranelift_function(&func, module.isa())?;
+        compiler.commit_aggregate_events()?;
+        #[cfg(feature = "px8-ds-test-support")]
+        record_transfer_helper_definition(helper.seat, &func);
+        let mut ctx = module.make_context();
+        std::mem::swap(&mut ctx.func, &mut func);
+        module
+            .define_function(id, &mut ctx)
+            .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
+    }
+    Ok(())
+}
+
 fn define_unit_body<M: Module>(
     module: &mut M,
     compiler: &mut Lowering<'_>,
@@ -11199,6 +11269,9 @@ fn define_unit_body<M: Module>(
         compiler.defining_function_id,
         crate::cranelift_backend::lowering::D8oBodyKey::OrdinaryUnit(unit.function),
     );
+    // RT-NATIVE-AGGREGATE-DATA-NOT-CODE: selection transfers in this body are
+    // emitted as calls to per-(owner, seat, template) helpers.
+    compiler.begin_transfer_helpers(func.name.clone());
     function_local.unit_calls = declared_calls.static_bodies;
     function_local.declaration_calls = declared_calls.declarations;
     // `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f` — THE REDIRECT.
@@ -11830,6 +11903,9 @@ fn define_unit_body<M: Module>(
         ledger.record_response_owner_calls(response_owner_calls);
     }
     compiler.record_finished_grafted_spine_function(&func, bundle)?;
+    let transfer_helpers = compiler.take_transfer_helpers();
+    let transfer_helper_ids =
+        Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
     verify_cranelift_function(&func, module.isa())?;
     compiler.commit_aggregate_events()?;
     #[cfg(test)]
@@ -11841,6 +11917,7 @@ fn define_unit_body<M: Module>(
     module
         .define_function(id, &mut ctx)
         .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
+    define_transfer_helper_bodies(module, compiler, helpers, &transfer_helpers, &transfer_helper_ids)?;
     // ⛔ Counted HERE, adjacent to `define_function`, and NOT at the call site
     // in the loop above -- where it was first written and where it was
     // worthless.

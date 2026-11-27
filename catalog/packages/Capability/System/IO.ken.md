@@ -47,6 +47,8 @@ export write_all_exact_prefix_prop,
   readAt,
   readDirectoryBatch,
   writeAt,
+  setLength,
+  sync,
   writeAll,
   spanBytes
 

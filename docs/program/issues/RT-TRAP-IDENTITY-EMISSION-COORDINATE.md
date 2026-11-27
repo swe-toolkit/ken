@@ -386,6 +386,8 @@ absent grep:
   - **No `serde`** anywhere in `effect_v1.rs`, at both refs.
   - **No `repr`** on either type. The file's four `repr(..)` attributes sit on
     `HostOpV1`, `CapabilityTokenV1`, `ResourceTokenV1` and `FdInheritancePolicyV1`.
+    Since `2b88e30e1` (RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE) there are three:
+    `FdInheritancePolicyV1` is removed. The premise is unchanged.
   - **Nothing serializes it or pins its layout** — zero hits for `RuntimeTrap` in
     any serialize/encode/to_bytes/section context, and zero for
     `size_of::<RuntimeTrap>` / `transmute` / `offset_of`. **Positively: what

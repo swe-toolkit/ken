@@ -66,6 +66,13 @@ pub(in crate::cranelift_backend) fn dead_arm_effect_trap(
     }
 }
 
+pub(in crate::cranelift_backend) fn sleep_deadline_domain_trap() -> RuntimeTrap {
+    RuntimeTrap {
+        code: RuntimeTrapCode::ExplicitTrap,
+        message: "Clock.sleep_until deadline is outside 0 <= d < 2^64 (38 §1.15)".to_string(),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum JoinResultRepresentation {
     NativeScalarPair,
@@ -1059,7 +1066,7 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(owned)
     }
 
-    fn source_origins_in_owner_subtree(
+    pub(in crate::cranelift_backend) fn source_origins_in_owner_subtree(
         &self,
         root: StaticOriginId,
     ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {

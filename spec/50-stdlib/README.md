@@ -511,8 +511,12 @@ this base; candidate-local tests do not establish official
 conformance, CI or measured landed trust. Section 23
 (SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTE-FRESH) specifies `substitute_fresh`:
 if a variable is absent from every replacement used by the expression,
-it is absent from the substituted expression. A sorted-list normal form
-and signed/field arithmetic remain deferred.
+it is absent from the substituted expression. Section 24
+(SPEC-SYMBOLIC-ALGEBRA-DERIV-FRESH) specifies `deriv_fresh`: syntactic
+absence of a variable is preserved by differentiation in any variable.
+The second-derivative zero result is a client composition, not another
+public law. A sorted-list normal form and signed/field arithmetic remain
+deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–9 (SPEC-GEOMETRY-EXACT-CONTRACT;
@@ -784,7 +788,8 @@ SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 SPEC-OPTIMIZATION-ARGMIN-COST-ORDER-INVARIANCE §1.5;
 SPEC-OPTIMIZATION-ARGMIN-APPEND-SPLIT §1.6) and §3
 (SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4;
-SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5).
+SPEC-OPTIMIZATION-ARGMAX-COST-ORDER-INVARIANCE §3.5), with
+SPEC-OPTIMIZATION-ARGMIN-MAP in §§1.9 and 3.9.
 The landed `Algorithm.Optimization.Argmin` exports `argmin` for the
 earliest minimum and `argmax` for the earliest greatest `Nat`-cost
 member of `NonEmpty a` with no `DecEq a`; the seven `argmin` and
@@ -824,7 +829,11 @@ measured no new `Axiom` and equal scratch trusted identities
 The §3.5 checked catalog law, seed and package-owned test are present
 on main; earlier candidate-local checks are not official conformance,
 CI, publication, landing or landed trust. Earlier D0 alone established
-no CI or landed trust measurement. Continuous or implicit search,
+no CI or landed trust measurement. Sections 1.9 and 3.9 specify
+`argmin_map` and `argmax_map`: selecting over mapped `NonEmpty`
+candidates equals mapping the choice made under `cost ∘ f`, including
+for non-injective `f`. No Option-form theorem is exported by this
+extension. Continuous or implicit search,
 heuristics, approximation, arbitrary-order or
 multi-objective costs, greatest-cost top-k and complexity claims remain
 deferred. The LEAST-K candidate delivers `least_k` and eight checked laws.

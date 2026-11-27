@@ -249,55 +249,23 @@ struct FsWriteAtRequestV1 {
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsSeekRequestV1 {
-    resource: u64,
-    origin: u64,
-    offset: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsSetLengthRequestV1 {
     resource: u64,
     length: u64,
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct FsSyncRequestV1 {
     resource: u64,
     mode: u64,
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsGetInheritanceRequestV1 {
-    resource: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsSetInheritanceRequestV1 {
-    resource: u64,
-    policy: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
-struct FsDuplicateRequestV1 {
-    resource: u64,
-    policy: u64,
-}
-
-#[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct ClockDeadlineRequestV1 {
     deadline: u64,
 }
 
 #[repr(C)]
-#[allow(dead_code)] // Manifest-covered V1 lane; native execution is deferred.
 struct EntropyRequestV1 {
     count: u64,
 }
@@ -647,6 +615,21 @@ impl HostEffectBackendV1 for ProcessHost {
         // sequence, and lets generated code validate one exact
         // response layout before interning the magnitude.
         nanoseconds.to_be_bytes().to_vec()
+    }
+
+    fn clock_monotonic_now(&mut self) -> Vec<u8> {
+        i128::try_from(crate::monotonic_nanoseconds_v1())
+            .expect("an Instant duration always fits signed nanoseconds")
+            .to_be_bytes()
+            .to_vec()
+    }
+
+    fn clock_sleep_until(&mut self, deadline: u64) {
+        crate::sleep_until_monotonic_v1(deadline);
+    }
+
+    fn entropy_random_bytes(&mut self, count: u64) -> Result<Vec<u8>, IoErrorIdentityV1> {
+        crate::kernel_entropy_v1(count)
     }
 
     fn console_write(
@@ -1479,7 +1462,8 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
         CanonicalOutcomeV1::Success(
             CanonicalReplyV1::Bytes(bytes)
             | CanonicalReplyV1::ReadChunk(bytes)
-            | CanonicalReplyV1::Instant(bytes),
+            | CanonicalReplyV1::Instant(bytes)
+            | CanonicalReplyV1::MonotonicInstant(bytes),
         ) => {
             context.response_arena.push(bytes.into_boxed_slice());
             let bytes = context
@@ -1568,11 +1552,6 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 len: bytes.len(),
             };
         }
-        CanonicalOutcomeV1::Success(
-            CanonicalReplyV1::MonotonicInstant(_)
-            | CanonicalReplyV1::FilePosition(_)
-            | CanonicalReplyV1::FdInheritancePolicy(_),
-        ) => reply.tag = REPLY_ERROR,
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
             reply.tag = REPLY_RESOURCE_ERROR;
             match error {
@@ -1835,14 +1814,46 @@ unsafe fn decode_native_request_v1(
                 },
             )
         }
-        HostOpV1::ClockWallNow if request_size == std::mem::size_of::<UnitRequestV1>() => {
+        HostOpV1::ClockWallNow | HostOpV1::ClockMonotonicNow
+            if request_size == std::mem::size_of::<UnitRequestV1>() =>
+        {
             if !request.cast::<UnitRequestV1>().is_aligned() {
                 return Err(-1);
             }
             (
                 None,
                 crate::ResourceInputsV1::None,
-                CanonicalRequestV1::ClockWallNow,
+                if op == HostOpV1::ClockWallNow {
+                    CanonicalRequestV1::ClockWallNow
+                } else {
+                    CanonicalRequestV1::ClockMonotonicNow
+                },
+            )
+        }
+        HostOpV1::ClockSleepUntil
+            if request_size == std::mem::size_of::<ClockDeadlineRequestV1>() =>
+        {
+            let request = request.cast::<ClockDeadlineRequestV1>();
+            if !request.is_aligned() {
+                return Err(-1);
+            }
+            let deadline = unsafe { (*request).deadline };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::ClockSleepUntil { deadline },
+            )
+        }
+        HostOpV1::EntropyRandomBytes if request_size == std::mem::size_of::<EntropyRequestV1>() => {
+            let request = request.cast::<EntropyRequestV1>();
+            if !request.is_aligned() {
+                return Err(-1);
+            }
+            let count = unsafe { (*request).count };
+            (
+                None,
+                crate::ResourceInputsV1::None,
+                CanonicalRequestV1::EntropyRandomBytes { count },
             )
         }
         HostOpV1::ConsoleFlush | HostOpV1::ConsoleIsTerminal
@@ -2084,6 +2095,37 @@ unsafe fn decode_native_request_v1(
                     wire.resource,
                 )),
                 request,
+            )
+        }
+        HostOpV1::FsSetLength if request_size == std::mem::size_of::<FsSetLengthRequestV1>() => {
+            if !request.cast::<FsSetLengthRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<FsSetLengthRequestV1>() };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                CanonicalRequestV1::FsSetLength { length: wire.length },
+            )
+        }
+        HostOpV1::FsSync if request_size == std::mem::size_of::<FsSyncRequestV1>() => {
+            if !request.cast::<FsSyncRequestV1>().is_aligned() {
+                return Err(-1);
+            }
+            let wire = unsafe { &*request.cast::<FsSyncRequestV1>() };
+            let mode = match wire.mode {
+                0 => crate::FsSyncModeV1::SyncFull,
+                1 => crate::FsSyncModeV1::SyncData,
+                _ => return Err(-1),
+            };
+            (
+                None,
+                crate::ResourceInputsV1::Target(crate::ResourceTokenV1::from_erased_identity(
+                    wire.resource,
+                )),
+                CanonicalRequestV1::FsSync { mode },
             )
         }
         HostOpV1::FsReadAt if request_size == std::mem::size_of::<FsPositionedRequestV1>() => {
@@ -2860,12 +2902,8 @@ mod tests {
         size_align!("ResourceRequestV1", ResourceRequestV1);
         size_align!("FsPositionedRequestV1", FsPositionedRequestV1);
         size_align!("FsWriteAtRequestV1", FsWriteAtRequestV1);
-        size_align!("FsSeekRequestV1", FsSeekRequestV1);
         size_align!("FsSetLengthRequestV1", FsSetLengthRequestV1);
         size_align!("FsSyncRequestV1", FsSyncRequestV1);
-        size_align!("FsGetInheritanceRequestV1", FsGetInheritanceRequestV1);
-        size_align!("FsSetInheritanceRequestV1", FsSetInheritanceRequestV1);
-        size_align!("FsDuplicateRequestV1", FsDuplicateRequestV1);
         size_align!("ClockDeadlineRequestV1", ClockDeadlineRequestV1);
         size_align!("EntropyRequestV1", EntropyRequestV1);
         size_align!("BufferAllocateRequestV1", BufferAllocateRequestV1);
@@ -2930,30 +2968,10 @@ mod tests {
         offset!("FsOpenRequestV1", FsOpenRequestV1, path);
         offset!("FsOpenRequestV1", FsOpenRequestV1, mode);
         offset!("ResourceRequestV1", ResourceRequestV1, resource);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, resource);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, origin);
-        offset!("FsSeekRequestV1", FsSeekRequestV1, offset);
         offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, resource);
         offset!("FsSetLengthRequestV1", FsSetLengthRequestV1, length);
         offset!("FsSyncRequestV1", FsSyncRequestV1, resource);
         offset!("FsSyncRequestV1", FsSyncRequestV1, mode);
-        offset!(
-            "FsGetInheritanceRequestV1",
-            FsGetInheritanceRequestV1,
-            resource
-        );
-        offset!(
-            "FsSetInheritanceRequestV1",
-            FsSetInheritanceRequestV1,
-            resource
-        );
-        offset!(
-            "FsSetInheritanceRequestV1",
-            FsSetInheritanceRequestV1,
-            policy
-        );
-        offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, resource);
-        offset!("FsDuplicateRequestV1", FsDuplicateRequestV1, policy);
         offset!("MappingAllocateRequestV1", MappingAllocateRequestV1, length);
         offset!(
             "MappingAllocateRequestV1",
@@ -4347,6 +4365,90 @@ mod tests {
             );
         }
 
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(context.effect_trace.len(), 2);
+        unsafe { ken_host_invocation_v1_destroy(initialized.context) };
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: with the statx facility absent (its probe reports EPERM
+    /// through the facility seam), raw FsMetadata on an existing file replies
+    /// REPLY_ERROR whose detail decodes to Unsupported, and its trace event is
+    /// the FileError carrier for FsMetadata, the path and Io(Unsupported).
+    /// Without the seam the same dispatch replies REPLY_METADATA.
+    /// CLAIMED: ProcessHost::fs_metadata, host_error, file_error and set_reply
+    /// carry the refusal unchanged; EPERM is not PermissionDenied here.
+    /// THE GAP: the seam replaces the probe's syscall result; no real host
+    /// lacking statx is exercised.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fs_metadata_raw_dispatch_refuses_unsupported_while_statx_is_absent() {
+        let directory = std::env::temp_dir()
+            .join(format!("ken-fs-metadata-statx-absent-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("known.bin"), b"five!").unwrap();
+        let initialized = context(&directory);
+        let path = b"known.bin".as_slice();
+        let request = FsPathRequestV1 {
+            capability: initialized.capability,
+            path: SliceV1 {
+                data: path.as_ptr(),
+                len: path.len(),
+            },
+        };
+        let dispatch = |reply: &mut HostReplyV1| unsafe {
+            ken_host_dispatch_v1(
+                initialized.context,
+                u64::from(HostOpV1::FsMetadata as u16),
+                std::ptr::from_ref(&request).cast(),
+                std::mem::size_of::<FsPathRequestV1>(),
+                std::ptr::from_mut(reply).cast(),
+            )
+        };
+        let blank = || HostReplyV1 {
+            tag: u64::MAX,
+            detail: u64::MAX,
+            bytes: SliceV1 {
+                data: std::ptr::null(),
+                len: usize::MAX,
+            },
+            resource_error: ResourceErrorReplyV1::default(),
+            effective_request: u64::MAX,
+            metadata: FileMetadataReplyV1::default(),
+        };
+
+        let mut absent = blank();
+        let status = crate::facility_v1::with_facility_fault(
+            crate::facility_v1::HostFacilityV1::Statx,
+            libc::EPERM,
+            || dispatch(&mut absent),
+        );
+        assert_eq!(status, 0, "the refusal is a typed reply, not a fallback");
+        assert_eq!(absent.tag, REPLY_ERROR);
+        assert_eq!(
+            io_error_from_tag(absent.detail),
+            Some(crate::IoErrorIdentityV1::Unsupported)
+        );
+        let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
+        assert_eq!(context.effect_trace.len(), 1);
+        assert_eq!(context.effect_trace[0].operation, HostOpV1::FsMetadata);
+        assert_eq!(
+            context.effect_trace[0].outcome,
+            CanonicalOutcomeV1::Error(crate::SemanticErrorV1::File(
+                crate::FileErrorIdentityV1 {
+                    operation: HostOpV1::FsMetadata,
+                    relative_path: path.to_vec(),
+                    cause: FileErrorCauseV1::Io(crate::IoErrorIdentityV1::Unsupported),
+                }
+            ))
+        );
+
+        let mut present = blank();
+        assert_eq!(dispatch(&mut present), 0);
+        assert_eq!(present.tag, REPLY_METADATA);
+        assert_eq!(present.metadata.size, 5);
         let context = unsafe { &*initialized.context.cast::<ProcessContext>() };
         assert_eq!(context.effect_trace.len(), 2);
         unsafe { ken_host_invocation_v1_destroy(initialized.context) };

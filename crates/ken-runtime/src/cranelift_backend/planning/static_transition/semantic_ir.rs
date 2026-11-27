@@ -117,6 +117,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ReadEof,
     Wrote,
     MkInstant,
+    MkMonotonicInstant,
     ReadChunk,
     ReadResultEof,
     Unit,
@@ -139,13 +140,6 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     DirectoryEnd,
     ListNil,
     ListCons,
-    /// ABI-S1 descriptor-operation error identities append without moving prior roles.
-    FileOperationSeek,
-    FileOperationSetLength,
-    FileOperationSync,
-    FileOperationGetInheritance,
-    FileOperationSetInheritance,
-    FileOperationDuplicate,
     /// ABI-S6 D4 appends the Mapping governor refusal role.
     ResourceMappingLimit,
     /// ABI-S6 D5a appends the third resource-kind reification role.
@@ -193,7 +187,7 @@ pub(in crate::cranelift_backend) const fn resource_kind_role(
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 67] = [
+    pub(super) const ALL: [Self; 62] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -219,6 +213,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ReadEof,
         Self::Wrote,
         Self::MkInstant,
+        Self::MkMonotonicInstant,
         Self::ReadChunk,
         Self::ReadResultEof,
         Self::Unit,
@@ -239,12 +234,6 @@ impl SynthesizedFixedConstructorRole {
         Self::DirectoryEnd,
         Self::ListNil,
         Self::ListCons,
-        Self::FileOperationSeek,
-        Self::FileOperationSetLength,
-        Self::FileOperationSync,
-        Self::FileOperationGetInheritance,
-        Self::FileOperationSetInheritance,
-        Self::FileOperationDuplicate,
         Self::ResourceMappingLimit,
         Self::ResourceKindMapping,
         Self::ExitSuccess,
@@ -303,6 +292,7 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadEof => &symbols.read_eof,
             Self::Wrote => &symbols.wrote,
             Self::MkInstant => &symbols.mk_instant,
+            Self::MkMonotonicInstant => &symbols.mk_monotonic_instant,
             Self::ReadChunk => &symbols.read_chunk,
             Self::ReadResultEof => &symbols.read_result_eof,
             Self::ExitSuccess => &symbols.exit_success,
@@ -325,12 +315,6 @@ impl SynthesizedFixedConstructorRole {
             Self::DirectoryEnd => &symbols.directory_end,
             Self::ListNil => &symbols.list_nil,
             Self::ListCons => &symbols.list_cons,
-            Self::FileOperationSeek => &symbols.file_operation_seek,
-            Self::FileOperationSetLength => &symbols.file_operation_set_length,
-            Self::FileOperationSync => &symbols.file_operation_sync,
-            Self::FileOperationGetInheritance => &symbols.file_operation_get_inheritance,
-            Self::FileOperationSetInheritance => &symbols.file_operation_set_inheritance,
-            Self::FileOperationDuplicate => &symbols.file_operation_duplicate,
             Self::ResourceMappingLimit => &symbols.resource_mapping_limit,
             Self::ChildExitExited => &symbols.px10_exit_symbols[0],
             Self::ChildExitSignaled => &symbols.px10_exit_symbols[1],
@@ -905,6 +889,7 @@ pub(super) fn build_synthesized_constructor_inventory(
         if matches!(
             role,
             SynthesizedFixedConstructorRole::MkInstant
+                | SynthesizedFixedConstructorRole::MkMonotonicInstant
                 | SynthesizedFixedConstructorRole::ReadChunk
                 | SynthesizedFixedConstructorRole::ReadResultEof
                 | SynthesizedFixedConstructorRole::ExitSuccess
@@ -940,6 +925,7 @@ pub(super) fn build_synthesized_constructor_inventory(
         SynthesizedFixedConstructorRole::ReadResultEof,
         SynthesizedFixedConstructorRole::ExitSuccess,
         SynthesizedFixedConstructorRole::ExitFailure,
+        SynthesizedFixedConstructorRole::MkMonotonicInstant,
     ] {
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
         identities.insert(SynthesizedConstructorRole::Fixed(role), span);

@@ -542,6 +542,43 @@ pub theorem interval_split_width
       in
         rational_add_cancel_r halves whole_width lo same_after_add
 
+pub theorem interval_split_hull_inside
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue (rational_leq lo m)
+      → IsTrue (rational_leq m hi)
+      → IsTrue
+        (interval_inside
+          (interval_hull (MkInterval lo m) (MkInterval m hi))
+          (MkInterval lo hi)) =
+  λlower.
+    λupper.
+      interval_hull_least
+        (MkInterval lo m)
+        (MkInterval m hi)
+        (MkInterval lo hi)
+        ((proof intro for bool_and)
+          (rational_leq lo lo)
+          (rational_leq m hi)
+          ((proof refl for rational_leq) lo)
+          upper)
+        ((proof intro for bool_and)
+          (rational_leq lo m)
+          (rational_leq hi hi)
+          lower
+          ((proof refl for rational_leq) hi))
+
+pub theorem interval_inside_split_hull
+      (lo : Rational) (hi : Rational) (m : Rational)
+    : IsTrue
+        (interval_inside
+          (MkInterval lo hi)
+          (interval_hull (MkInterval lo m) (MkInterval m hi))) =
+  (proof intro for bool_and)
+    (rational_leq (rational_min lo m) lo)
+    (rational_leq hi (rational_max m hi))
+    ((proof leq_left for rational_min) lo m)
+    ((proof right_leq for rational_max) m hi)
+
 pub fn interval_contains (i : Interval) (x : Rational) : Bool =
   match i {
     MkInterval lo hi ↦ bool_and (rational_leq lo x) (rational_leq x hi)
@@ -2095,6 +2132,22 @@ side, it rearranges the terms to add `lo` to the lower half-width, recovering
 plus `lo` also recovers `hi`, since `lo ≤ hi` follows by transitivity.
 Rational right-add cancellation removes the common `lo`.
 
+### Reassembling a split (§23)
+
+When `lo ≤ m ≤ hi`, `interval_split_hull_inside` places the hull of the two
+halves inside `MkInterval lo hi`. The converse, `interval_inside_split_hull`,
+needs no order premises: taking the minimum lower bound and maximum upper
+bound cannot exclude a point of the original interval. These laws compare
+endpoint values, not stored interval structure. For instance, splitting
+`[0, 1]` at `1/2` gives mutual inclusion, while splitting at `2` gives a
+hull of `[0, 2]`, which is not inside `[0, 1]`.
+
+To carry a member of either half into the whole, compose
+`interval_inside_hull_left` or `interval_inside_hull_right` with
+`interval_split_hull_inside` using `interval_inside_trans`, then apply
+`interval_inside_sound`. Direct inclusion of just the lower half needs
+only `m ≤ hi`; direct inclusion of just the upper half needs only `lo ≤ m`.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -2136,11 +2189,12 @@ interval subtraction are not.
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
    `interval_hull`, `interval_intersect`, `interval_inside` and
-   `interval_split_covers` form the public contract with sixty-one checked
+   `interval_split_covers` form the public contract with sixty-three checked
    public theorems, including `interval_width_mul`, `interval_width_inside`,
-   `interval_width_bounds_sub`, `interval_width_zero_equiv` and
-   `interval_split_width`. Section 22 adds one theorem and leaves the nine
-   public functions and all operation and law types from §§1–21 unchanged.
+   `interval_width_bounds_sub`, `interval_width_zero_equiv`,
+   `interval_split_width`, `interval_split_hull_inside` and
+   `interval_inside_split_hull`. Section 23 adds two theorems and leaves the
+   nine public functions and all operation and law types from §§1–22 unchanged.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
@@ -2187,7 +2241,9 @@ interval subtraction are not.
    [Adding the widths of a split](#adding-the-widths-of-a-split-22) uses public
    Rational order transitivity and addition/subtraction cancellation, with no
    new helper or import.
-4. **Trusted-base delta.** Zero: all sixty-one theorems and the split cover
+   [Reassembling a split](#reassembling-a-split-23) uses `interval_hull_least`
+   and the public Rational min/max bound laws without new helpers.
+4. **Trusted-base delta.** Zero: all sixty-three theorems and the split cover
    function have checked bodies, and the package declares no `Axiom` or new
    primitive. Imported rational, natural-number and logical providers retain
    their inherited trust.

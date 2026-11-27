@@ -4307,35 +4307,16 @@ impl HostHandler for PosixHost {
     }
 
     fn clock_monotonic_now(&mut self) -> BigInt {
-        BigInt::from(process_monotonic_baseline().elapsed().as_nanos())
+        BigInt::from(ken_host::monotonic_nanoseconds_v1())
     }
 
     fn entropy_random_bytes(&mut self, count: u64) -> io::Result<Vec<u8>> {
-        // The kernel CSPRNG, read directly. Not a userspace PRNG, not a
-        // seeded substitute, and no fallback: if the kernel source cannot be
-        // read the error propagates and the operation reports unavailable
-        // (ABI-S3 D3).
-        use std::io::Read;
-        let mut bytes = vec![
-            0u8;
-            usize::try_from(count).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "entropy request too large")
-            })?
-        ];
-        std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-        Ok(bytes)
+        ken_host::kernel_entropy_v1(count).map_err(|_| io::ErrorKind::Unsupported.into())
     }
 
     fn clock_sleep_until(&mut self, deadline: BigInt) {
-        let now = self.clock_monotonic_now();
-        // An already-reached deadline completes immediately rather than
-        // underflowing into a very long sleep.
-        if deadline <= now {
-            return;
-        }
-        let remaining = deadline - now;
-        if let Ok(nanoseconds) = u64::try_from(remaining) {
-            std::thread::sleep(std::time::Duration::from_nanos(nanoseconds));
+        if let Ok(deadline) = u64::try_from(deadline) {
+            ken_host::sleep_until_monotonic_v1(deadline);
         }
     }
 
@@ -5502,6 +5483,8 @@ pub struct FSIds {
     pub private_fs_open_id: GlobalId,
     pub private_fs_open_directory_id: GlobalId,
     pub private_fs_read_directory_batch_id: GlobalId,
+    pub private_fs_set_length_id: GlobalId,
+    pub private_fs_sync_id: GlobalId,
     pub private_fs_handle_metadata_id: GlobalId,
     pub private_buffer_allocate_id: GlobalId,
     pub private_fs_read_at_id: GlobalId,
@@ -5566,12 +5549,6 @@ pub struct FSIds {
     pub op_remove_directory_id: GlobalId,
     pub op_rename_id: GlobalId,
     pub op_change_mode_id: GlobalId,
-    pub op_seek_id: GlobalId,
-    pub op_set_length_id: GlobalId,
-    pub op_sync_id: GlobalId,
-    pub op_get_inheritance_id: GlobalId,
-    pub op_set_inheritance_id: GlobalId,
-    pub op_duplicate_id: GlobalId,
     pub mk_file_metadata_id: GlobalId,
     pub mk_dir_entry_id: GlobalId,
     pub directory_entries_id: GlobalId,
@@ -5600,6 +5577,8 @@ impl FSIds {
             private_fs_open_id: prelude.private_fs_open_id,
             private_fs_open_directory_id: prelude.private_fs_open_directory_id,
             private_fs_read_directory_batch_id: prelude.private_fs_read_directory_batch_id,
+            private_fs_set_length_id: prelude.private_fs_set_length_id,
+            private_fs_sync_id: prelude.private_fs_sync_id,
             private_fs_handle_metadata_id: prelude.private_fs_handle_metadata_id,
             private_buffer_allocate_id: prelude.private_buffer_allocate_id,
             private_fs_read_at_id: prelude.private_fs_read_at_id,
@@ -5664,12 +5643,6 @@ impl FSIds {
             op_remove_directory_id: roles.file_operation_remove_directory,
             op_rename_id: roles.file_operation_rename,
             op_change_mode_id: roles.file_operation_change_mode,
-            op_seek_id: roles.file_operation_seek,
-            op_set_length_id: roles.file_operation_set_length,
-            op_sync_id: roles.file_operation_sync,
-            op_get_inheritance_id: roles.file_operation_get_inheritance,
-            op_set_inheritance_id: roles.file_operation_set_inheritance,
-            op_duplicate_id: roles.file_operation_duplicate,
             mk_file_metadata_id: roles.file_metadata,
             mk_dir_entry_id: roles.dir_entry,
             directory_entries_id: roles.directory_entries,
@@ -5833,14 +5806,6 @@ fn decode_stream(value: &EvalVal, ids: &ConsoleIds) -> Option<ConsoleStream> {
         EvalVal::Ctor { id, .. } if *id == ids.stderr_id => Some(ConsoleStream::Stderr),
         _ => None,
     }
-}
-
-/// Process-wide monotonic origin. `std::time::Instant` is monotonic by
-/// construction, so elapsed nanoseconds from a single fixed origin cannot be
-/// moved by any wall-clock adjustment.
-fn process_monotonic_baseline() -> std::time::Instant {
-    static BASELINE: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    *BASELINE.get_or_init(std::time::Instant::now)
 }
 
 /// Decode the surface `Deadline` into absolute monotonic nanoseconds.
@@ -6021,12 +5986,8 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                         ken_host::FsCapabilityOperationV1::RenameDestination
                     }
                     FsOpKind::ChangeMode => ken_host::FsCapabilityOperationV1::ChangeMode,
-                    FsOpKind::Seek => ken_host::FsCapabilityOperationV1::Seek,
                     FsOpKind::SetLength => ken_host::FsCapabilityOperationV1::SetLength,
                     FsOpKind::Sync => ken_host::FsCapabilityOperationV1::Sync,
-                    FsOpKind::GetInheritance => ken_host::FsCapabilityOperationV1::GetInheritance,
-                    FsOpKind::SetInheritance => ken_host::FsCapabilityOperationV1::SetInheritance,
-                    FsOpKind::Duplicate => ken_host::FsCapabilityOperationV1::Duplicate,
                     FsOpKind::Spawn => ken_host::FsCapabilityOperationV1::Spawn,
                 },
                 held_rights,
@@ -6059,12 +6020,8 @@ fn from_denial_v1(error: &ken_host::CapabilityDeniedV1) -> CapabilityDenied {
                 ken_host::FsCapabilityOperationV1::RenameSource => FsOpKind::RenameSource,
                 ken_host::FsCapabilityOperationV1::RenameDestination => FsOpKind::RenameDestination,
                 ken_host::FsCapabilityOperationV1::ChangeMode => FsOpKind::ChangeMode,
-                ken_host::FsCapabilityOperationV1::Seek => FsOpKind::Seek,
                 ken_host::FsCapabilityOperationV1::SetLength => FsOpKind::SetLength,
                 ken_host::FsCapabilityOperationV1::Sync => FsOpKind::Sync,
-                ken_host::FsCapabilityOperationV1::GetInheritance => FsOpKind::GetInheritance,
-                ken_host::FsCapabilityOperationV1::SetInheritance => FsOpKind::SetInheritance,
-                ken_host::FsCapabilityOperationV1::Duplicate => FsOpKind::Duplicate,
                 ken_host::FsCapabilityOperationV1::Spawn => FsOpKind::Spawn,
             },
             held_rights: *held_rights,
@@ -6368,6 +6325,16 @@ fn narrow_host_u64(
     eval_to_bigint(value)
         .and_then(|value| value.to_u64())
         .ok_or(error)
+}
+
+fn narrow_host_file_position(value: &EvalVal) -> Result<u64, ken_host::ResourceErrorV1> {
+    use ken_host::{ResourceErrorV1::InvalidOffset, FILE_POSITION_MAX_V1};
+    let position = narrow_host_u64(value, InvalidOffset)?;
+    if position <= FILE_POSITION_MAX_V1 {
+        Ok(position)
+    } else {
+        Err(InvalidOffset)
+    }
 }
 
 fn resource_error_value_v1(
@@ -6739,9 +6706,28 @@ fn fs_dispatch<H: HostHandler>(
             },
             fs.op_metadata_id,
         )
+    } else if op_id == fs.private_fs_set_length_id {
+        let length = match narrow_host_file_position(args.get(2)?) {
+            Ok(length) => length,
+            Err(error) => {
+                let error = resource_error_value_v1(error, fs, ids, store);
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
+            }
+        };
+        (
+            ken_host::HostOpV1::FsSetLength,
+            ken_host::CanonicalRequestV1::FsSetLength { length },
+            fs.op_metadata_id,
+        )
+    } else if op_id == fs.private_fs_sync_id {
+        (
+            ken_host::HostOpV1::FsSync,
+            ken_host::CanonicalRequestV1::FsSync { mode: ken_host::FsSyncModeV1::SyncFull },
+            fs.op_metadata_id,
+        )
     } else if op_id == fs.private_fs_read_at_id {
         let file_offset =
-            match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+            match narrow_host_file_position(args.get(2)?) {
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
@@ -6774,7 +6760,7 @@ fn fs_dispatch<H: HostHandler>(
         )
     } else if op_id == fs.private_fs_write_at_id {
         let file_offset =
-            match narrow_host_u64(args.get(2)?, ken_host::ResourceErrorV1::InvalidOffset) {
+            match narrow_host_file_position(args.get(2)?) {
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
@@ -6913,6 +6899,8 @@ fn fs_dispatch<H: HostHandler>(
         operation,
         ken_host::HostOpV1::FsHandleMetadata
             | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength
+            | ken_host::HostOpV1::FsSync
             | ken_host::HostOpV1::BufferAllocate
             | ken_host::HostOpV1::FsReadAt
             | ken_host::HostOpV1::FsWriteAt
@@ -6950,7 +6938,9 @@ fn fs_dispatch<H: HostHandler>(
     };
     let resource = if matches!(
         operation,
-        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::MappingAcquireFile
+        ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength | ken_host::HostOpV1::FsSync
+            | ken_host::HostOpV1::MappingAcquireFile
             | ken_host::HostOpV1::ProcessPlanPush | ken_host::HostOpV1::ProcessSpawn
             | ken_host::HostOpV1::ProcessTakePipe | ken_host::HostOpV1::ProcessWait
             | ken_host::HostOpV1::ProcessSignal
@@ -7290,9 +7280,6 @@ fn reify_host_reply_v1(
                 make_ctor(fs.read_some_id, vec![span, count], store)
             }
         },
-        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::FilePosition(
-            position,
-        )) => EvalVal::BigInt(BigInt::from(position)),
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::WriteProgress(
             ken_host::WriteProgressV1::Wrote(transferred),
         )) => {
@@ -7392,7 +7379,11 @@ fn ambient_dispatch<H: HostHandler>(
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Unit) => {
             let unit = make_ctor(ids.unit_id, vec![], store);
-            Ok(make_result(true, unit, reply_slots, ids, store))
+            if operation == ken_host::HostOpV1::ClockSleepUntil {
+                Ok(unit)
+            } else {
+                Ok(make_result(true, unit, reply_slots, ids, store))
+            }
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bool(value)) => {
             Ok(make_ctor(
@@ -7768,7 +7759,18 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                 args: op_args,
                                 ..
                             } => {
-                                if let Some((clock, (operation, request))) =
+                                if clock_ids.is_some_and(|clock| {
+                                    *op_id == clock.random_bytes_id
+                                        && matches!(op_args.as_slice(), [count]
+                                            if eval_to_bigint(count).is_some_and(|n| u64::try_from(n).is_err()))
+                                }) {
+                                    // An exact Int outside the count carrier is
+                                    // rejected before dispatch in both lanes.
+                                    let error = io_error_identity_value(
+                                        ken_host::IoErrorIdentityV1::InvalidInput, ids, store,
+                                    );
+                                    make_result(false, error, reply_slots.as_deref(), ids, store)
+                                } else if let Some((clock, (operation, request))) =
                                     clock_ids.and_then(|clock| {
                                         decode_clock_request(*op_id, op_args, clock)
                                             .map(|decoded| (clock, decoded))
@@ -8359,6 +8361,8 @@ mod px5b_effect_observation_tests {
             private_fs_open_id: id(),
             private_fs_open_directory_id: id(),
             private_fs_read_directory_batch_id: id(),
+            private_fs_set_length_id: id(),
+            private_fs_sync_id: id(),
             private_fs_handle_metadata_id: id(),
             private_buffer_allocate_id: id(),
             private_fs_read_at_id: id(),
@@ -8423,12 +8427,6 @@ mod px5b_effect_observation_tests {
             op_remove_directory_id: id(),
             op_rename_id: id(),
             op_change_mode_id: id(),
-            op_seek_id: id(),
-            op_set_length_id: id(),
-            op_sync_id: id(),
-            op_get_inheritance_id: id(),
-            op_set_inheritance_id: id(),
-            op_duplicate_id: id(),
             nil_id: id(),
             cons_id: id(),
             mk_file_metadata_id: id(),
@@ -10656,32 +10654,15 @@ mod px5b_effect_observation_tests {
         }
     }
 
-    /// ABI-S3 AC-2, re-expressed for the uniform-refusal gate.
-    ///
-    /// `ClockMonotonicNow` is `RepresentedUnavailable`, so the interpreter must
-    /// now REFUSE it — `RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE`, and the
-    /// refusal is the property under test here.
-    ///
-    /// **`ambient_dispatch` returns `Result<EvalVal, ()>`: the error is unit,
-    /// so the refusal REASON is erased at this boundary and `is_err()` passes
-    /// for any failure, including one introduced by accident.** The wall reads
-    /// are therefore not decoration — `ClockWallNow` is `NativeTested`, so
-    /// driving both through the same closure makes this two-sided: the helper
-    /// is shown still working at the moment the unavailable op is shown
-    /// refused. Without that, this is an unguarded negative.
-    ///
-    /// **The wall clock still steps BACKWARDS while this runs**, which was the
-    /// original positive control and is retained: a green refusal must not be
-    /// obtainable from a harness that cannot perturb anything.
-    ///
-    /// **RETIRED AND DEFERRED, not deleted.** The monotonic-non-decreasing
-    /// property this test used to carry is implementation evidence for an arm
-    /// that is still live and byte-unchanged. It cannot be re-homed in
-    /// `ken-host`, whose test backend returns a CONSTANT monotonic reading, so
-    /// it is inherited by name by the promotion node for `ClockMonotonicNow`,
-    /// which must extend that backend to capture values regardless.
+    /// ABI-S3 AC-2. A test that only reads the monotonic clock passes whether
+    /// or not D1 was honoured, so the observation here is differential: the
+    /// wall clock is scripted to step BACKWARDS while the monotonic source
+    /// advances, and the wall-clock step is asserted first as a positive
+    /// control. Without that control a green monotonic result would be
+    /// vacuous -- it would equally mean the harness cannot perturb the wall
+    /// clock at all.
     #[test]
-    fn ac2_monotonic_is_refused_while_the_wall_clock_still_reads_and_steps_back() {
+    fn ac2_monotonic_readings_survive_a_wall_clock_step_backwards() {
         let ids = console_ids();
         let clock = abi_s3_clock_ids();
         let mut host = CaptureHost::new(Vec::new());
@@ -10689,6 +10670,7 @@ mod px5b_effect_observation_tests {
         let mut resources = ken_host::ResourceTableV1::default();
 
         host.set_clock_script([3_000, 1_000]);
+        host.set_monotonic_script([10, 20]);
 
         let mut read = |operation, request| {
             ambient_dispatch(
@@ -10702,19 +10684,22 @@ mod px5b_effect_observation_tests {
                 &mut store,
                 None,
             )
+            .expect("clock reifies")
         };
 
         let wall_first = read(
             ken_host::HostOpV1::ClockWallNow,
             ken_host::CanonicalRequestV1::ClockWallNow,
-        )
-        .expect("ClockWallNow is NativeTested and must still reify");
+        );
         let wall_second = read(
             ken_host::HostOpV1::ClockWallNow,
             ken_host::CanonicalRequestV1::ClockWallNow,
-        )
-        .expect("ClockWallNow is NativeTested and must still reify");
-        let monotonic = read(
+        );
+        let monotonic_first = read(
+            ken_host::HostOpV1::ClockMonotonicNow,
+            ken_host::CanonicalRequestV1::ClockMonotonicNow,
+        );
+        let monotonic_second = read(
             ken_host::HostOpV1::ClockMonotonicNow,
             ken_host::CanonicalRequestV1::ClockMonotonicNow,
         );
@@ -10741,57 +10726,38 @@ mod px5b_effect_observation_tests {
              so the monotonic result is vacuous"
         );
 
-        // THE PROPERTY UNDER TEST: an unavailable op is refused on the very
-        // path that just served an available one.
-        assert!(
-            monotonic.is_err(),
-            "ClockMonotonicNow is RepresentedUnavailable and must be refused \
-             by the interpreter path"
-        );
+        // The property under test: the same perturbation leaves monotonic
+        // readings non-decreasing.
+        assert!(nanoseconds(&monotonic_second) >= nanoseconds(&monotonic_first));
 
-        // D1 at the type layer, re-expressed WITHOUT dispatching. The claim is
-        // that a wall reading cannot be substituted where a monotonic one is
-        // required, and that is a fact about the id table -- it was only ever
-        // incidentally routed through a dispatch.
+        // D1 at the type layer: the two clocks do not merely differ in value,
+        // they reify to DIFFERENT constructors, so a wall reading cannot be
+        // substituted where a monotonic one is required.
         assert_eq!(constructor(&wall_first), clock.mkinstant_id);
-        assert_ne!(clock.mkinstant_id, clock.mk_monotonic_instant_id);
+        assert_eq!(
+            constructor(&monotonic_first),
+            clock.mk_monotonic_instant_id
+        );
+        assert_ne!(constructor(&wall_first), constructor(&monotonic_first));
     }
 
-    /// ABI-S3 AC-3, re-expressed for the uniform-refusal gate.
-    ///
-    /// `ClockSleepUntil` is `RepresentedUnavailable`, so the interpreter must
-    /// now REFUSE it — `RT-UNAVAILABLE-OP-UNIFORM-REFUSAL-GATE`.
-    ///
-    /// **The positive control is mandatory here and is not free, which is why
-    /// it is constructed rather than inherited.** `ambient_dispatch` returns
-    /// `Result<EvalVal, ()>` — a unit error, so the refusal reason is erased
-    /// and `is_err()` passes for *any* failure. Unlike its sibling, the
-    /// original of this test dispatched no available operation at all, so an
-    /// inverted version of it would be an unguarded negative: green whether
-    /// the gate refused the op or the helper was broken outright. The
-    /// `ClockWallNow` read below exists solely to make the refusal
-    /// discriminating.
-    ///
-    /// **RETIRED AND DEFERRED, not deleted.** The deadline-is-a-value property
-    /// and its discriminator are implementation evidence for an arm that is
-    /// still live and byte-unchanged. They cannot be re-homed in `ken-host`,
-    /// whose test backend signature is `clock_sleep_until(&mut self, _deadline:
-    /// u64)` — it records the op tag and **discards the deadline**, so the
-    /// claim is not expressible there without new capture surface. The
-    /// promotion node for `ClockSleepUntil` inherits both assertions by name
-    /// and must extend that backend to capture values regardless.
+    /// ABI-S3 AC-3. The deadline is a value, demonstrated by use rather than
+    /// by showing a field exists: a caller passes one, and the host observes
+    /// exactly that value. The second half is the discriminator -- a different
+    /// deadline must produce a different observation, otherwise the assertion
+    /// would hold for a host that ignored the argument entirely.
     #[test]
-    fn ac3_sleep_until_is_refused_on_a_path_that_still_serves_an_available_op() {
+    fn ac3_the_deadline_a_caller_passes_is_the_deadline_honoured() {
         let ids = console_ids();
         let clock = abi_s3_clock_ids();
         let mut store = EvalStore::new();
-        let mut host = CaptureHost::new(Vec::new());
-        let mut resources = ken_host::ResourceTableV1::default();
 
-        let mut dispatch = |operation, request| {
+        let mut sleep_with = |deadline: u64| -> Vec<ClockTrace> {
+            let mut host = CaptureHost::new(Vec::new());
+            let mut resources = ken_host::ResourceTableV1::default();
             ambient_dispatch(
-                operation,
-                request,
+                ken_host::HostOpV1::ClockSleepUntil,
+                ken_host::CanonicalRequestV1::ClockSleepUntil { deadline },
                 &mut host,
                 &mut resources,
                 &ids,
@@ -10800,32 +10766,36 @@ mod px5b_effect_observation_tests {
                 &mut store,
                 None,
             )
+            .expect("sleep reifies");
+            host.clock_trace().to_vec()
         };
 
-        // POSITIVE CONTROL, and the whole reason it is here: the helper is
-        // shown working on an available operation at the moment the
-        // unavailable one is shown refused. Without this the assertion below
-        // cannot distinguish a gate from a broken dispatcher.
-        assert!(
-            dispatch(
-                ken_host::HostOpV1::ClockWallNow,
-                ken_host::CanonicalRequestV1::ClockWallNow,
-            )
-            .is_ok(),
-            "ClockWallNow is NativeTested and must still reify, or the refusal \
-             below proves nothing"
+        assert_eq!(
+            sleep_with(4_242),
+            vec![ClockTrace::SleepUntil {
+                deadline: BigInt::from(4_242),
+            }]
         );
+        // Discriminator: the observation tracks the argument.
+        assert_ne!(sleep_with(4_242), sleep_with(9_999));
+    }
 
-        // THE PROPERTY UNDER TEST.
-        assert!(
-            dispatch(
-                ken_host::HostOpV1::ClockSleepUntil,
-                ken_host::CanonicalRequestV1::ClockSleepUntil { deadline: 4_242 },
-            )
-            .is_err(),
-            "ClockSleepUntil is RepresentedUnavailable and must be refused by \
-             the interpreter path"
-        );
+    /// Pin the upper edge without executing an admitted centuries-long sleep.
+    #[test]
+    fn sleep_deadline_decoder_distinguishes_u64_max_from_its_successor() {
+        let clock = abi_s3_clock_ids();
+        let deadline = |value| EvalVal::Ctor {
+            id: clock.mk_deadline_id,
+            args: Rc::new(vec![EvalVal::Ctor {
+                id: clock.mk_monotonic_instant_id,
+                args: Rc::new(vec![bigint_to_int_val(value)]),
+                slot: NULL_SLOT,
+            }]),
+            slot: NULL_SLOT,
+        };
+        let max = BigInt::from(u64::MAX);
+        assert_eq!(decode_deadline(&deadline(max.clone()), &clock), Some(u64::MAX));
+        assert_eq!(decode_deadline(&deadline(max + 1), &clock), None);
     }
 
     /// ABI-S3 AC-3b at the DECODE boundary — a `Deadline` carrying a second

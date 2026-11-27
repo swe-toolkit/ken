@@ -48,8 +48,10 @@ The all-in-window identity follows it and reuses the existing private
 `window_keep` and public list membership lemmas without a new helper.
 The no-member window law follows the identity with the same membership
 premise shape and an empty-list conclusion, without another helper.
-The singleton insert and sort laws close the checked source, in that order,
-followed by the private proof of the insert law's cons case.
+The singleton insert and sort laws are followed by `trace_merge_ordered_sort`
+and `trace_merge_all_ordered_sort`. The private insert cons-case proof comes
+next, then `trace_ordered_sort_fixed` and the private
+`trace_sort_append_sorted_suffix`, which closes the definition fence.
 Windowing includes the lower bound
 but excludes the upper; a merge tie favors the left input without examining
 payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
@@ -3976,6 +3978,55 @@ pub theorem trace_merge_ordered_sort
                     tail_sorted)))
   }
 
+pub theorem trace_merge_all_ordered_sort
+      (p : Type) (traces : List (List (Event p)))
+    : ((t : List (Event p)) → list_elem (List (Event p)) t traces → time_ordered p t)
+      → Equal
+        (List (Event p))
+        (trace_merge_all p traces)
+        (sort (Event p) (event_before p) (list_concat (Event p) traces)) =
+  match traces {
+    Nil ↦ λall. Proved;
+    Cons t rest ↦
+      λall.
+        let
+          rest_ordered : (u : List (Event p))
+            → list_elem
+            (List (Event p))
+            u rest → time_ordered p u =
+            λu. λmember. all u (list_elem_later (List (Event p)) u t rest member);
+          merged_rest = trace_merge_all p rest;
+          merged_rest_ordered : time_ordered p merged_rest =
+            trace_merge_all_ordered p rest rest_ordered;
+          merged_rest_sorted : Equal
+            (List (Event p))
+            merged_rest
+            (sort (Event p) (event_before p) (list_concat (Event p) rest)) =
+            trace_merge_all_ordered_sort p rest rest_ordered
+        in
+          trans
+            (List (Event p))
+            (trace_merge p t merged_rest)
+            (sort (Event p) (event_before p) (list_append (Event p) t merged_rest))
+            (sort
+              (Event p)
+              (event_before p)
+              (list_append (Event p) t (list_concat (Event p) rest)))
+            (trace_merge_ordered_sort
+              p
+              t
+              merged_rest
+              (all t (list_elem_head (List (Event p)) t rest))
+              merged_rest_ordered)
+            (trace_sort_append_sorted_suffix
+              p
+              t
+              merged_rest
+              (list_concat (Event p) rest)
+              merged_rest_ordered
+              merged_rest_sorted)
+  }
+
 theorem trace_merge_single_insert_cons
       (p : Type)
       (x : Event p)
@@ -4078,6 +4129,37 @@ theorem trace_ordered_sort_fixed
               (Nil (Event p))
               t
               (list_sorted_head (Event p) (event_before p) h t ordered)))
+  }
+
+theorem trace_sort_append_sorted_suffix
+      (p : Type) (xs : List (Event p)) (zs : List (Event p)) (ys : List (Event p))
+    : time_ordered p zs
+      → Equal (List (Event p)) zs (sort (Event p) (event_before p) ys)
+      → Equal
+        (List (Event p))
+        (sort (Event p) (event_before p) (list_append (Event p) xs zs))
+        (sort (Event p) (event_before p) (list_append (Event p) xs ys)) =
+  match xs {
+    Nil ↦
+      λordered_zs.
+        λzs_sorted.
+          trans
+            (List (Event p))
+            (sort (Event p) (event_before p) zs)
+            zs
+            (sort (Event p) (event_before p) ys)
+            (trace_ordered_sort_fixed p zs ordered_zs)
+            zs_sorted;
+    Cons x xt ↦
+      λordered_zs.
+        λzs_sorted.
+          cong
+            (List (Event p))
+            (List (Event p))
+            (sort (Event p) (event_before p) (list_append (Event p) xt zs))
+            (sort (Event p) (event_before p) (list_append (Event p) xt ys))
+            (insert (Event p) (event_before p) x)
+            (trace_sort_append_sorted_suffix p xt zs ys ordered_zs zs_sorted)
   }
 ```
 
@@ -4289,6 +4371,16 @@ The singleton-insertion law turns that outer merge into an insertion; the
 induction hypothesis identifies the inner merge with the sort of the left
 tail appended to the right trace.
 
+When every batch is time-ordered, merging the list of batches gives exactly
+the sort of their concatenation. The step case merges the head batch with
+the ordered merge of the rest, so the two-trace equation gives the sort of
+their append, and the induction hypothesis identifies the merged rest with
+the sort of the rest's concatenation. A private helper shows that sorting
+`xs` appended to an ordered list equal to `sort ys` is sorting `xs` appended
+to `ys`: insertion recurses over `xs`, and at the end sorting the ordered
+list leaves it unchanged. A single unordered batch shows that the premise
+is needed.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -4321,9 +4413,9 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-three
+   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-four
    checked laws form the package surface. The nine public functions are
-   unchanged by `trace_merge_ordered_sort`.
+   unchanged by `trace_merge_ordered_sort` and `trace_merge_all_ordered_sort`.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -4381,7 +4473,12 @@ merging, not window multiplicity.
    The ordered merge equation reuses singleton insertion, merge
    associativity, and ordered left-head selection. Its sole new helper,
    `trace_ordered_sort_fixed`, is private; no new import is needed.
-4. **Trusted-base delta.** Zero: all thirty-three exported laws have checked
+   The list form `trace_merge_all_ordered_sort` inducts on the batches,
+   reuses the two-trace equation and `trace_merge_all_ordered`, and replaces
+   the sorted merge of the remaining batches by the sort of their
+   concatenation through its sole new helper, the private
+   `trace_sort_append_sorted_suffix`; no new import is needed.
+4. **Trusted-base delta.** Zero: all thirty-four exported laws have checked
    proof bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -4444,5 +4541,11 @@ merging, not window multiplicity.
    order. The [ordered merge seed](../../../../conformance/stdlib/time-and-events/seed-trace-merge-ordered-sort.md)
    uses the new equation to obtain the interleaved list and refuses the plain
    append in the same proof form. Separate package controls check left-first
-   ties and distinguish the two ordering premises. These package tests are
-   not conformance-runner execution.
+   ties and distinguish the two ordering premises. The [ordered batches seed]
+   uses the list equation to obtain the sorted interleaving and refuses the
+   plain concatenation in the same proof form. The
+   `cat_time_merge_all_ordered_sort` package test checks those cases, the open
+   law and its trust boundary, and the premise-free failure for a single
+   descending batch. These package tests are not conformance-runner execution.
+
+[ordered batches seed]: ../../../../conformance/stdlib/time-and-events/seed-trace-merge-all-ordered-sort.md

@@ -32,6 +32,8 @@ mod account_db_v1;
 pub mod capability;
 mod effect_v1;
 mod effect_wire;
+#[cfg(target_os = "linux")]
+mod facility_v1;
 mod mapping_v1;
 #[cfg(target_os = "linux")]
 mod net_v1;
@@ -398,8 +400,19 @@ mod linux {
         })
     }
 
+    /// The one `statx` seat: the facility is required before the call.
+    fn statx_checked(
+        dir: impl rustix::fd::AsFd,
+        path: impl rustix::path::Arg,
+        flags: AtFlags,
+        mask: fs::StatxFlags,
+    ) -> io::Result<fs::Statx> {
+        crate::facility_v1::require(crate::facility_v1::HostFacilityV1::Statx)?;
+        fs::statx(dir, path, flags, mask).map_err(io::Error::from)
+    }
+
     fn statx_metadata(fd: impl rustix::fd::AsFd) -> io::Result<FileMetadataV1> {
-        let status = fs::statx(
+        let status = statx_checked(
             fd,
             "",
             AtFlags::EMPTY_PATH,
@@ -434,14 +447,6 @@ mod linux {
         File::from(handle.0.try_clone()?).write_at(bytes, offset)
     }
 
-    pub(super) fn resource_seek(handle: &ResourceHandle, from: FsSeekFromV1) -> io::Result<u64> {
-        File::from(handle.0.try_clone()?).seek(match from {
-            FsSeekFromV1::Start(offset) => SeekFrom::Start(offset),
-            FsSeekFromV1::Current(offset) => SeekFrom::Current(offset),
-            FsSeekFromV1::End(offset) => SeekFrom::End(offset),
-        })
-    }
-
     pub(super) fn resource_set_length(handle: &ResourceHandle, length: u64) -> io::Result<()> {
         File::from(handle.0.try_clone()?).set_len(length)
     }
@@ -454,41 +459,19 @@ mod linux {
         }
     }
 
-    pub(super) fn resource_get_inheritance(
-        handle: &ResourceHandle,
-    ) -> io::Result<FdInheritancePolicyV1> {
-        let flags = rustix::io::fcntl_getfd(&handle.0).map_err(io::Error::from)?;
-        Ok(if flags.contains(rustix::io::FdFlags::CLOEXEC) {
-            FdInheritancePolicyV1::CloseOnExec
-        } else {
-            FdInheritancePolicyV1::Inherit
-        })
-    }
-
-    pub(super) fn resource_set_inheritance(
-        handle: &ResourceHandle,
-        policy: FdInheritancePolicyV1,
-    ) -> io::Result<()> {
-        let mut flags = rustix::io::fcntl_getfd(&handle.0).map_err(io::Error::from)?;
-        match policy {
-            FdInheritancePolicyV1::Inherit => flags.remove(rustix::io::FdFlags::CLOEXEC),
-            FdInheritancePolicyV1::CloseOnExec => flags.insert(rustix::io::FdFlags::CLOEXEC),
-        }
-        rustix::io::fcntl_setfd(&handle.0, flags).map_err(io::Error::from)
-    }
-
-    pub(super) fn resource_duplicate(
-        handle: &ResourceHandle,
-        policy: FdInheritancePolicyV1,
-    ) -> io::Result<ResourceHandle> {
-        let duplicated = match policy {
-            // rustix 1.1 exposes `dup` as the safe Linux operation with the
-            // same min-zero allocation and no-CLOEXEC semantics.
-            FdInheritancePolicyV1::Inherit => rustix::io::dup(&handle.0),
-            FdInheritancePolicyV1::CloseOnExec => rustix::io::fcntl_dupfd_cloexec(&handle.0, 0),
-        }
-        .map_err(io::Error::from)?;
-        Ok(ResourceHandle(duplicated))
+    /// Promise class: durable invariant. MEASURED: the SyncFull backend
+    /// returns EINVAL on a live Linux pipe. CLAIMED: it reaches the kernel
+    /// rather than succeeding without a call. THE GAP: it tests no guarantee
+    /// of durability after failure and no surface argument wiring.
+    #[test]
+    fn resource_sync_full_refuses_a_pipe() {
+        let (_read, write) = std::io::pipe().expect("create a live pipe");
+        let error = resource_sync(&ResourceHandle(write.into()), FsSyncModeV1::SyncFull)
+            .expect_err("fsync on a pipe must not report success");
+        assert_eq!(
+            error.raw_os_error(),
+            Some(rustix::io::Errno::INVAL.raw_os_error())
+        );
     }
 
     pub(super) fn read(handle: &Handle) -> io::Result<Vec<u8>> {
@@ -539,7 +522,7 @@ mod linux {
             if !matches!(name.to_bytes(), b"." | b"..") {
                 let kind = match entry.file_type() {
                     FileType::Unknown => {
-                        let status = fs::statx(
+                        let status = statx_checked(
                             &handle.0,
                             name,
                             AtFlags::SYMLINK_NOFOLLOW,
@@ -590,9 +573,8 @@ mod linux {
     }
 
     pub(super) fn remove_directory_tree(parent: &Handle, leaf: &PathComponent) -> io::Result<()> {
-        use std::os::fd::AsRawFd;
         use std::os::unix::ffi::OsStrExt;
-        let mut target = PathBuf::from(format!("/proc/self/fd/{}", parent.0.as_raw_fd()));
+        let mut target = PathBuf::from(crate::facility_v1::proc_self_fd_path(&*parent.0)?);
         target.push(std::ffi::OsStr::from_bytes(leaf.as_bytes()));
         std::fs::remove_dir_all(target)
     }
@@ -1058,19 +1040,6 @@ pub fn process_stream_write_v1(
     process_v1::stream_write_v1(fd, bytes)
 }
 
-pub fn resource_seek_v1(handle: &ResourceHandleV1, from: FsSeekFromV1) -> HostResult<u64> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_seek(&handle.inner, from).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, from);
-        unsupported()
-    }
-}
-
 pub fn resource_set_length_v1(handle: &ResourceHandleV1, length: u64) -> HostResult<()> {
     assert_current_target_abi()?;
     #[cfg(target_os = "linux")]
@@ -1093,53 +1062,6 @@ pub fn resource_sync_v1(handle: &ResourceHandleV1, mode: FsSyncModeV1) -> HostRe
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (handle, mode);
-        unsupported()
-    }
-}
-
-pub fn resource_get_inheritance_v1(handle: &ResourceHandleV1) -> HostResult<FdInheritancePolicyV1> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_get_inheritance(&handle.inner).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = handle;
-        unsupported()
-    }
-}
-
-pub fn resource_set_inheritance_v1(
-    handle: &ResourceHandleV1,
-    policy: FdInheritancePolicyV1,
-) -> HostResult<()> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_set_inheritance(&handle.inner, policy).map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, policy);
-        unsupported()
-    }
-}
-
-pub fn resource_duplicate_v1(
-    handle: &ResourceHandleV1,
-    policy: FdInheritancePolicyV1,
-) -> HostResult<ResourceHandleV1> {
-    assert_current_target_abi()?;
-    #[cfg(target_os = "linux")]
-    {
-        linux::resource_duplicate(&handle.inner, policy)
-            .map(|inner| ResourceHandleV1 { inner })
-            .map_err(Into::into)
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = (handle, policy);
         unsupported()
     }
 }
@@ -1335,6 +1257,76 @@ pub fn rename(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Promise class: durable invariant. MEASURED: F_GETFD on the descriptor
+    /// returned by the public resource-open path for each OpenRequest mode.
+    /// CLAIMED: each filesystem resource open creates a close-on-exec
+    /// descriptor. THE GAP: this covers Ken's Linux open path, not descriptors
+    /// created or modified by an embedding host.
+    #[cfg(target_os = "linux")]
+    fn assert_resource_open_cloexec(request: OpenRequest) {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        struct TempRoot(std::path::PathBuf);
+        impl Drop for TempRoot {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "ken-resource-cloexec-{}-{request:?}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&dir).expect("create a fresh temp root");
+        let dir = TempRoot(dir);
+        let path = dir.0.join("entry");
+        match request {
+            OpenRequest::Read | OpenRequest::ReadWrite => {
+                std::fs::write(&path, b"fixture").expect("create file fixture");
+            }
+            OpenRequest::ReadDirectory => {
+                std::fs::create_dir(&path).expect("create directory fixture");
+            }
+            OpenRequest::CreateNew
+            | OpenRequest::CreateOrTruncate
+            | OpenRequest::CreateOrKeep
+            | OpenRequest::AppendOrCreate => {}
+        }
+        let root = open_root(&RootPath::new(&dir.0).unwrap()).expect("open temp root");
+        let leaf = PathComponent::new(b"entry").unwrap();
+        let handle = open_resource_at_v1(&root, &leaf, request).expect("open resource fixture");
+        let flags = rustix::io::fcntl_getfd(&handle.inner.0).expect("F_GETFD on returned resource");
+        assert!(
+            flags.contains(rustix::io::FdFlags::CLOEXEC),
+            "{request:?}: returned descriptor lacks FD_CLOEXEC"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    macro_rules! resource_open_cloexec_rows {
+        ($($name:ident => $request:ident),+ $(,)?) => {$(
+            #[test]
+            fn $name() {
+                assert_resource_open_cloexec(OpenRequest::$request);
+            }
+        )+};
+    }
+
+    #[cfg(target_os = "linux")]
+    resource_open_cloexec_rows! {
+        resource_open_cloexec_read => Read,
+        resource_open_cloexec_read_directory => ReadDirectory,
+        resource_open_cloexec_read_write => ReadWrite,
+        resource_open_cloexec_create_new => CreateNew,
+        resource_open_cloexec_create_or_truncate => CreateOrTruncate,
+        resource_open_cloexec_create_or_keep => CreateOrKeep,
+        resource_open_cloexec_append_or_create => AppendOrCreate,
+    }
 
     /// MEASURED: clearing each bit removes just that field, even if its slot
     /// still contains data. CLAIMED: absence is keyed only by the status mask.

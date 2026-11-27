@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-ORIENT-SCALE
 title: "Spec 67 says orientation survives a shared translation (§21), but says nothing about a shared scaling: a client that rescales a natural-coordinate figure by a positive factor cannot carry an orientation result to the rescaled points. Rule from a checked D0 at zero trust that multiplying every coordinate of the three points by Suc k leaves orient unchanged, and state it with a seed that separates a positive factor from the zero factor"
-status: ready
+status: merged
 owner: spec
 size: M
 tier: T1

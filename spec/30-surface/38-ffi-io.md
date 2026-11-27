@@ -1,8 +1,10 @@
 # Bytes, I/O, and the FFI
 
 > Status: **§1.1–§1.6 impl-ready (L6); §1.7 contract-pinned (PX8-T); §2–§4
-> impl-ready (L7)** — elaborated to team-ready rigor and normative for the
-> *trust and effect discipline*. **§1.1–§1.6 (`Bytes` + binary I/O, L6)** are
+> impl-ready (L7); FS descriptor retirement contract-pinned
+> (RT-FS-DESCRIPTOR-INHERITANCE-DUPLICATE)** — elaborated to team-ready rigor
+> and normative for the *trust and effect discipline*.
+> **§1.1–§1.6 (`Bytes` + binary I/O, L6)** are
 > built against the **landed** kernel/runtime (`14 §5` primitives, `41 §3a`
 > encoding, `36 §1` effect rows). **§1.7** pins the contract that PX8-R/PX8-F
 > must implement; it does not claim that substrate or surface is landed.
@@ -523,6 +525,12 @@ proc writeAt (a : Auth) (file : Resource ResourceKind.FsHandle) (fileOffset : In
   (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError WriteProgress) visits [FS]
 
+proc setLength (a : Auth) (file : Resource ResourceKind.FsHandle) (length : Int)
+  : HostIO a (Result ResourceError Unit) visits [FS]
+
+proc sync (a : Auth) (file : Resource ResourceKind.FsHandle)
+  : HostIO a (Result ResourceError Unit) visits [FS]
+
 proc spanBytes (a : Auth) (buffer : BufferHandle) (span : BufferSpan)
   : HostIO a (Result ResourceError Bytes) visits [FS]
 
@@ -584,10 +592,37 @@ resource-kind, liveness, rights, and range validation as defense in depth; the
 checked handle does not replace those checks.
 
 `fileOffset` is nonnegative, and target offset-plus-length arithmetic is checked
-for overflow before host I/O. Neither operation mutates a file-description
-cursor. Sequential reads, writes, copies, and seek-like state are derived code
-that explicitly threads `fileOffset + transferred`; PX8 adds neither a seek
-primitive nor vectored I/O.
+for overflow before host I/O. The host-width limit for `readAt` and `writeAt`
+`fileOffset`, for `fileOffset` plus the effective transfer length, and for a
+`setLength` length is the host's largest representable file offset: `2^63 − 1`
+on the Linux reference host, whose `off_t` is signed 64-bit. A value above
+this limit returns `InvalidOffset` at its existing check: before dispatch for
+the file offset or `setLength` length, and before backend I/O for the sum.
+A value at or below the limit passes the width check but does not guarantee
+success; an I/O refusal by the backend (for example `EFBIG`) is reported as
+`ResourceHostIO`. Neither operation mutates a file-description cursor.
+Sequential reads, writes, copies, and seek-like state are derived code
+that explicitly threads `fileOffset + transferred`. There is no seek
+primitive or relative file I/O, and PX8 adds no vectored I/O.
+
+`setLength` and `sync` are explicit imports from `Capability.System.IO`.
+Both operate on a live `ResourceWriteCreate` handle (any creation policy),
+require `WRITE`, and report host I/O failures as `ResourceHostIO` in
+`ResourceError`. Other handle modes are refused with `RightNotHeld` before
+backend access. `setLength` rejects a negative or host-width-unrepresentable
+length with `InvalidOffset` before dispatch. It sets the extent to `length`,
+preserving the retained prefix and zero-filling any extension.
+
+sync asks the host to flush the file's data and metadata (fsync(2)) and
+returns the host's outcome. Durability after machine failure is the kernel
+and filesystem's contract and is not tested by Ken.
+
+Every FsHandle descriptor is created with close-on-exec, and no Ken operation
+clears that flag or duplicates a descriptor. Inheritance into a child is decided
+only by the spawn plan (§1.11), which starts the child with exactly {0, 1, 2};
+the plan's closefrom step and the per-descriptor flag are independent, as for
+sockets (§1.13). The host ABI has no descriptor-inheritance query, inheritance
+setter or duplication operation.
 
 Derived `readAt` admits a raw `BufferWindow` in this exact order:
 
@@ -804,6 +839,36 @@ and this section is the normative source those laws witness. The conformance
 seed (`../../conformance/surface/ffi-io/`) discriminates each property against
 its non-conformant counterpart — a `retryable`-from-transience-alone
 implementation, and a `Revoked = Transient` or triplicated-`Revoked` surface.
+
+(3) `Unsupported` is host inability, probed once. `IOError.Unsupported`
+means that this host cannot provide a facility the operation requires; it
+is not an authority denial, an object-state error or an input error, and
+`error_transience IOError.Unsupported = Permanent`. For each facility
+below, the host decides availability at most once per process, on the
+first operation that needs it, by a probe that performs none of the
+operation's effects. While the probe has found its facility absent, each
+listed operation returns `IOError.Unsupported` in its existing error
+form before using the facility, with no fallback, whatever errno the
+kernel or a policy such as seccomp gave the probe; a policy's `EPERM` is
+not `PermissionDenied` here. If a probe fails without establishing absence,
+the current operation stops at that facility check and reports the probe's
+error through the operation's existing error mapping. No availability
+verdict is cached, and the next operation that needs the facility probes
+again. An operation whose facility
+is present behaves as if no probe existed.
+
+| Facility | Needed by |
+|---|---|
+| process descriptors (`pidfd_open`, `pidfd_send_signal`, `waitid(P_PIDFD)`) | `ProcessSpawn` |
+| `statx` | `FsMetadata`, `FsHandleMetadata`; `FsReadDirectoryBatch` only for an entry whose type the read did not report |
+| `/proc/self/fd`, describing this process | recursive `FsRemoveDirectory`; `NetListen` and `NetConnect` on a Unix address |
+| close-on-exec stream sockets, one facility per address family | `NetListen` and `NetConnect` on an address of that family |
+| `accept4` | `NetAccept` |
+
+Descriptor closure in a spawned child is performed by the C library's
+spawn machinery, whose mechanism Ken does not observe, so it is not
+probed. A policy that denies a host call outside this table reaches that
+operation's ordinary error mapping.
 
 ### 1.9 Memory mappings as opaque runtime-owned regions and bounded views (ABI-S6)
 
@@ -1428,22 +1493,22 @@ The existing exact checked FS result carriers `FileKind` (`KFile`,
 metadata and directory replies select their checked constructors;
 source uses only `FileKind.KFile` and its three sibling qualified
 cases, `FileMetadata.MkFileMetadata` and `DirEntry.MkDirEntry`.
-`FileOperation` has sixteen exact checked operation cases selected by
-native FileError production and already named by source in
-`Capability.System.Error` (§33 §3.3). It moves from that package home
-to the scoped floor, with its complete cases available as
-`FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
+`FileOperation` has ten exact checked path-operation cases and is named
+by source in `Capability.System.Error` (§33 §3.3). It moved from that
+package home to the scoped floor in Increment 3a. Its complete cases
+are available as `FileOperation.OpReadFile`, `FileOperation.OpWriteFile`,
 `FileOperation.OpAppendFile`, `FileOperation.OpMetadata`,
 `FileOperation.OpReadDirectory`, `FileOperation.OpCreateDirectory`,
 `FileOperation.OpRemoveFile`, `FileOperation.OpRemoveDirectory`,
-`FileOperation.OpRename`, `FileOperation.OpChangeMode`,
-`FileOperation.OpSeek`, `FileOperation.OpSetLength`,
-`FileOperation.OpSync`, `FileOperation.OpGetInheritance`,
-`FileOperation.OpSetInheritance` and `FileOperation.OpDuplicate`.
+`FileOperation.OpRename`, and `FileOperation.OpChangeMode`.
+`FileOperation` names only path operations; handle operations report through
+`ResourceError` and have no `FileOperation` case.
 Only these five I/O family names enter the counted floor from this
 paragraph; none of their constructor leaves joins bare protected B.
 `StateOp.Get` and `StateOp.Put` are likewise scoped (§36 §4.2).
-Native stable-symbol leaves and runtime IDs do not change.
+Native stable-symbol leaves and runtime IDs do not change for the cases
+that remain, including all ten `FileOperation` cases. The six retired
+leaves have no stable symbol or runtime ID.
 
 For ABI-S4, `FileMetadata` grows in place, retaining its scoped-floor
 family and the qualified `FileMetadata.MkFileMetadata` constructor.
@@ -1814,6 +1879,53 @@ The whole-list `read_directory` source operation, its `FSOp` constructor
 retired in this same change. Neither new host operation reuses `0x0305`.
 There is no compatibility alias or bounded whole-list replacement.
 `FileOperation.OpReadDirectory` remains as the directory-open error tag.
+
+### 1.15 Monotonic clock, deadline sleep and kernel entropy
+
+> **Status: contract-pinned (RT-CLOCK-OP-NATIVE-PROMOTION).** Architect
+> AC-0 `evt_4zbmaff96r9wv` rules the contract on `b9c1853d6`;
+> implementation and assembled evidence are separate.
+
+In Strict source, import `monotonic_now` and `sleep_until` from
+`Capability.Time.Monotonic`, `EntropyIO` and `random_bytes` from
+`Capability.System.Entropy`, and `host_entropy` from
+`Capability.Process.Exit`, which also homes `host_clock`. These names
+are not ambient floor bindings. Clock operations visit `Clock`, and
+`random_bytes` visits `Entropy`; neither effect grants FS authority.
+
+`monotonic_now` returns a `MonotonicInstant` containing the `Int` count of
+nanoseconds elapsed since a process-wide baseline. Readings are nonnegative
+and do not decrease within a process. The epoch is otherwise unspecified:
+a reading or `Deadline` has no meaning outside its originating process.
+Programs should derive deadlines from readings in that process. These
+are host properties, not Ken theorems about external readings.
+
+The floor admits the exact checked types `MonotonicInstant` and `Deadline`.
+`MonotonicInstant.MkMonotonicInstant` wraps an `Int`, and
+`Deadline.MkDeadline` wraps a `MonotonicInstant`. Only the qualified
+constructors resolve at those checked identities. The native monotonic
+reply selects the exact checked instant constructor; native sleep reads
+both exact checked constructors, not their spellings.
+
+`sleep_until` takes a `Deadline`. Its nanosecond operand `d` must satisfy
+`0 ≤ d < 2^64`. With an admitted operand, sleep returns `Unit` only once
+that same clock reads at or past `d`. An already reached deadline returns
+without suspending. Sleep is uncancellable; cancellation is left to PX12.
+Outside the domain, both lanes refuse the effect with the same terminal
+class and no `ClockSleepUntil` trace event. There is no successful return
+for an out-of-domain deadline.
+
+`random_bytes` takes an `Int` count `n` and returns `Result IOError Bytes`.
+For `0 ≤ n ≤ MAX_ENTROPY_REQUEST_BYTES_V1` (1024 bytes), success returns
+exactly `n` bytes from the kernel CSPRNG, including empty `Bytes` for
+zero. A negative or over-bound count returns `Err` with
+`IOError.InvalidInput`, rather than truncating or supplying bytes. For a
+negative count, both lanes must record the same event or neither must
+record an event. If the kernel source cannot supply the full admitted
+count, the result is `Err` with `IOError.Unsupported` and no bytes. There is
+no fallback, substitute userspace PRNG, or retry on another source.
+Returned bytes are runtime observations, not a proof of unpredictability
+or a broader cryptographic guarantee.
 
 ## 2. The FFI surface — the `foreign` declaration
 

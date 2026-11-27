@@ -319,6 +319,8 @@ fn runtime_producible_constructors(
         read_eof,
         wrote,
         mk_instant,
+        mk_monotonic_instant,
+        mk_deadline,
         read_chunk,
         read_result_eof,
         unit,
@@ -339,21 +341,14 @@ fn runtime_producible_constructors(
         dir_entry,
         directory_entries,
         directory_end,
-        file_operation_seek,
-        file_operation_set_length,
-        file_operation_sync,
-        file_operation_get_inheritance,
-        file_operation_set_inheritance,
-        file_operation_duplicate,
         resource_mapping_limit,
         px10_exit_symbols,
         px11_address_symbols,
         resource_kind_symbols,
     } = symbols;
-    // The checked ITree/Coproduct spine is constructed by the program; the
-    // host never synthesizes Ret, Vis or InL as a response. Keep these three
-    // fields bound exhaustively, but outside the host-producible inventory.
-    let _ = (itree_ret, itree_vis, coproduct_in_l);
+    // The program constructs the ITree/Coproduct spine and the sleep request
+    // wrapper. These checked roles do not belong to the producer inventory.
+    let _ = (itree_ret, itree_vis, coproduct_in_l, mk_deadline);
     // The remaining roles name constructors the runtime can put in front of
     // a match: host-effect responses, process-entry inputs and primitives.
     let mut producible = [
@@ -391,6 +386,7 @@ fn runtime_producible_constructors(
         read_eof,
         wrote,
         mk_instant,
+        mk_monotonic_instant,
         read_chunk,
         read_result_eof,
         unit,
@@ -411,12 +407,6 @@ fn runtime_producible_constructors(
         dir_entry,
         directory_entries,
         directory_end,
-        file_operation_seek,
-        file_operation_set_length,
-        file_operation_sync,
-        file_operation_get_inheritance,
-        file_operation_set_inheritance,
-        file_operation_duplicate,
         resource_mapping_limit,
     ]
     .into_iter()
@@ -904,14 +894,20 @@ impl EffectSeatLedger {
                 open.effect_origin
             )));
         }
-        if planned.is_empty() && operation != ken_host::HostOpV1::ClockWallNow {
+        let arity = ken_host::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == operation as u16)
+            .map(|row| row.4)
+            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                format!("host effect seat ledger: missing catalog arity for {operation:?}")))?;
+        if planned.is_empty() && arity != 0 {
             return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {effect_origin:?} is visited but plans no seat at all"
             )));
         }
-        if operation == ken_host::HostOpV1::ClockWallNow && !planned.is_empty() {
+        if arity == 0 && !planned.is_empty() {
             return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                "host effect seat ledger: zero-arity ClockWallNow \
+                "host effect seat ledger: zero-arity {operation:?} \
                  {effect_origin:?} planned unexpected seats {planned:?}"
             )));
         }
@@ -1493,6 +1489,10 @@ impl<'a> Lowering<'a> {
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
         let pointer_type = builder.func.dfg.value_type(arena);
         let output = builder.ins().stack_addr(pointer_type, output_slot, 0);
+        // The helper writes the output only when it reports success. Keep the
+        // unused failure-path word initialized; `valid` remains the authority.
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().stack_store(zero, output_slot, 0);
         let call = builder.ins().call(helper, &[arena, tag, *value, output]);
         let status = builder.inst_results(call)[0];
         Self::require_one_of_i64(builder, status, &[0, 1]);
@@ -1751,7 +1751,13 @@ impl<'a> Lowering<'a> {
         name: &'static str,
     ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
     {
-        let (_, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        let (seat, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
+        if seat.operation == ken_host::HostOpV1::ClockSleepUntil {
+            let deadline = seats.specialized(EffectSeatSlot::Argument(index))?;
+            let reading = self.checked_unary_effect_field(deadline, &self.process_symbols.mk_deadline)?;
+            let nanoseconds = self.checked_unary_effect_field(reading, &self.process_symbols.mk_monotonic_instant)?.clone();
+            return self.narrow_native_int_u64(builder, &nanoseconds);
+        }
         match operand {
             LoweringOperand::Specialized(value @ Lowered::Int { .. }) => {
                 let value = value.clone();
@@ -1771,6 +1777,40 @@ impl<'a> Lowering<'a> {
                 },
             ),
         }
+    }
+
+    fn checked_unary_effect_field<'v>(
+        &self,
+        value: &'v Lowered,
+        expected: &RuntimeSymbol,
+    ) -> Result<&'v Lowered, CraneliftBackendError> {
+        if let Lowered::Constructor { constructor, args, .. } = value {
+            if constructor == expected {
+                if let [field] = args.as_slice() {
+                    return field.specialized_at("a checked unary host operand field");
+                }
+            }
+        }
+        Err(unsupported(LoweringCause::Fragment, "ClockSleepUntil",
+            "deadline operand does not carry the exact checked unary constructors"))
+    }
+
+    fn narrow_file_position_seat(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seats: &ClaimedEffectSeats<'_>,
+        index: u32,
+        name: &'static str,
+    ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
+    {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let (value, valid) = self.narrow_positioned_int_seat(builder, seats, index, name)?;
+        let within_host_width = builder.ins().icmp_imm(
+            IntCC::UnsignedLessThanOrEqual,
+            value,
+            ken_host::FILE_POSITION_MAX_V1 as i64,
+        );
+        Ok((value, builder.ins().band(valid, within_host_width)))
     }
 
     pub(super) fn narrow_carried_int_u64(
@@ -3412,8 +3452,8 @@ impl<'a> Lowering<'a> {
             // BEFORE any seat is claimed. On a provably dead arm that refusal
             // fails the whole object emission for a lane no execution reaches --
             // the identical defect, one check earlier. The original governed
-            // fixtures used the four ABI-A3 directory arms; after their
-            // promotion the retained pair uses ClockMonotonicNow.
+            // fixtures used the four ABI-A3 directory arms; the retained pair
+            // was retired at PX11 Inc2 when the unavailable population emptied.
             //
             // Same fail-closed substitute for the same reason: an arm wrongly
             // proven dead HALTS rather than issuing an operation this backend
@@ -3703,13 +3743,32 @@ impl<'a> Lowering<'a> {
                     .ins()
                     .stack_store(limit, request, request_offset(1));
             }
-            ken_host::HostOpV1::ClockWallNow => {
+            ken_host::HostOpV1::ClockWallNow | ken_host::HostOpV1::ClockMonotonicNow => {
                 if capability.is_some() || !args.is_empty() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
-                        "ambient ClockWallNow carried an operand",
+                        "ambient clock read carried an operand",
                     ));
                 }
+            }
+            ken_host::HostOpV1::ClockSleepUntil => {
+                let (deadline, valid) = self.narrow_positioned_int_seat(builder, &seats, 0, "deadline")?;
+                let dispatch = builder.create_block();
+                let invalid = builder.create_block();
+                builder.ins().brif(valid, dispatch, &[], invalid, &[]);
+                builder.switch_to_block(invalid);
+                let status = self.emit_current_trap(builder, &sleep_deadline_domain_trap())?;
+                builder.ins().return_(&[status]);
+                self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+                builder.switch_to_block(dispatch);
+                builder.ins().stack_store(deadline, request, request_offset(0));
+            }
+            ken_host::HostOpV1::EntropyRandomBytes => {
+                let (count, valid) = self.narrow_positioned_int_seat(builder, &seats, 0, "entropy count")?;
+                let invalid = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0);
+                let detail = builder.ins().iconst(types::I64, IO_ERROR_INVALID_INPUT_DISCRIMINATOR);
+                record_narrow_failure(builder, invalid, error_reply_tag, detail);
+                builder.ins().stack_store(count, request, request_offset(0));
             }
             ken_host::HostOpV1::ConsoleWrite
             | ken_host::HostOpV1::ConsoleFlush
@@ -3940,7 +3999,11 @@ impl<'a> Lowering<'a> {
                     builder.ins().stack_store(mode, request, request_offset(3));
                 }
             }
-            ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::FsReadDirectoryBatch | ken_host::HostOpV1::ResourceRelease => {
+            ken_host::HostOpV1::FsHandleMetadata
+            | ken_host::HostOpV1::FsReadDirectoryBatch
+            | ken_host::HostOpV1::FsSetLength
+            | ken_host::HostOpV1::FsSync
+            | ken_host::HostOpV1::ResourceRelease => {
                 if capability.is_some() {
                     return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
@@ -3980,6 +4043,20 @@ impl<'a> Lowering<'a> {
                 builder
                     .ins()
                     .stack_store(token, request, request_offset(0));
+                if operation == ken_host::HostOpV1::FsSetLength {
+                    let (length, valid) = self.narrow_file_position_seat(
+                        builder, &seats, 1, "setLength length",
+                    )?;
+                    let invalid = builder.ins().icmp_imm(
+                        cranelift_codegen::ir::condcodes::IntCC::Equal, valid, 0,
+                    );
+                    let detail = builder.ins().iconst(types::I64, RESOURCE_ERROR_INVALID_OFFSET);
+                    record_narrow_failure(builder, invalid, resource_error_reply_tag, detail);
+                    builder.ins().stack_store(length, request, request_offset(1));
+                } else if operation == ken_host::HostOpV1::FsSync {
+                    let full = builder.ins().iconst(types::I64, 0);
+                    builder.ins().stack_store(full, request, request_offset(1));
+                }
             }
             ken_host::HostOpV1::BufferAllocate => {
                 if capability.is_some() {
@@ -4387,7 +4464,7 @@ impl<'a> Lowering<'a> {
                 let (file_offset, file_offset_valid) = if stream {
                     (builder.ins().iconst(types::I64, 0), builder.ins().iconst(types::I64, 1))
                 } else {
-                    self.narrow_positioned_int_seat(builder, &seats, 1, "file offset")?
+                    self.narrow_file_position_seat(builder, &seats, 1, "file offset")?
                 };
                 let buffer = self.lower_resource_token_seat(
                     builder,
@@ -4594,7 +4671,20 @@ impl<'a> Lowering<'a> {
                 value: detail,
                 known: None,
             }))
-        } else if operation == ken_host::HostOpV1::ClockWallNow {
+        } else if operation == ken_host::HostOpV1::ClockSleepUntil {
+            Self::require_i64(builder, tag, wire.reply_unit_tag as i64);
+            let ok_root = SynthesizedAggregatePath::root(SynthesizedAggregateRoot::HostResultOk);
+            let unit = self.synthesized_constructor(
+                static_origin,
+                &ok_root,
+                SynthesizedFixedConstructorRole::Unit,
+                self.process_symbols.unit.clone(),
+                Vec::new(),
+                &seats,
+            )?;
+            self.reconcile_host_result_root(static_origin, &ok_root, &unit)?;
+            Ok(LoweringOperand::Specialized(unit))
+        } else if matches!(operation, ken_host::HostOpV1::ClockWallNow | ken_host::HostOpV1::ClockMonotonicNow) {
             Self::require_i64(builder, tag, wire.reply_bytes_tag as i64);
             let response_pointer = builder.ins().stack_load(
                 pointer_type,
@@ -4616,11 +4706,16 @@ impl<'a> Lowering<'a> {
             let ok_root = SynthesizedAggregatePath::root(
                 SynthesizedAggregateRoot::HostResultOk,
             );
+            let (role, symbol) = if operation == ken_host::HostOpV1::ClockWallNow {
+                (SynthesizedFixedConstructorRole::MkInstant, &self.process_symbols.mk_instant)
+            } else {
+                (SynthesizedFixedConstructorRole::MkMonotonicInstant, &self.process_symbols.mk_monotonic_instant)
+            };
             let instant = self.synthesized_constructor(
                 static_origin,
                 &ok_root,
-                SynthesizedFixedConstructorRole::MkInstant,
-                self.process_symbols.mk_instant.clone(),
+                role,
+                symbol.clone(),
                 vec![SynthesizedArgument::Scalar(instant_int)],
                 &seats,
             )?;
@@ -4628,7 +4723,7 @@ impl<'a> Lowering<'a> {
             Ok(LoweringOperand::Specialized(instant))
         } else {
             let success_tag = match operation {
-                ken_host::HostOpV1::ConsoleRead => wire.reply_bytes_tag,
+                ken_host::HostOpV1::ConsoleRead | ken_host::HostOpV1::EntropyRandomBytes => wire.reply_bytes_tag,
                 ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::FsReadDirectoryBatch => {
                     wire.reply_bytes_tag
                 }
@@ -4683,6 +4778,8 @@ impl<'a> Lowering<'a> {
                 | ken_host::HostOpV1::ProcessTakePipe
                 | ken_host::HostOpV1::ProcessWait
                 | ken_host::HostOpV1::ProcessSignal
+                | ken_host::HostOpV1::FsSetLength
+                | ken_host::HostOpV1::FsSync
                 | ken_host::HostOpV1::NetListen
                 | ken_host::HostOpV1::NetConnect
                 | ken_host::HostOpV1::NetAccept
@@ -4966,6 +5063,8 @@ impl<'a> Lowering<'a> {
                     | ken_host::HostOpV1::ProcessTakePipe
                     | ken_host::HostOpV1::ProcessWait
                     | ken_host::HostOpV1::ProcessSignal
+                    | ken_host::HostOpV1::FsSetLength
+                    | ken_host::HostOpV1::FsSync
                     | ken_host::HostOpV1::NetListen
                     | ken_host::HostOpV1::NetConnect
                     | ken_host::HostOpV1::NetAccept
@@ -5372,7 +5471,7 @@ impl<'a> Lowering<'a> {
                         )?,
                     ],
                 })
-            } else if operation == ken_host::HostOpV1::FsReadFile {
+            } else if matches!(operation, ken_host::HostOpV1::FsReadFile | ken_host::HostOpV1::EntropyRandomBytes) {
                 // `D2` — self-validating span; see `masked_reply_response_bytes`.
                 masked_reply_response_bytes(
                     builder,

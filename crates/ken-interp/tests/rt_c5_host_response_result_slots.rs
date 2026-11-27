@@ -1,14 +1,13 @@
 //! C5 host-response slots (spec/40-runtime/42-evaluation.md §3.6): checked
 //! Vis families drive real CaptureHost replies. Promise class: durable
-//! invariant. Entropy's unavailable random-bytes operation is a labelled
-//! transition sentinel, retired when that operation is promoted.
+//! invariant.
 
 use std::path::PathBuf;
 
 use ken_elaborator::capabilities::{Cap, AUTH_FULL};
 use ken_interp::{
-    apply, eval, CaptureHost, ConsoleIds, ConsoleStream, CoproductIds, EvalStore, EvalVal, FSIds,
-    PosixHost, RunIoError,
+    apply, eval, CaptureHost, ClockIds, ConsoleIds, ConsoleStream, CoproductIds, EvalStore,
+    EvalVal, FSIds, PosixHost, RunIoError,
 };
 use ken_kernel::{Context, GlobalId, Term};
 
@@ -16,6 +15,7 @@ struct Fixture {
     elab: ken_elaborator::ElabEnv,
     ids: ConsoleIds,
     fs: FSIds,
+    clock: ClockIds,
     coproduct: CoproductIds,
     store: EvalStore,
 }
@@ -36,6 +36,7 @@ impl Fixture {
         .expect("checked response-index family");
         let ids = ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
         let fs = FSIds::from_elab(&elab.prelude_env).expect("FS ABI");
+        let clock = ClockIds::from_elab(&elab.prelude_env).expect("Clock ABI");
         let coproduct = CoproductIds {
             inl_id: elab.prelude_env.inl_id,
             inr_id: elab.prelude_env.inr_id,
@@ -61,6 +62,7 @@ impl Fixture {
             elab,
             ids,
             fs,
+            clock,
             coproduct,
             store,
         }
@@ -262,7 +264,7 @@ impl Fixture {
             host,
             &self.ids,
             Some(&self.fs),
-            None,
+            Some(&self.clock),
             Some(&self.coproduct),
             &self.elab.env,
             &mut self.store,
@@ -868,22 +870,31 @@ fn ambient_io_error_unit() {
     assert!(host.stdout().is_empty());
 }
 
-/// Transition sentinel: EntropyRandomBytes is RepresentedUnavailable. When
-/// promoted, retire this refusal and add its IOError/Bytes response row.
-#[test]
-fn entropy_random_bytes_stays_unavailable_until_promotion() {
-    let mut f = Fixture::new();
+fn entropy_tree(f: &mut Fixture) -> EvalVal {
     let action = f.call("random_bytes", [EvalVal::Int(8)]);
     let full = f.full();
     let result_ty = f.eval_expr("Result IOError Bytes");
-    let tree = f.call("host_entropy", [full, result_ty, action]);
-    let mut host = host();
-    let before = (host.trace().len(), host.fs_trace().len());
+    f.call("host_entropy", [full, result_ty, action])
+}
+
+/// Promise class: durable invariant. MEASURED: with the production Clock
+/// installation, `random_bytes 8` through `host_entropy` reifies a checked
+/// `Result IOError Bytes` whose Ok payload is CaptureHost's exact bytes; with
+/// no installation, the same tree is UnknownEffect and leaves both traces
+/// unchanged. CLAIMED: the response comes from the installed decoder.
+/// THE GAP: CaptureHost never fails entropy, so no Err(IOError) row is driven
+/// here; the Err slot is checked by verify_pair's slot and alternate clauses.
+#[test]
+fn entropy_random_bytes_reifies_its_io_error_bytes_response() {
+    let mut f = Fixture::new();
+    let uninstalled = entropy_tree(&mut f);
+    let mut absent_host = host();
+    let before = (absent_host.trace().len(), absent_host.fs_trace().len());
     assert!(
         matches!(
             ken_interp::run_io(
-                tree,
-                &mut host,
+                uninstalled,
+                &mut absent_host,
                 &f.ids,
                 Some(&f.fs),
                 None,
@@ -893,7 +904,20 @@ fn entropy_random_bytes_stays_unavailable_until_promotion() {
             ),
             Err(RunIoError::UnknownEffect(_))
         ),
-        "unavailable entropy must not invent an IOError/Bytes host reply"
+        "without the Clock installation the effect is not decoded"
     );
-    assert_eq!((host.trace().len(), host.fs_trace().len()), before);
+    assert_eq!(
+        (absent_host.trace().len(), absent_host.fs_trace().len()),
+        before
+    );
+
+    let installed = entropy_tree(&mut f);
+    let mut host = host();
+    let response = f.verify_pair(installed, "IOError", "Bytes", &mut host);
+    assert!(
+        matches!(&response, EvalVal::Ctor { id, args, .. }
+            if *id == f.ids.ok_id
+                && matches!(&args[2], EvalVal::Bytes(bytes) if bytes.as_slice() == [0, 1, 2, 3, 4, 5, 6, 7])),
+        "installed entropy must reify Ok with CaptureHost's exact bytes: {response:?}"
+    );
 }

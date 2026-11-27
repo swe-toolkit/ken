@@ -1,7 +1,8 @@
-//! Natural-point orientation: spec/50-stdlib/67-geometry.md §§18–19, 21.
+//! Natural-point orientation: spec/50-stdlib/67-geometry.md §§18–19, 21–22.
 //! Promise class: durable invariant. Checked public laws and independently
 //! reduced closed values distinguish shared-axis collinearity from an off-line
-//! triple; false claims reject only after complete accepted prefixes.
+//! triple and positive scaling from collapse to the origin. False claims
+//! reject only after complete accepted prefixes.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -130,6 +131,103 @@ theorem refuse_one_point_translation
       (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) = Proved
 "#;
 
+const SCALE_IMPORTS: &str = r#"import Algorithm.Geometry.NatOrientation (orient, orient_scale)
+import Algorithm.Geometry.NatBox (MkPoint)
+import Core.Logic.OrdResult (OrdResult, Eq, Gt)
+import Core.Logic.Transport (trans)
+import Data.Numeric.Nat.Arithmetic (mul)
+import Data.Numeric.Nat.Order (compare)
+
+"#;
+
+const SCALE_COORDINATES: &str = r#"const n0 : Nat = Zero
+const n1 : Nat = Suc n0
+
+"#;
+
+const SCALE_OPEN: &str = r#"theorem open_scale
+    (xa : Nat) (ya : Nat) (xb : Nat) (yb : Nat) (xc : Nat) (yc : Nat) (k : Nat)
+  : Equal OrdResult
+      (orient (MkPoint (mul xa (Suc k)) (mul ya (Suc k)))
+              (MkPoint (mul xb (Suc k)) (mul yb (Suc k)))
+              (MkPoint (mul xc (Suc k)) (mul yc (Suc k))))
+      (orient (MkPoint xa ya) (MkPoint xb yb) (MkPoint xc yc)) =
+  orient_scale xa ya xb yb xc yc k
+
+theorem open_compare_mul_cancel (a : Nat) (b : Nat) (k : Nat)
+  : Equal OrdResult (compare (mul a (Suc k)) (mul b (Suc k))) (compare a b) =
+  (proof mul_cancel_r for compare) a b k
+
+"#;
+
+const SCALE_ACCEPTED_ROWS: &str = r#"theorem unit_turn_gt
+  : Equal OrdResult (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) Gt = Proved
+
+theorem doubled_turn_by_law
+  : Equal OrdResult
+      (orient (MkPoint (mul n0 (Suc n1)) (mul n0 (Suc n1)))
+              (MkPoint (mul n1 (Suc n1)) (mul n0 (Suc n1)))
+              (MkPoint (mul n0 (Suc n1)) (mul n1 (Suc n1))))
+      Gt =
+  trans
+    OrdResult
+    (orient (MkPoint (mul n0 (Suc n1)) (mul n0 (Suc n1)))
+            (MkPoint (mul n1 (Suc n1)) (mul n0 (Suc n1)))
+            (MkPoint (mul n0 (Suc n1)) (mul n1 (Suc n1))))
+    (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1))
+    Gt
+    (orient_scale n0 n0 n1 n0 n0 n1 n1)
+    unit_turn_gt
+
+theorem doubled_equation_closed
+  : Equal OrdResult
+      (orient (MkPoint (mul n0 (Suc n1)) (mul n0 (Suc n1)))
+              (MkPoint (mul n1 (Suc n1)) (mul n0 (Suc n1)))
+              (MkPoint (mul n0 (Suc n1)) (mul n1 (Suc n1))))
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) =
+  Proved
+
+theorem zero_scaled_is_eq
+  : Equal OrdResult
+      (orient (MkPoint (mul n0 Zero) (mul n0 Zero))
+              (MkPoint (mul n1 Zero) (mul n0 Zero))
+              (MkPoint (mul n0 Zero) (mul n1 Zero)))
+      Eq =
+  Proved
+"#;
+
+const SCALE_REFUSED_TURN: &str = r#"
+theorem zero_turn_by_law
+  : Equal OrdResult
+      (orient (MkPoint (mul n0 Zero) (mul n0 Zero))
+              (MkPoint (mul n1 Zero) (mul n0 Zero))
+              (MkPoint (mul n0 Zero) (mul n1 Zero)))
+      Gt =
+  trans
+    OrdResult
+    (orient (MkPoint (mul n0 Zero) (mul n0 Zero))
+            (MkPoint (mul n1 Zero) (mul n0 Zero))
+            (MkPoint (mul n0 Zero) (mul n1 Zero)))
+    (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1))
+    Gt
+    (orient_scale n0 n0 n1 n0 n0 n1 n1)
+    unit_turn_gt
+"#;
+
+const SCALE_REFUSED_EQUATION: &str = r#"
+theorem zero_equation_claim
+  : Equal OrdResult
+      (orient (MkPoint (mul n0 Zero) (mul n0 Zero))
+              (MkPoint (mul n1 Zero) (mul n0 Zero))
+              (MkPoint (mul n0 Zero) (mul n1 Zero)))
+      (orient (MkPoint n0 n0) (MkPoint n1 n0) (MkPoint n0 n1)) =
+  Proved
+"#;
+
+fn scale_accepted() -> String {
+    format!("{SCALE_IMPORTS}{SCALE_COORDINATES}{SCALE_OPEN}{SCALE_ACCEPTED_ROWS}")
+}
+
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages")
 }
@@ -225,17 +323,17 @@ fn owned_open_law(
     owner
 }
 
-/// SOURCE: spec/50-stdlib/67-geometry.md §§19 and 21, Architect AC-0.
+/// SOURCE: spec/50-stdlib/67-geometry.md §§19, 21 and 22, Architect AC-0.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: provider-relative trust identity equality for each package;
-/// exact owned Transparent law identities in complete open clients; and the
-/// checked Order cancellation identity reachable from the translation proof.
+/// owned Transparent law identities cited in open clients; and the respective
+/// Order cancellation identity reachable from each geometry proof.
 /// CLAIMED: the laws are available at their public types without new trust.
 /// THE GAP: providers carry their own trust, measured before each load.
-/// Adding unrelated exports or refactoring proofs around the cancellation
-/// seam stays green. New trust or a lost law type, owner, or checked use fails.
+/// Adding unrelated exports or refactoring proofs while retaining the checked
+/// Order dependencies stays green. New trust or a lost type, owner, or use fails.
 #[test]
-fn shared_axis_and_translation_laws_have_checked_owners_and_zero_new_trust() {
+fn public_laws_have_checked_owners_and_zero_new_trust() {
     let mut env = ElabEnv::new().expect("fresh elaborator");
     for provider in [
         "Core.Classes.LawfulClasses",
@@ -284,6 +382,21 @@ fn shared_axis_and_translation_laws_have_checked_owners_and_zero_new_trust() {
     assert!(
         proof_uses_order_law(&env, &owned, translate, cancel),
         "the translation proof consumes the Order law through geometry-owned proofs"
+    );
+
+    env.elaborate_file(&format!("{SCALE_IMPORTS}{SCALE_OPEN}"))
+        .expect("open scaling and positive-factor cancellation clients check");
+    let scale = owned_open_law(&env, GEOMETRY, &owned, "orient_scale", "open_scale");
+    let mul_cancel = owned_open_law(
+        &env,
+        ORDER,
+        &order,
+        "compare::mul_cancel_r",
+        "open_compare_mul_cancel",
+    );
+    assert!(
+        proof_uses_order_law(&env, &owned, scale, mul_cancel),
+        "the scaling proof consumes the Order law through geometry-owned proofs"
     );
 
     env.elaborate_file(AXIS_ACCEPTED)
@@ -337,6 +450,34 @@ fn translation_helpers_stay_private_to_the_checked_package() {
         match loaded_orientation().elaborate_file(&format!("import {GEOMETRY} ({helper})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{GEOMETRY}.{helper}"), "import of {helper}");
+            }
+            other => panic!("{helper} must refuse selective import: {other:?}"),
+        }
+    }
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §22, Architect AC-0.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: each scaling helper refuses selective import with its qualified
+/// UnboundName after a fresh, successful load of its owner (including Order).
+/// CLAIMED: the five proof steps do not extend the public API.
+/// THE GAP: this is selective-import visibility, not a complete export roster.
+/// Adding unrelated declarations stays green; exposing any named helper fails.
+#[test]
+fn scaling_helpers_stay_private_to_their_checked_packages() {
+    for (package, helper) in [
+        (GEOMETRY, "orient_compare_congr"),
+        (GEOMETRY, "orient_scale_sum"),
+        (GEOMETRY, "orient_factor_sum"),
+        (GEOMETRY, "orient_scale_product"),
+        (ORDER, "compare_bits"),
+    ] {
+        let mut env = ElabEnv::new().expect("fresh elaborator");
+        env.elaborate_module_from_roots(&[catalog_root()], package)
+            .expect("helper owner root-loads before the import probe");
+        match env.elaborate_file(&format!("import {package} ({helper})")) {
+            Err(ElabError::UnboundName { name, .. }) => {
+                assert_eq!(name, format!("{package}.{helper}"), "import of {helper}");
             }
             other => panic!("{helper} must refuse selective import: {other:?}"),
         }
@@ -458,5 +599,60 @@ fn translating_only_one_point_refuses_at_its_own_theorem() {
         TRANSLATE_ACCEPTED,
         "refuse_one_point_translation",
         TRANSLATE_REFUSED,
+    );
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §22, AC-2 scaling rows.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: a closed unit turn gives Gt, the doubled turn uses the checked
+/// scaling law, the doubled equation checks independently, and zero gives Eq.
+/// CLAIMED: doubling preserves this turn; multiplying by zero does not.
+/// THE GAP: the closed rows supplement the generic open type, not prove it.
+/// Equivalent arithmetic is compatible; changing these results or bypassing
+/// the public law in the doubled turn witness fails.
+#[test]
+fn positive_scaling_preserves_the_turn_but_zero_gives_eq() {
+    let mut env = loaded_orientation();
+    env.elaborate_file(&scale_accepted())
+        .expect("unit turn, doubled turn by law, doubled equation, and zero Eq check");
+    let scale = env.globals[&format!("{GEOMETRY}.orient_scale")];
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals["doubled_turn_by_law"])
+        .expect("doubled turn has a checked body");
+    assert!(
+        term_contains_const(&body, scale),
+        "doubled turn cites orient_scale"
+    );
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §22, AC-2 scaling refusal.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: changing the scaled coordinates' factor from two to zero in
+/// the Gt client rejects with a kernel TypeMismatch at the added theorem.
+/// CLAIMED: the positive-factor law cannot prove Gt for these zero-scaled points.
+/// THE GAP: this use could fail at the law application even with a wrong
+/// generic law; the separate equation refusal pins the false equality.
+/// Diagnostic offsets may move; accepting the claim or failing its prefix breaks.
+#[test]
+fn zero_scaled_gt_by_law_refuses_at_its_own_theorem() {
+    refuses_only_at_added_theorem(&scale_accepted(), "zero_turn_by_law", SCALE_REFUSED_TURN);
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §22, AC-2 equation refusal.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the doubled equation checks directly, but the same equation
+/// at factor zero rejects at its own theorem after a fresh accepted prefix.
+/// CLAIMED: zero scaling does not preserve the unit turn, independently of
+/// whether a client can apply the positive-factor law.
+/// THE GAP: this is one counterexample, not a classification of all triples.
+/// Equivalent proofs and shifted spans are compatible; accepting the zero
+/// equation or failing its prefix breaks.
+#[test]
+fn zero_scaled_equation_refuses_at_its_own_theorem() {
+    refuses_only_at_added_theorem(
+        &scale_accepted(),
+        "zero_equation_claim",
+        SCALE_REFUSED_EQUATION,
     );
 }

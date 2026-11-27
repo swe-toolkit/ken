@@ -3,11 +3,10 @@
 use crate::{
     CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1, CapabilityDeniedV1,
     CapabilityTraceIdentity, ConsoleStreamV1, CreatePolicyV1, DirEntryV1, EffectEvent,
-    FdInheritancePolicyV1, FileErrorCauseV1, FileErrorIdentityV1, FileMetadataV1,
-    FsCapabilityOperationV1, FsNodeKindV1, FsOpenModeV1, FsSeekFromV1, FsSyncModeV1, HostOpV1,
-    IoErrorIdentityV1, MappingProtectionV1, ResourceBindingRole, ResourceErrorV1, ResourceKindV1,
-    ResourceSettlementObservationV1, ResourceSettlementOutcomeV1, ResourceTraceIdentityV1,
-    SemanticErrorV1, TerminalExitClass,
+    FileErrorCauseV1, FileErrorIdentityV1, FileMetadataV1, FsCapabilityOperationV1, FsNodeKindV1,
+    FsOpenModeV1, FsSyncModeV1, HostOpV1, IoErrorIdentityV1, MappingProtectionV1,
+    ResourceBindingRole, ResourceErrorV1, ResourceKindV1, ResourceSettlementObservationV1,
+    ResourceSettlementOutcomeV1, ResourceTraceIdentityV1, SemanticErrorV1, TerminalExitClass,
 };
 
 const MAGIC: &[u8; 8] = b"KETRACE3";
@@ -107,13 +106,6 @@ fn stream_tag(stream: ConsoleStreamV1) -> u8 {
         ConsoleStreamV1::Stdin => 0,
         ConsoleStreamV1::Stdout => 1,
         ConsoleStreamV1::Stderr => 2,
-    }
-}
-
-fn inheritance_policy_tag(policy: FdInheritancePolicyV1) -> u8 {
-    match policy {
-        FdInheritancePolicyV1::Inherit => 0,
-        FdInheritancePolicyV1::CloseOnExec => 1,
     }
 }
 
@@ -254,23 +246,6 @@ fn put_request(
             put_u64(out, *buffer_start);
             put_u64(out, *length);
         }
-        CanonicalRequestV1::FsSeek { from } => {
-            put_u8(out, 25);
-            match from {
-                FsSeekFromV1::Start(offset) => {
-                    put_u8(out, 0);
-                    put_u64(out, *offset);
-                }
-                FsSeekFromV1::Current(offset) => {
-                    put_u8(out, 1);
-                    put_i64(out, *offset);
-                }
-                FsSeekFromV1::End(offset) => {
-                    put_u8(out, 2);
-                    put_i64(out, *offset);
-                }
-            }
-        }
         CanonicalRequestV1::FsSetLength { length } => {
             put_u8(out, 26);
             put_u64(out, *length);
@@ -284,15 +259,6 @@ fn put_request(
                     FsSyncModeV1::SyncData => 1,
                 },
             );
-        }
-        CanonicalRequestV1::FsGetInheritance => put_u8(out, 28),
-        CanonicalRequestV1::FsSetInheritance { policy } => {
-            put_u8(out, 29);
-            put_u8(out, inheritance_policy_tag(*policy));
-        }
-        CanonicalRequestV1::FsDuplicate { policy } => {
-            put_u8(out, 30);
-            put_u8(out, inheritance_policy_tag(*policy));
         }
         CanonicalRequestV1::BufferAllocate { capacity } => {
             put_u8(out, 20);
@@ -492,14 +458,6 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
                 crate::ChildExitV1::Signaled(signal) => { put_u8(out, 1); put_u8(out, *signal); }
             }
         }
-        CanonicalReplyV1::FilePosition(position) => {
-            put_u8(out, 13);
-            put_u64(out, *position);
-        }
-        CanonicalReplyV1::FdInheritancePolicy(policy) => {
-            put_u8(out, 14);
-            put_u8(out, inheritance_policy_tag(*policy));
-        }
     }
     Ok(())
 }
@@ -566,12 +524,8 @@ fn fs_operation_tag(operation: FsCapabilityOperationV1) -> u8 {
         FsCapabilityOperationV1::RenameSource => 8,
         FsCapabilityOperationV1::RenameDestination => 9,
         FsCapabilityOperationV1::ChangeMode => 10,
-        FsCapabilityOperationV1::Seek => 11,
         FsCapabilityOperationV1::SetLength => 12,
         FsCapabilityOperationV1::Sync => 13,
-        FsCapabilityOperationV1::GetInheritance => 14,
-        FsCapabilityOperationV1::SetInheritance => 15,
-        FsCapabilityOperationV1::Duplicate => 16,
         FsCapabilityOperationV1::Spawn => 17,
     }
 }
@@ -853,16 +807,6 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn get_inheritance_policy(
-    cursor: &mut Cursor<'_>,
-) -> Result<FdInheritancePolicyV1, EffectTraceWireError> {
-    match cursor.u8()? {
-        0 => Ok(FdInheritancePolicyV1::Inherit),
-        1 => Ok(FdInheritancePolicyV1::CloseOnExec),
-        _ => Err(EffectTraceWireError),
-    }
-}
-
 fn get_stream(cursor: &mut Cursor<'_>) -> Result<ConsoleStreamV1, EffectTraceWireError> {
     match cursor.u8()? {
         0 => Ok(ConsoleStreamV1::Stdin),
@@ -1004,14 +948,6 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
             buffer_start: cursor.u64()?,
             length: cursor.u64()?,
         },
-        25 => CanonicalRequestV1::FsSeek {
-            from: match cursor.u8()? {
-                0 => FsSeekFromV1::Start(cursor.u64()?),
-                1 => FsSeekFromV1::Current(cursor.i64()?),
-                2 => FsSeekFromV1::End(cursor.i64()?),
-                _ => return Err(EffectTraceWireError),
-            },
-        },
         26 => CanonicalRequestV1::FsSetLength {
             length: cursor.u64()?,
         },
@@ -1021,13 +957,6 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
                 1 => FsSyncModeV1::SyncData,
                 _ => return Err(EffectTraceWireError),
             },
-        },
-        28 => CanonicalRequestV1::FsGetInheritance,
-        29 => CanonicalRequestV1::FsSetInheritance {
-            policy: get_inheritance_policy(cursor)?,
-        },
-        30 => CanonicalRequestV1::FsDuplicate {
-            policy: get_inheritance_policy(cursor)?,
         },
         20 => CanonicalRequestV1::BufferAllocate {
             capacity: cursor.u64()?,
@@ -1153,8 +1082,6 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
         4 => CanonicalReplyV1::ReadEof,
         5 => CanonicalReplyV1::Instant(cursor.bytes()?),
         12 => CanonicalReplyV1::MonotonicInstant(cursor.bytes()?),
-        13 => CanonicalReplyV1::FilePosition(cursor.u64()?),
-        14 => CanonicalReplyV1::FdInheritancePolicy(get_inheritance_policy(cursor)?),
         16 => CanonicalReplyV1::SocketAddress(get_socket_address(cursor)?),
         15 => CanonicalReplyV1::ChildExit(match cursor.u8()? {
             0 => crate::ChildExitV1::Exited(cursor.u8()?),
@@ -1302,12 +1229,8 @@ fn get_fs_operation(
         8 => Ok(FsCapabilityOperationV1::RenameSource),
         9 => Ok(FsCapabilityOperationV1::RenameDestination),
         10 => Ok(FsCapabilityOperationV1::ChangeMode),
-        11 => Ok(FsCapabilityOperationV1::Seek),
         12 => Ok(FsCapabilityOperationV1::SetLength),
         13 => Ok(FsCapabilityOperationV1::Sync),
-        14 => Ok(FsCapabilityOperationV1::GetInheritance),
-        15 => Ok(FsCapabilityOperationV1::SetInheritance),
-        16 => Ok(FsCapabilityOperationV1::Duplicate),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -2044,115 +1967,47 @@ mod tests {
         assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: all three
-    /// signed/unsigned seek-origin forms, set-length, file-position replies,
-    /// and the two PX9 capability-operation identities round-trip with exact
-    /// distinct tags; an unknown seek-origin tag and a truncated payload are
-    /// rejected. CLAIMED: ABI-S1's descriptor wire shape
-    /// is typed and fail-closed rather than an untagged offset. THE GAP: native
-    /// execution remains deliberately unavailable in this partial.
+    /// Promise class: normative compatibility vector. MEASURED: length keeps
+    /// tag 26 and its full unsigned payload; retired tags 25, 13 (reply), and
+    /// 11 (right denial) reject well-formed former payloads. CLAIMED: the
+    /// decoder does not admit the retired operation through another tag.
+    /// THE GAP: this exercises the codec, not execution of either live lane.
     #[test]
-    fn abi_s1_descriptor_requests_and_position_reply_round_trip_typed_wire() {
-        let requests = [
-            CanonicalRequestV1::FsSeek {
-                from: FsSeekFromV1::Start(0x0123_4567_89ab_cdef),
-            },
-            CanonicalRequestV1::FsSeek {
-                from: FsSeekFromV1::Current(-41),
-            },
-            CanonicalRequestV1::FsSeek {
-                from: FsSeekFromV1::End(-73),
-            },
-            CanonicalRequestV1::FsSetLength {
-                length: 0xfedc_ba98_7654_3210,
-            },
-        ];
-        let mut encodings = Vec::new();
-        for request in &requests {
-            let mut encoded = Vec::new();
-            put_request(&mut encoded, request).expect("descriptor request encodes");
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
-            assert_eq!(get_request(&mut cursor).unwrap(), *request);
-            assert_eq!(cursor.position, encoded.len());
-            encodings.push(encoded);
-        }
-        assert_eq!(
-            encodings.iter().map(|bytes| bytes[0]).collect::<Vec<_>>(),
-            vec![25, 25, 25, 26]
-        );
-        assert_eq!(
-            encodings
-                .iter()
-                .take(3)
-                .map(|bytes| bytes[1])
-                .collect::<Vec<_>>(),
-            vec![0, 1, 2]
-        );
-        for (index, left) in encodings.iter().enumerate() {
-            for right in &encodings[index + 1..] {
-                assert_ne!(left, right);
-            }
-        }
-
-        let mut reply = Vec::new();
-        put_reply(
-            &mut reply,
-            &CanonicalReplyV1::FilePosition(0x1020_3040_5060_7080),
-        )
-        .unwrap();
-        assert_eq!(reply[0], 13);
-        let mut cursor = Cursor {
-            bytes: &reply,
-            position: 0,
+    fn set_length_round_trips_and_retired_seek_wire_tags_refuse() {
+        let request = CanonicalRequestV1::FsSetLength {
+            length: 0xfedc_ba98_7654_3210,
         };
-        assert_eq!(
-            get_reply(&mut cursor).unwrap(),
-            CanonicalReplyV1::FilePosition(0x1020_3040_5060_7080)
-        );
-        assert_eq!(cursor.position, reply.len());
-
-        for (operation, tag) in [
-            (FsCapabilityOperationV1::Seek, 11),
-            (FsCapabilityOperationV1::SetLength, 12),
-        ] {
-            let denial = CapabilityDeniedV1::RightNotHeld {
-                operation,
-                held_rights: 0x55,
-            };
+        let mut encoded = Vec::new();
+        put_request(&mut encoded, &request).unwrap();
+        assert_eq!(encoded, [26, 0x10, 0x32, 0x54, 0x76, 0x98, 0xba, 0xdc, 0xfe]);
+        let mut cursor = Cursor { bytes: &encoded, position: 0 };
+        assert_eq!(get_request(&mut cursor).unwrap(), request);
+        assert_eq!(cursor.position, encoded.len());
+        for bytes in [&[25, 0, 1, 0, 0, 0, 0, 0, 0, 0][..], &[26, 1, 2, 3]] {
+            let mut cursor = Cursor { bytes, position: 0 };
+            assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
+        }
+        let mut cursor = Cursor { bytes: &[13, 1, 0, 0, 0, 0, 0, 0, 0], position: 0 };
+        assert_eq!(get_reply(&mut cursor), Err(EffectTraceWireError));
+        let mut cursor = Cursor { bytes: &[0, 11, 0x55], position: 0 };
+        assert_eq!(get_denial(&mut cursor), Err(EffectTraceWireError));
+        for (tag, operation) in [(12, FsCapabilityOperationV1::SetLength), (13, FsCapabilityOperationV1::Sync)] {
+            let denial = CapabilityDeniedV1::RightNotHeld { operation, held_rights: 0x55 };
             let mut encoded = Vec::new();
             put_denial(&mut encoded, &denial);
             assert_eq!(encoded, [0, tag, 0x55]);
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
+            let mut cursor = Cursor { bytes: &encoded, position: 0 };
             assert_eq!(get_denial(&mut cursor).unwrap(), denial);
             assert_eq!(cursor.position, encoded.len());
         }
-
-        let malformed_origin = [25, 3];
-        let mut cursor = Cursor {
-            bytes: &malformed_origin,
-            position: 0,
-        };
-        assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
-        let truncated_set_length = [26, 1, 2, 3];
-        let mut cursor = Cursor {
-            bytes: &truncated_set_length,
-            position: 0,
-        };
-        assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
     }
 
     /// Promise class: normative compatibility vector. MEASURED: full and data
     /// sync use distinct typed mode tags, round-trip without conflation, the
-    /// pathless `FsSync` file-error identity survives, and unknown or absent
+    /// exact sync I/O cause survives, and unknown or absent
     /// modes are rejected. CLAIMED: ABI-S1 D3 preserves the
     /// fsync/fdatasync distinction at the canonical wire boundary. THE GAP:
-    /// native execution remains deliberately unavailable in this partial.
+    /// the codec alone does not establish OS behavior.
     #[test]
     fn abi_s1_sync_modes_round_trip_distinct_and_fail_closed() {
         for (mode, bytes) in [
@@ -2185,18 +2040,14 @@ mod tests {
         assert_eq!(get_denial(&mut cursor).unwrap(), denial);
         assert_eq!(cursor.position, encoded.len());
 
-        let file_error = SemanticErrorV1::File(FileErrorIdentityV1 {
-            operation: HostOpV1::FsSync,
-            relative_path: Vec::new(),
-            cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(77)),
-        });
+        let io_error = SemanticErrorV1::Io(IoErrorIdentityV1::Other(77));
         let mut encoded = Vec::new();
-        put_error(&mut encoded, &file_error).expect("sync file error encodes");
+        put_error(&mut encoded, &io_error).expect("sync I/O error encodes");
         let mut cursor = Cursor {
             bytes: &encoded,
             position: 0,
         };
-        assert_eq!(get_error(&mut cursor).unwrap(), file_error);
+        assert_eq!(get_error(&mut cursor).unwrap(), io_error);
         assert_eq!(cursor.position, encoded.len());
 
         for malformed in [&[27, 2][..], &[27][..]] {
@@ -2208,106 +2059,37 @@ mod tests {
         }
     }
 
-    /// Promise class: normative compatibility vector. MEASURED: get and set
-    /// have distinct request identities; both inheritance policies preserve
-    /// their frozen tags through set requests and get replies; rights and PX9
-    /// operation identities remain profile-specific; and unknown or truncated
-    /// policy values are refused. CLAIMED: ABI-S1 D4 never conflates direction
-    /// or defaults an unrecognized policy to inheritance. THE GAP: OS behavior
-    /// and resource-right enforcement are exercised by the dispatcher test.
+    /// Promise class: normative compatibility vector. MEASURED: the request,
+    /// reply and denial decoders reject complete former inheritance/duplication
+    /// payloads. CLAIMED: the decoder does not admit a retired operation through
+    /// another tag. THE GAP: these vectors pin the former bytes; the remaining
+    /// typed request, reply, and denial alternatives have no retired variant.
     #[test]
-    fn abi_s1_inheritance_policy_wire_is_typed_distinct_and_fail_closed() {
-        assert_eq!(FdInheritancePolicyV1::Inherit as u64, 0);
-        assert_eq!(FdInheritancePolicyV1::CloseOnExec as u64, 1);
-
-        let mut get = Vec::new();
-        put_request(&mut get, &CanonicalRequestV1::FsGetInheritance).unwrap();
-        assert_eq!(get, [28]);
-        let mut cursor = Cursor {
-            bytes: &get,
+    fn retired_inheritance_and_duplication_wire_tags_refuse() {
+        for bytes in [&[28][..], &[29, 0], &[30, 1]] {
+            let mut cursor = Cursor { bytes, position: 0 };
+            assert_eq!(
+                get_request(&mut cursor),
+                Err(EffectTraceWireError),
+                "{bytes:?}"
+            );
+        }
+        let mut reply = Cursor {
+            bytes: &[14, 0],
             position: 0,
         };
-        assert_eq!(
-            get_request(&mut cursor).unwrap(),
-            CanonicalRequestV1::FsGetInheritance
-        );
-        assert_eq!(cursor.position, get.len());
-
-        for (policy, request_bytes, reply_bytes) in [
-            (FdInheritancePolicyV1::Inherit, [29, 0], [14, 0]),
-            (FdInheritancePolicyV1::CloseOnExec, [29, 1], [14, 1]),
-        ] {
-            let request = CanonicalRequestV1::FsSetInheritance { policy };
-            let mut encoded = Vec::new();
-            put_request(&mut encoded, &request).unwrap();
-            assert_eq!(encoded, request_bytes);
+        assert_eq!(get_reply(&mut reply), Err(EffectTraceWireError));
+        for tag in [14, 15, 16] {
+            let bytes = [0, tag, 0x55]; // RightNotHeld, former operation, held rights.
             let mut cursor = Cursor {
-                bytes: &encoded,
+                bytes: &bytes,
                 position: 0,
             };
-            assert_eq!(get_request(&mut cursor).unwrap(), request);
-            assert_eq!(cursor.position, encoded.len());
-
-            let reply = CanonicalReplyV1::FdInheritancePolicy(policy);
-            let mut encoded = Vec::new();
-            put_reply(&mut encoded, &reply).unwrap();
-            assert_eq!(encoded, reply_bytes);
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
-            assert_eq!(get_reply(&mut cursor).unwrap(), reply);
-            assert_eq!(cursor.position, encoded.len());
-        }
-
-        for (operation, tag) in [
-            (FsCapabilityOperationV1::GetInheritance, 14),
-            (FsCapabilityOperationV1::SetInheritance, 15),
-        ] {
-            let denial = CapabilityDeniedV1::RightNotHeld {
-                operation,
-                held_rights: 0x55,
-            };
-            let mut encoded = Vec::new();
-            put_denial(&mut encoded, &denial);
-            assert_eq!(encoded, [0, tag, 0x55]);
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
-            assert_eq!(get_denial(&mut cursor).unwrap(), denial);
-            assert_eq!(cursor.position, encoded.len());
-        }
-
-        for operation in [HostOpV1::FsGetInheritance, HostOpV1::FsSetInheritance] {
-            let file_error = SemanticErrorV1::File(FileErrorIdentityV1 {
-                operation,
-                relative_path: Vec::new(),
-                cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(78)),
-            });
-            let mut encoded = Vec::new();
-            put_error(&mut encoded, &file_error).unwrap();
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
-            assert_eq!(get_error(&mut cursor).unwrap(), file_error);
-            assert_eq!(cursor.position, encoded.len());
-        }
-
-        for malformed in [&[29, 2][..], &[29][..]] {
-            let mut cursor = Cursor {
-                bytes: malformed,
-                position: 0,
-            };
-            assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
-        }
-        for malformed in [&[14, 2][..], &[14][..]] {
-            let mut cursor = Cursor {
-                bytes: malformed,
-                position: 0,
-            };
-            assert_eq!(get_reply(&mut cursor), Err(EffectTraceWireError));
+            assert_eq!(
+                get_denial(&mut cursor),
+                Err(EffectTraceWireError),
+                "{bytes:?}"
+            );
         }
     }
 
@@ -2406,85 +2188,6 @@ mod tests {
                 position: 0,
             };
             assert_eq!(get_resource_kind(&mut cursor), Err(EffectTraceWireError));
-        }
-    }
-
-    /// Promise class: normative compatibility vector. MEASURED: both frozen
-    /// policies round-trip through the distinct duplicate request tag, the
-    /// operation keeps its independent PX9 and right identities, and unknown
-    /// or truncated policy payloads fail closed. CLAIMED: ABI-S1 D5 reuses the
-    /// D4 policy without defaulting or tag conflation. THE GAP: descriptor and
-    /// resource-table behavior are exercised by the dispatcher discriminator.
-    #[test]
-    fn abi_s1_duplicate_wire_is_typed_distinct_and_fail_closed() {
-        for (policy, bytes) in [
-            (FdInheritancePolicyV1::Inherit, [30, 0]),
-            (FdInheritancePolicyV1::CloseOnExec, [30, 1]),
-        ] {
-            let request = CanonicalRequestV1::FsDuplicate { policy };
-            let mut encoded = Vec::new();
-            put_request(&mut encoded, &request).unwrap();
-            assert_eq!(encoded, bytes);
-            let mut cursor = Cursor {
-                bytes: &encoded,
-                position: 0,
-            };
-            assert_eq!(get_request(&mut cursor).unwrap(), request);
-            assert_eq!(cursor.position, encoded.len());
-        }
-
-        let denial = CapabilityDeniedV1::RightNotHeld {
-            operation: FsCapabilityOperationV1::Duplicate,
-            held_rights: 0x55,
-        };
-        let mut encoded = Vec::new();
-        put_denial(&mut encoded, &denial);
-        assert_eq!(encoded, [0, 16, 0x55]);
-        let mut cursor = Cursor {
-            bytes: &encoded,
-            position: 0,
-        };
-        assert_eq!(get_denial(&mut cursor).unwrap(), denial);
-        assert_eq!(cursor.position, encoded.len());
-
-        let file_error = SemanticErrorV1::File(FileErrorIdentityV1 {
-            operation: HostOpV1::FsDuplicate,
-            relative_path: Vec::new(),
-            cause: FileErrorCauseV1::Io(IoErrorIdentityV1::Other(79)),
-        });
-        let mut encoded = Vec::new();
-        put_error(&mut encoded, &file_error).unwrap();
-        let mut cursor = Cursor {
-            bytes: &encoded,
-            position: 0,
-        };
-        assert_eq!(get_error(&mut cursor).unwrap(), file_error);
-        assert_eq!(cursor.position, encoded.len());
-
-        let acquired = CanonicalReplyV1::ResourceAcquired {
-            schema_version: 1,
-            resource_kind: ResourceKindV1::FsHandle,
-            identity: ResourceTraceIdentityV1(31),
-        };
-        let mut encoded = Vec::new();
-        put_reply(&mut encoded, &acquired).unwrap();
-        assert_eq!(
-            encoded[0], 8,
-            "duplicate reuses ResourceAcquired reply wire"
-        );
-        let mut cursor = Cursor {
-            bytes: &encoded,
-            position: 0,
-        };
-        assert_eq!(get_reply(&mut cursor).unwrap(), acquired);
-        assert_eq!(cursor.position, encoded.len());
-
-        for malformed in [&[30, 2][..], &[30][..]] {
-            let mut cursor = Cursor {
-                bytes: malformed,
-                position: 0,
-            };
-            assert_eq!(get_request(&mut cursor), Err(EffectTraceWireError));
         }
     }
 

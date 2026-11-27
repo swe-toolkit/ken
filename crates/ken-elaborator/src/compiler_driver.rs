@@ -3287,16 +3287,6 @@ fn emit_native_program_preparation(
                 dir_entry: host_spine.dir_entry.to_string(),
                 directory_entries: host_spine.directory_entries.to_string(),
                 directory_end: host_spine.directory_end.to_string(),
-                file_operation_seek: host_spine.file_operation_seek.to_string(),
-                file_operation_set_length: host_spine.file_operation_set_length.to_string(),
-                file_operation_sync: host_spine.file_operation_sync.to_string(),
-                file_operation_get_inheritance: host_spine
-                    .file_operation_get_inheritance
-                    .to_string(),
-                file_operation_set_inheritance: host_spine
-                    .file_operation_set_inheritance
-                    .to_string(),
-                file_operation_duplicate: host_spine.file_operation_duplicate.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
                 px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
                 px11_address_symbols: host_spine.px11_address_symbols.clone().map(|symbol| symbol.to_string()),
@@ -3326,6 +3316,8 @@ fn emit_native_program_preparation(
                 read_eof: host_spine.read_eof.to_string(),
                 wrote: host_spine.wrote.to_string(),
                 mk_instant: host_spine.mk_instant.to_string(),
+                mk_monotonic_instant: host_spine.mk_monotonic_instant.to_string(),
+                mk_deadline: host_spine.mk_deadline.to_string(),
                 read_chunk: host_spine.read_chunk.to_string(),
                 read_result_eof: host_spine.read_result_eof.to_string(),
                 unit: host_spine.unit.to_string(),
@@ -4318,6 +4310,8 @@ fn checked_host_operation_pairs(
         (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (prelude.private_fs_open_directory_id, ken_host::HostOpV1::FsOpenDirectory),
         (prelude.private_fs_read_directory_batch_id, ken_host::HostOpV1::FsReadDirectoryBatch),
+        (prelude.private_fs_set_length_id, ken_host::HostOpV1::FsSetLength),
+        (prelude.private_fs_sync_id, ken_host::HostOpV1::FsSync),
         (
             prelude.private_fs_handle_metadata_id,
             ken_host::HostOpV1::FsHandleMetadata,
@@ -4465,12 +4459,6 @@ fn checked_host_spine_v1(
         dir_entry: resolve_id(roles.dir_entry)?,
         directory_entries: resolve_id(roles.directory_entries)?,
         directory_end: resolve_id(roles.directory_end)?,
-        file_operation_seek: resolve_id(roles.file_operation_seek)?,
-        file_operation_set_length: resolve_id(roles.file_operation_set_length)?,
-        file_operation_sync: resolve_id(roles.file_operation_sync)?,
-        file_operation_get_inheritance: resolve_id(roles.file_operation_get_inheritance)?,
-        file_operation_set_inheritance: resolve_id(roles.file_operation_set_inheritance)?,
-        file_operation_duplicate: resolve_id(roles.file_operation_duplicate)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
         px10_exit_symbols: [
             resolve_id(prelude.px10_exit_ids[0])?,
@@ -4521,6 +4509,8 @@ fn checked_host_spine_v1(
         read_eof: resolve_id(roles.read_eof)?,
         wrote: resolve_id(roles.wrote)?,
         mk_instant: resolve_id(roles.mk_instant)?,
+        mk_monotonic_instant: resolve_id(roles.monotonic_instant_constructor)?,
+        mk_deadline: resolve_id(roles.deadline_constructor)?,
         read_chunk: resolve_id(roles.read_chunk)?,
         read_result_eof: resolve_id(roles.read_result_eof)?,
         unit: resolve_id(roles.unit)?,
@@ -4725,13 +4715,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.file_operation_remove_file,
         &spine.file_operation_remove_directory,
         &spine.dir_entry,
-        // ABI-S1 appends without changing established positional identities.
-        &spine.file_operation_seek,
-        &spine.file_operation_set_length,
-        &spine.file_operation_sync,
-        &spine.file_operation_get_inheritance,
-        &spine.file_operation_set_inheritance,
-        &spine.file_operation_duplicate,
         // ABI-S6 D4 appends without moving established positional identities.
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
@@ -4741,6 +4724,10 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S2 appends in the same order as the runtime role decoder.
         &spine.directory_entries,
         &spine.directory_end,
+        // Clock promotion appends in that same order.
+        &spine.mk_monotonic_instant,
+        &spine.mk_deadline,
+        // PX11 Inc2 socket address roles append after Clock's, in the same order.
         &spine.px11_address_symbols[0],
         &spine.px11_address_symbols[1],
         &spine.px11_address_symbols[2],
@@ -5013,8 +5000,6 @@ mod native_pre_source_stable_symbols {
             );
             checked_ops.insert(operation as u16);
         }
-        // FsSeek, FsSetLength, FsSync, FsGetInheritance, FsSetInheritance and
-        // FsDuplicate have no checked constructor and cannot reach erasure.
         for op in HostOpV1::ALL
             .into_iter()
             .filter(|op| op.takes_capability_operand())
@@ -9473,12 +9458,12 @@ mod d1b_role_c1_roster_identity {
             ("exit_code_type", "ExitCode", roles.exit_code_type),
             (
                 "monotonic_instant_constructor",
-                "MkMonotonicInstant",
+                "MonotonicInstant.MkMonotonicInstant",
                 roles.monotonic_instant_constructor,
             ),
             (
                 "deadline_constructor",
-                "MkDeadline",
+                "Deadline.MkDeadline",
                 roles.deadline_constructor,
             ),
             (
@@ -9629,6 +9614,8 @@ mod d1b_role_c1_roster_identity {
             ("read_eof", record.spine.read_eof.clone()),
             ("wrote", record.spine.wrote.clone()),
             ("mk_instant", record.spine.mk_instant.clone()),
+            ("monotonic_instant_constructor", record.spine.mk_monotonic_instant.clone()),
+            ("deadline_constructor", record.spine.mk_deadline.clone()),
             ("read_chunk", record.spine.read_chunk.clone()),
             ("read_result_eof", record.spine.read_result_eof.clone()),
             ("unit", record.spine.unit.clone()),
@@ -9673,30 +9660,6 @@ mod d1b_role_c1_roster_identity {
             ("dir_entry", record.spine.dir_entry.clone()),
             ("directory_entries", record.spine.directory_entries.clone()),
             ("directory_end", record.spine.directory_end.clone()),
-            (
-                "file_operation_seek",
-                record.spine.file_operation_seek.clone(),
-            ),
-            (
-                "file_operation_set_length",
-                record.spine.file_operation_set_length.clone(),
-            ),
-            (
-                "file_operation_sync",
-                record.spine.file_operation_sync.clone(),
-            ),
-            (
-                "file_operation_get_inheritance",
-                record.spine.file_operation_get_inheritance.clone(),
-            ),
-            (
-                "file_operation_set_inheritance",
-                record.spine.file_operation_set_inheritance.clone(),
-            ),
-            (
-                "file_operation_duplicate",
-                record.spine.file_operation_duplicate.clone(),
-            ),
             (
                 "resource_mapping_limit",
                 record.spine.resource_mapping_limit.clone(),

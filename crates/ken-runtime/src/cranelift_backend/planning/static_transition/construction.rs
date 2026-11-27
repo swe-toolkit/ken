@@ -456,6 +456,9 @@ impl<'src> Planner<'src> {
                 family, operation, ..
             } => {
                 self.intern_trap(&super::joins_traps::dead_arm_effect_trap(family, *operation))?;
+                if *operation == ken_host::HostOpV1::ClockSleepUntil {
+                    self.intern_trap(&super::joins_traps::sleep_deadline_domain_trap())?;
+                }
             }
             _ => {}
         }

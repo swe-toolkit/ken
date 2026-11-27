@@ -232,6 +232,10 @@ claim with no conformance case is a claim no one can rely on
   empty and multi-batch results, sticky `DirectoryEnd`, exactly-once names for
   an unmodified directory without an order promise, and `NotDirectory` under
   `FileOperation.OpReadDirectory` when a regular file is opened as a directory.
+- `surface/ffi-io/seed-clock-entropy.md` — RT-CLOCK `38 §1.15`: Strict
+  package-home import pairs, the two scoped clock floor families, process-local
+  monotonic readings, deadline domain and same-clock behavior, exact entropy
+  count bounds, and `Unsupported` when the kernel source is unavailable.
 - `surface/classes/seed-classes.md` — Lc typeclasses/constraints (classes-as-
   subobjects, `33 §5` + `39 §6`, ADR 0008): a `class` → a Σ+η **record**, an
   `instance` → a **record value** with real law proofs, and `where C A` → an
@@ -419,6 +423,12 @@ claim with no conformance case is a claim no one can rely on
   equal-time, different-payload singleton tie: first-event-first values and
   both public equations accept; the fresh-prefix swapped insertion equation
   is refused at the kernel as `KernelRejected(TypeMismatch)`.
+- `stdlib/time-and-events/seed-trace-merge-ordered-sort.md` — §22's
+  ordered-trace merge equals the sorted append; a plain-append conclusion
+  refuses at the closing `Refl`.
+- `stdlib/time-and-events/seed-trace-merge-all-ordered-sort.md` — §23's
+  ordered-batch merge equals the sorted concatenation; a plain-concatenation
+  conclusion and a premise-free claim are refused at `Refl`.
 - `security/ifc/seed-ifc.md` — Sec1 information-flow-by-typing (the
   implicit-flow discriminator, label joins, capability-gated declassify, the
   relational by-proof mode).
@@ -517,6 +527,11 @@ claim with no conformance case is a claim no one can rely on
   but have no executing native arm; all four native cells remain
   `BLOCKED-ON-RT-COMPMATCH-TREE-SCRUTINEE`
   ([[RT-COMPMATCH-TREE-SCRUTINEE]]).
+- `behavioral/file-io/seed-descriptor-operations.md` — DESCRIPTOR's
+  black-box `setLength` and `sync` behavior: retained-prefix truncation,
+  zero-filled extension, pre-dispatch refusals, host flush request/outcome,
+  the non-claim about machine-failure durability, and the per-mode `FsHandle`
+  `FD_CLOEXEC` observation with its separate PX10 child-descriptor control.
 - `behavioral/agentic/seed-agentic.md` — B4 the agentic boundary (WS-B capstone,
   `74`): assuring an embedded agent's outputs **reduces to the existing seam**
   aimed at a maximally-nondeterministic component (agent = maximal `P`) — **no
