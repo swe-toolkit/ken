@@ -8,7 +8,8 @@
 //! the same root. Every payload is computed from `|argv0|`, so no row is known
 //! at compile time.
 //!
-//! The rows are the Architect's AC-0 recut (21 programs):
+//! The rows are the Architect's AC-0 recut (21 programs), plus four `W` rows
+//! from the r3 ruling:
 //! - **Helper rows** (`H`, `J`, `K`): a recursive helper `pick` returns an
 //!   `ExitCode` that `main` inspects, answering `Failure 7` on `Success` and
 //!   `Failure 9` on `Failure`. `H` returns `Failure` from a tail position, `J`
@@ -18,6 +19,10 @@
 //!   with the helper result returned directly by `main`, the code computed in
 //!   a unit and wrapped by the root (`R`), or the code produced inside a
 //!   generated continuation context (`X`).
+//! - **Wrapped-answer rows** (`W`): a recursive non-root `walk` typed
+//!   `HostIO APartial ExitCode` answers through `host_pure`, so its result
+//!   reaches the root inside a checked `ITree.Ret`. `main` returns it
+//!   directly, unstepped (`fuel` Zero) or after recursion.
 //!
 //! **Promise classes.** The paired outcome is a durable invariant: native and
 //! interpreter must agree on every row, each at the status the source
@@ -31,7 +36,9 @@
 //! status and terminal error. CLAIMED: a non-root unit never projects its
 //! `ExitCode` result into the process status; only the root's terminal
 //! result does. THE GAP: the rows cover tail, join and carried-code helper
-//! results and one continuation context. Another non-root producer shape
+//! results, one continuation context and one `HostIO` helper answer wrapped
+//! in `ITree.Ret`. A `host_bind` that inspects such an answer is outside this
+//! WP (a separate Runtime carry). Another non-root producer shape
 //! is covered only by the shared `terminal_result_origins` predicate, which
 //! every projecting seat reads.
 
@@ -40,7 +47,7 @@
 const MALFORMED_FAILURE_LINE: &str = "ken native trap: malformed ExitCode::Failure payload";
 
 /// Each row compiles and runs a whole native root on this thread. Measured on
-/// these 21 rows at the candidate: all pass at a stated 2 MiB stack. The
+/// these 25 rows at the candidate: all pass at a stated 2 MiB stack. The
 /// 8 MiB provision applies 6 MiB of headroom. `Builder::stack_size` keeps the
 /// provision local rather than ambient.
 const ROW_STACK_MEASURED_PEAK_BYTES: usize = 2 * 1024 * 1024;
@@ -361,4 +368,102 @@ fn xneg_context_negative_failure_traps_malformed() {
 #[test]
 fn x264_context_non_immediate_failure_traps_malformed() {
     assert_malformed("X264", context_program(BIG));
+}
+
+// Wrapped-answer rows: a non-root `HostIO` helper's answer, returned by main.
+
+/// `walk` answers `Success` for `True` and `Failure 7` for `False` at `Zero`,
+/// and otherwise recurses with one less fuel and the flag negated.
+fn walk_program(fuel: &str, flag: &str) -> String {
+    format!(
+        "program capabilities FS APartial
+import Capability.Process.Exit (host_pure)
+fn walk (fuel : Nat) (flag : Bool) : HostIO APartial ExitCode =
+  match fuel {{
+    Zero |-> match flag {{
+      True |-> host_pure APartial ExitCode ExitCode.Success;
+      False |-> host_pure APartial ExitCode (ExitCode.Failure 7)
+    }};
+    Suc smaller |-> walk smaller (match flag {{
+      True |-> False;
+      False |-> True
+    }})
+  }}
+
+fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)
+  : HostIO APartial ExitCode =
+  walk ({fuel}) {flag}
+"
+    )
+}
+
+/// The bound native observation equals the interpreter's on the same root,
+/// and both exit with `status`. A native trap is reported as the launcher's
+/// run error, which names the terminal value.
+fn assert_walk(label: &'static str, source: String, status: i32) {
+    std::thread::Builder::new()
+        .name(label.to_string())
+        .stack_size(ROW_STACK_BYTES)
+        .spawn(move || {
+            let root = tempfile::Builder::new()
+                .prefix(&format!("ken-rt-exitcode-nt-{label}-"))
+                .tempdir()
+                .unwrap();
+            let compiled = ken_cli::build_native_program_with_roots(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots(),
+                "native-program",
+                root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+            .unwrap_or_else(|error| panic!("{label}: native build: {error:?}"));
+            let native = ken_runtime::run_bound_process_effect_observation(
+                &compiled.artifact,
+                &ken_runtime::NativeEffectRunOptionsV1 {
+                    arguments: Vec::new(),
+                    environment: Vec::new(),
+                    cwd: root.path().to_owned(),
+                    plan_hash: compiled.plan_transport_hash,
+                },
+            )
+            .unwrap_or_else(|error| panic!("{label}: native run: {error:?}"));
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &roots(),
+                &[b"native-program".to_vec()],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .unwrap_or_else(|error| panic!("{label}: interpreter run: {error:?}"));
+            assert_eq!(native, interpreted, "{label}: native and interpreter observations");
+            assert_eq!(native.exit_status, status, "{label}: exit status");
+            assert_eq!(native.terminal_error, None, "{label}: terminal error");
+        })
+        .expect("spawn stated-stack walk row")
+        .join()
+        .expect("walk row thread");
+}
+
+#[test]
+fn w_zero_true_unstepped_wrapped_success_exits_zero() {
+    assert_walk("W-zero-true", walk_program("Zero", "True"), 0);
+}
+
+#[test]
+fn w_zero_false_unstepped_wrapped_failure_exits_seven() {
+    assert_walk("W-zero-false", walk_program("Zero", "False"), 7);
+}
+
+#[test]
+fn w_one_false_stepped_wrapped_success_exits_zero() {
+    assert_walk("W-one-false", walk_program("Suc Zero", "False"), 0);
+}
+
+#[test]
+fn w_two_true_stepped_wrapped_success_exits_zero() {
+    assert_walk("W-two-true", walk_program("Suc (Suc Zero)", "True"), 0);
 }

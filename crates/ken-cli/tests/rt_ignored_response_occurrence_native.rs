@@ -164,6 +164,9 @@ fn run_plain_recursive_match_census() {
     // replaces the immediate-tag require, adding one carrier slot and a
     // carrier round trip of the decoded status. Capacity routing is
     // unchanged.
+    // EXITCODE-NONTERMINAL strips one carried `ITree.Ret` before the root
+    // exit-code decode: four more slots and a strip prelude in that block,
+    // with SSA values renumbered. Capacity routing is unchanged.
     assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
         PLAIN_MATCH_CAPACITY_IR.trim_end_matches('\n').as_bytes(),
         "the measured zero-S native unit IR differs from reviewed capacity routing");

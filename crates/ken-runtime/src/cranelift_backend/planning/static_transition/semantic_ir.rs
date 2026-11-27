@@ -160,6 +160,9 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     ResourceKindSocketListener,
     ResourceKindSocketStream,
     ResourceKindSocketDatagram,
+    /// The checked process root strips one carried `ITree.Ret` around its
+    /// `ExitCode`. Shares the source constructor identity plane.
+    ItreeRet,
 }
 
 pub(super) const RESOURCE_KIND_POPULATION:
@@ -189,7 +192,7 @@ pub(in crate::cranelift_backend) const fn resource_kind_role(
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 63] = [
+    pub(super) const ALL: [Self; 64] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -253,6 +256,7 @@ impl SynthesizedFixedConstructorRole {
         Self::ResourceKindSocketListener,
         Self::ResourceKindSocketStream,
         Self::ResourceKindSocketDatagram,
+        Self::ItreeRet,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -301,6 +305,7 @@ impl SynthesizedFixedConstructorRole {
             Self::ReadResultEof => &symbols.read_result_eof,
             Self::ExitSuccess => &symbols.exit_success,
             Self::ExitFailure => &symbols.exit_failure,
+            Self::ItreeRet => &symbols.itree_ret,
             Self::Unit => &symbols.unit,
             Self::FileOperationAppend => &symbols.file_operation_append,
             Self::FileOperationMetadata => &symbols.file_operation_metadata,
@@ -898,6 +903,7 @@ pub(super) fn build_synthesized_constructor_inventory(
                 | SynthesizedFixedConstructorRole::ReadResultEof
                 | SynthesizedFixedConstructorRole::ExitSuccess
                 | SynthesizedFixedConstructorRole::ExitFailure
+                | SynthesizedFixedConstructorRole::ItreeRet
         ) {
             continue;
         }
@@ -930,6 +936,7 @@ pub(super) fn build_synthesized_constructor_inventory(
         SynthesizedFixedConstructorRole::ExitSuccess,
         SynthesizedFixedConstructorRole::ExitFailure,
         SynthesizedFixedConstructorRole::MkMonotonicInstant,
+        SynthesizedFixedConstructorRole::ItreeRet,
     ] {
         let span = arena.intern(role.spelling(symbols).as_bytes())?;
         identities.insert(SynthesizedConstructorRole::Fixed(role), span);

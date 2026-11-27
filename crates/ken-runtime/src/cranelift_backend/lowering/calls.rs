@@ -2928,6 +2928,69 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+    /// The carried counterpart of `unwrap_terminal_ret` for the process root:
+    /// a constructor word whose checked identity is `ITree.Ret` is replaced by
+    /// its one field. Every other word passes through unchanged.
+    pub(super) fn strip_carried_terminal_ret(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        let ret_identity = self.static_transition_plan.synthesized_constructor_identity(
+            SynthesizedConstructorRole::Fixed(SynthesizedFixedConstructorRole::ItreeRet),
+        )?;
+        let joined = builder.create_block();
+        builder.append_block_param(joined, types::I64);
+        let examine = builder.create_block();
+        let constructor_word = builder.create_block();
+        let unwrap = builder.create_block();
+        let tag = builder
+            .ins()
+            .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+        let is_immediate_status = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            tag,
+            BoundaryTag::ImmediateExitStatus as i64,
+        );
+        builder
+            .ins()
+            .brif(is_immediate_status, joined, &[word.word.into()], examine, &[]);
+
+        builder.switch_to_block(examine);
+        let class = self.emit_carrier_class(builder, word)?;
+        let is_constructor = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            class,
+            BoundaryClass::Constructor as i64,
+        );
+        builder
+            .ins()
+            .brif(is_constructor, constructor_word, &[], joined, &[word.word.into()]);
+
+        builder.switch_to_block(constructor_word);
+        let constructor = self.emit_carrier_tag(builder, word)?;
+        let ret_tag = Self::carrier_identity_immediate(builder, ret_identity.tag_abi_word()?);
+        let is_ret = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            constructor,
+            ret_tag,
+        );
+        builder
+            .ins()
+            .brif(is_ret, unwrap, &[], joined, &[word.word.into()]);
+
+        builder.switch_to_block(unwrap);
+        let fields = self.emit_carrier_field_count(builder, word)?;
+        Self::require_i64(builder, fields, 1);
+        let answer = self.emit_carrier_field(builder, word, 0)?;
+        builder.ins().jump(joined, &[answer.word.into()]);
+
+        builder.switch_to_block(joined);
+        Ok(CarriedBoundaryWord {
+            word: builder.block_params(joined)[0],
+        })
+    }
+
     pub(super) fn unwrap_terminal_ret(&self, lowered: Lowered) -> Lowered {
         unwrap_terminal_ret_with_symbols(lowered, &self.process_symbols)
     }

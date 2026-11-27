@@ -11666,6 +11666,10 @@ fn define_unit_body<M: Module>(
                     }),
                 ),
                 LoweringOperand::Carried(word) => {
+                    // A non-root `HostIO` unit answers its `ExitCode` inside the
+                    // checked `ITree.Ret`; strip that one wrapper, as `emit_result`
+                    // does for a specialized answer, before decoding the status.
+                    let word = compiler.strip_carried_terminal_ret(&mut builder, word)?;
                     let tag = builder
                         .ins()
                         .band_imm(word.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
