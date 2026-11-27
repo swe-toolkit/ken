@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-EDGELESS
 title: "Spec 62 says reachability grows with the graph (graph_reachable_graph_monotone) and that a union with an included graph adds nothing (§19), but no law gives reachability in the graph with no edges, the bottom of that order: a client that starts a search from an edgeless graph cannot rewrite the result to the target test at the start vertex without unfolding the search. Rule from a checked D0 at zero trust that graph_reachable over MkGraph q (λs. λt. False) from s equals target s, and state it with a seed that separates the start vertex from a vertex one edge away"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
