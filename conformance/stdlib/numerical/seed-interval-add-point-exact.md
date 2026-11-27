@@ -22,6 +22,8 @@ the base interval. The closed exclusion illustrates law use but does not
 discriminate the law: the same closed result is derivable without it.
 
 ```ken
+import Core.Classes.LawfulClasses (IsTrue)
+import Core.Logic.Transport (sym, trans)
 import Data.Numeric.Rational
   (Rational, MkRational, rational_add, rational_zero)
 import Algorithm.Numeric.RationalInterval
