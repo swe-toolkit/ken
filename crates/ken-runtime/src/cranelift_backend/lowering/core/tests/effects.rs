@@ -133,6 +133,7 @@ fn run_checked_bounded_nat_fixture(
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
+            k_unit_answer_wraps: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             statically_unselected_roots: BTreeMap::new(),
             lowered_construct_origins: BTreeSet::new(),

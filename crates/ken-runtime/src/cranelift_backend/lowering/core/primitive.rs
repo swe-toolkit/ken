@@ -745,46 +745,10 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         word: CarriedBoundaryWord,
     ) -> Result<Lowered, CraneliftBackendError> {
-        use cranelift_codegen::ir::condcodes::IntCC;
-        let refs = self.carrier_refs()?;
         let arena = self.carrier_arena()?;
         let pointer_type = builder.func.dfg.value_type(arena);
-        let class = self.emit_carrier_class(builder, word)?;
-        let borrowed = builder.create_block();
-        let persistent = builder.create_block();
-        let done = builder.create_block();
-        builder.append_block_param(done, pointer_type);
-        builder.append_block_param(done, types::I64);
-        let is_borrowed =
-            builder
-                .ins()
-                .icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
-        builder
-            .ins()
-            .brif(is_borrowed, borrowed, &[], persistent, &[]);
-
-        builder.switch_to_block(borrowed);
-        let pointer = self.emit_carrier_scalar(builder, word)?;
-        let (data, len) = Self::borrowed_bytes_view(builder, pointer);
-        builder.ins().jump(done, &[data.into(), len.into()]);
-
-        builder.switch_to_block(persistent);
-        Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
-        let slot =
-            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-        let view = builder.ins().stack_addr(pointer_type, slot, 0);
-        let call = builder
-            .ins()
-            .call(refs.bytes_view, &[arena, word.word, view]);
-        let status = builder.inst_results(call)[0];
-        Self::require_i64(builder, status, BOUNDARY_OK);
-        let data = builder.ins().stack_load(pointer_type, slot, 0);
-        let len = builder.ins().stack_load(types::I64, slot, 8);
-        builder.ins().jump(done, &[data.into(), len.into()]);
-
-        builder.switch_to_block(done);
-        let data = builder.block_params(done)[0];
-        let len = builder.block_params(done)[1];
+        let (data, len, outcome) = self.view_carried_bytes_word(builder, word)?;
+        Self::require_i64(builder, outcome, 0);
         let valid = builder.ins().iconst(types::I8, 1);
         Ok(Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
             builder,
@@ -795,7 +759,7 @@ impl<'a> Lowering<'a> {
         )))
     }
 
-    fn borrowed_bytes_view(
+    pub(in crate::cranelift_backend::lowering) fn borrowed_bytes_view(
         builder: &mut FunctionBuilder<'_>,
         pointer: cranelift_codegen::ir::Value,
     ) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
@@ -899,7 +863,6 @@ impl<'a> Lowering<'a> {
         seat: StaticOriginId,
         operand: &LoweringOperand,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        use cranelift_codegen::ir::condcodes::IntCC;
         let constructors = self.bytes_list_constructors(seat)?;
         match operand {
             LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => {
@@ -918,38 +881,20 @@ impl<'a> Lowering<'a> {
                 Ok(tail)
             }
             LoweringOperand::Carried(word) => {
-                let class = self.emit_carrier_class(builder, *word)?;
-                let borrowed = builder.create_block();
-                let persistent = builder.create_block();
-                let done = builder.create_block();
-                builder.append_block_param(done, types::I64);
-                let is_borrowed = builder.ins().icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
-                builder.ins().brif(is_borrowed, borrowed, &[], persistent, &[]);
-
-                builder.switch_to_block(borrowed);
-                let pointer = self.emit_carrier_scalar(builder, *word)?;
-                let (data, len) = Self::borrowed_bytes_view(builder, pointer);
-                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |_, _| Ok(data))?;
-                builder.ins().jump(done, &[list.word.into()]);
-
-                builder.switch_to_block(persistent);
-                Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
-                let arena = self.carrier_arena()?;
-                let pointer_type = builder.func.dfg.value_type(arena);
-                let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-                let out = builder.ins().stack_addr(pointer_type, slot, 0);
-                self.emit_bytes_list_view(builder, *word, out)?;
-                let len = builder.ins().stack_load(types::I64, slot, 8);
-                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |lowering, builder| {
+                // Entry 18: the one carried-Bytes class dispatch, shared with the
+                // host-seat observer and the primitive operand view. The checked
+                // Bytes operand is this caller's authority for the borrowed arm.
+                let word = *word;
+                let (_, len, outcome) = self.view_carried_bytes_word(builder, word)?;
+                Self::require_i64(builder, outcome, 0);
+                self.build_bytes_list_loop(builder, seat, constructors, len, move |lowering, builder| {
                     // Only the length survives the previous view. Materializing a
-                    // Cons can invalidate the data pointer, so read it afresh.
-                    lowering.emit_bytes_list_view(builder, *word, out)?;
-                    Ok(builder.ins().stack_load(pointer_type, slot, 0))
-                })?;
-                builder.ins().jump(done, &[list.word.into()]);
-
-                builder.switch_to_block(done);
-                Ok(CarriedBoundaryWord { word: builder.block_params(done)[0] })
+                    // Cons can invalidate a persistent data pointer, so view
+                    // afresh; the borrowed record's pointer is invocation-stable.
+                    let (data, _, outcome) = lowering.view_carried_bytes_word(builder, word)?;
+                    Self::require_i64(builder, outcome, 0);
+                    Ok(data)
+                })
             }
             LoweringOperand::Residual(_) => Err(CraneliftBackendError::ResidualRepresentationRequired {
                 site: "bytes_to_list requires an ordinary bytes value",
@@ -959,17 +904,6 @@ impl<'a> Lowering<'a> {
                 "bytes_to_list only supports Bytes arguments in native lowering",
             )),
         }
-    }
-
-    fn emit_bytes_list_view(
-        &self,
-        builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
-        out: cranelift_codegen::ir::Value,
-    ) -> Result<(), CraneliftBackendError> {
-        let call = builder.ins().call(self.carrier_refs()?.bytes_view, &[self.carrier_arena()?, word.word, out]);
-        Self::require_i64(builder, builder.inst_results(call)[0], BOUNDARY_OK);
-        Ok(())
     }
 
     fn build_bytes_list_loop(

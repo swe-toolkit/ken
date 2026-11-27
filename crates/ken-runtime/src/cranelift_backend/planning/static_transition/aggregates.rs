@@ -158,6 +158,9 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// A defunctionalized recursive-position residual: forwarded child,
     /// worker Parameter tail, then the complete context Capture run.
     RecursivePositionResidual,
+    /// Entry 17: the `ITree::Ret` a K context wraps around one predeclared
+    /// unit's direct-style answer at one unit-answer Call occurrence.
+    KContextUnitAnswerRet,
 }
 
 /// One parent-field disposition shared by the producer and both consumers.
@@ -3456,6 +3459,8 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     BoundaryClosureEnvironment,
     RecursivePositionResidual,
     PrimitiveResult,
+    /// Entry 17: rooted at one K context's unit-answer Call occurrence.
+    KContextUnitAnswerRet,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -4148,7 +4153,8 @@ impl SynthesizedHostResultTree {
             | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
             | SynthesizedAggregateRoot::BoundaryClosureEnvironment
             | SynthesizedAggregateRoot::RecursivePositionResidual
-            | SynthesizedAggregateRoot::PrimitiveResult => {
+            | SynthesizedAggregateRoot::PrimitiveResult
+            | SynthesizedAggregateRoot::KContextUnitAnswerRet => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -6225,6 +6231,61 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 shape: PlannedAggregateShape::Constructor,
                 declared_children: Some(Cow::Borrowed(declared)),
                 children: children.clone(),
+                meet,
+                allocation,
+            });
+        }
+    }
+    // Entry 17: one `ITree::Ret` record per K context unit-answer Call
+    // occurrence, keyed on the context's emission owner (its enclosing
+    // specialization). Its one child is the unit's answer, whose lifetime and
+    // referent owners come from the Call occurrence's own authority.
+    let mut unit_answer_keys = BTreeSet::new();
+    for answer in plan.k_context_unit_answer_calls()? {
+        let owner = ContinuationEmissionOwner::Specialization(answer.enclosing);
+        for &seat in &answer.calls {
+            if !unit_answer_keys.insert((owner, seat)) {
+                continue;
+            }
+            let authority = occurrence_authority(plan, seat)?;
+            let child_authority = PlannedOccurrenceChildAuthority {
+                origin: seat,
+                position: 0,
+                owner: authority.owner,
+                lifetime: authority.lifetime,
+            };
+            let owners = aggregate_child_referent_owners(plan, &child_authority)?;
+            let escapes = owners.contains(&BoundaryReferentOwner::InvocationArena);
+            let children = vec![PlannedAggregateChild {
+                position: 0,
+                origin: Some(seat),
+                field_identity: None,
+                lifetime: if escapes {
+                    PlannedReferentLifetime::ActivationOwned
+                } else {
+                    PlannedReferentLifetime::Persistent
+                },
+                owners,
+            }];
+            let (meet, allocation) = if escapes {
+                (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
+            } else {
+                (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
+            };
+            records.push(PlannedAggregateOwnership {
+                id: AggregateOccurrenceId(0),
+                producer: AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: SynthesizedAggregatePath::root(
+                        SynthesizedAggregateRoot::KContextUnitAnswerRet,
+                    ),
+                    role: SynthesizedAggregateRole::KContextUnitAnswerRet,
+                },
+                owner: plan.semantic.function_owner(seat)?,
+                shape: PlannedAggregateShape::Constructor,
+                declared_children: Some(Cow::Borrowed(positional_capture_declared_children(1)?)),
+                children,
                 meet,
                 allocation,
             });
@@ -11224,6 +11285,21 @@ impl<'src> StaticTransitionPlan<'src> {
                     }
             })
             .map(|record| record.id)
+    }
+    /// Entry 17: the planned `ITree::Ret` record for one K context
+    /// unit-answer Call occurrence under its emission owner.
+    pub(in crate::cranelift_backend) fn k_context_unit_answer_ret_occurrence(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+    ) -> Result<AggregateOccurrenceId, CraneliftBackendError> {
+        self.synthesized_aggregate_record(
+            owner,
+            seat,
+            &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::KContextUnitAnswerRet),
+            SynthesizedAggregateRole::KContextUnitAnswerRet,
+        )
+        .map(|record| record.id)
     }
     /// The record of one synthesized use, found by the full four-part key.
     ///

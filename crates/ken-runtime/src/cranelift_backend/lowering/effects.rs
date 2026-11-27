@@ -1655,7 +1655,6 @@ impl<'a> Lowering<'a> {
         ),
         CraneliftBackendError,
     > {
-        use cranelift_codegen::ir::condcodes::IntCC;
         // ⛔ The record is CONSUMED, not decorative. An observer emitted for a
         // seat whose need is not a byte span would be reading a value the
         // planner never said was one, and that is a representation decision
@@ -1676,9 +1675,76 @@ impl<'a> Lowering<'a> {
             }
             ByteSpanAuthority::Seat(_) => {}
         }
+        self.view_carried_bytes_word(builder, target)
+    }
+
+    /// Entry 18: the one class dispatch that views a carried `Bytes` word as
+    /// `(pointer, length, outcome)`, shared by every carried-`Bytes` consumer.
+    ///
+    /// A word tagged `InvocationBorrowed` with class `BorrowedOpaque` is the
+    /// borrowed process-input record; it is viewed in place, and its address is
+    /// stable for the invocation because no materialization moves it. Any other
+    /// tag goes to the persistent byte-span helper, whose class and owner guards
+    /// are unchanged. A borrowed word of another class is outcome `2`.
+    pub(super) fn view_carried_bytes_word(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        target: CarriedBoundaryWord,
+    ) -> Result<
+        (
+            cranelift_codegen::ir::Value,
+            cranelift_codegen::ir::Value,
+            cranelift_codegen::ir::Value,
+        ),
+        CraneliftBackendError,
+    > {
+        use cranelift_codegen::ir::condcodes::IntCC;
         let refs = self.carrier_refs()?;
         let boundary_arena = self.carrier_arena()?;
         let pointer_type = builder.func.dfg.value_type(boundary_arena);
+        let done = builder.create_block();
+        builder.append_block_param(done, pointer_type);
+        builder.append_block_param(done, types::I64);
+        builder.append_block_param(done, types::I64);
+
+        let tag = builder
+            .ins()
+            .band_imm(target.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+        let is_borrowed = builder.ins().icmp_imm(
+            IntCC::Equal,
+            tag,
+            crate::boundary_value::BoundaryTag::InvocationBorrowed as i64,
+        );
+        let borrowed = builder.create_block();
+        let stored = builder.create_block();
+        builder.ins().brif(is_borrowed, borrowed, &[], stored, &[]);
+
+        builder.switch_to_block(borrowed);
+        let class = self.emit_carrier_class(builder, target)?;
+        let opaque = builder
+            .ins()
+            .icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
+        let borrowed_view = builder.create_block();
+        let borrowed_refused = builder.create_block();
+        builder
+            .ins()
+            .brif(opaque, borrowed_view, &[], borrowed_refused, &[]);
+        builder.switch_to_block(borrowed_view);
+        let record = self.emit_carrier_scalar(builder, target)?;
+        let (data, len) = Self::borrowed_bytes_view(builder, record);
+        let good = builder.ins().iconst(types::I64, 0);
+        builder
+            .ins()
+            .jump(done, &[data.into(), len.into(), good.into()]);
+        builder.switch_to_block(borrowed_refused);
+        let null = builder.ins().iconst(pointer_type, 0);
+        let empty = builder.ins().iconst(types::I64, 0);
+        let not_a_span = builder.ins().iconst(types::I64, 2);
+        builder
+            .ins()
+            .jump(done, &[null.into(), empty.into(), not_a_span.into()]);
+
+        builder.switch_to_block(stored);
 
         let view_slot =
             builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
@@ -1690,10 +1756,6 @@ impl<'a> Lowering<'a> {
 
         let observed = builder.create_block();
         let refused = builder.create_block();
-        let done = builder.create_block();
-        builder.append_block_param(done, pointer_type);
-        builder.append_block_param(done, types::I64);
-        builder.append_block_param(done, types::I64);
         let ok = builder.ins().icmp_imm(IntCC::Equal, status, BOUNDARY_OK);
         builder.ins().brif(ok, observed, &[], refused, &[]);
 

@@ -7402,6 +7402,7 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         })
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
 
+    let unit_answers = compiler.static_transition_plan.k_context_unit_answer_calls()?;
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
     let mut staged = Vec::new();
     for context in contexts {
@@ -7598,6 +7599,25 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             #[cfg(feature = "px8-ds-test-support")]
             if let Some(access) = &function_local.checked_ih_generated_entry_access {
                 record_checked_ih_generated_entry_installed(access);
+            }
+            // Entry 17: this context's own unit-answer Call occurrences, each
+            // with its planned `ITree::Ret` record under this emission owner.
+            if let Some(answer) = unit_answers.iter().find(|answer| answer.context == context.id) {
+                if answer.enclosing != context.enclosing {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a K context unit-answer fact names a different enclosing specialization"
+                            .to_string(),
+                    ));
+                }
+                for &seat in &answer.calls {
+                    let record = compiler
+                        .static_transition_plan
+                        .k_context_unit_answer_ret_occurrence(emission_owner, seat)?;
+                    function_local
+                        .k_unit_answer_wraps
+                        .insert(seat, (record, answer.k_ret_identity));
+                }
             }
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
@@ -10867,7 +10887,7 @@ pub(super) fn define_unit_bodies<M: Module>(
     bundle: &UnitBundle,
     call_edges: &CallEdgeTargets,
     staged_root_value: Option<&RuntimeValue>,
-) -> Result<(RootUnitResult, Vec<StagedResultBody>), CraneliftBackendError> {
+) -> Result<RootUnitResult, CraneliftBackendError> {
     let root = compiler
         .static_transition_plan
         .root_emittable_unit()?
@@ -10880,7 +10900,6 @@ pub(super) fn define_unit_bodies<M: Module>(
         compiler.oriented_subcontinuation_plan.as_ref(),
     ));
     let mut root_result = None;
-    let mut unit_result_proofs = Vec::new();
     // `D5a` checkpoint 1: the SAME population `declare_unit_bundle` walked.
     // Both passes read `executable_units` so declared and defined cannot
     // disagree -- reading different methods here is exactly how a phantom
@@ -10922,8 +10941,6 @@ pub(super) fn define_unit_bodies<M: Module>(
             is_root,
             staged_root_value,
         )?;
-        let (outcome, proof) = outcome;
-        unit_result_proofs.extend(proof);
         if let Some(outcome) = outcome {
             if root_result.replace(outcome).is_some() {
                 return Err(backend_module(
@@ -10951,13 +10968,12 @@ pub(super) fn define_unit_bodies<M: Module>(
             )
         })?
         .close(&compiler.consumed_recursive_call_templates)?;
-    let root_result = root_result.ok_or_else(|| {
+    root_result.ok_or_else(|| {
         backend_module(
             LoweringCause::PlannerInvariant,
             "the emitted unit bundle did not define its recorded root".to_string(),
         )
-    })?;
-    Ok((root_result, unit_result_proofs))
+    })
 }
 
 struct OwnedUnitEmission {
@@ -11160,7 +11176,7 @@ fn define_unit_body<M: Module>(
     worker_targets: &WorkerTargets,
     is_root: bool,
     staged_root_value: Option<&RuntimeValue>,
-) -> Result<(Option<RootUnitResult>, Option<StagedResultBody>), CraneliftBackendError> {
+) -> Result<Option<RootUnitResult>, CraneliftBackendError> {
     // ⭐ The declared size and the walked size must agree. They are the same
     // walk by construction (`abi::slot_offsets` totals for both), so this
     // rejects a corrupted descriptor rather than a divergent derivation.
@@ -11328,7 +11344,6 @@ fn define_unit_body<M: Module>(
     let token_scope = CheckedTokenFunctionScope::open(compiler)?;
     let mut func_ctx = FunctionBuilderContext::new();
     let root_outcome;
-    let mut unit_publication = None;
     {
         let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
         let entry = builder.create_block();
@@ -11826,37 +11841,21 @@ fn define_unit_body<M: Module>(
             (word, None)
         };
         root_outcome = outcome;
-        let result_offset = i32::try_from(result_offset).map_err(|_| {
-            backend_module(
-                LoweringCause::Capacity,
-                "abi result slot offset exceeds addressable range".to_string(),
-            )
-        })?;
-        let result_store = result.map(|result| {
-            (
-                builder.ins().store(MemFlags::trusted(), result, slots, result_offset),
+        if let Some(result) = result {
+            builder.ins().store(
+                MemFlags::trusted(),
                 result,
-            )
-        });
-        let status = builder.ins().iconst(types::I64, 0);
-        let return_inst = builder.ins().return_(&[status]);
-        if !is_root {
-            if let Some((result_store, returned_word)) = result_store {
-                unit_publication = Some(FunctionResultPublication {
-                    frame: slots,
-                    result_offset,
-                    trap_offset: i32::try_from(trap_offset).map_err(|_| {
-                        backend_module(
-                            LoweringCause::Capacity,
-                            "abi trap slot offset exceeds addressable range".to_string(),
-                        )
-                    })?,
-                    result_store,
-                    returned_word,
-                    return_inst,
-                });
-            }
+                slots,
+                i32::try_from(result_offset).map_err(|_| {
+                    backend_module(
+                        LoweringCause::Capacity,
+                        "abi result slot offset exceeds addressable range".to_string(),
+                    )
+                })?,
+            );
         }
+        let status = builder.ins().iconst(types::I64, 0);
+        builder.ins().return_(&[status]);
         compiler.record_checked_frame_terminal(&builder, FrameTerminalKind::Normal)?;
         builder.seal_all_blocks();
         builder.finalize();
@@ -11928,21 +11927,6 @@ fn define_unit_body<M: Module>(
     let transfer_helper_ids =
         Lowering::declare_transfer_helpers(module, &mut func, &transfer_helpers)?;
     verify_cranelift_function(&func, module.isa())?;
-    // The unit is defined here, but its finished body still grounds every
-    // generated-Result call of it, so the closure receives a proof-only copy.
-    let unit_result_proof = unit_publication.map(|publication| {
-        let mut proof = stage_result_body(
-            compiler,
-            ExistingResultUnitIdentity::Unit(unit.function),
-            id,
-            func.clone(),
-            Some(publication),
-            None,
-            None,
-        );
-        proof.already_defined = true;
-        proof
-    });
     compiler.commit_aggregate_events()?;
     #[cfg(test)]
     scale_b_record_unit_body(&func);
@@ -11968,7 +11952,7 @@ fn define_unit_body<M: Module>(
         let (declared, defined) = cell.get();
         cell.set((declared, defined + 1));
     });
-    Ok((root_outcome, unit_result_proof))
+    Ok(root_outcome)
 }
 
 #[cfg(test)]
@@ -12201,10 +12185,6 @@ enum ExistingResultUnitIdentity {
     Continuation(ContinuationSpecializationId),
     Context(ContinuationContextId),
     Response(StaticResponseOwnerId),
-    /// A predeclared unit publishes through the same Result frame protocol.
-    /// It is defined by the unit pass, so it joins the realization relation
-    /// as a proof-only participant.
-    Unit(PredeclaredFunctionId),
 }
 
 #[derive(Default)]
@@ -12814,7 +12794,6 @@ pub(super) struct StagedResultBody {
     publication: Option<FunctionResultPublication>,
     required_contract: Option<ConstructorIdentity>,
     independent_contract: Option<ConstructorIdentity>,
-    already_defined: bool,
 }
 
 /// Every stack slot whose address contributes to `value`, including through
@@ -12958,28 +12937,16 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     // memory analyses for every dependency round.
     let mut candidates = Vec::<FinishedUnitResultRealization>::new();
     for (body, func) in staged.iter().zip(&indexed) {
-        let proof_only = matches!(body.unit, ExistingResultUnitIdentity::Unit(_));
-        let mut verified = true;
         for obligation in &body.call_obligations {
             let target = Lowering::decode_direct_callee(func, obligation.call)?;
-            match verify_call_result_obligation(func, obligation, target) {
-                Ok(()) => {}
-                Err(_) if proof_only => verified = false,
-                Err(error) => return Err(error),
-            }
+            verify_call_result_obligation(func, obligation, target)?;
         }
         if let Some(publication) = body.publication {
-            match verify_publication_and_terminals(func, publication, true) {
-                Ok(()) => {}
-                Err(_) if proof_only => verified = false,
-                Err(error) => return Err(error),
-            }
-            if verified {
-                candidates.push(FinishedUnitResultRealization {
-                    unit: body.unit,
-                    target: body.target,
-                });
-            }
+            verify_publication_and_terminals(func, publication, true)?;
+            candidates.push(FinishedUnitResultRealization {
+                unit: body.unit,
+                target: body.target,
+            });
         }
     }
     // Greatest fixed point: a status-0 return initializes the Result slot by
@@ -13377,9 +13344,6 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     }
     drop(indexed);
     for mut body in staged.drain(..) {
-        if body.already_defined {
-            continue;
-        }
         let mut ctx = module.make_context();
         std::mem::swap(&mut ctx.func, &mut body.func);
         module
@@ -17627,6 +17591,5 @@ fn stage_result_body(
         publication,
         required_contract,
         independent_contract,
-        already_defined: false,
     }
 }
