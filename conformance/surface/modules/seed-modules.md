@@ -867,9 +867,10 @@ sentinel beside the current contract.
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
   `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
   `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
-  `ResourceKind.SocketListener`, and `ResourceKind.SocketStream`; none is a bare
-  constructor path. An imported `SpawnPlan` type in type position is distinct
-  from the `ResourceKind.SpawnPlan` constructor. The inductive
+  `ResourceKind.SocketListener`, `ResourceKind.SocketStream`, and
+  `ResourceKind.SocketDatagram`; none is a bare constructor path. An imported
+  `SpawnPlan` type in type position is distinct from the
+  `ResourceKind.SpawnPlan` constructor. The inductive
   members and their exact constructors are:
 
   | parent | constructors |
@@ -886,7 +887,7 @@ sentinel beside the current contract.
   | `List` | `Nil`, `Cons` |
   | `Nat` | `Zero`, `Suc` |
   | `Option` | `None`, `Some` |
-  | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, `ResourceKind.SocketStream` |
+  | `ResourceKind` | `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, `ResourceKind.SocketStream`, `ResourceKind.SocketDatagram` |
   | `ExitCode` | `ExitCode.Success`, `ExitCode.Failure` |
   | `Instant` | `Instant.MkInstant` |
   | `ITree` | `ITree.Ret`, `ITree.Vis` |
@@ -3306,11 +3307,12 @@ claimed for this corpus.
 The original executable closure derives the signature eight and exact
 internal `{Nat, Pair, Equal, Prop, Proved, Top, Bottom}` independently; it
 never widens resolution from compiler-global presence. Constructor capture
-remains exact-parent-derived, including the nine scoped `ResourceKind` paths:
+remains exact-parent-derived, including the ten scoped `ResourceKind` paths:
 `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
 `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
 `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
-`ResourceKind.SocketListener`, and `ResourceKind.SocketStream`. Pair-family capture
+`ResourceKind.SocketListener`, `ResourceKind.SocketStream`, and
+`ResourceKind.SocketDatagram`. Pair-family capture
 reuses the four pre-source ids and keys every companion type to the exact Pair
 id. The fifteen-name landing closes the strict-Pair rows and every Pair-binding
 clash before allocation. Canonical `Ord Nat`, `Ord Pair`, and `DecEq Pair`

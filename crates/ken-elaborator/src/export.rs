@@ -638,7 +638,11 @@ pub(crate) const fn host_operation_family_v1(
         ken_host::HostOpV1::NetListen | ken_host::HostOpV1::NetAccept
         | ken_host::HostOpV1::NetConnect | ken_host::HostOpV1::NetReceive
         | ken_host::HostOpV1::NetSend | ken_host::HostOpV1::NetShutdown
-        | ken_host::HostOpV1::NetLocalAddress => HostOpFamilyV1::Net,
+        | ken_host::HostOpV1::NetLocalAddress
+        | ken_host::HostOpV1::NetDatagramBind
+        | ken_host::HostOpV1::NetDatagramSendTo
+        | ken_host::HostOpV1::NetDatagramReceiveFrom
+        | ken_host::HostOpV1::NetDatagramLocalAddress => HostOpFamilyV1::Net,
     }
 }
 
@@ -744,6 +748,10 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::NetSend => "NetSend",
         ken_host::HostOpV1::NetShutdown => "NetShutdown",
         ken_host::HostOpV1::NetLocalAddress => "NetLocalAddress",
+        ken_host::HostOpV1::NetDatagramBind => "NetDatagramBind",
+        ken_host::HostOpV1::NetDatagramSendTo => "NetDatagramSendTo",
+        ken_host::HostOpV1::NetDatagramReceiveFrom => "NetDatagramReceiveFrom",
+        ken_host::HostOpV1::NetDatagramLocalAddress => "NetDatagramLocalAddress",
     }
 }
 
@@ -995,7 +1003,7 @@ const FS_HANDLE_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
     },
 ];
 
-const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 6] = [
+const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 8] = [
     ResourceLifetimeBindingPoint {
         operation: ken_host::HostOpV1::FsReadAt,
         role: ken_host::ResourceBindingRole::Buffer,
@@ -1010,6 +1018,14 @@ const BUFFER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 6] = [
     },
     ResourceLifetimeBindingPoint {
         operation: ken_host::HostOpV1::NetSend,
+        role: ken_host::ResourceBindingRole::Buffer,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::NetDatagramSendTo,
+        role: ken_host::ResourceBindingRole::Buffer,
+    },
+    ResourceLifetimeBindingPoint {
+        operation: ken_host::HostOpV1::NetDatagramReceiveFrom,
         role: ken_host::ResourceBindingRole::Buffer,
     },
     ResourceLifetimeBindingPoint {
@@ -1052,6 +1068,12 @@ const SOCKET_STREAM_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 5] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetSend, role: ken_host::ResourceBindingRole::File },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetShutdown, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetLocalAddress, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
+];
+const SOCKET_DATAGRAM_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 4] = [
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetDatagramSendTo, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetDatagramReceiveFrom, role: ken_host::ResourceBindingRole::File },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetDatagramLocalAddress, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
 
@@ -1180,6 +1202,16 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
             });
         }
     }
+    if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetDatagramBind) {
+        if let Some(operation) = first_reachable_operation(alphabet, &[
+            ken_host::HostOpV1::NetDatagramSendTo, ken_host::HostOpV1::NetDatagramReceiveFrom,
+            ken_host::HostOpV1::NetDatagramLocalAddress,
+        ]) {
+            return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketDatagram, operation,
+            });
+        }
+    }
     if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::ProcessTakePipe) {
         if let Some(operation) = first_reachable_operation(alphabet, &[
             ken_host::HostOpV1::ResourceStreamRead, ken_host::HostOpV1::ResourceStreamWrite,
@@ -1210,6 +1242,7 @@ fn project_resource_lifetime_obligation(
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetDatagramBind)
     {
         Ok(Some(project_resource_lifetime_obligation_body(alphabet)))
     } else {
@@ -1268,6 +1301,7 @@ fn project_resource_lifetime_obligation_body(
         (ken_host::ResourceKindV1::SocketListener, ken_host::HostOpV1::NetListen, ken_host::ResourceBindingRole::Target, SOCKET_LISTENER_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetAccept, ken_host::ResourceBindingRole::File, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetConnect, ken_host::ResourceBindingRole::Target, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::SocketDatagram, ken_host::HostOpV1::NetDatagramBind, ken_host::ResourceBindingRole::Target, SOCKET_DATAGRAM_REQUIRE_SAME_AT.as_slice()),
     ] {
         if alphabet_contains_host_op(alphabet, operation) {
             plans.push(ResourceLifetimePlan {
@@ -1316,9 +1350,12 @@ fn validate_resource_lifetime_selection(
     let has_socket = [ken_host::HostOpV1::NetListen, ken_host::HostOpV1::NetAccept,
         ken_host::HostOpV1::NetConnect].into_iter()
         .any(|operation| alphabet_contains_host_op(alphabet, operation));
+    let has_datagram = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetDatagramBind);
 
     match value {
-        Some(value) if has_buffer || has_file || has_mapping || has_process || has_socket => {
+        Some(value)
+            if has_buffer || has_file || has_mapping || has_process || has_socket || has_datagram =>
+        {
             validate_resource_lifetime_obligation(value, alphabet)
         }
         None if has_buffer => Err(ExportError::MissingResourceLifetimePlan {
@@ -1335,6 +1372,9 @@ fn validate_resource_lifetime_selection(
         }),
         None if has_socket => Err(ExportError::MissingResourceLifetimePlan {
             resource_kind: ken_host::ResourceKindV1::SocketListener,
+        }),
+        None if has_datagram => Err(ExportError::MissingResourceLifetimePlan {
+            resource_kind: ken_host::ResourceKindV1::SocketDatagram,
         }),
         Some(_) => Err(ExportError::InvalidResourceLifetimeObligation),
         None => Ok(()),
@@ -1358,6 +1398,7 @@ fn validate_resource_lifetime_obligation(
         ken_host::ResourceKindV1::PipeWrite,
         ken_host::ResourceKindV1::SocketListener,
         ken_host::ResourceKindV1::SocketStream,
+        ken_host::ResourceKindV1::SocketDatagram,
     ] {
         let acquisition = match resource_kind {
             ken_host::ResourceKindV1::FsHandle => ken_host::HostOpV1::FsOpen,
@@ -1368,6 +1409,7 @@ fn validate_resource_lifetime_obligation(
             ken_host::ResourceKindV1::PipeRead | ken_host::ResourceKindV1::PipeWrite => ken_host::HostOpV1::ProcessTakePipe,
             ken_host::ResourceKindV1::SocketListener => ken_host::HostOpV1::NetListen,
             ken_host::ResourceKindV1::SocketStream => ken_host::HostOpV1::NetConnect,
+            ken_host::ResourceKindV1::SocketDatagram => ken_host::HostOpV1::NetDatagramBind,
         };
         if (alphabet_contains_host_op(alphabet, acquisition)
             || (resource_kind == ken_host::ResourceKindV1::SocketStream
@@ -1409,6 +1451,7 @@ const fn canonical_resource_kind_v1(value: ken_host::ResourceKindV1) -> &'static
         ken_host::ResourceKindV1::PipeWrite => "PipeWrite",
         ken_host::ResourceKindV1::SocketListener => "SocketListener",
         ken_host::ResourceKindV1::SocketStream => "SocketStream",
+        ken_host::ResourceKindV1::SocketDatagram => "SocketDatagram",
     }
 }
 
@@ -1796,6 +1839,73 @@ mod resource_lifetime_hash_tests {
             Err(ExportError::ResourceLifetimeUseWithoutAcquire {
                 resource_kind: ken_host::ResourceKindV1::SocketListener,
                 operation: ken_host::HostOpV1::NetAccept,
+            })
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: a datagram alphabet
+    /// projects one SocketDatagram plan bound at NetDatagramBind's Target,
+    /// requiring the same identity exactly at send and receive (File), local
+    /// address and release (Target); the buffer plan also binds send and
+    /// receive by Buffer; removing bind refuses the first datagram use.
+    /// CLAIMED: datagram sockets are bracket-owned identities in the
+    /// resource-lifetime export. THE GAP: Ward's monitor is not run.
+    #[test]
+    fn px11_datagram_lifetimes_bind_socket_and_buffer_roles() {
+        let alphabet = [
+            ken_host::HostOpV1::BufferAllocate,
+            ken_host::HostOpV1::NetDatagramBind,
+            ken_host::HostOpV1::NetDatagramSendTo,
+            ken_host::HostOpV1::NetDatagramReceiveFrom,
+            ken_host::HostOpV1::NetDatagramLocalAddress,
+            ken_host::HostOpV1::ResourceRelease,
+        ]
+        .map(|operation| canonical_host_perform_signature_v1(operation).to_string())
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        let projected = project_resource_lifetime_obligation(&alphabet)
+            .expect("checked datagram alphabet")
+            .expect("datagram bind projects lifetimes");
+        assert_eq!(
+            projected.plans.iter().map(|plan| plan.resource_kind).collect::<Vec<_>>(),
+            [ken_host::ResourceKindV1::Buffer, ken_host::ResourceKindV1::SocketDatagram]
+        );
+        let binding = |op, role| ResourceLifetimeBindingPoint { operation: op, role };
+        assert_eq!(
+            projected.plans[1].bind_at,
+            binding(ken_host::HostOpV1::NetDatagramBind, ken_host::ResourceBindingRole::Target)
+        );
+        assert_eq!(
+            projected.plans[1].require_same_at,
+            [
+                binding(ken_host::HostOpV1::NetDatagramSendTo, ken_host::ResourceBindingRole::File),
+                binding(ken_host::HostOpV1::NetDatagramReceiveFrom, ken_host::ResourceBindingRole::File),
+                binding(ken_host::HostOpV1::NetDatagramLocalAddress, ken_host::ResourceBindingRole::Target),
+                binding(ken_host::HostOpV1::ResourceRelease, ken_host::ResourceBindingRole::Target),
+            ]
+        );
+        for operation in [ken_host::HostOpV1::NetDatagramSendTo, ken_host::HostOpV1::NetDatagramReceiveFrom] {
+            assert!(projected.plans[0].require_same_at.contains(&binding(
+                operation,
+                ken_host::ResourceBindingRole::Buffer,
+            )));
+        }
+        assert_eq!(validate_resource_lifetime_obligation(&projected, &alphabet), Ok(()));
+        for operation in [
+            ken_host::HostOpV1::NetDatagramBind,
+            ken_host::HostOpV1::NetDatagramSendTo,
+            ken_host::HostOpV1::NetDatagramReceiveFrom,
+            ken_host::HostOpV1::NetDatagramLocalAddress,
+        ] {
+            assert_eq!(host_operation_family(operation), ("FSOp", "Net"), "{operation:?}");
+        }
+        let mut missing_bind = alphabet;
+        missing_bind.remove(canonical_host_perform_signature_v1(ken_host::HostOpV1::NetDatagramBind));
+        assert_eq!(
+            project_resource_lifetime_obligation(&missing_bind),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketDatagram,
+                operation: ken_host::HostOpV1::NetDatagramSendTo,
             })
         );
     }

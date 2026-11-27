@@ -409,6 +409,37 @@ struct NetLocalAddressRequestV1 {
     target: u64,
 }
 
+// PX11-DATAGRAM-SOCKETS: the datagram records are part of the attested
+// layout, but the native decoder has no arm for them. Their operations are
+// RepresentedUnavailable, so `require_native_operation_v1` refuses them and
+// `decode_native_request_v1` keeps its `_ => Err(-3)` default.
+#[repr(C)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct NetDatagramBindRequestV1 {
+    capability: u64,
+    address: SocketAddressRecordV1,
+}
+
+#[repr(C)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct NetDatagramSendToRequestV1 {
+    socket: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+    span_origin: u64,
+    peer: SocketAddressRecordV1,
+}
+
+#[repr(C)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct NetDatagramReceiveFromRequestV1 {
+    socket: u64,
+    buffer: u64,
+    buffer_start: u64,
+    length: u64,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {
@@ -471,6 +502,7 @@ const REPLY_READ_PROGRESS: u64 = 7;
 const REPLY_WRITE_PROGRESS: u64 = 8;
 const REPLY_CHILD_EXIT: u64 = 9;
 const REPLY_SOCKET_ADDRESS: u64 = 10;
+const REPLY_DATAGRAM_RECEIPT: u64 = 11;
 
 struct ProcessContext {
     _posture: ProcessPostureV1,
@@ -1552,6 +1584,12 @@ fn set_reply(reply: &mut HostReplyV1, outcome: CanonicalOutcomeV1, context: &mut
                 len: bytes.len(),
             };
         }
+        CanonicalOutcomeV1::Success(CanonicalReplyV1::DatagramReceipt(_)) => {
+            // Unreachable from native code: `require_native_operation_v1`
+            // refuses every datagram operation before dispatch. The tag is
+            // reserved; the native parity node defines this reply's payload.
+            reply.tag = REPLY_DATAGRAM_RECEIPT;
+        }
         CanonicalOutcomeV1::Error(crate::SemanticErrorV1::Resource(error)) => {
             reply.tag = REPLY_RESOURCE_ERROR;
             match error {
@@ -1617,6 +1655,7 @@ fn resource_kind_tag(kind: crate::ResourceKindV1) -> u64 {
         crate::ResourceKindV1::PipeWrite => 6,
         crate::ResourceKindV1::SocketListener => 7,
         crate::ResourceKindV1::SocketStream => 8,
+        crate::ResourceKindV1::SocketDatagram => 9,
     }
 }
 
@@ -1684,6 +1723,7 @@ fn decode_resource_error_reply(
         6 => Some(crate::ResourceKindV1::PipeWrite),
         7 => Some(crate::ResourceKindV1::SocketListener),
         8 => Some(crate::ResourceKindV1::SocketStream),
+        9 => Some(crate::ResourceKindV1::SocketDatagram),
         _ => None,
     };
     let all_zero = payload == ResourceErrorReplyV1::default();
@@ -3790,6 +3830,7 @@ mod tests {
             ),
             (crate::ResourceKindV1::SocketListener, "resource_kind.SocketListener", 7),
             (crate::ResourceKindV1::SocketStream, "resource_kind.SocketStream", 8),
+            (crate::ResourceKindV1::SocketDatagram, "resource_kind.SocketDatagram", 9),
         ];
         assert_eq!(
             crate::resource_kind_population_v1().expect("native resource-kind catalog"),
@@ -3805,7 +3846,8 @@ mod tests {
                 | crate::ResourceKindV1::PipeRead
                 | crate::ResourceKindV1::PipeWrite
                 | crate::ResourceKindV1::SocketListener
-                | crate::ResourceKindV1::SocketStream => {}
+                | crate::ResourceKindV1::SocketStream
+                | crate::ResourceKindV1::SocketDatagram => {}
             }
             assert_eq!(effect_binding("tag", binding), tag, "catalog {binding}");
             assert_eq!(resource_kind_tag(kind), tag, "encoder {kind:?}");
@@ -4098,6 +4140,7 @@ mod tests {
             (crate::ResourceKindV1::PipeWrite, 6),
             (crate::ResourceKindV1::SocketListener, 7),
             (crate::ResourceKindV1::SocketStream, 8),
+            (crate::ResourceKindV1::SocketDatagram, 9),
         ] {
             assert_eq!(
                 project(crate::ResourceErrorV1::ReleaseFailed {

@@ -303,6 +303,22 @@ fn console_stream_family_and_eq_char_keep_exact_checked_ids_without_trust() {
     ] {
         expected_added.insert(("Capability.Net.Stream".to_string(), name.to_string()));
     }
+    // Transition sentinel: PX11-DATAGRAM-SOCKETS adds the checked datagram
+    // home. A later deliberate home expansion must update this inventory.
+    for name in [
+        "DatagramFit",
+        "WholeDatagram",
+        "TruncatedDatagram",
+        "DatagramReceipt",
+        "EmptyDatagram",
+        "ReceivedDatagram",
+        "with_datagram_socket",
+        "send_datagram",
+        "receive_datagram",
+        "datagram_local_address",
+    ] {
+        expected_added.insert(("Capability.Net.Datagram".to_string(), name.to_string()));
+    }
     for (home, name) in [
         ("Capability.Time.Monotonic", "monotonic_now"),
         ("Capability.Time.Monotonic", "sleep_until"),

@@ -19,7 +19,8 @@
 > **Surface standing.** The security requirements in this chapter remain
 > committed. The filesystem surface is landed (`38 §1.3.1`); PX11 specifies
 > a class-scoped Net grant on the existing `Cap a` and Net operations and
-> results (`38 §1.13`), interpreter-first rather than already landed.
+> results (`38 §1.13`, with datagrams in `38 §1.13.1`), interpreter-first
+> rather than already landed.
 > The bounded use-site authority predicate, a distinguishing pair of live
 > authority sinks, and a clearance-checked labeled Net send remain gaps.
 > Sections 7, 8, and H name their exits; example metanotation does not
@@ -399,8 +400,8 @@ that capability opens **carries a clearance label** (`61 §3`, data may flow
 only `⊑` that clearance). The landed filesystem instance is in
 `38 §1.3.1`; PX11 specifies the Net capability, operation and result
 association in `38 §1.13`. The following network arrow remains target
-metanotation for a **labeled** network sink: PX11's `send_socket` has
-no socket-clearance label or enforcing flow check.
+metanotation for a **labeled** network sink: PX11's `send_socket` and
+`send_datagram` have no socket-clearance label or enforcing flow check.
 
 ```text
 send(capability for Net authority a, socket at κ, message at ℓ)
@@ -448,13 +449,13 @@ classes:
 | Site or example | Definition keyword | Authority index or quantification | Operation | Effect-indexed result | Standing |
 |---|---|---|---|---|---|
 | §3.1 target signature (issue anchor `:173`) | `proc` target | bounded `{c : Cap a \| demand ⊑ authority c}` unavailable | sufficiency-demanding FS sink unavailable | must use the sink's `FS a (Result …)` association | `AUTH-BOUNDED-SINK`; design-committed, not instantiated |
-| §6 network arrow (issue anchor `:337`) | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
+| §6 network arrow (issue anchor `:337`) | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` and `send_datagram` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
 | no-ambient family: `classify`, `save`, `save_bad` | `fn` for pure classify; `proc` for both saves | none for classify; `Cap AFull` for save; save_bad omits it | none for classify; source-facing `writeFile` for both saves | pure `Tag`; both saves use `FS AFull (Result FileError Unit)` | current positive and deliberate no-cap negative below |
 | `sandbox` | `proc` target | lower-bounded child quantification unavailable | real lower-bound sink unavailable | would follow the admitted FS sink association | `AUTH-BOUNDED-SINK`; metatheoretic target |
 | AC3 order-dual pair | no standalone definition | same attenuated cap under two demands unavailable | two real sinks unavailable | accept/reject observations, not a source result annotation | `AUTH-AC3-ORIENTATION`; metatheoretic form, orientation net live |
 | three management negatives | no definition | held capability only | names remain deliberately unbound | none | current negative contract |
 | `use_child` | `proc` | `Cap APartial` | current `readFile APartial c_child path` | `FS APartial (Result FileError Bytes)` | current source spelling below |
-| `exfil` | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
+| `exfil` | labeled `proc` target | class-scoped Net grant specified in §38 §1.13 | `send_socket` and `send_datagram` specified, unlabeled | Net result specified; labeled clearance result absent | `AUTH-NET-FLOW-SINK`; deferred `(oracle)` |
 
 The current filesystem shapes below follow the checked exemplar at
 `catalog/packages/Capability/Filesystem/Authority.ken.md`, while staying at
@@ -522,10 +523,10 @@ proc use_child (c_child : Cap APartial) (path : Bytes)
 ```
 
 Finally, `exfil` remains a deferred `(oracle)` `AUTH-NET-FLOW-SINK`
-example, not Ken source. PX11 supplies a class-scoped Net grant and an
-unlabeled `send_socket`, **not** a sink at `Public`. A future labeled sink
-must reject `Bytes @ Secret` by `61`'s `L-SINK` even when the grant is
-present. Omitting either the capability concession or the flow
+example, not Ken source. PX11 supplies a class-scoped Net grant and
+unlabeled `send_socket` and `send_datagram`, **not** a sink at `Public`. A
+future labeled sink must reject `Bytes @ Secret` by `61`'s `L-SINK` even
+when the grant is present. Omitting either the capability concession or the flow
 concession must reject independently. This retains AC6 without claiming
 PX11 has already delivered an IFC-checked network sink.
 
@@ -601,9 +602,9 @@ mechanism, and runtime audit emission (`40-runtime`/`Ward`).
   audit-record **emission** (§5) — `40-runtime`/`Ward`, riding the contracts this
   chapter pins.
 - **Specified by PX11 (`AUTH-NET-SURFACE` exited, `38 §1.13`):** the
-  class-scoped Net grant on `Cap a`, socket operations and `HostIO a`
-  results. This is the interpreter-first contract, not a native-parity or
-  IFC-flow claim.
+  class-scoped Net grant on `Cap a`, stream and datagram socket operations
+  (`38 §1.13.1`) and `HostIO a` results. This is the interpreter-first
+  contract, not a native-parity or IFC-flow claim.
 - **Deferred (`AUTH-NET-FLOW-SINK`, `(oracle)`):** a labeled network sink
   with independent capability and clearance checks (`ℓ ⊔ pc ⊑ κ`, §6).
 - **Deferred (`AUTH-BOUNDED-SINK`, `(oracle)`):** the pinned use-site predicate

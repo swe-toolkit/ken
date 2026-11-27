@@ -6351,25 +6351,38 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     );
 }
 
-/// The represented-unavailable population is empty: every host operation is
-/// NativeTested and every one is a Cranelift consumer. The rows whose subject
-/// had to be an unavailable or non-consumer operation, including the
-/// `RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` dead-arm pair, were retired at PX11
-/// Inc2 when that population emptied. The refusal paths stay, fail-closed for
-/// the next operation, and are unexercised while the population is empty.
+/// Promise class: transition sentinel, named for the datagram boundary.
+/// MEASURED: the RepresentedUnavailable host operations, and the host
+/// operations absent from `CRANELIFT_HOST_EFFECT_CONSUMERS_V1`, are each
+/// exactly the four PX11 datagram operations. CLAIMED: native lowering has a
+/// typed refusal seat for exactly those four and a consumer for every other
+/// operation. THE GAP: the datagram native-parity node retires this row by
+/// promoting the four, which must edit this inventory; the refusal itself is
+/// measured by `px11_datagram_programs_refuse_native_build_by_typed_cause`.
 #[test]
-fn represented_unavailable_and_non_consumer_host_operation_populations_are_empty() {
-    assert!(
-        ken_host::HostOpV1::ALL
-            .iter()
-            .all(|op| op.availability() == ken_host::HostOpAvailabilityV1::NativeTested),
-        "the unavailable-lane rows were retired at PX11 Inc2 because their population is \
-         empty; restore them with a real subject when it is not"
-    );
+fn represented_unavailable_and_non_consumer_host_operations_are_exactly_the_datagram_four() {
+    use std::collections::BTreeSet;
+    let datagram = [
+        ken_host::HostOpV1::NetDatagramBind,
+        ken_host::HostOpV1::NetDatagramSendTo,
+        ken_host::HostOpV1::NetDatagramReceiveFrom,
+        ken_host::HostOpV1::NetDatagramLocalAddress,
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    let unavailable = ken_host::HostOpV1::ALL
+        .into_iter()
+        .filter(|op| op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(unavailable, datagram, "exact RepresentedUnavailable population");
+    let non_consumers = ken_host::HostOpV1::ALL
+        .into_iter()
+        .filter(|op| !CRANELIFT_HOST_EFFECT_CONSUMERS_V1.contains(op))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(non_consumers, datagram, "exact non-consumer population");
     assert_eq!(
-        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.len(),
+        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.len() + datagram.len(),
         ken_host::HostOpV1::ALL.len(),
-        "the non-consumer rows were retired at PX11 Inc2 because their population is empty; \
-         restore them with a real subject when it is not"
+        "the consumer roster has no duplicate"
     );
 }

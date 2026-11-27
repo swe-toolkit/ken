@@ -199,7 +199,8 @@ fn normalize_outcome(
                 | CanonicalReplyV1::WriteProgress(_)
                 | CanonicalReplyV1::MonotonicInstant(_)
                 | CanonicalReplyV1::ChildExit(_)
-                | CanonicalReplyV1::SocketAddress(_) => {
+                | CanonicalReplyV1::SocketAddress(_)
+                | CanonicalReplyV1::DatagramReceipt(_) => {
                     NormalizedReply::Other(reply.clone())
                 }
             })
@@ -282,7 +283,8 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                 | ResourceKindV1::PipeRead
                 | ResourceKindV1::PipeWrite
                 | ResourceKindV1::SocketListener
-                | ResourceKindV1::SocketStream => {
+                | ResourceKindV1::SocketStream
+                | ResourceKindV1::SocketDatagram => {
                     panic!("this control only constructs FS/Buffer/Mapping acquisitions")
                 }
             },
@@ -303,7 +305,8 @@ fn preregistered_tuple_normalizes_only_by_acquisition_ordinal() {
                 | ResourceKindV1::PipeRead
                 | ResourceKindV1::PipeWrite
                 | ResourceKindV1::SocketListener
-                | ResourceKindV1::SocketStream => {
+                | ResourceKindV1::SocketStream
+                | ResourceKindV1::SocketDatagram => {
                     panic!("this control only constructs FS/Buffer/Mapping acquisitions")
                 }
             },

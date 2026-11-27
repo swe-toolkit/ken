@@ -391,7 +391,7 @@ fn abstract_export_keeps_qualified_constructor_private() {
 }
 
 /// Promise class: durable invariant. MEASURED: ResourceKind qualified
-/// expressions and all nine pattern arms check with canonical prelude IDs,
+/// expressions and all ten pattern arms check with canonical prelude IDs,
 /// even after the qualified flat spelling is forged to a Bool constructor.
 /// CLAIMED: scoped constructor selection is per parent type, preserving
 /// match exhaustiveness and trust. THE GAP: the bare and rebind tests inspect
@@ -417,7 +417,8 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
            ResourceKind.PipeRead |-> Zero;\
            ResourceKind.PipeWrite |-> Zero;\
            ResourceKind.SocketListener |-> Zero;\
-           ResourceKind.SocketStream |-> Zero }",
+           ResourceKind.SocketStream |-> Zero;\
+           ResourceKind.SocketDatagram |-> Zero }",
     )
     .expect("every checked ResourceKind member qualifies");
     assert_eq!(env.env.constructor(buffer).unwrap().0.id, kind_id);
@@ -427,7 +428,7 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
             "fn incomplete (k : ResourceKind) : Nat = match k {\
                ResourceKind.Buffer |-> Zero }",
         )
-        .expect_err("the other eight constructors must remain required");
+        .expect_err("the other nine constructors must remain required");
     assert!(
         matches!(error, ElabError::ExhaustivenessError { .. }),
         "wrong missing-identity refusal: {error:?}"
@@ -435,7 +436,7 @@ fn scoped_resource_kind_qualifies_every_arm_and_checks_coverage() {
     assert_eq!(env.env.trusted_base(), trust);
 }
 
-/// Promise class: durable invariant. MEASURED: eight ResourceKind constructor
+/// Promise class: durable invariant. MEASURED: nine ResourceKind constructor
 /// spellings are absent from the bare global map; bare SpawnPlan names the
 /// distinct pure plan type. A bare Buffer expression and pattern each reject;
 /// the qualified positive survives a forged flat display spelling.
@@ -453,6 +454,7 @@ fn scoped_resource_kind_bare_member_neither_resolves_nor_binds() {
         "PipeWrite",
         "SocketListener",
         "SocketStream",
+        "SocketDatagram",
     ] {
         assert!(
             !env.globals.contains_key(bare),

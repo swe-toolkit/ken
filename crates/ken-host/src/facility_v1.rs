@@ -28,6 +28,12 @@ pub(crate) enum HostFacilityV1 {
     StreamSocketUnix,
     /// `accept4` with `SOCK_CLOEXEC`.
     Accept4,
+    /// `socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0)`.
+    DatagramSocketInet4,
+    /// `socket(AF_INET6, SOCK_DGRAM | SOCK_CLOEXEC, 0)`.
+    DatagramSocketInet6,
+    /// `socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0)`.
+    DatagramSocketUnix,
 }
 
 /// The verdicts decided so far. Production has one, for the whole process.
@@ -93,7 +99,8 @@ fn means_absent(facility: HostFacilityV1, errno: i32) -> bool {
             errno,
             libc::ENOENT | libc::ENOTDIR | libc::ENOSYS | libc::EPERM | libc::EACCES
         ),
-        StreamSocketInet4 | StreamSocketInet6 | StreamSocketUnix => matches!(
+        StreamSocketInet4 | StreamSocketInet6 | StreamSocketUnix | DatagramSocketInet4
+        | DatagramSocketInet6 | DatagramSocketUnix => matches!(
             errno,
             libc::ENOSYS
                 | libc::EINVAL
@@ -125,6 +132,18 @@ fn probe(facility: HostFacilityV1) -> io::Result<()> {
         StreamSocketInet6 => observed(StreamSocketInet6, stream_socket_probe(libc::AF_INET6)),
         StreamSocketUnix => observed(StreamSocketUnix, stream_socket_probe(libc::AF_UNIX)),
         Accept4 => observed(Accept4, accept4_probe()),
+        DatagramSocketInet4 => observed(
+            DatagramSocketInet4,
+            socket_probe(libc::AF_INET, libc::SOCK_DGRAM),
+        ),
+        DatagramSocketInet6 => observed(
+            DatagramSocketInet6,
+            socket_probe(libc::AF_INET6, libc::SOCK_DGRAM),
+        ),
+        DatagramSocketUnix => observed(
+            DatagramSocketUnix,
+            socket_probe(libc::AF_UNIX, libc::SOCK_DGRAM),
+        ),
     }
 }
 
@@ -172,9 +191,13 @@ fn accept4_probe() -> io::Result<()> {
 }
 
 fn stream_socket_probe(family: libc::c_int) -> io::Result<()> {
+    socket_probe(family, libc::SOCK_STREAM)
+}
+
+fn socket_probe(family: libc::c_int, kind: libc::c_int) -> io::Result<()> {
     // An unbound socket, closed at once: no address, no traffic.
     // SAFETY: socket returns a fresh descriptor on success, owned here.
-    let fd = unsafe { libc::socket(family, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
+    let fd = unsafe { libc::socket(family, kind | libc::SOCK_CLOEXEC, 0) };
     if fd < 0 {
         return Err(io::Error::last_os_error());
     }
@@ -191,6 +214,18 @@ fn unsupported() -> io::Error {
 pub(crate) fn proc_self_fd_path(fd: impl std::os::fd::AsFd) -> io::Result<String> {
     require(HostFacilityV1::ProcSelfFd)?;
     Ok(format!("/proc/self/fd/{}", fd.as_fd().as_raw_fd()))
+}
+
+/// The `/proc/<pid>/fd` spelling of one of this process's descriptors, with
+/// the pid as `/proc` itself names this process. A datagram Unix bind records
+/// this spelling as its name, so it must not resolve per reader.
+pub(crate) fn proc_pid_fd_path(fd: impl std::os::fd::AsFd) -> io::Result<String> {
+    require(HostFacilityV1::ProcSelfFd)?;
+    let pid = std::fs::read_link("/proc/self")?;
+    let pid = pid.to_str().filter(|pid| !pid.is_empty() && pid.bytes().all(|byte| byte.is_ascii_digit()))
+        .ok_or_else(|| io::Error::from_raw_os_error(libc::ENOENT))?
+        .to_owned();
+    Ok(format!("/proc/{pid}/fd/{}", fd.as_fd().as_raw_fd()))
 }
 
 /// A test's private verdict cache plus the scripted results of one

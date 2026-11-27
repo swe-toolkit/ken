@@ -4,6 +4,9 @@ import Capability.Net.Stream
   (SocketAddress, socket_unix_path, with_socket_listener, with_socket_accept,
     with_socket_connection, socket_local_address, ListeningSocket, receive_socket,
     send_socket, shutdown_socket, ShutdownWrite)
+import Capability.Net.Datagram
+  (DatagramReceipt, with_datagram_socket, send_datagram, receive_datagram,
+    datagram_local_address)
 import Capability.Process.Exit (host_bind, host_pure)
 import Capability.System.Buffer (BufferHandle, MkBufferWindow)
 import Capability.System.IO (readAt)
@@ -75,6 +78,49 @@ proc file_body (cap : Cap AFull) (address : SocketAddress)
     (ResourceBodyResult Unit Unit)
     (withBuffer AFull Unit Unit (1 : Int) (prepare_span cap address file)) settle
 
+proc datagram_body (buffer : BufferHandle) (span : BufferSpan)
+    (socket : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [Net] =
+  host_bind AFull (Result ResourceError SocketAddress) (ResourceBodyResult Unit Unit)
+    (datagram_local_address AFull socket)
+    (λlocal. match local {
+      Err _ ↦ failed;
+      Ok peer ↦ host_bind AFull (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+        (send_datagram AFull socket peer buffer span)
+        (λsent. match sent {
+          Err _ ↦ failed;
+          Ok _ ↦ host_bind AFull (Result ResourceError DatagramReceipt)
+            (ResourceBodyResult Unit Unit)
+            (receive_datagram AFull socket buffer (MkBufferWindow (0 : Int) (1 : Int)))
+            (λreceived. match received { Err _ ↦ failed; Ok _ ↦ passed })
+        })
+    })
+
+proc prepare_datagram (cap : Cap AFull) (address : SocketAddress)
+    (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind AFull (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (1 : Int)))
+    (λread_result.
+      match read_result {
+      Err _ ↦ failed;
+      Ok ReadProgress.ReadEof ↦ failed;
+      Ok (ReadProgress.ReadSome span _) ↦
+        host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
+          (ResourceBodyResult Unit Unit)
+          (with_datagram_socket AFull Unit Unit cap address (datagram_body buffer span)) settle
+    })
+
+proc datagram_file_body (cap : Cap AFull) (address : SocketAddress)
+    (file : Resource ResourceKind.FsHandle)
+    : HostIO AFull (ResourceBodyResult Unit Unit)
+    visits [FS, Net] =
+  host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (1 : Int) (prepare_datagram cap address file)) settle
+
 fn settled (_stream : Resource ResourceKind.SocketStream)
     : HostIO AFull (ResourceBodyResult Unit Unit) = passed
 
@@ -98,8 +144,18 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                 Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 3);
                 Ok outcome ↦ finish (Ok ResourceError (ResourceBracketResult Unit Unit) outcome)
               });
-            Cons _ _ ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
-              ExitCode (with_socket_connection AFull Unit Unit cap address settled) finish
+            Cons _ more ↦ match more {
+              Nil ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit))
+                ExitCode (with_socket_connection AFull Unit Unit cap address settled) finish;
+              Cons _ _ ↦
+                host_bind AFull (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+                  (withResource AFull Unit Unit cap (bytes_encode "payload")
+                    ResourceOpenMode.ResourceRead (datagram_file_body cap address))
+                  (λopened. match opened {
+                    Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 3);
+                    Ok outcome ↦ finish (Ok ResourceError (ResourceBracketResult Unit Unit) outcome)
+                  })
+            }
           }
         }
       }

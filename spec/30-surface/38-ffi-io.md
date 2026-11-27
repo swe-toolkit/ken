@@ -158,9 +158,9 @@ two landed, ordinary surface witnesses used by this clause are:
 
 Their complete result and capability types are defined by the landed FS and
 Console floors; this clause fixes the operation-to-row association. The later
-PX11 stream-socket producers (§1.13) carry `visits [Net]` and supply a real
-`Net` operation-binding witness. They do not retroactively alter the L6
-`FS` and `Console` witnesses.
+PX11 stream- and datagram-socket producers (§1.13, §1.13.1) carry
+`visits [Net]` and supply a real `Net` operation-binding witness. They do
+not retroactively alter the L6 `FS` and `Console` witnesses.
 
 - **The no-untracked-I/O guard is the `36 §1.4` escape check — L6 introduces no
   new gate.** Each I/O operation is a `perform_E` site (`36 §1.2`): it is the
@@ -861,9 +861,10 @@ is present behaves as if no probe existed.
 |---|---|
 | process descriptors (`pidfd_open`, `pidfd_send_signal`, `waitid(P_PIDFD)`) | `ProcessSpawn` |
 | `statx` | `FsMetadata`, `FsHandleMetadata`; `FsReadDirectoryBatch` only for an entry whose type the read did not report |
-| `/proc/self/fd`, describing this process | recursive `FsRemoveDirectory`; `NetListen` and `NetConnect` on a Unix address |
+| `/proc/self/fd`, describing this process | recursive `FsRemoveDirectory`; `NetListen`, `NetConnect`, `NetDatagramBind` and `NetDatagramSendTo` on a Unix address |
 | close-on-exec stream sockets, one facility per address family | `NetListen` and `NetConnect` on an address of that family |
 | `accept4` | `NetAccept` |
+| close-on-exec datagram sockets, one facility per address family | `NetDatagramBind` on an address of that family |
 
 Descriptor closure in a spawned child is performed by the C library's
 spawn machinery, whose mechanism Ken does not observe, so it is not
@@ -1571,9 +1572,10 @@ signature is homed by analogy.
 ### 1.13 Typed stream sockets (PX11 first slice)
 
 > **PX11 status: specified; stream-socket native parity is PX11 Inc2.**
-> The seven `Net` host operations are `NativeTested`: they execute on
-> the checked interpreter and on the native lane, and a declared `Net`
-> grant no longer refuses a native build. No seed execution, official
+> The seven `Net` stream host operations are `NativeTested`: they
+> execute on the checked interpreter and on the native lane, and a
+> declared `Net` grant no longer refuses a native build. The four
+> datagram operations of §1.13.1 are interpreter-only. No seed execution, official
 > conformance, CI, publication, landing or trusted-base measurement is
 > claimed by this Spec addition.
 
@@ -1599,7 +1601,8 @@ abstract namespace needs its own authority class in a successor.
 re-exports that same `SocketAddress` identity, and provides the socket
 resource operations below and a closed shutdown-direction family.
 `ResourceKind` gains the two scoped cases `ResourceKind.SocketListener`
-and `ResourceKind.SocketStream`, for nine in all. The contract shapes are:
+and `ResourceKind.SocketStream`; with §1.13.1's
+`ResourceKind.SocketDatagram` there are ten in all. The contract shapes are:
 
 ```ken
 pub fn socket_ipv4 (octets : Vec UInt8 4) (port : UInt16) : SocketAddress
@@ -1683,7 +1686,7 @@ carrier; Net-class
 membership is checked on the decoded address at admission, not
 inferred from a string or from the effect row alone.
 
-All seven operations declare `visits [Net]`; the existing §36 §1.4
+All seven stream operations declare `visits [Net]`; the existing §36 §1.4
 escape check rejects a caller without `Net` in its row. Acquiring a
 listener or connected stream also takes `Cap a`, and acceptance is
 confined to an already-held listener. A listener bound to IPv4 or IPv6
@@ -1733,7 +1736,7 @@ socket-error family:
 ```ken
 pub data SocketOperation = ListenSocket | AcceptSocket | ConnectSocket
   | ReceiveSocket | SendSocket | ShutdownSocket | LocalSocketAddress
-  | CloseSocket
+  | CloseSocket | BindSocket
 pub data Operation = FilesystemOp FileOperation
   | ProcessOp ProcessOperation | SocketOp SocketOperation
 pub data ResourceRef = FilesystemResource (Option Bytes)
@@ -1746,8 +1749,9 @@ pub fn socket_error_to_system
     cause NoSafeContext
 ```
 
-The operation identity distinguishes the seven Net operations and
-resource closure; `LocalSocketAddress` is idempotent, while the other
+The operation identity distinguishes the seven stream operations, the
+datagram bind of §1.13.1 (`BindSocket`, last in the sum) and resource
+closure; `LocalSocketAddress` is idempotent, while the other
 socket operations, including close, are non-idempotent for retry
 classification. The address is carried when known, never a raw fd;
 accepted peers need not disclose their remote address. Only a
@@ -1760,17 +1764,171 @@ connect to an existing endpoint refusing the connection maps
 `ENOTCONN` map to `IOError.Other 98`, `Other 104` and `Other 107`.
 No new `IOError` constructor or trust-bearing rule is introduced.
 
-The seven new host operations are `NetListen`, `NetAccept`, `NetConnect`,
-`NetReceive`, `NetSend`, `NetShutdown` and `NetLocalAddress`. Their
-host-family codes are `0x0701` through `0x0707` in that order.
+The seven stream host operations are `NetListen`, `NetAccept`,
+`NetConnect`, `NetReceive`, `NetSend`, `NetShutdown` and
+`NetLocalAddress`. Their host-family codes are `0x0701` through `0x0707`
+in that order; the four datagram operations of §1.13.1 follow at
+`0x0708` through `0x070B`, for eleven `Net` operations in all.
 `ResourceKind.SocketListener` and `ResourceKind.SocketStream` are new
 opaque resource kinds; resource release uses the existing operation.
-All seven operations are `NativeTested` and execute on both the interpreter
-and native lanes. A declared Net grant no longer triggers a native-build
-refusal. Datagrams, typed option families, an injected resolver and DNS
+All seven stream operations are `NativeTested` and execute on both the
+interpreter and native lanes. A declared Net grant no longer triggers a
+native-build refusal. Typed option families, an injected resolver and DNS
 boundary, nonblocking/readiness and abstract Unix names remain subsequent work.
 No new kernel rule or trusted postulate is authorized. Any required trust
 growth is an operator stop.
+
+#### 1.13.1 Typed datagram sockets (PX11-DATAGRAM-SOCKETS)
+
+> **Status: specified; host and interpreter lanes only.** The four
+> datagram operations are `RepresentedUnavailable`. The shared executor
+> admits them through an explicit interpreter-only roster naming exactly
+> these four; the native ABI keeps its own `NativeTested` gate. Native
+> parity is a successor node. No seed execution, official conformance,
+> CI, publication, landing or trusted-base measurement is claimed by
+> this Spec addition.
+
+A datagram socket binds to a typed `SocketAddress`, sends one bounded
+datagram to a typed peer, and receives one datagram together with its
+sender's address. It reuses §1.13's `SocketAddress` identity and smart
+constructors, `Net` classes, FS-root rule and bracket release. The
+`Capability.Net.Datagram` home re-exports `SocketAddress`, `socket_ipv4`,
+`socket_ipv6` and `socket_unix_path`, and provides the operations below.
+`ResourceKind` gains the opaque scoped case `ResourceKind.SocketDatagram`,
+for ten kinds in all. The contract shapes are:
+
+```ken
+pub data DatagramFit = WholeDatagram | TruncatedDatagram
+export WholeDatagram, TruncatedDatagram
+pub data DatagramReceipt = EmptyDatagram (Option SocketAddress)
+  | ReceivedDatagram BufferSpan TransferCount DatagramFit (Option SocketAddress)
+export EmptyDatagram, ReceivedDatagram
+
+proc with_datagram_socket (a : Auth) (e : Type) (r : Type)
+    (cap : Cap a) (address : SocketAddress)
+    (body : Resource ResourceKind.SocketDatagram
+      -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Net]
+proc send_datagram (a : Auth) (socket : Resource ResourceKind.SocketDatagram)
+    (peer : SocketAddress) (buffer : BufferHandle) (span : BufferSpan)
+  : HostIO a (Result ResourceError Unit) visits [Net]
+proc receive_datagram (a : Auth) (socket : Resource ResourceKind.SocketDatagram)
+    (buffer : BufferHandle) (window : BufferWindow)
+  : HostIO a (Result ResourceError DatagramReceipt) visits [Net]
+proc datagram_local_address (a : Auth)
+    (socket : Resource ResourceKind.SocketDatagram)
+  : HostIO a (Result ResourceError SocketAddress) visits [Net]
+```
+
+The four host operations are `NetDatagramBind`, `NetDatagramSendTo`,
+`NetDatagramReceiveFrom` and `NetDatagramLocalAddress`, with host-family
+codes `0x0708` through `0x070B` in that order. They are carried on the
+existing FSOp carrier under the `Net` row label, as the stream operations
+are. All four declare `visits [Net]`. Release is the existing
+`ResourceRelease`. A separate local-address operation exists because an
+IPv4 or IPv6 socket bound to port zero can learn its port only by readback,
+and widening `SocketTarget` or `NetLocalAddress` would change a stream
+operation.
+
+**Bind.** `with_datagram_socket` is the only datagram acquisition, so every
+`Resource ResourceKind.SocketDatagram` is bound; there is no datagram
+connect and no unbound or unconnected receive state, and no typed error
+for one is added. Bind takes `Cap a` and checks the address's `Net` class
+exactly as `NetListen` does: `Loopback`, `Inet` and `Unix`, where a `Unix`
+declaration also needs `FS AFull`. An address outside the held class is
+`ResourceHostIO IOError.CapabilityDenied`, and a revoked grant is
+`ResourceHostIO IOError.Revoked`, both before any socket syscall. A Unix
+path is resolved by §1.13's rules with the same errors: outside the root,
+a `..` component or a symbolic link at any component is `CapabilityDenied`;
+an empty or final-dot name is `InvalidInput`; a missing parent is
+`NotFound`; a non-directory parent is `NotDirectory`. A refused bind leaves
+no inode. The socket is `SOCK_DGRAM | SOCK_CLOEXEC`, blocking, with no
+option set; a failure after `socket()` closes it. The resource retains the
+originating grant's provenance, and release does not unlink the pathname.
+
+A datagram Unix bind uses the spelling
+`/proc/<pid>/fd/<parent fd>/<leaf>`, with the pid as `/proc` names this
+process, not `/proc/self/...`, so the name the kernel records is unique
+among live processes. The leaf is at most 79 bytes: the prefix takes at
+most 28 of the 107 `sun_path` bytes (six for `/proc/`, seven pid digits,
+four for `/fd/`, ten descriptor digits and a slash). A longer leaf is
+`IOError.InvalidInput`. The socket keeps its pinned parent directory open
+until release, so the descriptor number inside a live socket's name cannot
+be reused by another live bind in the same process.
+
+**Send.** `send_datagram` takes no `Cap`; the peer is admitted against the
+socket's retained grant. An IP peer outside the held class is
+`CapabilityDenied`, and a revoked grant is `Revoked`. A Unix peer is
+admitted by the stream connect rule: §1.13's root resolution and symlink
+refusal, then the leaf is pinned `O_PATH | O_NOFOLLOW` and the datagram is
+sent to that pinned descriptor's `/proc/self/fd` spelling, which is the
+destination only and is never observable. A peer whose family differs
+from the socket's bound family is `IOError.InvalidInput`. A datagram is
+atomic: the whole effective span is sent as one datagram or an error is
+returned, so the result is `Unit`, not `WriteProgress`. The payload
+maximum is 65507 bytes for every family, the IPv4 UDP maximum applied
+uniformly; a larger effective span is `IOError.InvalidInput`. An empty
+effective span is `ResourceError.InvalidBounds` by the shared buffer
+check; sending an empty datagram is outside this slice. Every refusal in
+this paragraph precedes any syscall. The send uses `MSG_NOSIGNAL`; other
+OS failures map through the host's canonical identity mapping to
+`IOError.Other errno`, as for streams.
+
+**Receive.** `receive_datagram` blocks for one datagram, received with
+`recvfrom` and `MSG_TRUNC` so the host learns its true length. The
+delivered bytes are the prefix that fits the effective window, returned
+as `ReceivedDatagram` with the live span and `TransferCount` (delivered,
+effective). Its fit is `TruncatedDatagram` exactly when the true length
+exceeds the effective window, and `WholeDatagram` otherwise; the kernel
+discards the excess. Truncation is a typed field of a successful receipt,
+not an error, because the datagram was consumed and its prefix delivered.
+A received zero-length datagram is `EmptyDatagram` with its sender. A zero
+effective window is `ResourceError.InvalidBounds` without a host call; it
+cannot be `ReadEof`, because a datagram socket has no end of stream.
+Readiness and nonblocking receive are PX12.
+
+**Local address.** `datagram_local_address` returns the OS-assigned port
+for an IP bind to port zero, and for a Unix socket the validated address
+it was bound with.
+
+**Sender identity.** An IPv4 sender is `Some` of its address and port. An
+IPv6 sender is `Some` with its flowinfo dropped, because flowinfo is not
+part of the address identity; a sender with a nonzero scope ID is `None`,
+because this slice's `SocketAddress` has no scope. For Unix, the host keeps
+a per-process table from each live datagram socket's exact kernel-recorded
+name to the validated `SocketAddress` it was bound with; an entry is added
+at bind and removed at release. A received Unix sender name equal to a live
+entry is reported as that validated address. Otherwise a sender name that
+validates as a `SocketAddress` Unix path (absolute, 2–107 bytes, no zero
+byte) is reported as that path. An unnamed sender, an abstract name or a
+name that does not validate is `None`.
+
+The residual: if the socket file of a live entry is unlinked by a separate
+FS act and another process binds the same location through this process's
+`/proc` spelling, its datagrams report this socket's validated address.
+That address still names the location where the sender is bound.
+
+**Kinds and errors.** A stream or listener resource passed where a
+datagram resource is required is excluded statically by the kind index; at
+the host it is the existing `ResourceKindMismatch`, and a released socket
+is the existing `Closed`. `Capability.System.Error`'s `SocketOperation`
+gains one constructor, `BindSocket`, last in both the data declaration and
+the export list, and non-idempotent. Send, receive, local address and close
+reuse `SendSocket`, `ReceiveSocket`, `LocalSocketAddress` (idempotent) and
+`CloseSocket`. `SocketResource` carries the bound address for bind,
+receive and local address, and the peer for send. No new `IOError`
+constructor is added.
+
+**Native refusal.** A native build of a program that uses a datagram
+operation fails at build time with the existing refusal: `N0001`,
+`LoweringCause::Fragment`, reason
+`effect <owner>::FSOp.<decimal code> is a represented unavailable lane`,
+where the code is one of 1800–1803. Which of the four is reached first is
+incidental to source order. The four operations are absent from the native
+host-effect consumer roster, the native ABI refuses them at run time, and
+its request decoder has no arm for them; no datagram code is emitted. A
+stream-only program still builds and runs natively. No new kernel rule or
+trusted postulate is authorized.
 
 ### 1.14 Bracketed directory batches (ABI-S2)
 

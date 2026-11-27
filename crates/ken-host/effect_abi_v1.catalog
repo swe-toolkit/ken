@@ -25,6 +25,7 @@ tag|reply.read_progress|7
 tag|reply.write_progress|8
 tag|reply.child_exit|9
 tag|reply.socket_address|10
+tag|reply.datagram_receipt|11
 error|resource.Closed|0
 error|resource.MalformedResource|1
 error|resource.RightNotHeld|2
@@ -45,6 +46,7 @@ tag|resource_kind.PipeRead|5
 tag|resource_kind.PipeWrite|6
 tag|resource_kind.SocketListener|7
 tag|resource_kind.SocketStream|8
+tag|resource_kind.SocketDatagram|9
 tag|socket_family.inet4|0
 tag|socket_family.inet6|1
 tag|socket_family.unix|2
@@ -126,3 +128,7 @@ operation|NetReceive|0704|native|NetReceiveRequestV1|4|HostReplyV1|1
 operation|NetSend|0705|native|NetSendRequestV1|5|HostReplyV1|1
 operation|NetShutdown|0706|native|NetShutdownRequestV1|2|HostReplyV1|1
 operation|NetLocalAddress|0707|native|NetLocalAddressRequestV1|1|HostReplyV1|1
+operation|NetDatagramBind|0708|unavailable|NetDatagramBindRequestV1|2|HostReplyV1|1
+operation|NetDatagramSendTo|0709|unavailable|NetDatagramSendToRequestV1|6|HostReplyV1|1
+operation|NetDatagramReceiveFrom|070A|unavailable|NetDatagramReceiveFromRequestV1|4|HostReplyV1|1
+operation|NetDatagramLocalAddress|070B|unavailable|NetLocalAddressRequestV1|1|HostReplyV1|1

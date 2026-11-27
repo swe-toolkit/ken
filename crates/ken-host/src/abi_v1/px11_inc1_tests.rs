@@ -31,6 +31,9 @@ fn px11_native_net_layout_matches_c_and_stream_offsets_pairwise() {
     record!(NetSendRequestV1; stream, buffer, buffer_start, length, span_origin);
     record!(NetShutdownRequestV1; stream, how);
     record!(NetLocalAddressRequestV1; target);
+    record!(NetDatagramBindRequestV1; capability, address);
+    record!(NetDatagramSendToRequestV1; socket, buffer, buffer_start, length, span_origin, peer);
+    record!(NetDatagramReceiveFromRequestV1; socket, buffer, buffer_start, length);
     for field in ["stream", "buffer", "buffer_start", "length"] {
         assert_eq!(
             fact(&format!("OFFSET_NetReceiveRequestV1_{field}")),
@@ -339,6 +342,68 @@ fn px11_native_net_request_decode_known_answers_and_malformed_addresses() {
             "{op:?} is native tested"
         );
     }
+}
+
+/// Promise class: durable invariant. MEASURED: each of the four datagram
+/// operations is RepresentedUnavailable, `require_native_operation_v1`
+/// refuses it, and a well-sized, aligned record for it decodes to the
+/// default `Err(-3)`; the catalog marks each row `unavailable` with the
+/// datagram receipt and kind tags 11 and 9. CLAIMED: the native ABI keeps
+/// refusing datagram requests at run time. THE GAP: build-time refusal is
+/// measured by the CLI suite; this row is the run-time second guard.
+#[test]
+fn px11_native_abi_refuses_every_datagram_operation_at_run_time() {
+    let unix = b"/tmp/px11-datagram";
+    let address = SocketAddressRecordV1 {
+        family: 2,
+        bytes: SliceV1 { data: unix.as_ptr(), len: unix.len() },
+        port: 0,
+    };
+    let peer = SocketAddressRecordV1 {
+        family: 2,
+        bytes: SliceV1 { data: unix.as_ptr(), len: unix.len() },
+        port: 0,
+    };
+    let socket = 0x0000_0004_0000_0005;
+    let buffer = 0x0000_0008_0000_0009;
+    let decoded = [
+        unsafe { decode(HostOpV1::NetDatagramBind, &NetDatagramBindRequestV1 { capability: 3, address }) }.err(),
+        unsafe {
+            decode(HostOpV1::NetDatagramSendTo, &NetDatagramSendToRequestV1 {
+                socket, buffer, buffer_start: 0, length: 1, span_origin: buffer, peer,
+            })
+        }
+        .err(),
+        unsafe {
+            decode(HostOpV1::NetDatagramReceiveFrom, &NetDatagramReceiveFromRequestV1 {
+                socket, buffer, buffer_start: 0, length: 1,
+            })
+        }
+        .err(),
+        unsafe { decode(HostOpV1::NetDatagramLocalAddress, &NetLocalAddressRequestV1 { target: socket }) }.err(),
+    ];
+    assert_eq!(decoded, [Some(-3); 4]);
+    for (op, name) in [
+        (HostOpV1::NetDatagramBind, "NetDatagramBind"),
+        (HostOpV1::NetDatagramSendTo, "NetDatagramSendTo"),
+        (HostOpV1::NetDatagramReceiveFrom, "NetDatagramReceiveFrom"),
+        (HostOpV1::NetDatagramLocalAddress, "NetDatagramLocalAddress"),
+    ] {
+        assert_eq!(op.availability(), crate::HostOpAvailabilityV1::RepresentedUnavailable);
+        assert!(require_native_operation_v1(op).is_err(), "{op:?} is refused natively");
+        let row = crate::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == op as u16)
+            .unwrap_or_else(|| panic!("{op:?} has a catalog row"));
+        assert_eq!((row.0, row.2), (name, "unavailable"));
+    }
+    let binding = |name: &str| {
+        crate::HOST_EFFECT_ABI_V1_BINDINGS
+            .iter()
+            .find_map(|(kind, binding, value)| (*kind == "tag" && *binding == name).then_some(*value))
+    };
+    assert_eq!(binding("reply.datagram_receipt"), Some(REPLY_DATAGRAM_RECEIPT));
+    assert_eq!(binding("resource_kind.SocketDatagram"), Some(9));
 }
 
 /// Promise class: normative compatibility vector. MEASURED: reply tag,

@@ -1,0 +1,430 @@
+program capabilities FS AFull, Net Loopback Unix, RootExecution Allow
+
+import Capability.Net.Datagram
+  (SocketAddress,
+    socket_ipv4,
+    socket_ipv6,
+    socket_unix_path,
+    DatagramFit,
+    DatagramReceipt,
+    with_datagram_socket,
+    send_datagram,
+    receive_datagram,
+    datagram_local_address)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+
+import Capability.System.IO (readAt, spanBytes)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk,
+    withBuffer,
+    withResource)
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+const address4 : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      (127 : UInt8)
+      (VCons
+        UInt8
+        (Suc (Suc Zero))
+        (0 : UInt8)
+        (VCons UInt8 (Suc Zero) (0 : UInt8) (VCons UInt8 Zero (1 : UInt8) (VNil UInt8)))))
+    (0 : UInt16)
+
+fn loopback_tail (n : Nat) : Vec UInt8 (Suc n) =
+  match n {
+    Zero ↦ VCons UInt8 Zero (1 : UInt8) (VNil UInt8);
+    Suc rest ↦ VCons UInt8 (Suc rest) (0 : UInt8) (loopback_tail rest)
+  }
+
+const address6 : SocketAddress =
+  socket_ipv6
+    (loopback_tail
+      (Suc
+        (Suc
+          (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))))))
+    (0 : UInt16)
+
+fn first_byte_is (selector : Bytes) (code : Int) : Bool =
+  match bytes_at selector (0 : Int) {
+    None ↦ False;
+    Some first ↦ eq_int (uint8_to_int first) code
+  }
+
+-- Selector "4", "6" or "t" (IPv4 truncation) binds both sockets to a
+-- loopback port zero; anything else binds the two Unix paths.
+fn select_address (selector : Bytes) (unix_path : Bytes) : Result IOError SocketAddress =
+  match first_byte_is selector (52 : Int) {
+    True ↦ Ok IOError SocketAddress address4;
+    False ↦
+      match first_byte_is selector (116 : Int) {
+        True ↦ Ok IOError SocketAddress address4;
+        False ↦
+          match first_byte_is selector (54 : Int) {
+            True ↦ Ok IOError SocketAddress address6;
+            False ↦ socket_unix_path unix_path
+          }
+      }
+  }
+
+-- The receive window: the whole seven-byte payload fits a window of 16, and
+-- the truncation row receives it into a window of 6.
+fn receive_window (selector : Bytes) : Int =
+  match first_byte_is selector (116 : Int) {
+    True ↦ 6 : Int;
+    False ↦ 16 : Int
+  }
+
+const failed_at : UInt8 -> HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  λcode. host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit code)
+
+const passed : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyOk UInt8 Unit MkUnit)
+
+fn octets_equal (left : List UInt8) (right : List UInt8) : Bool =
+  match left {
+    Nil ↦
+      match right {
+        Nil ↦ True;
+        Cons _ _ ↦ False
+      };
+    Cons first rest ↦
+      match right {
+        Nil ↦ False;
+        Cons second remaining ↦
+          match eq_int (uint8_to_int first) (uint8_to_int second) {
+            False ↦ False;
+            True ↦ octets_equal rest remaining
+          }
+      }
+  }
+
+fn bytes_equal (left : Bytes) (right : Bytes) : Bool =
+  octets_equal (bytes_to_list left) (bytes_to_list right)
+
+-- The delivered prefix: all seven payload bytes, or the first six when the
+-- datagram was truncated into a window of six.
+fn expected_prefix (selector : Bytes) : Bytes =
+  match first_byte_is selector (116 : Int) {
+    True ↦ bytes_encode "PX11ok";
+    False ↦ bytes_encode "PX11ok!"
+  }
+
+fn fit_matches (selector : Bytes) (fit : DatagramFit) : Bool =
+  match fit {
+    DatagramFit.WholeDatagram ↦
+      match first_byte_is selector (116 : Int) {
+        True ↦ False;
+        False ↦ True
+      };
+    DatagramFit.TruncatedDatagram ↦ first_byte_is selector (116 : Int)
+  }
+
+fn whole_from_some (fit : DatagramFit) (sender : Option SocketAddress) : Bool =
+  match fit {
+    DatagramFit.WholeDatagram ↦
+      match sender {
+        None ↦ False;
+        Some _ ↦ True
+      };
+    DatagramFit.TruncatedDatagram ↦ False
+  }
+
+-- The reply proves the reported sender routes to the sending socket: the
+-- receiver sends back to it, and the sender must receive that datagram.
+proc check_reply
+      (sender : Resource ResourceKind.SocketDatagram) (buffer : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError DatagramReceipt)
+    (ResourceBodyResult UInt8 Unit)
+    (receive_datagram AFull sender buffer (MkBufferWindow (0 : Int) (16 : Int)))
+    (λreply.
+      match reply {
+        Err _ ↦ failed_at (61 : UInt8);
+        Ok receipt ↦
+          match receipt {
+            DatagramReceipt.EmptyDatagram _ ↦ failed_at (62 : UInt8);
+            DatagramReceipt.ReceivedDatagram _ _ fit sender ↦
+              match whole_from_some fit sender {
+                True ↦ passed;
+                False ↦ failed_at (63 : UInt8)
+              }
+          }
+      })
+
+proc check_received
+      (selector : Bytes)
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (sender : Resource ResourceKind.SocketDatagram)
+      (buffer : BufferHandle)
+      (span : BufferSpan)
+      (fit : DatagramFit)
+      (from : SocketAddress)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  match fit_matches selector fit {
+    False ↦ failed_at (54 : UInt8);
+    True ↦
+      host_bind
+        AFull
+        (Result ResourceError Bytes)
+        (ResourceBodyResult UInt8 Unit)
+        (spanBytes AFull buffer span)
+        (λfrozen.
+          match frozen {
+            Err _ ↦ failed_at (55 : UInt8);
+            Ok delivered ↦
+              match bytes_equal delivered (expected_prefix selector) {
+                False ↦ failed_at (56 : UInt8);
+                True ↦
+                  host_bind
+                    AFull
+                    (Result ResourceError Unit)
+                    (ResourceBodyResult UInt8 Unit)
+                    (send_datagram AFull receiver from buffer span)
+                    (λreplied.
+                      match replied {
+                        Err _ ↦ failed_at (57 : UInt8);
+                        Ok _ ↦ check_reply sender buffer
+                      })
+              }
+          })
+  }
+
+proc receive_body
+      (selector : Bytes)
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (sender : Resource ResourceKind.SocketDatagram)
+      (incoming : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError DatagramReceipt)
+    (ResourceBodyResult UInt8 Unit)
+    (receive_datagram
+      AFull
+      receiver
+      incoming
+      (MkBufferWindow (0 : Int) (receive_window selector)))
+    (λreceived.
+      match received {
+        Err _ ↦ failed_at (50 : UInt8);
+        Ok receipt ↦
+          match receipt {
+            DatagramReceipt.EmptyDatagram _ ↦ failed_at (51 : UInt8);
+            DatagramReceipt.ReceivedDatagram span _ fit reported ↦
+              match reported {
+                None ↦ failed_at (52 : UInt8);
+                Some from ↦ check_received selector receiver sender incoming span fit from
+              }
+          }
+      })
+
+proc sender_body
+      (selector : Bytes)
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (receiver_address : SocketAddress)
+      (payload : BufferHandle)
+      (payload_span : BufferSpan)
+      (sender : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError Unit)
+    (ResourceBodyResult UInt8 Unit)
+    (send_datagram AFull sender receiver_address payload payload_span)
+    (λsent.
+      match sent {
+        Err _ ↦ failed_at (45 : UInt8);
+        Ok _ ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (withBuffer AFull UInt8 Unit (16 : Int) (receive_body selector receiver sender))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+                Ok _ ↦ failed_at (46 : UInt8);
+                Err _ ↦ failed_at (47 : UInt8)
+              })
+      })
+
+proc receiver_body
+      (cap : Cap AFull)
+      (selector : Bytes)
+      (sender_address : SocketAddress)
+      (payload : BufferHandle)
+      (payload_span : BufferSpan)
+      (receiver : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult UInt8 Unit)
+    (datagram_local_address AFull receiver)
+    (λlocal.
+      match local {
+        Err _ ↦ failed_at (40 : UInt8);
+        Ok receiver_address ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_datagram_socket
+              AFull
+              UInt8
+              Unit
+              cap
+              sender_address
+              (sender_body selector receiver receiver_address payload payload_span))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+                Ok _ ↦ failed_at (41 : UInt8);
+                Err _ ↦ failed_at (42 : UInt8)
+              })
+      })
+
+proc buffer_body
+      (cap : Cap AFull)
+      (selector : Bytes)
+      (receiver_address : SocketAddress)
+      (sender_address : SocketAddress)
+      (file : Resource ResourceKind.FsHandle)
+      (payload : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (ResourceBodyResult UInt8 Unit)
+    (readAt AFull file (0 : Int) payload (MkBufferWindow (0 : Int) (7 : Int)))
+    (λread_result.
+      match read_result {
+        Err _ ↦ failed_at (30 : UInt8);
+        Ok ReadProgress.ReadEof ↦ failed_at (31 : UInt8);
+        Ok (ReadProgress.ReadSome span _) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_datagram_socket
+              AFull
+              UInt8
+              Unit
+              cap
+              receiver_address
+              (receiver_body cap selector sender_address payload span))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+                Ok _ ↦ failed_at (32 : UInt8);
+                Err _ ↦ failed_at (33 : UInt8)
+              })
+      })
+
+proc file_body
+      (cap : Cap AFull)
+      (selector : Bytes)
+      (receiver_address : SocketAddress)
+      (sender_address : SocketAddress)
+      (file : Resource ResourceKind.FsHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (withBuffer
+      AFull
+      UInt8
+      Unit
+      (16 : Int)
+      (buffer_body cap selector receiver_address sender_address file))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ passed;
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+        Ok _ ↦ failed_at (21 : UInt8);
+        Err _ ↦ failed_at (22 : UInt8)
+      })
+
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
+fn exit_for (outcome : Result FileError (ResourceBracketResult UInt8 Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ ExitCode.Failure code;
+    Ok _ ↦ ExitCode.Failure 71;
+    Err _ ↦ ExitCode.Failure 72
+  }
+
+-- Arguments are read from the end: selector, receiver path, sender path.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match reversed_arguments arguments (Nil Bytes) {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons sender_path rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons receiver_path rest_two ↦
+              match rest_two {
+                Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+                Cons selector _ ↦
+                  match select_address selector receiver_path {
+                    Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+                    Ok receiver_address ↦
+                      match select_address selector sender_path {
+                        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 77);
+                        Ok sender_address ↦
+                          match caps {
+                            ProgramCaps.MkProgramCaps cap ↦
+                              host_bind
+                                AFull
+                                (Result FileError (ResourceBracketResult UInt8 Unit))
+                                ExitCode
+                                (withResource
+                                  AFull
+                                  UInt8
+                                  Unit
+                                  cap
+                                  (bytes_encode "px11-payload.bin")
+                                  ResourceOpenMode.ResourceRead
+                                  (file_body cap selector receiver_address sender_address))
+                                (λoutcome. host_pure AFull ExitCode (exit_for outcome))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }

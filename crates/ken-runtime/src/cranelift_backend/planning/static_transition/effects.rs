@@ -583,6 +583,12 @@ fn host_effect_seat_contract(
                 | Op::NetAccept
                 | Op::NetReceive | Op::NetSend | Op::NetShutdown
                 | Op::NetLocalAddress => None,
+                // PX11-DATAGRAM-SOCKETS: RepresentedUnavailable, no native
+                // seat. Native lowering refuses them before any seat exists.
+                Op::NetDatagramBind
+                | Op::NetDatagramSendTo
+                | Op::NetDatagramReceiveFrom
+                | Op::NetDatagramLocalAddress => None,
             };
         }
         EffectSeatSlot::Argument(ordinal) => ordinal,
@@ -820,7 +826,12 @@ fn host_effect_seat_contract(
             | Op::NetReceive
             | Op::NetSend
             | Op::NetShutdown
-            | Op::NetLocalAddress,
+            | Op::NetLocalAddress
+            // PX11-DATAGRAM-SOCKETS: no native seat; see the capability arm.
+            | Op::NetDatagramBind
+            | Op::NetDatagramSendTo
+            | Op::NetDatagramReceiveFrom
+            | Op::NetDatagramLocalAddress,
             _,
         ) => None,
     }

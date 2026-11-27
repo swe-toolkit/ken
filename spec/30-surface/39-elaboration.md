@@ -131,10 +131,11 @@ The loader proceeds as follows:
    `ResourceKind.Buffer`, `ResourceKind.Mapping`,
    `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
    `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
-   `ResourceKind.SocketListener`, and `ResourceKind.SocketStream` use its exact
-   parent; their bare spellings are not reserved. `ExitCode.Success` and
-   `ExitCode.Failure` are scoped; `ProgramCaps.MkProgramCaps` is scoped
-   but remains runner-minted and is not made public by qualification.
+   `ResourceKind.SocketListener`, `ResourceKind.SocketStream`, and
+   `ResourceKind.SocketDatagram` use its exact parent; their bare spellings
+   are not reserved. `ExitCode.Success` and `ExitCode.Failure` are scoped;
+   `ProgramCaps.MkProgramCaps` is scoped but remains runner-minted and is not
+   made public by qualification.
    `Coproduct.InL`, `Coproduct.InR`, `Instant.MkInstant`, `ITree.Ret`, and
    `ITree.Vis` use their exact scoped identities, not bare B names.
    `MonotonicInstant.MkMonotonicInstant` and `Deadline.MkDeadline` likewise

@@ -4369,6 +4369,10 @@ fn checked_host_operation_pairs(
         (prelude.px11_op_ids[4], ken_host::HostOpV1::NetSend),
         (prelude.px11_op_ids[5], ken_host::HostOpV1::NetShutdown),
         (prelude.px11_op_ids[6], ken_host::HostOpV1::NetLocalAddress),
+        (prelude.px11_op_ids[7], ken_host::HostOpV1::NetDatagramBind),
+        (prelude.px11_op_ids[8], ken_host::HostOpV1::NetDatagramSendTo),
+        (prelude.px11_op_ids[9], ken_host::HostOpV1::NetDatagramReceiveFrom),
+        (prelude.px11_op_ids[10], ken_host::HostOpV1::NetDatagramLocalAddress),
     ]
     .into_iter()
 }
@@ -4420,6 +4424,7 @@ fn checked_host_spine_v1(
                 PipeWrite => prelude.px10_kind_ids[3],
                 SocketListener => prelude.px11_kind_ids[0],
                 SocketStream => prelude.px11_kind_ids[1],
+                SocketDatagram => prelude.px11_kind_ids[2],
             })
         })
         .collect::<Result<Vec<_>, _>>()?
@@ -5017,8 +5022,9 @@ mod native_pre_source_stable_symbols {
     }
 
     /// Promise class: durable invariant. MEASURED: every emitted Net effect
-    /// in the public-wrapper fixture retains the checked semantic arity and
-    /// has a capability exactly for listen/connect. CLAIMED: erasure splits
+    /// in the public-wrapper fixture, the four datagram operations included,
+    /// retains the checked semantic arity and has a capability exactly for
+    /// listen, connect and datagram bind. CLAIMED: erasure splits
     /// the right operands. THE GAP: this does not exercise object emission;
     /// the default test-thread stack overflowed during native preparation,
     /// before any operand assertion (no finer frame was sampled).
@@ -5132,12 +5138,15 @@ mod native_pre_source_stable_symbols {
         let expected = checked_host_operation_pairs(&env.prelude_env)
             .filter_map(|(id, op)| {
                 let has_cap = match op {
-                    Op::NetListen | Op::NetConnect => true,
+                    Op::NetListen | Op::NetConnect | Op::NetDatagramBind => true,
                     Op::NetAccept
                     | Op::NetReceive
                     | Op::NetSend
                     | Op::NetShutdown
-                    | Op::NetLocalAddress => false,
+                    | Op::NetLocalAddress
+                    | Op::NetDatagramSendTo
+                    | Op::NetDatagramReceiveFrom
+                    | Op::NetDatagramLocalAddress => false,
                     _ => return None,
                 };
                 let (family, index) = env.env.constructor(id).expect("checked Net constructor");
@@ -5153,6 +5162,10 @@ mod native_pre_source_stable_symbols {
             Op::NetSend,
             Op::NetShutdown,
             Op::NetLocalAddress,
+            Op::NetDatagramBind,
+            Op::NetDatagramSendTo,
+            Op::NetDatagramReceiveFrom,
+            Op::NetDatagramLocalAddress,
         ]
         .map(|op| op as u16);
         let mut seen = BTreeSet::new();
