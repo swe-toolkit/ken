@@ -1858,7 +1858,12 @@ impl<'a> Lowering<'a> {
                 "  UNIT-RESULT transfer origin={origin:?} value={}",
                 lowered_value_kind(value)
             ));
+            // Only the root's result is the process answer. Terminal result
+            // origins are selected for the root unit alone, so in any other unit
+            // an exit-shaped result stays an ordinary carried constructor and the
+            // root decodes it.
             let process_exit = self.process_object
+                && self.function_local.terminal_result_origins.contains(&origin)
                 && matches!(
                     value,
                     Lowered::Constructor { constructor, .. }
