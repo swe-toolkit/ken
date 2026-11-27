@@ -168,6 +168,17 @@ falls back to the interpreter could not pass. 2 fired. The native
 refusal has two planes, the plan gate and the wire layout, and the frame
 removes the first and requires the second to lower.
 
+## Known native-planner limits, out of scope
+
+Recorded so a later WP does not rediscover them as new walls (Architect
+`evt_15q6qwa3yyh67`, found while withdrawing AC-16-3):
+
+- a returned-Vis "unknown endpoint" under curried unfolding;
+- "no derivable successor response row".
+
+No small reaching shape below these limits produced the AC-16-3 row, so
+AC-16-2(a) and (b), the exchange mutation witness, replace it.
+
 ## Inc2 symptom inventory
 
 ```text
