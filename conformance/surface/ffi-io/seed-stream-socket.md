@@ -714,17 +714,15 @@ on candidate `61e05cfbb1bd115cf58b3b36d6a07cf834f98a20`). The durable
 
 - promise class: durable invariant.
 - spec: §1.13 native boundary and `45 §4` checked host entrypoint.
-- given: use the same checked Net-free body, FS authority and resource
-  profile as the declaration-only negative above, in a fresh output
-  directory. The only program difference is the absence of `Net Loopback`
-  in its capability header. Its main returns
-  a known ground exit result without a socket effect.
+- given: use a checked program with a `Net`-free capability header, an FS
+  authority and a resource profile. Its main returns a known ground exit
+  result without a socket effect. Build it in a fresh output directory.
 - expect: native build succeeds, emits a runnable artifact and its invocation
   returns the known exit result. It does not merely fail with a different
   diagnostic. Interpreter execution of that same source gives the same
   result.
-- why: rejecting every native build satisfies a negative-only refusal case;
-  this paired positive case would reject such an implementation.
+- why: this positive case requires a Net-free native build to produce and
+  execute a working artifact; blanket native-build rejection would fail it.
 
 Clean-room provenance: no external references were consulted. This amendment
 is grounded in §1.13, the settled AC-0 ruling and first-principles behavior.
