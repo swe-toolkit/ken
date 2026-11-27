@@ -84,14 +84,32 @@ used in these rows.
 ### surface/ffi-io/datagram-send-payload-bound
 
 - promise class: normative compatibility vector — the 65507-byte payload
-  maximum for every family.
+  maximum, for each family separately.
 - spec: §1.13.1 send payload bound.
-- given: on a bound IPv4 loopback socket with a buffer of capacity 65508,
-  request a send of an effective span of 65508 bytes, and separately of
-  65507 bytes with every byte initialized.
-- expect: the 65508-byte request returns `ResourceHostIO IOError.InvalidInput`
-  with no send syscall; the 65507-byte request is admitted past the bound.
-- why: the bound is exact, not off by one, and applies before any syscall.
+- given: under `Net Loopback`, run the case once for each family: IPv4
+  receiver and sender both bound at `127.0.0.1` port 0; IPv6 receiver and
+  sender both bound at `::1` port 0; Unix receiver `R/max-receiver.sock` and
+  sender `R/max-sender.sock`. Read the receiver's address with
+  `datagram_local_address`. Use a buffer of capacity 65508 whose every byte is
+  initialized, byte `i` being `i mod 251`. From the sender, first request a
+  send of the effective span of all 65508 bytes to the receiver, then a send
+  of the effective span of its first 65507 bytes. Then call
+  `receive_datagram` on the receiver with a window of 65508. Record backend
+  send calls. The harness bounds the receive with a timeout.
+- expect, per family: the 65508-byte request returns
+  `ResourceHostIO IOError.InvalidInput` with zero backend send calls. The
+  65507-byte request returns `Ok Unit` with exactly one backend send call.
+  The receive completes, and its first receipt is `ReceivedDatagram` with a
+  `TransferCount` of 65507 of an effective 65508, `WholeDatagram`, exactly
+  the first 65507 bytes of the buffer, and `Some` sender equal to the
+  sender's own local address.
+- control: a family whose maximum is too high delivers the 65508-byte
+  datagram first, so the first receipt has a count of 65508 and fails this
+  case. A family whose maximum is too low refuses the 65507-byte send, and the
+  receive does not complete within the timeout, which also fails this case.
+- why: the bound is exact, not off by one, applies to every family, and is
+  enforced before any syscall. The accepted maximum is observed as a
+  delivered datagram, not only as a request that passes the bound check.
 
 ### surface/ffi-io/datagram-empty-span-and-zero-window-are-invalid-bounds
 
