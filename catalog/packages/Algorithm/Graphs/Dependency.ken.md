@@ -649,6 +649,35 @@ pub theorem graph_union_reachable_idem
         (graph_reachable q fq g s target) =
   graph_union_reachable_absorb q fq g g s target (λu. λv. λpresent. present)
 
+pub const graph_edgeless (q : Type) : Graph q = MkGraph q (λs. λt. False)
+
+pub theorem graph_reachable_edgeless
+      (q : Type) (fq : Finite q) (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq (graph_edgeless q) s target) (target s) =
+  bool_eq_from_iff
+    (graph_reachable q fq (graph_edgeless q) s target)
+    (target s)
+    (λreach.
+      let witness =
+        require_some
+          (ReachWitness q (graph_edgeless q) s target)
+          (graph_find_walk q fq (graph_edgeless q) s target)
+          (graph_find_walk_some q fq (graph_edgeless q) s target reach)
+      in
+        match witness {
+          MkReach t hit walk ↦ edgeless_walk_start q s t target walk hit
+        })
+    (λhit.
+      graph_reachable_complete
+        q
+        fq
+        (graph_edgeless q)
+        s
+        s
+        target
+        (WalkHere q (graph_edgeless q) s)
+        hit)
+
 pub fn contains (q : Type) (d : DecEq q) (x : q) (xs : List q) : Bool =
   match xs {
     Nil ↦ False;
@@ -1058,7 +1087,9 @@ A finite certificate need not have unique entries. For Boolean vertices,
 compares them. An edge from `True` to `False` makes the latter reachable from
 the former, without making the reverse direction reachable. An order or a
 cycle is chosen by the checked dependency operation, never by reading an
-unchecked list as a path.
+unchecked list as a path. `graph_edgeless q` keeps the vertices of `q` but
+has no edges. Predicate reachability on it tests only the start vertex,
+which is reachable by an empty walk.
 
 ```ken example
 import Data.Finite.Finite (bool_finite)
@@ -1161,6 +1192,17 @@ from the union back to `g`: the private `graph_union_edge_absorb` splits a
 union edge with `graph_union_edge_cases`, keeps a `g` edge as it is, and sends
 an `h` edge through the edge-inclusion premise. `graph_union_reachable_idem`
 is that law at `h := g`, with the identity inclusion.
+
+`graph_reachable_edgeless` extracts a witness with the private `require_some`.
+The private `edgeless_walk_start` eliminates each `WalkStep` directly with
+`absurd`: its edge proof reduces to `Equal Bool False True`. No induction
+is needed. In the `WalkHere` case, the matched walk refines the endpoint
+in the hit implication to the start. Completeness at `WalkHere` gives the
+converse, and `bool_eq_from_iff` joins the two directions. The named
+`graph_edgeless` constant lets the law type refer to the graph without a
+lambda in the type; a client graph with the same body works by conversion.
+Since every edge query on `graph_edgeless` reduces to `False`, it is the
+least graph under edge inclusion and needs no separate public edge law.
 
 For successor lists, `contains` over `list_append` is the `bool_or` of
 membership in the two inputs. Private `contains_append` inducts on the first
@@ -1654,6 +1696,14 @@ theorem graph_union_edge_absorb
       Inl from_g ↦ from_g;
       Inr from_h ↦ included u v from_h
     }
+
+theorem edgeless_walk_start
+      (q : Type) (s : q) (t : q) (target : q → Bool) (walk : Walk q (graph_edgeless q) s t)
+    : Equal Bool (target t) True → Equal Bool (target s) True =
+  match walk {
+    WalkHere ↦ λhit. hit;
+    WalkStep u v e prefix ↦ λhit. absurd e
+  }
 
 theorem bool_eq_from_iff
       (b : Bool)
@@ -3478,7 +3528,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–22](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–23](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3516,8 +3566,13 @@ checks that an appended successor list has the union's edge, in both operand
 orders, and that neither operand alone supplies the missing edge. The §21
 [seed](../../../../conformance/stdlib/graphs/seed-topo-order-reverse.md)
 checks the reversed vertex list on a one-way edge and refuses the original
-list in the same proof form. The public API exports six data families (`Graph`, `Walk`, `Cycle`, `ReachWitness`,
-`TopoOrder`, `OrderOrCycle`) and eight
+list in the same proof form. The [§23 seed][edgeless-seed] is authored, not
+officially conformance-run. It distinguishes an edgeless graph from a complete
+graph on the same vertices and checks a start that already satisfies the
+target.
+
+The public API exports six data families (`Graph`, `Walk`, `Cycle`,
+`ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
 constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `MkTopoOrder`, `HasOrder`, `HasCycle`). Its twenty functions are `edge`,
 `walk_append`, `graph_reachable`, `graph_find_walk`, `graph_reverse`,
@@ -3525,9 +3580,10 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `topo_order_reverse`, `topo_order_union`,
 `dependency_order_or_cycle`, `graph_from_successors`, and `successors_append`.
-Thirty-eight kernel-checked theorems expose their laws, including the
-appended-list edge equation, `topo_order_reverse_vertices`, and
-`topo_order_union_vertices`. Every other helper is private to this package.
+Its one public constant is `graph_edgeless`. Thirty-nine kernel-checked
+theorems expose the laws, including the appended-list edge equation,
+`topo_order_reverse_vertices`, `topo_order_union_vertices`, and
+`graph_reachable_edgeless`. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -3579,6 +3635,11 @@ without graph reversal,
 and confirms the one-direction helper remains private. The successor-append
 package test checks the open edge law, both operand orders and independent edge
 values, refuses each operand-alone claim on a fresh accepted prefix, compares
-exact trusted identities and keeps both proof helpers private. These package
+exact trusted identities and keeps both proof helpers private. The edgeless
+reachability package test checks the generic law and closed clients, refuses
+the complete graph's result on the edgeless graph, and checks trusted
+identity equality and the private helper's import boundary. These package
 tests do not stand in for official conformance-runner execution or CI, and do
 not establish execution of the §2 seed.
+
+[edgeless-seed]: ../../../../conformance/stdlib/graphs/seed-reachability-edgeless.md
