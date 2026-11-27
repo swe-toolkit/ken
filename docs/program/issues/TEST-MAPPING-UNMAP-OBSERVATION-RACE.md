@@ -1,7 +1,7 @@
 ---
 id: TEST-MAPPING-UNMAP-OBSERVATION-RACE
 title: "consumed_mapping_is_actually_unmapped unmaps a page and then asserts that mincore on the freed address fails with ENOMEM, but libtest runs tests on parallel threads and any concurrent mmap can be handed the freed page first, so the row reddens with no product change. Make the observation race-free, so it proves the range was released rather than that nobody reused it"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T2

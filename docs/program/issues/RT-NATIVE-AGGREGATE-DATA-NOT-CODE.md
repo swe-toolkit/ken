@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-AGGREGATE-DATA-NOT-CODE
 title: "Native lowering transfers a run-time-selected value into a carrier with an inline case split over the whole alternative tree of the value's type, at every transfer site, so per-site code grows with the type's width. PX11 Inc2's exchange reaches one function, u2:59, of about 1.49M instructions, in which carrier allocation and transfer are 75% of the values, and Cranelift refuses it as CodeTooLarge. Emit a transfer whose static template contains a run-time selection once, as an out-of-line helper per (owner, seat, template), and call it from every site"
-status: ready
+status: merged
 owner: runtime
 size: L
 tier: T1
