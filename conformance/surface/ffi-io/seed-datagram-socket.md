@@ -86,10 +86,14 @@ used in these rows.
 - promise class: normative compatibility vector — the 65507-byte payload
   maximum, for each family separately.
 - spec: §1.13.1 send payload bound.
-- given: under `Net Loopback`, run the case once for each family: IPv4
-  receiver and sender both bound at `127.0.0.1` port 0; IPv6 receiver and
-  sender both bound at `::1` port 0; Unix receiver `R/max-receiver.sock` and
-  sender `R/max-sender.sock`. Read the receiver's address with
+- given: run the case once for each family, each under authority that
+  admits its bind: IPv4 receiver and sender both bound at `127.0.0.1` port 0
+  under `Net Loopback`; IPv6 receiver and sender both bound at `::1` port 0
+  under `Net Loopback`; Unix receiver `R/max-receiver.sock` and sender
+  `R/max-sender.sock` under `Net Unix` with the default `FS AFull` root `R`
+  of the Unix fixture above. Both binds of each family must acquire
+  `ResourceKind.SocketDatagram`; a refused bind fails the case rather than
+  reaching the payload oracle. Read the receiver's address with
   `datagram_local_address`. Use a buffer of capacity 65508 whose every byte is
   initialized, byte `i` being `i mod 251`. From the sender, first request a
   send of the effective span of all 65508 bytes to the receiver, then a send
