@@ -3274,7 +3274,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 unit_bundle,
                 call_edges,
             )?;
-            let root_result = super::units::define_unit_bodies(
+            let (root_result, unit_result_proofs) = super::units::define_unit_bodies(
                 &mut module,
                 &mut compiler,
                 helpers,
@@ -3359,6 +3359,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 )));
             }
             staged_result_bodies.extend(staged_response_owners);
+            staged_result_bodies.extend(unit_result_proofs);
             super::units::close_and_define_staged_result_bodies(
                 &mut module,
                 helpers,
