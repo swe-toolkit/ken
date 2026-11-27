@@ -1994,3 +1994,53 @@ unchanged list from the union order. Reversing only `h`'s edge makes
 refuses before the transfer is used. That refusal tests the premise,
 not the transfer itself; the open client distinguishes the stated type
 from one that wrongly asks for forwardness over the whole union.
+
+## 23. In an edgeless graph only the start is reachable
+
+`Algorithm.Graphs.Dependency` must export these Transparent checked
+public declarations in the order shown, immediately after
+`graph_union_reachable_idem` and before `contains`:
+
+```ken
+pub const graph_edgeless (q : Type) : Graph q = MkGraph q (λs. λt. False)
+
+pub theorem graph_reachable_edgeless
+      (q : Type) (fq : Finite q) (s : q) (target : q → Bool)
+    : Equal Bool (graph_reachable q fq (graph_edgeless q) s target) (target s)
+```
+
+Beyond the explicit `Finite q` evidence, the law has no premise. It
+equates two Boolean decisions: reachability from `s` in the edgeless
+graph on the left, and the target test `target s` on the right. The
+carrier is still `q`; an edgeless graph need not have an empty vertex
+type. `graph_edgeless q` is the bottom of §7's graph-inclusion order:
+every graph on `q` vacuously includes every edge of `graph_edgeless q`.
+
+As in §20, the surface grammar does not admit the inline lambda in the
+law's type. The named constant supplies the graph argument there. A
+client using `MkGraph q (λu. λv. False)` in a term, or a constant defined
+by that term, can use the law by conversion. No edge-level theorem is
+exported: `edge q (graph_edgeless q) s t` reduces to `False`, even for
+open vertices.
+
+From affirmative reachability, `graph_find_walk_some` and the private
+`require_some` extract a witness. The private `edgeless_walk_start`,
+immediately before `bool_eq_from_iff`, matches on its walk. A `WalkStep`
+requires `Equal Bool False True` after reduction, so `absurd` eliminates
+it without induction. In the `WalkHere` arm the endpoint is `s`, and
+the target evidence is already evidence for `target s`. The target-hit
+implication stays in the match result type so that arm refines it.
+`graph_reachable_complete` at `WalkHere` gives the converse, and the
+private `bool_eq_from_iff` joins the two directions.
+
+The roster through §23 is twenty public functions, thirty-nine public
+theorems and one public constant. No §§1–22 operation or law type changes.
+
+Architect AC-0 (`evt_5ryk30k2kbm54`) checked the body on `0a53d387d` in
+scratch with no new `Axiom` and unchanged exact trusted `GlobalId` sets
+(114 → 114). For Bool vertices and target `is_true v = v`, the complete
+graph reaches a hit from `False`, but the edgeless graph gives `False`.
+The same edgeless law application claiming `True` refuses; starting at
+`True` with a client-defined edgeless graph instead gives `True` by
+conversion. These are scratch results, not assembled AC-T, official
+conformance, CI or landing evidence.
