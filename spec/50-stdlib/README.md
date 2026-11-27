@@ -597,8 +597,8 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–12
-(SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
+**`68-numerical.md`** §§1–24 (DRAFT v0;
+SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
 SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY;
@@ -609,22 +609,35 @@ SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ABSORPTION §8;
 SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-ASSOCIATIVITY §9;
 SPEC-NUMERICAL-INTERVAL-POINT-UNITS §10;
 SPEC-NUMERICAL-INTERVAL-POINT-ZERO-ABSORPTION §11;
-SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12). The §1–2
-`Algorithm.Numeric.RationalInterval` operations, ten checked laws,
-seeds and required Rational monotonicity/min-max exports are present
-on main. Non-negative `Rational` endpoints admit inclusive membership
-and inverted-bounds empty intervals; point, addition and multiplication
-use corresponding endpoints, while hull/intersection use exact min/max
-bounds. Section 3 specifies public endpoint-wise `interval_inside`,
-soundness, reflexivity, addition/multiplication isotonicity, four
+SPEC-NUMERICAL-INTERVAL-CONTAINS-RESPECT §12;
+SPEC-NUMERICAL-INTERVAL-INVERTED-EMPTY §13;
+SPEC-NUMERICAL-INTERVAL-INSIDE-ANTISYMMETRY §14;
+SPEC-NUMERICAL-INTERVAL-WIDTH §15;
+SPEC-NUMERICAL-INTERVAL-WIDTH-INSIDE-MONO §16;
+SPEC-NUMERICAL-INTERVAL-WIDTH-MUL §17;
+SPEC-NUMERICAL-INTERVAL-WIDTH-BOUNDS-DISTANCE §18;
+SPEC-NUMERICAL-INTERVAL-HULL-INTERSECT-IDEMPOTENT §19;
+SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
+SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21;
+SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22;
+SPEC-NUMERICAL-INTERVAL-SPLIT-HULL §23;
+SPEC-NUMERICAL-INTERVAL-ADD-POINT-EXACT §24). The
+`Algorithm.Numeric.RationalInterval` operations and ten checked laws
+of §§1–2, their seeds, and the required Rational monotonicity/min-max
+exports are present on main. Non-negative `Rational` endpoints admit
+inclusive membership and inverted-bounds empty intervals. Point,
+addition and multiplication use corresponding endpoints, while hull
+and intersection use exact min/max bounds. Section 3 specifies public
+endpoint-wise `interval_inside`, soundness, reflexivity,
+addition/multiplication isotonicity, four
 hull/intersection inclusions, and a converse only with a member
 witness. Its nine generic laws and the Boolean operation are present in the
 catalog package with checked bodies. The authored seed at
 `conformance/stdlib/numerical/seed-interval-inclusion.md` runs in targeted
-package acceptance, including its two refused clients. Exact trusted-base
-identity sets remain equal at 114 → 114 on the candidate; the earlier D0
-scratch result by itself did not establish execution, CI or a landed trust
-delta. Inverted empty intervals need not
+package acceptance, including its two refused clients. The §3 candidate's
+targeted test measured equal exact trusted-base identity sets (114 → 114).
+Neither that test nor the earlier scratch D0 establishes official runner
+execution, CI or a landed trust measurement. Inverted empty intervals need not
 pass the endpoint test despite vacuous member-set inclusion. Section 4
 specifies four checked inclusions: each side of the
 left- and right-oriented distributivity pair lies inside the other
@@ -665,8 +678,8 @@ inclusion, including inverted intervals: two new compositional laws
 and two existing-law instances, without structural `Equal Interval`.
 Architect's isolated D0 on `fd2f57557` checked the two generic bodies
 with no new `Axiom` and equal scratch trust identities (114 → 114).
-This assembled candidate adds both §8 checked catalog exports, the
-corrected CV seed and a package-owned test. Architect's D0 remains
+Both §8 checked catalog exports, the corrected CV seed and the
+package-owned test are present on main. Architect's D0 remains
 scratch evidence; reported candidate-local tests and mutations are not
 official conformance-runner execution, CI, publication, landing or
 landed trust. Section 9 specifies four premise-free public laws for
@@ -675,8 +688,8 @@ including inverted intervals, without structural `Equal Interval`.
 The proofs need only existing public interval laws, with no new helper
 or Rational export. Architect's isolated AC-0 on `903b06068` checked
 all four generic proofs without an `Axiom` and with equal scratch
-trusted identities 114 → 114. This assembled candidate has four
-checked §9 catalog exports, a package-owned test and the authored
+trusted identities 114 → 114. Main carries the four §9 checked
+catalog exports, a package-owned test and the authored
 `conformance/stdlib/numerical/seed-interval-hull-intersect-associativity.md`.
 The named `cat_numeric_interval_hull_intersect_associativity` target
 passed 2/2 with reported candidate-local trusted identity sets
@@ -695,12 +708,36 @@ measurement. Section 12 specifies one public membership-respect law:
 law with `interval_point_contains`; it is not a second public export.
 Architect's detached scratch D0 checked the generic law without a new
 `Axiom` and with unchanged trusted identity sets 114 → 114.
-The §12 catalog export and its seed are present with a targeted
-package test. No official
-conformance-runner execution, CI, publication, landing or measured
-landed trust is established for §12. Signed arithmetic, division,
-`Float`, rounding, width and structural hull/intersection equalities
-remain deferred.
+The §12 catalog export, seed and targeted package test are present on
+main. The historical checks do not establish official conformance-runner
+execution or measured landed trust.
+Section 13 remains DRAFT v0 in the Spec: inverted intervals have no
+members, and each endpoint of an ordered interval is a member. All
+three checked laws and their seed are present on main. Section 14
+recovers rational equivalence of corresponding endpoints from mutual
+inclusion. Section 15 defines width by truncated rational subtraction;
+§16 gives monotonicity under inclusion, §17 gives the width formula for
+products of ordered intervals, and §18 bounds directed, truncated
+subtraction of two members by the width. Section 19 gives structural
+idempotence for hull and intersection, not structural equality for
+general regroupings. Section 20 gives equivalence of any two members when the
+width is zero. Section 21 covers each member by one of the two halves
+of a split; §22 divides the width at an in-range split; §23 relates
+reassembly by hull and the original interval through endpoint inclusion.
+The §§13–23 catalog laws, conformance seeds and package-test sources
+are present on main. Their historical D0 and candidate-local checks
+are separate from official conformance execution and landed trust
+measurements.
+Section 24 specifies `interval_add_point_exact`: shifting the interval
+by a point and shifting the tested value by the same amount leaves the
+membership Boolean unchanged. Architect AC-0 checked the theorem in
+scratch with identical trusted `GlobalId` sets (114 → 114). The §24
+catalog export, its package test and the authored seed
+`conformance/stdlib/numerical/seed-interval-add-point-exact.md`
+accompany this section.
+Scratch D0 does not establish assembled AC-T, official conformance, CI
+or landing. Signed arithmetic, division, `Float` and
+rounding remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–13 (SPEC-TIME-EVENT-TRACE-CONTRACT;

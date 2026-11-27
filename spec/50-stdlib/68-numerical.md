@@ -22,7 +22,8 @@
 > SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
 > SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21;
 > SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22;
-> SPEC-NUMERICAL-INTERVAL-SPLIT-HULL §23).** The §1–2 operations,
+> SPEC-NUMERICAL-INTERVAL-SPLIT-HULL §23;
+> SPEC-NUMERICAL-INTERVAL-ADD-POINT-EXACT §24).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -2071,3 +2072,48 @@ conclusion and the exact open-client types check distinct claims.
 Section 23 raises the public theorem count from sixty-one to sixty-three
 and leaves the public function count at nine. No operation or law type
 from §§1–22 changes.
+
+## 24. Adding a point shifts membership exactly
+
+`Algorithm.Numeric.RationalInterval` must export this public Transparent
+checked theorem immediately after `interval_mul_point` and before
+`interval_width_point`:
+
+```ken
+pub theorem interval_add_point_exact
+      (i : Interval) (t : Rational) (x : Rational)
+    : Equal Bool
+        (interval_contains (interval_add i (interval_point t)) (rational_add x t))
+        (interval_contains i x)
+```
+
+Adding `interval_point t` shifts both endpoints by `t`. Testing `x + t`
+in that interval gives the same Boolean as testing `x` in `i`. There is
+no premise on membership or endpoint order. Unlike §1's enclosure law,
+this equality also lets a client infer membership of `x` in `i` from
+membership of `x + t` in the shifted interval.
+
+For `i = MkInterval lo hi`, the proof cancels the common shift in both
+endpoint comparisons. `rational_add_mono` gives preservation of order.
+For reflection of order, `rational_sub_mono` subtracts `t` on both
+sides. Every non-negative rational `a` satisfies `t ≤ a + t`, so
+`add_cancel for rational_sub` and `rational_add_cancel_r` show that
+`(a + t) - t` is rationally equivalent to `a`; `respect for rational_leq`
+then transfers the comparison. The private Boolean equality proof joins
+the two implications, and congruence lifts both comparison equalities
+through `bool_and`. All new helpers stay private. No new `Axiom`, import
+or public Rational export is needed.
+
+Architect AC-0 (`evt_1b1n2fsh3bvws`) checked the body and open client on
+`4af183c60` in scratch, with unchanged exact trusted `GlobalId` sets
+(114 → 114). For `i = [1, 2]` and `t = 1`, the open client transports
+membership of `x + 1` in `[2, 3]` back to membership of `x` in `[1, 2]`.
+The tested enclosure-only term does not close that goal, and the twin
+that omits the shift from the target claim refuses. The closed exclusion
+of `1` from `[2, 3]` computes without the law and is not evidence for the
+converse. These are D0 results, not assembled AC-T, official conformance,
+CI or landing evidence.
+
+Section 24 raises the public theorem count from sixty-three to sixty-four
+and leaves the public function count at nine. No operation or law type
+from §§1–23 changes.
