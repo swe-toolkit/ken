@@ -84,7 +84,8 @@ whose derivation bottoms out in the built-ins (the class + instances are Ken;
 the `Int` instance of `Num`/`Ord` wraps the audited primitive op, `30 §6` F2).
 The **first tranche** — `Eq`/`DecEq`/`Ord`, the pattern-setter — is pinned in
 **`51-lawful-classes.md`** (ES4-classes), with the `catalog/packages/` layout
-established at `../../catalog/packages/README.md`:
+established at `../../catalog/packages/README.md`.
+Section 51.9 adds public `bool_eq_from_iff` (SPEC-CORE-BOOL-EQ-FROM-IFF-PUBLIC).
 
 | Class | Operations | Laws (propositions) |
 |---|---|---|

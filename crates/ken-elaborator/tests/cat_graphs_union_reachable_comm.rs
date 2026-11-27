@@ -258,27 +258,22 @@ fn union_reachable_comm_closed_both_orders_and_false_single_input() {
     }
 }
 
-/// SOURCE: spec 62 §16 private edge inclusion and Boolean bridge.
+/// SOURCE: spec 62 §16 private edge inclusion helper.
 /// PROMISE CLASS: durable invariant.
-/// MEASURED: each isolated selective import of a private helper is refused
-/// as UnboundName with its fully qualified Dependency name and import span.
-/// CLAIMED: clients reuse only the public commutation law, not its scaffolding.
-/// THE GAP: these two imports are the named helpers; the test does not assert
-/// that every future private helper in the module remains inaccessible.
+/// MEASURED: the selective import is refused as UnboundName with its fully
+/// qualified Dependency name and import span.
+/// CLAIMED: clients cannot import the private edge inclusion helper.
+/// THE GAP: this checks the named helper, not all private declarations.
 #[test]
 fn union_reachable_comm_helpers_remain_private() {
-    for helper in ["graph_union_edge_swap", "bool_eq_from_iff"] {
-        let mut env = loaded_graph();
-        let source = format!("import {GRAPH} ({helper})");
-        let name = format!("{GRAPH}.{helper}");
-        match env.elaborate_file(&source) {
-            Err(ElabError::UnboundName {
-                name: refused,
-                span,
-            }) if refused == name
-                && span.start <= "import ".len()
-                && span.end >= source.len() - 1 => {}
-            other => panic!("private {name} must refuse its import: {other:?}"),
-        }
+    let mut env = loaded_graph();
+    let source = format!("import {GRAPH} (graph_union_edge_swap)");
+    let name = format!("{GRAPH}.graph_union_edge_swap");
+    match env.elaborate_file(&source) {
+        Err(ElabError::UnboundName {
+            name: refused,
+            span,
+        }) if refused == name && span.start <= "import ".len() && span.end >= source.len() - 1 => {}
+        other => panic!("private {name} must refuse its import: {other:?}"),
     }
 }

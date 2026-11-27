@@ -348,7 +348,10 @@ above, no further kernel capability needed. Getting here took a real
 correction, worth recording (`§6`). The public
 `bool_false_of_not_true` proof uses a checked `Bool` case split: a
 refuted `True` decision must be `False`. Collection proofs reuse this
-single lemma rather than each declaring a local copy.
+single lemma rather than each declaring a local copy. The public
+`bool_eq_from_iff` joins the two truth implications of a pair of Booleans
+into `Equal Bool`; Rational, Dependency and RationalInterval import it
+rather than declaring a copy.
 
 ```ken
 pub fn bool_leq (a : Bool) (b : Bool) : Bool =
@@ -488,6 +491,27 @@ pub theorem bool_false_of_not_true
   match decision eqn : occurrence {
     True ↦ absurd (forbidden occurrence);
     False ↦ Proved
+  }
+
+pub theorem bool_eq_from_iff
+      (p : Bool)
+    : (q : Bool)
+      → (Equal Bool p True → Equal Bool q True)
+      → (Equal Bool q True → Equal Bool p True)
+      → Equal Bool p q =
+  match p {
+    True ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. Proved;
+          False ↦ λforward. λbackward. absurd (forward Proved)
+        };
+    False ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. absurd (backward Proved);
+          False ↦ λforward. λbackward. Proved
+        }
   }
 
 fn compare_bool_cases (b : Bool) : Or (Equal Bool b True) (Equal Bool b False) =
@@ -2811,8 +2835,8 @@ Ken-native; no external reference implementation informed its source.
    `bool_and::intro`, `bool_and::comm`, `bool_and::assoc`,
    `bool_and::idempotent`, `bool_and::left_identity`,
    `bool_and::right_identity`, `bool_or`, `bool_not`, `bool_cases`,
-   `bool_false_of_not_true`, `or_left`, `or_right`, `or_cases`, `and_true`,
-   `and_cases`, `class Ord`, `leq_nat`,
+   `bool_false_of_not_true`, `bool_eq_from_iff`, `or_left`, `or_right`,
+   `or_cases`, `and_true`, `and_cases`, `class Ord`, `leq_nat`,
    `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
