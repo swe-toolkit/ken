@@ -740,7 +740,7 @@ or landing. Signed arithmetic, division, `Float` and
 rounding remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–13 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+**`69-time-and-events.md`** §§1–24 (SPEC-TIME-EVENT-TRACE-CONTRACT;
 SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
 SPEC-TIME-MERGE-MEMBERSHIP; SPEC-TIME-WINDOW-COMPOSITION;
 SPEC-TIME-MERGE-ASSOCIATIVITY; SPEC-TIME-WINDOW-ADJACENT-SPLIT;
@@ -749,7 +749,18 @@ SPEC-TIME-INVERTED-WINDOW-EMPTY §9;
 SPEC-TIME-WINDOW-ALL-IDENTITY §10;
 SPEC-TIME-WINDOW-COMMUTATION §11;
 SPEC-TIME-WINDOW-LENGTH-BOUND §12;
-SPEC-TIME-MERGE-SEPARATED-APPEND §13).
+SPEC-TIME-MERGE-SEPARATED-APPEND §13;
+SPEC-TIME-WINDOW-NONE-EMPTY §14;
+SPEC-TIME-TRACE-MERGE-ALL §15;
+SPEC-TIME-TRACE-MERGE-ALL-COUNT §16;
+SPEC-TIME-WINDOW-MERGE-ALL §17;
+SPEC-TIME-MERGE-ALL-APPEND §18;
+SPEC-TIME-MERGE-LENGTH §19;
+SPEC-TIME-MERGE-DISTINCT-TIMES-COMMUTE §20;
+SPEC-TIME-MERGE-SINGLETONS-SORT §21;
+SPEC-TIME-MERGE-ORDERED-SORT-APPEND §22;
+SPEC-TIME-MERGE-ALL-ORDERED-SORT-CONCAT §23;
+SPEC-TIME-WINDOW-SORT-COMMUTE §24).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -813,11 +824,24 @@ left member precedes or ties every right member by `event_before`,
 merge is structurally equal to append without requiring ordered traces.
 Architect's isolated D0 on `a3f9b487b2abdf3768214e88c3d548545ce74a13`
 checked the generic proof with identical 114-element trusted identity
-sets. The §13 Spec-only child does not add a catalog export, seed or
-package test, nor does it establish candidate execution, official
-conformance, CI, publication, landing or measured landed trust. Clock
-effects, durations, causality, infinite streams, premise-free structural
-window/merge distribution and k-way merge remain deferred.
+sets. The §13 catalog export, seed and package test are present on main.
+Section 14 gives the empty result when every event misses the window.
+Sections 15–18 specify finite batch merging and its multiplicity,
+ordered-window and append laws. Section 19 gives merge lengths; §20
+allows swapping merge operands when cross-input times are distinct.
+Sections 21–23 relate stable time sort to merging singletons, two
+ordered traces or a batch of ordered traces. The §§14–23 catalog
+exports, authored seeds and package-test sources are present on main.
+Artifact presence and historical checks do not establish official
+conformance execution or a landed trust measurement.
+Section 24 specifies `trace_window_sort`: a half-open window and stable
+time sort commute as structural list equality on any finite trace.
+The §24 catalog export, package test and authored seed accompany this
+section. Architect AC-0 checked the law in scratch with identical
+trusted `GlobalId` sets (114 → 114); that is not assembled AC-T,
+official conformance or CI evidence. Clock effects, durations,
+causality, infinite streams and premise-free structural window/merge
+distribution remain deferred.
 
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
