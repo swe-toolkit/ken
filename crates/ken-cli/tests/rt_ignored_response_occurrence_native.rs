@@ -159,6 +159,11 @@ fn run_plain_recursive_match_census() {
     // RT-CLOCK changes only the exit-code narrowing block in this fixture:
     // the shared helper's output slot is initialized before the call, and
     // subsequent SSA values are renumbered. Capacity routing is unchanged.
+    // RT-NATIVE-EXITCODE-NONTERMINAL changes only the root carried-Failure
+    // decode in this fixture: the shared carried exit-status transfer
+    // replaces the immediate-tag require, adding one carrier slot and a
+    // carrier round trip of the decoded status. Capacity routing is
+    // unchanged.
     assert_eq!(emitted_ir.trim_end_matches('\n').as_bytes(),
         PLAIN_MATCH_CAPACITY_IR.trim_end_matches('\n').as_bytes(),
         "the measured zero-S native unit IR differs from reviewed capacity routing");
