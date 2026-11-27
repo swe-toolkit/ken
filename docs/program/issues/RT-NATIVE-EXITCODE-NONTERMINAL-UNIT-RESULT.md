@@ -23,6 +23,18 @@ ordinary carried constructor.
 
 ## Settled inputs (main `fa83c81f1`; anchors re-checked at release)
 
+> **Corrected by AC-0** (Architect `evt_1cvv78w07fk1v`, on `0a53d387d`). The
+> first two inputs below are false. The seam is reached by 0 of 21 measured
+> rows. The projector is the join seat, whose gate reads
+> `terminal_result_origins`, a set selected for every unit, root or not.
+> `transfer_constructor_operands` (`core.rs` ~`:14904`) projects a carried
+> Failure code with no gate. The ruled fix selects that set only for the
+> root, gates the Failure arm on it, and decodes a non-immediate root code
+> through the existing `transfer_carried_failure_exit_status` mapping. That
+> last step changes the root decode. The Steward authorized it
+> (`evt_28ggwxv0sjmrn`), relaxing the first stop condition for that step
+> alone.
+
 - **The seam.** `transfer_unit_result_into_carrier`
   (`lowering/calls.rs:1851`) sets `process_exit` from `self.process_object`
   and the constructor being `exit_success` or `exit_failure` (`:1861-1867`),
@@ -64,6 +76,9 @@ RT-ROOT-EXIT-PROJECTION-KEYED-ON-JOIN, `emit_process_exit_status`,
 `rt_native_exitcode_failure_out_of_range.rs`.
 
 ## Acceptance
+
+AC-1 and AC-2 are replaced by the Architect's recut in `evt_1cvv78w07fk1v`:
+its 21 paired rows, and the mutations M-F2, M-F3 and M-D. AC-0 is done.
 
 - **AC-0 (Architect, before code).** Rule what makes a unit result the root
   result at this seam, and whether it shares the join seat's predicate.
