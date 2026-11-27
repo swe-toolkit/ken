@@ -1,7 +1,7 @@
 ---
 id: RT-FS-SET-LENGTH-HOST-WIDTH-ADMISSION
 title: "Spec 38 §1.7.1 says setLength refuses a host-width-unrepresentable length with InvalidOffset before dispatch, but both lanes admit any length that fits u64, while the Linux host's off_t is signed 64-bit: a length in [2^63, 2^64) is dispatched, and Rust std refuses it inside File::set_len, so the program sees ResourceHostIO instead of InvalidOffset. Bound admission at the host width in both lanes and pin the range"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1

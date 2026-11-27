@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-EXITCODE-FAILURE-OUT-OF-RANGE
 title: "For ExitCode.Failure with a runtime payload that is negative or at least 2^64, the interpreter reports terminal_error MalformedHostAbiField. The native exit decoder instead tests the payload for zero without gating on whether narrowing succeeded, so the result depends on an output word the helper never wrote. Main reports the wrong trap line or none, and after RT-CLOCK it reports none. Report the malformed-Failure-payload trap natively, matching the interpreter"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

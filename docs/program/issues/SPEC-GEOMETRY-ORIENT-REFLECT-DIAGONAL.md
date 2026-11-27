@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-ORIENT-REFLECT-DIAGONAL
 title: "Spec 67 proves that orientation survives a shared translation (§21) and a shared positive scaling (§22), and flips under swapping two points (§18), but no law says what reflection does: a client that mirrors three points across the diagonal, exchanging each point's coordinates, cannot rewrite the mirrored turn to the original one. Rule from a checked D0 at zero trust that the turn of the three reflected points is ord_result_flip of the original turn, and state it with a seed that separates the flip from preservation"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
