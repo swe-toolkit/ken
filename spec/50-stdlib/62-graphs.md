@@ -1498,10 +1498,11 @@ swapped union through `graph_union_edge_right q h g`, and the right
 witness through `graph_union_edge_left q h g`. Applying §7's
 `graph_reachable_graph_monotone` with that inclusion gives the
 true-reachability implication in one direction; applying it with
-`graph_union_edge_swap q h g` gives the converse. The private
-`bool_eq_from_iff` splits the two result Booleans and uses these
+`graph_union_edge_swap q h g` gives the converse. LawfulClasses' public
+`bool_eq_from_iff` (51 §9) splits the two result Booleans and uses these
 two implications to construct `Equal Bool` for the displayed law.
-Neither helper is an additional public export or assumption.
+`graph_union_edge_swap` stays private in Dependency, which imports
+`bool_eq_from_iff` rather than exporting it. Neither proof adds an assumption.
 
 **Edge-level commutation is not public here.** The edge equation
 reduces under §15's `graph_union_edge` to commutation of `bool_or` on
@@ -1511,11 +1512,10 @@ Booleans, a Core fact not yet public as a named law. Moreover,
 only the private true-edge inclusion, not public edge equality. A
 client seeking edge-level commutation must currently split the
 Booleans using §15's `graph_union_edge_left`, `_right` and `_cases`.
-A **separate Core node for Steward intake**, not part of this WP,
-would publish `bool_eq_from_iff` and a `bool_or` commutation law in
-`Core.Classes.LawfulClasses`, then migrate and retire both private
-copies of the generic helper in Dependency and Rational. This
-section does not authorize that Core or Rational change.
+`SPEC-CORE-BOOL-EQ-FROM-IFF-PUBLIC` (51 §9) publishes `bool_eq_from_iff`
+from `Core.Classes.LawfulClasses`; Dependency and Rational import it
+and keep no private copy. A `bool_or` commutation law remains a separate
+Core node.
 
 The §15.2 roster of **17 functions and 30 theorems** is historical:
 it counts public names through §15 and remains unchanged. §16 adds
@@ -1583,9 +1583,8 @@ No operation or law type from §§1–16 changes.
 
 The proof uses two **private** edge-inclusion theorems in
 Dependency, `graph_union_edge_regroup_right` and
-`graph_union_edge_regroup_left`, directly after
-`graph_union_edge_swap` and before `bool_eq_from_iff`. The right
-helper transports a checked true edge from `(g ∪ h) ∪ k` into
+`graph_union_edge_regroup_left`, directly after `graph_union_edge_swap`.
+The right helper transports a checked true edge from `(g ∪ h) ∪ k` into
 `g ∪ (h ∪ k)`; the left helper transports it back. Each applies
 `graph_union_edge_cases` first to the outer union and then to the
 inner union where necessary, rebuilding the chosen true edge with
@@ -1593,8 +1592,8 @@ inner union where necessary, rebuilding the chosen true edge with
 is an implication on `Equal Bool (edge …) True`, the form required
 by §7's `graph_reachable_graph_monotone`; neither helper needs an
 open-edge Boolean case split. Two applications of that monotonicity
-law, one per direction, feed the existing private `bool_eq_from_iff`
-to close the displayed Boolean equality. These helpers remain
+law, one per direction, feed LawfulClasses' public `bool_eq_from_iff`
+(51 §9) to close the displayed Boolean equality. The edge helpers remain
 private like §16's `graph_union_edge_swap`: the public inclusion
 and case laws already let a client derive either direction.
 Publishing an edge regrouping law here would duplicate a
@@ -1770,9 +1769,9 @@ The checked proof combines §15's `graph_union_reachable_left` with
 §7's `graph_reachable_graph_monotone` from `graph_union q g h` back to
 `g`. The private `graph_union_edge_absorb` splits a checked union edge
 with `graph_union_edge_cases`: a `g` edge stays unchanged, while an
-`h` edge passes through `included`. The existing private
-`bool_eq_from_iff` joins the forward and reverse truth implications
-into the public `Equal Bool` result. The helper stays private; the
+`h` edge passes through `included`. LawfulClasses' public
+`bool_eq_from_iff` (51 §9) joins the forward and reverse truth implications
+into the public `Equal Bool` result. The edge helper stays private; the
 public union case and inclusion laws already give clients its effect.
 No public edge-level law, new assumption, kernel or surface rule is
 specified.
@@ -1855,7 +1854,7 @@ operation. No §§1–19 operation or law type changes.
 
 Pointwise edge equality lets clients derive a reachability
 consequence from §7's `graph_reachable_graph_monotone` in both
-directions, with the existing private Boolean-iff equality step.
+directions, using LawfulClasses' public `bool_eq_from_iff` (51 §9).
 That consequence is **not** a second public reachability-equality
 export. It would specialize the more general graph principle that
 pointwise equal edges have equal reachability; this §20 exports
@@ -2024,14 +2023,14 @@ exported: `edge q (graph_edgeless q) s t` reduces to `False`, even for
 open vertices.
 
 From affirmative reachability, `graph_find_walk_some` and the private
-`require_some` extract a witness. The private `edgeless_walk_start`,
-immediately before `bool_eq_from_iff`, matches on its walk. A `WalkStep`
-requires `Equal Bool False True` after reduction, so `absurd` eliminates
-it without induction. In the `WalkHere` arm the endpoint is `s`, and
-the target evidence is already evidence for `target s`. The target-hit
-implication stays in the match result type so that arm refines it.
-`graph_reachable_complete` at `WalkHere` gives the converse, and the
-private `bool_eq_from_iff` joins the two directions.
+`require_some` extract a witness. The private `edgeless_walk_start`
+matches on its walk. A `WalkStep` requires `Equal Bool False True` after
+reduction, so `absurd` eliminates it without induction. In the `WalkHere`
+arm the endpoint is `s`, and the target evidence is already evidence for
+`target s`. The target-hit implication stays in the match result type so
+that arm refines it.
+`graph_reachable_complete` at `WalkHere` gives the converse, and
+LawfulClasses' public `bool_eq_from_iff` (51 §9) joins the two directions.
 
 The roster through §23 is twenty public functions, thirty-nine public
 theorems and one public constant. No §§1–22 operation or law type changes.

@@ -2099,10 +2099,10 @@ For reflection of order, `rational_sub_mono` subtracts `t` on both
 sides. Every non-negative rational `a` satisfies `t ≤ a + t`, so
 `add_cancel for rational_sub` and `rational_add_cancel_r` show that
 `(a + t) - t` is rationally equivalent to `a`; `respect for rational_leq`
-then transfers the comparison. The private Boolean equality proof joins
-the two implications, and congruence lifts both comparison equalities
-through `bool_and`. All new helpers stay private. No new `Axiom`, import
-or public Rational export is needed.
+then transfers the comparison. LawfulClasses' public `bool_eq_from_iff`
+(51 §9) joins the two implications, and congruence lifts both comparison
+equalities through `bool_and`. All new helpers stay private. No other
+import, new `Axiom`, or public Rational export is needed.
 
 Architect AC-0 (`evt_1b1n2fsh3bvws`) checked the body and open client on
 `4af183c60` in scratch, with unchanged exact trusted `GlobalId` sets
