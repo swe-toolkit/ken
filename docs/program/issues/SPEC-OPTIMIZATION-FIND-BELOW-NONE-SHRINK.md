@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-FIND-BELOW-NONE-SHRINK
 title: "Spec 72 §2.4 proves that a witness found below a bound is still found below any larger bound (find_below_stable), but no law states the absence half: a client that knows a search below a large bound found nothing cannot conclude that a search below a smaller bound finds nothing without re-deriving it from completeness and refutation. Rule from a checked D0 at zero trust that find_below p larger = None and bound <= larger give find_below p bound = None, and state it with a seed whose accepted row is open in p"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

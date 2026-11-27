@@ -1,7 +1,7 @@
 ---
 id: SPEC-CORE-BOOL-EQ-FROM-IFF-PUBLIC
 title: "Three catalog packages (Rational, Dependency, RationalInterval) each carry a byte-equivalent private bool_eq_from_iff, the proof that two Booleans are equal when each being True implies the other, because every WP that needed it was scoped to its own package. Publish it once from Core.Classes.LawfulClasses at zero trust, migrate the three packages to import it, retire the private copies, and update the spec text and privacy tests that name them"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
