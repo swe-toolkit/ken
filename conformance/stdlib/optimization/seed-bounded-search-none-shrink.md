@@ -8,8 +8,10 @@ bound and an order premise, the law concludes `None` below a smaller
 bound. The accepted client leaves the predicate open and cites the law.
 It is not a closed search example: the existing §2.4 seed covers the
 concrete `None` behavior. The authored seed has not been executed by the
-official conformance runner. Package-test, CI, publication, landing, and
-trust measurements are not claimed here.
+official conformance runner. This seed does not claim package-test execution,
+official conformance-runner execution, CI, publication, landing, or a landed-trust
+measurement. Architect AC-0 separately reports a scratch D0 trusted-GlobalId
+measurement (114 → 114).
 
 ## Accepted open application
 
