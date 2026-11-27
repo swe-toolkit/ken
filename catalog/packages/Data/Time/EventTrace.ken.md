@@ -49,9 +49,10 @@ The all-in-window identity follows it and reuses the existing private
 The no-member window law follows the identity with the same membership
 premise shape and an empty-list conclusion, without another helper.
 The singleton insert and sort laws are followed by `trace_merge_ordered_sort`
-and `trace_merge_all_ordered_sort`. The private insert cons-case proof comes
-next, then `trace_ordered_sort_fixed` and the private
-`trace_sort_append_sorted_suffix`, which closes the definition fence.
+and `trace_merge_all_ordered_sort`, then `trace_window_sort`. The private
+insert cons-case proof comes next, then `trace_ordered_sort_fixed` and
+`trace_sort_append_sorted_suffix`. The nine window-sort helpers close the
+definition fence.
 Windowing includes the lower bound
 but excludes the upper; a merge tie favors the left input without examining
 payloads. Membership uses Ω-valued `list_elem`, so neither a payload equality
@@ -4027,6 +4028,26 @@ pub theorem trace_merge_all_ordered_sort
               merged_rest_sorted)
   }
 
+pub theorem trace_window_sort
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
+    : Equal
+        (List (Event p))
+        (trace_window p lo hi (sort (Event p) (event_before p) tr))
+        (sort (Event p) (event_before p) (trace_window p lo hi tr)) =
+  match tr {
+    Nil ↦ Proved;
+    Cons x t ↦
+      trace_window_sort_cons
+        p
+        lo
+        hi
+        x
+        t
+        (trace_window_sort p lo hi t)
+        (event_in_window p lo hi x)
+        Refl
+  }
+
 theorem trace_merge_single_insert_cons
       (p : Type)
       (x : Event p)
@@ -4160,6 +4181,411 @@ theorem trace_sort_append_sorted_suffix
             (sort (Event p) (event_before p) (list_append (Event p) xt ys))
             (insert (Event p) (event_before p) x)
             (trace_sort_append_sorted_suffix p xt zs ys ordered_zs zs_sorted)
+  }
+
+theorem trace_window_sort_cons
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (x : Event p)
+      (t : List (Event p))
+      (ih : Equal
+        (List (Event p))
+        (trace_window p lo hi (sort (Event p) (event_before p) t))
+        (sort (Event p) (event_before p) (trace_window p lo hi t)))
+      (decision : Bool)
+    : Equal Bool (event_in_window p lo hi x) decision
+      → Equal
+        (List (Event p))
+        (trace_window
+          p
+          lo
+          hi
+          (insert (Event p) (event_before p) x (sort (Event p) (event_before p) t)))
+        (sort
+          (Event p)
+          (event_before p)
+          (window_keep (Event p) x (trace_window p lo hi t) decision)) =
+  let sorted_t : time_ordered p (sort (Event p) (event_before p) t) =
+    (proof sorted for sort)
+      (Event p)
+      (event_before p)
+      (λe. λf. (proof total for leq_nat) (event_time p e) (event_time p f))
+      t
+  in
+    match decision {
+      True ↦
+        λkept.
+          trans
+            (List (Event p))
+            (trace_window
+              p
+              lo
+              hi
+              (insert (Event p) (event_before p) x (sort (Event p) (event_before p) t)))
+            (insert
+              (Event p)
+              (event_before p)
+              x
+              (trace_window p lo hi (sort (Event p) (event_before p) t)))
+            (insert
+              (Event p)
+              (event_before p)
+              x
+              (sort (Event p) (event_before p) (trace_window p lo hi t)))
+            (filter_insert
+              (Event p)
+              (event_before p)
+              (event_before_trans p)
+              (event_in_window p lo hi)
+              x
+              (sort (Event p) (event_before p) t)
+              True
+              kept
+              sorted_t)
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_window p lo hi (sort (Event p) (event_before p) t))
+              (sort (Event p) (event_before p) (trace_window p lo hi t))
+              (insert (Event p) (event_before p) x)
+              ih);
+      False ↦
+        λdropped.
+          trans
+            (List (Event p))
+            (trace_window
+              p
+              lo
+              hi
+              (insert (Event p) (event_before p) x (sort (Event p) (event_before p) t)))
+            (trace_window p lo hi (sort (Event p) (event_before p) t))
+            (sort (Event p) (event_before p) (trace_window p lo hi t))
+            (filter_insert
+              (Event p)
+              (event_before p)
+              (event_before_trans p)
+              (event_in_window p lo hi)
+              x
+              (sort (Event p) (event_before p) t)
+              False
+              dropped
+              sorted_t)
+            ih
+    }
+
+theorem filter_insert
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (x : a)
+      (xs : List a)
+      (decision : Bool)
+    : Equal Bool (keep x) decision
+      → is_sorted a le xs
+      → Equal
+        (List a)
+        (filter a keep (insert a le x xs))
+        (insert_kept a le x (filter a keep xs) decision) =
+  match xs {
+    Nil ↦
+      λkept.
+        λsorted_input. filter_cons_insert a le le_trans keep x (Nil a) decision kept Proved;
+    Cons h t ↦
+      λkept.
+        λsorted_input.
+          filter_insert_cons
+            a
+            le
+            le_trans
+            keep
+            x
+            h
+            t
+            decision
+            kept
+            sorted_input
+            (filter_insert
+              a
+              le
+              le_trans
+              keep
+              x
+              t
+              decision
+              kept
+              (list_sorted_tail a le h t sorted_input))
+            (le x h)
+            Refl
+  }
+
+theorem filter_insert_cons
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (decision : Bool)
+      (kept : Equal Bool (keep x) decision)
+      (sorted_input : is_sorted a le (Cons a h t))
+      (ih : Equal
+        (List a)
+        (filter a keep (insert a le x t))
+        (insert_kept a le x (filter a keep t) decision))
+      (comparison : Bool)
+    : Equal Bool (le x h) comparison
+      → Equal
+        (List a)
+        (filter a keep (insert a le x (Cons a h t)))
+        (insert_kept a le x (filter a keep (Cons a h t)) decision) =
+  match comparison {
+    True ↦
+      λfirst.
+        trans
+          (List a)
+          (filter a keep (insert a le x (Cons a h t)))
+          (filter a keep (Cons a x (Cons a h t)))
+          (insert_kept a le x (filter a keep (Cons a h t)) decision)
+          (cong
+            (List a)
+            (List a)
+            (insert a le x (Cons a h t))
+            (Cons a x (Cons a h t))
+            (filter a keep)
+            (insert_starts_after a le x (Cons a h t) first))
+          (filter_cons_insert
+            a
+            le
+            le_trans
+            keep
+            x
+            (Cons a h t)
+            decision
+            kept
+            (list_sorted_cons a le x (Cons a h t) sorted_input first));
+    False ↦
+      λlater.
+        trans
+          (List a)
+          (filter a keep (insert a le x (Cons a h t)))
+          (filter a keep (Cons a h (insert a le x t)))
+          (insert_kept a le x (filter a keep (Cons a h t)) decision)
+          (cong
+            (List a)
+            (List a)
+            (insert a le x (Cons a h t))
+            (Cons a h (insert a le x t))
+            (filter a keep)
+            (insert_after_head a le x h t later))
+          (filter_insert_later a le keep x h t decision ih later)
+  }
+
+theorem filter_insert_later
+      (a : Type)
+      (le : a → a → Bool)
+      (keep : a → Bool)
+      (x : a)
+      (h : a)
+      (t : List a)
+      (decision : Bool)
+    : Equal
+        (List a)
+        (filter a keep (insert a le x t))
+        (insert_kept a le x (filter a keep t) decision)
+      → Equal Bool (le x h) False
+      → Equal
+        (List a)
+        (filter a keep (Cons a h (insert a le x t)))
+        (insert_kept a le x (filter a keep (Cons a h t)) decision) =
+  match decision {
+    True ↦
+      λih.
+        λlater.
+          trans
+            (List a)
+            (filter a keep (Cons a h (insert a le x t)))
+            (window_keep a h (insert a le x (filter a keep t)) (keep h))
+            (insert a le x (filter a keep (Cons a h t)))
+            (cong
+              (List a)
+              (List a)
+              (filter a keep (insert a le x t))
+              (insert a le x (filter a keep t))
+              (λrest. window_keep a h rest (keep h))
+              ih)
+            (window_keep_insert a le x h (filter a keep t) (keep h) later);
+    False ↦
+      λih.
+        λlater.
+          cong
+            (List a)
+            (List a)
+            (filter a keep (insert a le x t))
+            (filter a keep t)
+            (λrest. window_keep a h rest (keep h))
+            ih
+  }
+
+theorem filter_cons_insert
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (x : a)
+      (xs : List a)
+      (decision : Bool)
+    : Equal Bool (keep x) decision
+      → is_sorted a le (Cons a x xs)
+      → Equal
+        (List a)
+        (filter a keep (Cons a x xs))
+        (insert_kept a le x (filter a keep xs) decision) =
+  match decision {
+    True ↦
+      λkept.
+        λsorted_input.
+          J
+            (λchoice _.
+              Equal
+                (List a)
+                (match choice {
+                  True ↦ Cons a x (filter a keep xs);
+                  False ↦ filter a keep xs
+                })
+                (insert a le x (filter a keep xs)))
+            (sym
+              (List a)
+              (insert a le x (filter a keep xs))
+              (Cons a x (filter a keep xs))
+              (insert_starts_after
+                a
+                le
+                x
+                (filter a keep xs)
+                (filter_starts_after a le le_trans keep x xs sorted_input)))
+            (sym Bool (keep x) True kept);
+    False ↦
+      λdropped.
+        λsorted_input.
+          J
+            (λchoice _.
+              Equal
+                (List a)
+                (match choice {
+                  True ↦ Cons a x (filter a keep xs);
+                  False ↦ filter a keep xs
+                })
+                (filter a keep xs))
+            Refl
+            (sym Bool (keep x) False dropped)
+  }
+
+fn insert_kept
+      (a : Type) (le : a → a → Bool) (x : a) (rest : List a) (decision : Bool)
+    : List a =
+  match decision {
+    True ↦ insert a le x rest;
+    False ↦ rest
+  }
+
+theorem window_keep_insert
+      (a : Type) (le : a → a → Bool) (x : a) (h : a) (rest : List a) (decision : Bool)
+    : Equal Bool (le x h) False
+      → Equal
+        (List a)
+        (window_keep a h (insert a le x rest) decision)
+        (insert a le x (window_keep a h rest decision)) =
+  match decision {
+    True ↦
+      λlater.
+        sym
+          (List a)
+          (insert a le x (Cons a h rest))
+          (Cons a h (insert a le x rest))
+          (insert_after_head a le x h rest later);
+    False ↦ λlater. Refl
+  }
+
+theorem insert_after_head
+      (a : Type) (le : a → a → Bool) (x : a) (h : a) (rest : List a)
+    : Equal Bool (le x h) False
+      → Equal (List a) (insert a le x (Cons a h rest)) (Cons a h (insert a le x rest)) =
+  λlater.
+    J
+      (λchoice _.
+        Equal
+          (List a)
+          (match choice {
+            True ↦ Cons a x (Cons a h rest);
+            False ↦ Cons a h (insert a le x rest)
+          })
+          (Cons a h (insert a le x rest)))
+      Refl
+      (sym Bool (le x h) False later)
+
+theorem insert_starts_after
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : starts_after a le x xs → Equal (List a) (insert a le x xs) (Cons a x xs) =
+  match xs {
+    Nil ↦ λfirst. Refl;
+    Cons y rest ↦
+      λfirst.
+        J
+          (λchoice _.
+            Equal
+              (List a)
+              (match choice {
+                True ↦ Cons a x (Cons a y rest);
+                False ↦ Cons a y (insert a le x rest)
+              })
+              (Cons a x (Cons a y rest)))
+          Refl
+          (sym Bool (le x y) True first)
   }
 ```
 
@@ -4381,6 +4807,21 @@ to `ys`: insertion recurses over `xs`, and at the end sorting the ordered
 list leaves it unchanged. A single unordered batch shows that the premise
 is needed.
 
+### Windowing and sorting
+
+`trace_window_sort` equates the window of a sorted trace with the sort of
+that window. The lists are structurally equal, including the order of events
+with tied timestamps. The law takes no ordering or bound premise. It does
+not equate the window of a sorted trace with the window of the original
+trace, which can retain events in a different order.
+
+The proof inducts on the input trace. For a cons, the sorted tail allows
+filtering to commute with insertion: insert the new event into the filtered
+tail if it is in the window, and leave that tail alone otherwise. When
+filtering drops a head that the new event precedes, transitivity shows that
+the new event also precedes the surviving tail. The induction hypothesis
+then identifies the filtered sorted tail with the sort of the filtered tail.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -4413,9 +4854,10 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-four
+   `trace_merge`, `trace_merge_all`, `event_singleton`, and the thirty-five
    checked laws form the package surface. The nine public functions are
-   unchanged by `trace_merge_ordered_sort` and `trace_merge_all_ordered_sort`.
+   unchanged by `trace_merge_ordered_sort`, `trace_merge_all_ordered_sort`,
+   and `trace_window_sort`.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -4424,8 +4866,12 @@ merging, not window multiplicity.
    preservation uses derived `count` and checked addition laws. Length
    preservation uses direct induction over trace merge and the collections
    provider's public `list_append::length`, without requiring an event witness.
-   Generic list lemmas are owned by the collections provider, not copied
-   into this package.
+   The window-sort proof uses a generic filter-over-insert step and two
+   generic insert views proved privately here: Derived exports no equivalent.
+   `insert_after_head` and `insert_starts_after` duplicate the statements
+   of Derived's private `derived_insert_cons_false` and
+   `derived_insert_head_ordered`, respectively. Moving or promoting these
+   generic facts is a separate factoring decision.
    Window membership instantiates its two generic filter proofs and projects
    both half-open timestamp bounds. Window/merge distribution also uses
    the public filtered-head-order proof from the collections provider.
@@ -4478,7 +4924,7 @@ merging, not window multiplicity.
    the sorted merge of the remaining batches by the sort of their
    concatenation through its sole new helper, the private
    `trace_sort_append_sorted_suffix`; no new import is needed.
-4. **Trusted-base delta.** Zero: all thirty-four exported laws have checked
+4. **Trusted-base delta.** Zero: all thirty-five exported laws have checked
    proof bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
@@ -4546,6 +4992,12 @@ merging, not window multiplicity.
    plain concatenation in the same proof form. The
    `cat_time_merge_all_ordered_sort` package test checks those cases, the open
    law and its trust boundary, and the premise-free failure for a single
-   descending batch. These package tests are not conformance-runner execution.
+   descending batch. The [window-sort seed] uses `trace_window_sort` on an
+   open trace and refuses the equation that drops the sort on the right.
+   The `cat_time_window_sort` package test checks these actual seed fences,
+   verifies that computation alone cannot close the open equation, and
+   checks a closed usage example that can compute without the law. These
+   package tests are not conformance-runner execution.
 
 [ordered batches seed]: ../../../../conformance/stdlib/time-and-events/seed-trace-merge-all-ordered-sort.md
+[window-sort seed]: ../../../../conformance/stdlib/time-and-events/seed-trace-window-sort-commute.md
