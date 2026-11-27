@@ -52,7 +52,7 @@ Current state only; the operator owns lanes, order and objectives. Hard limit
 **RESTRUCTURING IS ADMISSIBLE; difficulty is the signal, not a reason to
 restate the objective.** Zero rows cleared plus N structural findings is not
 zero progress. But "could be indicative" is a prior: a minimal correct repair
-still wins when the structure says so, and restructuring returns to me to size
+still wins when the structure says so, and the Steward sizes a restructuring
 as its own node. Investigation opens a repair, never a separate report node.
 
 ## Authorized roster
