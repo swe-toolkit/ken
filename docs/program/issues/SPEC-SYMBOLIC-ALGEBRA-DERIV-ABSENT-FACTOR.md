@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIV-ABSENT-FACTOR
 title: "Spec 66 pulls a literal constant out of a derivative (deriv_const_factor, for EConst k) and says a derivative in an absent variable evaluates to zero (deriv_absent), but no law pulls out a factor that is constant only because the variable does not occur in it: a client differentiating y * e in x must unfold the product rule and discharge the y-derivative by hand. Rule from a checked D0 at zero trust that, when occurs v c is False, deriv v (EMul c e) is poly_eq to EMul c (deriv v e), and state it with a seed whose accepted row is open in e"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

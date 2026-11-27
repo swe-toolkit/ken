@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-SORT-COMMUTE
 title: "Spec 69 ties merging to sorting (§21 to §23) and proves that a window distributes over merge and append, but no law says that windowing commutes with sorting: a client that sorts an unordered trace and then selects a time window cannot rewrite the result to the sort of the window without unfolding insertion sort. Rule from a checked D0 at zero trust that trace_window over sort by event_before equals sort of trace_window, and state it with a seed whose accepted row is open in the trace"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
