@@ -493,6 +493,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CaseEmissionStatus, PlannedReferentLifetime,
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
+    PlannedEffectSeatField,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
     RecursiveCarrierBoxedStore, RecursiveCarrierMemberSchema, RecursiveCarrierStore,
@@ -510,7 +511,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     PendingVisRelay, PendingVisRelayKey, PendingVisRelayResume, ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
     BracketSettlementId,
     BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
-    SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
+    resource_kind_role, SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use super::planning::{
@@ -1218,6 +1219,7 @@ impl ArtifactHelpers<'_> {
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
+            k_unit_answer_wraps: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             statically_unselected_roots: BTreeMap::new(),
             unselected_calls_settled: false,
@@ -1552,6 +1554,10 @@ struct FunctionLocalRefs {
     /// The exact emitted constructor identity for each function-local SSA word.
     generated_constructor_authorities:
         BTreeMap<cranelift_codegen::ir::Value, GeneratedConstructorAuthority>,
+    /// Entry 17: in a K context function only, each unit-answer Call
+    /// occurrence of the context's own result walk, with its planned
+    /// `ITree::Ret` record and the K row's Ret identity.
+    k_unit_answer_wraps: BTreeMap<StaticOriginId, (AggregateOccurrenceId, ConstructorIdentity)>,
     /// Each generated call's exact finished status/Trap/Result obligation.
     pending_call_result_obligations: Vec<PendingCallResultObligation>,
     /// Source subtree roots explicitly excluded in this function.

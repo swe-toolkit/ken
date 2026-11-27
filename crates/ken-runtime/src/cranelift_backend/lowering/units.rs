@@ -7402,6 +7402,7 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
         })
         .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
 
+    let unit_answers = compiler.static_transition_plan.k_context_unit_answer_calls()?;
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
     let mut staged = Vec::new();
     for context in contexts {
@@ -7598,6 +7599,25 @@ pub(super) fn stage_continuation_context_bodies<M: Module>(
             #[cfg(feature = "px8-ds-test-support")]
             if let Some(access) = &function_local.checked_ih_generated_entry_access {
                 record_checked_ih_generated_entry_installed(access);
+            }
+            // Entry 17: this context's own unit-answer Call occurrences, each
+            // with its planned `ITree::Ret` record under this emission owner.
+            if let Some(answer) = unit_answers.iter().find(|answer| answer.context == context.id) {
+                if answer.enclosing != context.enclosing {
+                    return Err(backend_module(
+                        LoweringCause::PlannerInvariant,
+                        "a K context unit-answer fact names a different enclosing specialization"
+                            .to_string(),
+                    ));
+                }
+                for &seat in &answer.calls {
+                    let record = compiler
+                        .static_transition_plan
+                        .k_context_unit_answer_ret_occurrence(emission_owner, seat)?;
+                    function_local
+                        .k_unit_answer_wraps
+                        .insert(seat, (record, answer.k_ret_identity));
+                }
             }
             compiler.function_local = function_local;
             compiler.open_aggregate_events(id)?;
@@ -12915,6 +12935,7 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
     // call/publication once before either graph iteration so a later SCC pass
     // can consume only already-audited locators without re-running the CFG and
     // memory analyses for every dependency round.
+    let mut candidates = Vec::<FinishedUnitResultRealization>::new();
     for (body, func) in staged.iter().zip(&indexed) {
         for obligation in &body.call_obligations {
             let target = Lowering::decode_direct_callee(func, obligation.call)?;
@@ -12922,16 +12943,22 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
         }
         if let Some(publication) = body.publication {
             verify_publication_and_terminals(func, publication, true)?;
+            candidates.push(FinishedUnitResultRealization {
+                unit: body.unit,
+                target: body.target,
+            });
         }
     }
-    let mut realizations = Vec::<FinishedUnitResultRealization>::new();
+    // Greatest fixed point: a status-0 return initializes the Result slot by
+    // induction on dynamic call depth, so a recursive participant may assume
+    // its own SCC. On an acyclic graph this equals the least fixed point.
+    let mut realizations = candidates;
     loop {
-        let mut progress = false;
+        let mut removed = Vec::new();
         for (body, func) in staged.iter().zip(&indexed) {
-            if realizations
-                .iter()
-                .any(|realization| realization.target == body.target)
-            {
+            if !realizations.iter().any(|realization| {
+                realization.target == body.target && realization.unit == body.unit
+            }) {
                 continue;
             }
             let Some(publication) = body.publication else {
@@ -12962,30 +12989,29 @@ pub(super) fn close_and_define_staged_result_bodies<M: Module>(
                     realized_call_words.insert(obligation.result_word);
                 }
             }
-            if !dependencies_ready {
-                continue;
-            }
-            let reachable = reachable_with_cuts(func, &BTreeSet::new())?;
-            let cfg = func.cfg();
-            let (valid, grounded) = prove_realized_value(
-                body,
-                func,
-                &cfg,
-                &reachable,
-                &realized_call_words,
-                publication.returned_word,
-            )?;
-            if valid && grounded {
-                realizations.push(FinishedUnitResultRealization {
-                    unit: body.unit,
-                    target: body.target,
-                });
-                progress = true;
+            let proven = dependencies_ready && {
+                let reachable = reachable_with_cuts(func, &BTreeSet::new())?;
+                let cfg = func.cfg();
+                let (valid, grounded) = prove_realized_value(
+                    body,
+                    func,
+                    &cfg,
+                    &reachable,
+                    &realized_call_words,
+                    publication.returned_word,
+                )?;
+                valid && grounded
+            };
+            if !proven {
+                removed.push((body.unit, body.target));
             }
         }
-        if !progress {
+        if removed.is_empty() {
             break;
         }
+        realizations.retain(|realization| {
+            !removed.contains(&(realization.unit, realization.target))
+        });
     }
     let missing_realizations = required_realizations
         .iter()

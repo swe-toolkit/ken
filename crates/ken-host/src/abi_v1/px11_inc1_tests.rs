@@ -82,7 +82,7 @@ fn token(word: u64) -> ResourceTokenV1 {
 /// distinct C-shaped records yields the typed canonical request and exact
 /// resource/capability operands, and malformed addresses fail with -1.
 /// CLAIMED: Inc1's native decoder is complete and structural only. THE GAP:
-/// these calls bypass the unchanged RepresentedUnavailable dispatch gate;
+/// these calls isolate request decoding from host dispatch;
 /// operational native parity is an Inc2 acceptance criterion.
 #[test]
 fn px11_native_net_request_decode_known_answers_and_malformed_addresses() {
@@ -332,11 +332,11 @@ fn px11_native_net_request_decode_known_answers_and_malformed_addresses() {
     ] {
         assert_eq!(
             op.availability(),
-            crate::HostOpAvailabilityV1::RepresentedUnavailable
+            crate::HostOpAvailabilityV1::NativeTested
         );
         assert!(
-            require_native_operation_v1(op).is_err(),
-            "{op:?} remains unavailable"
+            require_native_operation_v1(op).is_ok(),
+            "{op:?} is native tested"
         );
     }
 }

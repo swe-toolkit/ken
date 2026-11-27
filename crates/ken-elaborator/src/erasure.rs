@@ -973,8 +973,6 @@ pub(crate) struct CheckedHostSpineV1 {
     pub resource_invalid_offset: StableSymbol,
     pub resource_invalid_bounds: StableSymbol,
     pub resource_no_progress: StableSymbol,
-    pub resource_kind_fs_handle: StableSymbol,
-    pub resource_kind_buffer: StableSymbol,
     pub resource_trace_identity: StableSymbol,
     pub nat_zero: StableSymbol,
     pub nat_suc: StableSymbol,
@@ -1012,10 +1010,10 @@ pub(crate) struct CheckedHostSpineV1 {
     /// ABI-S6 D4 appends without moving established positional roles.
     pub resource_mapping_limit: StableSymbol,
     /// ABI-S6 D5a appends the now-native Mapping kind role.
-    pub resource_kind_mapping: StableSymbol,
     /// PX10 checked resource kinds and typed wait constructors.
-    pub px10_kind_symbols: [StableSymbol; 4],
     pub px10_exit_symbols: [StableSymbol; 2],
+    pub px11_address_symbols: [StableSymbol; 3],
+    pub resource_kind_symbols: [StableSymbol; ken_host::RESOURCE_KIND_COUNT_V1],
     /// Checked constructor for the parent write end of child stdin. Both take
     /// constructors share ProcessTakePipe but have different source arities.
     pub process_take_pipe_write_constructor: StableSymbol,
@@ -4692,7 +4690,7 @@ fn lower_checked_host_computation(
             }
             let runtime_args = &decoded.args[decoded.constructor.family_parameter_count..];
             let (capability, semantic_args) =
-                if static_host_operation_requires_capability(decoded.operation) {
+                if decoded.operation.takes_capability_operand() {
                     let (cap, rest) = runtime_args.split_first().ok_or_else(|| {
                         expression_lowering_error(
                             root,
@@ -4987,62 +4985,6 @@ fn decode_checked_host_operation<'a>(
     })
 }
 
-const fn static_host_operation_requires_capability(operation: ken_host::HostOpV1) -> bool {
-    !operation.is_ambient()
-        && !matches!(
-            operation,
-            ken_host::HostOpV1::FsHandleMetadata
-                | ken_host::HostOpV1::FsReadDirectoryBatch
-                | ken_host::HostOpV1::FsSetLength
-                | ken_host::HostOpV1::FsSync
-                | ken_host::HostOpV1::BufferAllocate
-                | ken_host::HostOpV1::FsReadAt
-                | ken_host::HostOpV1::FsWriteAt
-                | ken_host::HostOpV1::BufferFreeze
-                | ken_host::HostOpV1::MappingAllocate
-                | ken_host::HostOpV1::MappingReadView
-                | ken_host::HostOpV1::MappingWriteView
-                | ken_host::HostOpV1::MappingAcquireFile
-                | ken_host::HostOpV1::ResourceStreamRead
-                | ken_host::HostOpV1::ResourceStreamWrite
-                | ken_host::HostOpV1::ProcessPlanPush
-                | ken_host::HostOpV1::ProcessSpawn
-                | ken_host::HostOpV1::ProcessTakePipe
-                | ken_host::HostOpV1::ProcessWait
-                | ken_host::HostOpV1::ProcessSignal
-                | ken_host::HostOpV1::ResourceRelease
-        )
-}
-
-const fn runtime_selected_host_operation_requires_capability(
-    operation: ken_host::HostOpV1,
-) -> bool {
-    !operation.is_ambient()
-        && !matches!(
-            operation,
-            ken_host::HostOpV1::FsHandleMetadata
-                | ken_host::HostOpV1::FsReadDirectoryBatch
-                | ken_host::HostOpV1::FsSetLength
-                | ken_host::HostOpV1::FsSync
-                | ken_host::HostOpV1::BufferAllocate
-                | ken_host::HostOpV1::FsReadAt
-                | ken_host::HostOpV1::FsWriteAt
-                | ken_host::HostOpV1::BufferFreeze
-                | ken_host::HostOpV1::MappingAllocate
-                | ken_host::HostOpV1::MappingReadView
-                | ken_host::HostOpV1::MappingWriteView
-                | ken_host::HostOpV1::MappingAcquireFile
-                | ken_host::HostOpV1::ResourceStreamRead
-                | ken_host::HostOpV1::ResourceStreamWrite
-                | ken_host::HostOpV1::ProcessPlanPush
-                | ken_host::HostOpV1::ProcessSpawn
-                | ken_host::HostOpV1::ProcessTakePipe
-                | ken_host::HostOpV1::ProcessWait
-                | ken_host::HostOpV1::ProcessSignal
-                | ken_host::HostOpV1::ResourceRelease
-        )
-}
-
 fn lower_runtime_selected_host_operation(
     operation: RuntimeExpr,
     continuation_body: RuntimeExpr,
@@ -5102,7 +5044,7 @@ fn lower_runtime_selected_host_operation(
                 .map(|index| RuntimeExpr::Var(index as u32))
                 .collect::<Vec<_>>();
             let (capability, args) =
-                if runtime_selected_host_operation_requires_capability(host_operation) {
+                if host_operation.takes_capability_operand() {
                     let mut args = runtime_args.into_iter();
                     let cap = args.next().ok_or_else(|| {
                         expression_lowering_error(
@@ -8219,6 +8161,12 @@ fn decode_checked_runtime_symbols_v1(
         ordered.push(read_role_symbol(bytes, &mut offset)?);
     }
 
+    let resource_kind_symbols = (0..ken_host::RESOURCE_KIND_COUNT_V1)
+        .map(|_| read_role_symbol(bytes, &mut offset))
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .expect("one decoded symbol per host resource kind");
+
     let io_error_count = read_role_count(bytes, &mut offset)?;
     let mut io_errors = Vec::with_capacity(io_error_count.min(64));
     for _ in 0..io_error_count {
@@ -8240,7 +8188,7 @@ fn decode_checked_runtime_symbols_v1(
         operations.push((symbol, tag));
     }
 
-    let spine = RuntimeCheckedHostSpineV1::from_ordered(ordered, io_errors, operations)
+    let spine = RuntimeCheckedHostSpineV1::from_ordered(ordered, resource_kind_symbols, io_errors, operations)
         .ok_or_else(|| role_record_error("host spine field count does not match this decoder"))?;
 
     let record = RuntimeCheckedRoleSymbolsV1 {
@@ -9635,11 +9583,14 @@ mod px7l_tests {
                 &family("ResourceError"),
                 "MappingLimit",
             ),
-            resource_kind_mapping: StableSymbol::constructor(&family("ResourceKind"), "Mapping"),
-            px10_kind_symbols: ["SpawnPlan", "ChildProcess", "PipeRead", "PipeWrite"]
-                .map(|name| StableSymbol::constructor(&family("ResourceKind"), name)),
             px10_exit_symbols: ["Exited", "Signaled"]
                 .map(|name| StableSymbol::constructor(&family("ChildExit"), name)),
+            resource_kind_symbols: std::array::from_fn(|index| {
+                let kind = ken_host::resource_kind_population_v1().unwrap()[index].0;
+                StableSymbol::constructor(&family("ResourceKind"), format!("{kind:?}"))
+            }),
+            px11_address_symbols: ["PrivateSocketIPv4", "PrivateSocketIPv6", "PrivateSocketUnix"]
+                .map(|name| StableSymbol::constructor(&family("SocketAddress"), name)),
             process_take_pipe_write_constructor: StableSymbol::constructor(
                 &family("FSOp"),
                 "PrivateProcessTakePipeWrite",
@@ -9680,8 +9631,6 @@ mod px7l_tests {
                 "InvalidBounds",
             ),
             resource_no_progress: StableSymbol::constructor(&family("ResourceError"), "NoProgress"),
-            resource_kind_fs_handle: StableSymbol::constructor(&family("ResourceKind"), "FsHandle"),
-            resource_kind_buffer: StableSymbol::constructor(&family("ResourceKind"), "Buffer"),
             resource_trace_identity: StableSymbol::constructor(
                 &family("ResourceTraceIdentity"),
                 "PrivateResourceTraceIdentity",
@@ -9976,50 +9925,6 @@ mod px7l_tests {
         );
     }
 
-    #[test]
-    fn static_and_runtime_selected_capability_policies_are_exhaustively_identical() {
-        for operation in ken_host::HostOpV1::ALL {
-            let expected = !operation.is_ambient()
-                && !matches!(
-                    operation,
-                    ken_host::HostOpV1::FsHandleMetadata
-                        | ken_host::HostOpV1::FsReadDirectoryBatch
-                        | ken_host::HostOpV1::FsSetLength
-                        | ken_host::HostOpV1::FsSync
-                        | ken_host::HostOpV1::BufferAllocate
-                        | ken_host::HostOpV1::FsReadAt
-                        | ken_host::HostOpV1::FsWriteAt
-                        | ken_host::HostOpV1::BufferFreeze
-                        | ken_host::HostOpV1::MappingAllocate
-                        | ken_host::HostOpV1::MappingReadView
-                        | ken_host::HostOpV1::MappingWriteView
-                        | ken_host::HostOpV1::MappingAcquireFile
-                        | ken_host::HostOpV1::ResourceStreamRead
-                        | ken_host::HostOpV1::ResourceStreamWrite
-                        | ken_host::HostOpV1::ProcessPlanPush
-                        | ken_host::HostOpV1::ProcessSpawn
-                        | ken_host::HostOpV1::ProcessTakePipe
-                        | ken_host::HostOpV1::ProcessWait
-                        | ken_host::HostOpV1::ProcessSignal
-                        | ken_host::HostOpV1::ResourceRelease
-                );
-            assert_eq!(
-                static_host_operation_requires_capability(operation),
-                expected,
-                "static capability policy drifted for {operation:?}"
-            );
-            assert_eq!(
-                runtime_selected_host_operation_requires_capability(operation),
-                expected,
-                "runtime-selected capability policy drifted for {operation:?}"
-            );
-            assert_eq!(
-                static_host_operation_requires_capability(operation),
-                runtime_selected_host_operation_requires_capability(operation),
-                "static and runtime-selected paths disagree for {operation:?}"
-            );
-        }
-    }
 }
 
 #[cfg(test)]
@@ -10076,8 +9981,6 @@ mod d1b_role_b_decoder_alignment {
             resource_invalid_offset: sentinel("resource_invalid_offset"),
             resource_invalid_bounds: sentinel("resource_invalid_bounds"),
             resource_no_progress: sentinel("resource_no_progress"),
-            resource_kind_fs_handle: sentinel("resource_kind_fs_handle"),
-            resource_kind_buffer: sentinel("resource_kind_buffer"),
             resource_trace_identity: sentinel("resource_trace_identity"),
             nat_zero: sentinel("nat_zero"),
             nat_suc: sentinel("nat_suc"),
@@ -10110,9 +10013,9 @@ mod d1b_role_b_decoder_alignment {
             directory_entries: sentinel("directory_entries"),
             directory_end: sentinel("directory_end"),
             resource_mapping_limit: sentinel("resource_mapping_limit"),
-            resource_kind_mapping: sentinel("resource_kind_mapping"),
-            px10_kind_symbols: [0, 1, 2, 3].map(|i| sentinel(&format!("px10_kind_{i}"))),
             px10_exit_symbols: [0, 1].map(|i| sentinel(&format!("px10_exit_{i}"))),
+            resource_kind_symbols: std::array::from_fn(|i| sentinel(&format!("resource_kind_{i}"))),
+            px11_address_symbols: [0, 1, 2].map(|i| sentinel(&format!("px11_address_{i}"))),
             process_take_pipe_write_constructor: sentinel("take_stdin"),
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
@@ -10191,11 +10094,6 @@ mod d1b_role_b_decoder_alignment {
             ),
             (spine.resource_no_progress.as_str(), "resource_no_progress"),
             (
-                spine.resource_kind_fs_handle.as_str(),
-                "resource_kind_fs_handle",
-            ),
-            (spine.resource_kind_buffer.as_str(), "resource_kind_buffer"),
-            (
                 spine.resource_trace_identity.as_str(),
                 "resource_trace_identity",
             ),
@@ -10255,10 +10153,6 @@ mod d1b_role_b_decoder_alignment {
                 spine.resource_mapping_limit.as_str(),
                 "resource_mapping_limit",
             ),
-            (
-                spine.resource_kind_mapping.as_str(),
-                "resource_kind_mapping",
-            ),
         ];
         for (decoded_symbol, field) in pairs {
             assert_eq!(
@@ -10267,6 +10161,9 @@ mod d1b_role_b_decoder_alignment {
                 "field {field} decoded to {decoded_symbol}, which is another field's sentinel \
                  -- the encoder's order and this decoder's order have drifted apart"
             );
+        }
+        for (index, symbol) in spine.resource_kind_symbols.iter().enumerate() {
+            assert_eq!(*symbol, sentinel(&format!("resource_kind_{index}")).to_string());
         }
         for (index, symbol) in spine.io_errors.iter().enumerate() {
             assert_eq!(*symbol, sentinel(&format!("io_error_{index}")).to_string());
