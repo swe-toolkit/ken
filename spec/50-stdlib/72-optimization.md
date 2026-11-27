@@ -662,7 +662,8 @@ use `Proved`, not `Refl`, because the true goals reduce to `Top`.
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-REFUTED-RANGE §2.5;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-LEAST-HIT §2.6;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH-AGREE §2.7;
-> SPEC-OPTIMIZATION-BOUNDED-SEARCH-OFFSET-SPLIT §2.8).** The
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH-OFFSET-SPLIT §2.8;
+> SPEC-OPTIMIZATION-FIND-BELOW-NONE-SHRINK §2.9).** The
 > original three general laws, catalog module and seed are present on
 > main. Section 2.4's fourth law was checked in Architect D0; its
 > catalog export and package-owned test are on main. The roots-loaded
@@ -692,6 +693,11 @@ use `Proved`, not `Refl`, because the true goals reduce to `Top`.
 > without added `Axiom` or postulate, preserving the exact scratch
 > trusted `GlobalId` set (114 → 114). This is not assembled AC-T,
 > official conformance, CI, publication, landing or measured landed trust.
+> Section 2.9 specifies the tenth public law. Architect's isolated AC-0 on
+> `2d4cdc1b4` checked it and its seed clients without added `Axiom` or
+> postulate, preserving the exact scratch trusted `GlobalId` set
+> (114 → 114). This is not assembled AC-T, official conformance, CI,
+> publication, landing or measured landed trust.
 
 ### 2.1 Carrier and result
 
@@ -844,12 +850,13 @@ congruence, symmetry and transitivity. Matching on a computed order
 comparison supplies an explicit equation, not a refinement inferred
 from an indirectly convertible expression.
 
-There is **no corresponding `None`-stability law**. For
-`above_two n = lt_nat two n`, `find_below above_two three` is `None`,
+There is **no corresponding `None`-stability law for growing bounds**.
+For `above_two n = lt_nat two n`, `find_below above_two three` is `None`,
 while `find_below above_two ten` is `Some three`. Growing a bound can
 introduce a first hit; the accepted same-premise `Some` result and the
 refused false `None` conclusion are paired in the closed seed at
 `conformance/stdlib/optimization/seed-bounded-search-bound-stability.md`.
+`None` does persist when the bound shrinks; §2.9 states that law.
 The finite instance checks the boundary but does not prove the
 generic theorem. Architect's isolated D0 at landed base `0bb872591`
 checked the generic body (`ken check` and `ken fmt --check` rc 0), two
@@ -1047,9 +1054,39 @@ full search returns 5, not 7.
 
 The proofs share induction on `width`, retaining `None` or translating
 `Some` by adding the offset. That outcome translation stays private
-and appears in neither public type. The module exports `find_below`
-plus nine public laws, ten public names in all. No §1–§2.7 operation
-or law type changes.
+and appears in neither public type. After §2.8 the module exports
+`find_below` plus nine public laws; §2.9 adds a tenth. No §1–§2.7
+operation or law type changes.
+
+### 2.9 A refuted search stays refuted at a smaller bound
+
+`Algorithm.Optimization.BoundedSearch` must export this public Transparent
+theorem directly after `find_below_stable` and before `find_below_ext`:
+
+```ken
+pub theorem find_below_none_shrink
+      (p : Nat → Bool) (bound : Nat) (larger : Nat)
+    : Equal Bool (leq_nat bound larger) True
+      → Equal (Option Nat) (find_below p larger) (None Nat)
+      → Equal (Option Nat) (find_below p bound) (None Nat)
+```
+
+The only premises are that `bound ≤ larger` and that the search with
+predicate `p` returns `None` below `larger`. The same predicate then
+returns `None` below `bound`. This is the downward `None` companion to
+§2.4, not an upward stability law: §2.4's `above_two` returns `None`
+below `three` but `Some three` below `ten`.
+
+For each `m < bound`, the inline order step uses `lt_nat.to_leq_suc`
+to obtain `Suc m ≤ bound`, `leq_nat.trans` to obtain `Suc m ≤ larger`,
+and `lt_nat.from_leq_suc` to obtain `m < larger`. At `larger`,
+`find_below_complete` uses the observed `None` to prove
+`Equal Bool (p m) False`. `find_below_refuted` at `bound` uses that
+pointwise refutation to conclude `None` for the smaller search.
+The proof adds no helper and changes no import.
+
+The module exports `find_below` plus ten public laws, eleven public
+names in all. No §1–§2.8 operation or law type changes.
 
 ## 3. Greatest-cost candidate
 

@@ -917,9 +917,11 @@ neither shipped-seed execution, CI nor a landed trust measurement.
 Section 2.4 adds one public `find_below_stable` law: if the result is
 `Some n` and `leq_nat bound larger = True`, that **same** `Some n`
 remains at the larger bound. `leq_suc_not_leq_same` stays private;
-there is no `None`-stability law, since a larger range can contain a
-first hit. Architect's D0 checked the generic proof with no new
-`Axiom` and equal scratch trusted identities 114 → 114. The §2.4
+there is no upward `None`-stability law, since a larger range can contain
+a first hit. §2.9 adds the downward law, `find_below_none_shrink`: `None`
+below a larger bound gives `None` below a smaller one. Architect's D0
+checked the §2.4 generic proof with no new `Axiom` and equal scratch
+trusted identities 114 → 114. The §2.4
 catalog export, seed and package-owned test are now on main; the
 test and earlier D0 do not establish official conformance or a
 landed trust measurement. The `List`-input Option
