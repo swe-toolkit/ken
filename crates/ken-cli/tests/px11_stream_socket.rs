@@ -130,6 +130,9 @@ fn px11_all_three_families_exchange_exact_bytes_and_observe_eof() {
 /// address-aware System.Error conversion preserves typed failure identity.
 /// THE GAP: the checked theorem in the fixture pins the address itself;
 /// the runtime match observes the envelope's constructor and cause.
+/// the typed conversion is applied to the pattern-matched identity;
+/// converting a carried response identity inside a bracket continuation is a
+/// native lowering limit shared with FS brackets (separate follow-up).
 #[test]
 fn px11_missing_unix_listener_has_typed_socket_error() {
     let dir = tempfile::Builder::new()
@@ -149,6 +152,9 @@ fn px11_missing_unix_listener_has_typed_socket_error() {
 /// CLAIMED: a grant for a different address class cannot authorize connect.
 /// THE GAP: the host-level backend-call counter independently checks that
 /// denial precedes the socket syscall; an eventual NotFound must not suffice.
+/// the typed conversion is applied to the pattern-matched identity;
+/// converting a carried response identity inside a bracket continuation is a
+/// native lowering limit shared with FS brackets (separate follow-up).
 #[test]
 fn px11_wrong_grant_refuses_unix_connect() {
     let dir = tempfile::Builder::new()

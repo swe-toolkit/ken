@@ -27,18 +27,24 @@ fn classify (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) :
     Err _ ↦ ExitCode.Failure 86
   }
 
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
 proc main
       (input : ProcessInput) (caps : ProgramCaps AFull)
     : HostIO AFull ExitCode
     visits [Net] =
   match input {
     MkProcessInput arguments _ _ ↦
-      match arguments {
+      match reversed_arguments arguments (Nil Bytes) {
         Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
-        Cons operation rest ↦
+        Cons path rest ↦
           match rest {
             Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
-            Cons path _ ↦
+            Cons operation _ ↦
               match socket_unix_path path {
                 Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
                 Ok address ↦

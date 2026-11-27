@@ -73,8 +73,8 @@ proc main
                     (λoutcome.
                       match outcome {
                         Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
-                        Err (ResourceError.ResourceHostIO identity) ↦
-                          match typed_missing_address address identity {
+                        Err (ResourceError.ResourceHostIO IOError.NotFound) ↦
+                          match typed_missing_address address IOError.NotFound {
                             True ↦ host_pure AFull ExitCode ExitCode.Success;
                             False ↦ host_pure AFull ExitCode (ExitCode.Failure 77)
                           };

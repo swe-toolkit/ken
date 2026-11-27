@@ -62,8 +62,8 @@ proc main
                     (λoutcome.
                       match outcome {
                         Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
-                        Err (ResourceError.ResourceHostIO identity) ↦
-                          match typed_denied_address address identity {
+                        Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦
+                          match typed_denied_address address IOError.CapabilityDenied {
                             True ↦ host_pure AFull ExitCode ExitCode.Success;
                             False ↦ host_pure AFull ExitCode (ExitCode.Failure 77)
                           };
