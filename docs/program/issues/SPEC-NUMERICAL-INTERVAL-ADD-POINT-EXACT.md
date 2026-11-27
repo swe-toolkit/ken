@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-ADD-POINT-EXACT
 title: "Spec 68 proves that interval addition encloses every sum of members (interval_add_encloses) and that adding two point intervals gives the point of the sum (interval_add_point), but no law says that shifting by a point loses nothing: a client that translates an enclosure by a known offset cannot conclude that a shifted value outside the result was outside the original. Rule from a checked D0 at zero trust that interval_contains (interval_add i (interval_point t)) (rational_add x t) equals interval_contains i x, and state it with a seed whose accepted row needs the converse"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
