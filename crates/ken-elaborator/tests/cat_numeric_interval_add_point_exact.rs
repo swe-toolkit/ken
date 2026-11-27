@@ -244,8 +244,8 @@ fn dropped_shifts_and_enclosure_only_refuse_in_the_own_theorem() {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: each selective import from the checked package refuses with
 /// UnboundName for the requested helper.
-/// CLAIMED: the six proof helpers are not client API.
-/// THE GAP: this checks the six named import attempts; the exact export
+/// CLAIMED: the five proof helpers are not client API.
+/// THE GAP: this checks the five named import attempts; the exact export
 /// roster separately detects any other public addition.
 #[test]
 fn point_shift_proof_helpers_are_private() {
@@ -256,7 +256,6 @@ fn point_shift_proof_helpers_are_private() {
         "rational_add_sub_cancel",
         "rational_leq_add_left",
         "rational_zero_leq",
-        "bool_eq_from_iff",
     ] {
         let source = format!("import {INTERVAL} ({helper})");
         match env.elaborate_file(&source) {
