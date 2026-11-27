@@ -27,7 +27,7 @@ without requiring either interval to contain a member.
 ## 2. Definition
 
 `Interval` holds two rational values and exports `MkInterval` so clients can
-construct boxes directly. The six arithmetic and point laws, together with
+construct boxes directly. The seven arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
 source; their operations follow. The width operation and seven checked laws,
 including `interval_width_mul`, `interval_width_inside`,
@@ -275,6 +275,36 @@ pub theorem interval_mul_point
         (interval_mul (interval_point x) (interval_point y))
         (interval_point (rational_mul x y)) =
   Refl
+
+pub theorem interval_add_point_exact
+      (i : Interval) (t : Rational) (x : Rational)
+    : Equal Bool
+        (interval_contains (interval_add i (interval_point t)) (rational_add x t))
+        (interval_contains i x) =
+  match i {
+    MkInterval lo hi ↦
+      trans
+        Bool
+        (bool_and
+          (rational_leq (rational_add lo t) (rational_add x t))
+          (rational_leq (rational_add x t) (rational_add hi t)))
+        (bool_and (rational_leq lo x) (rational_leq (rational_add x t) (rational_add hi t)))
+        (bool_and (rational_leq lo x) (rational_leq x hi))
+        (cong
+          Bool
+          Bool
+          (rational_leq (rational_add lo t) (rational_add x t))
+          (rational_leq lo x)
+          (λlower. bool_and lower (rational_leq (rational_add x t) (rational_add hi t)))
+          (rational_add_leq_shift lo x t))
+        (cong
+          Bool
+          Bool
+          (rational_leq (rational_add x t) (rational_add hi t))
+          (rational_leq x hi)
+          (λupper. bool_and (rational_leq lo x) upper)
+          (rational_add_leq_shift x hi t))
+  }
 
 pub theorem interval_width_point
       (x : Rational)
@@ -1885,6 +1915,118 @@ theorem rational_sub_zero_leq
       }
   }
 
+theorem rational_add_leq_shift
+      (a : Rational) (b : Rational) (t : Rational)
+    : Equal Bool (rational_leq (rational_add a t) (rational_add b t)) (rational_leq a b) =
+  bool_eq_from_iff
+    (rational_leq (rational_add a t) (rational_add b t))
+    (rational_leq a b)
+    (rational_add_leq_cancel_r a b t)
+    (λordered. rational_add_mono a b t t ordered ((proof refl for rational_leq) t))
+
+theorem rational_add_leq_cancel_r
+      (a : Rational) (b : Rational) (t : Rational)
+    : IsTrue (rational_leq (rational_add a t) (rational_add b t)) → IsTrue (rational_leq a b) =
+  λshifted.
+    trans
+      Bool
+      (rational_leq a b)
+      (rational_leq (rational_sub (rational_add a t) t) (rational_sub (rational_add b t) t))
+      True
+      (sym
+        Bool
+        (rational_leq (rational_sub (rational_add a t) t) (rational_sub (rational_add b t) t))
+        (rational_leq a b)
+        ((proof respect for rational_leq)
+          (rational_sub (rational_add a t) t)
+          a
+          (rational_sub (rational_add b t) t)
+          b
+          (rational_add_sub_cancel a t)
+          (rational_add_sub_cancel b t)))
+      (rational_sub_mono
+        (rational_add a t)
+        (rational_add b t)
+        t
+        t
+        shifted
+        ((proof refl for rational_leq) t))
+
+theorem rational_add_sub_cancel
+      (a : Rational) (t : Rational)
+    : rational_equiv (rational_sub (rational_add a t) t) a =
+  rational_add_cancel_r
+    (rational_sub (rational_add a t) t)
+    a
+    t
+    ((proof add_cancel for rational_sub) (rational_add a t) t (rational_leq_add_left a t))
+
+theorem rational_leq_add_left
+      (a : Rational) (t : Rational)
+    : IsTrue (rational_leq t (rational_add a t)) =
+  trans
+    Bool
+    (rational_leq t (rational_add a t))
+    (rational_leq (rational_add rational_zero t) (rational_add a t))
+    True
+    (sym
+      Bool
+      (rational_leq (rational_add rational_zero t) (rational_add a t))
+      (rational_leq t (rational_add a t))
+      ((proof respect for rational_leq)
+        (rational_add rational_zero t)
+        t
+        (rational_add a t)
+        (rational_add a t)
+        ((proof zero_l for rational_add) t)
+        ((proof refl for rational_equiv) (rational_add a t))))
+    (rational_add_mono
+      rational_zero
+      a
+      t
+      t
+      (rational_zero_leq a)
+      ((proof refl for rational_leq) t))
+
+theorem rational_zero_leq (a : Rational) : IsTrue (rational_leq rational_zero a) =
+  match a {
+    MkRational n d ↦
+      trans
+        Bool
+        (leq_nat (mul Zero (Suc d)) (mul n (Suc Zero)))
+        (leq_nat Zero (mul n (Suc Zero)))
+        True
+        (cong
+          Nat
+          Bool
+          (mul Zero (Suc d))
+          Zero
+          (λv. leq_nat v (mul n (Suc Zero)))
+          ((proof zero_l for mul) (Suc d)))
+        Proved
+  }
+
+theorem bool_eq_from_iff
+      (p : Bool)
+    : (q : Bool)
+      → (Equal Bool p True → Equal Bool q True)
+      → (Equal Bool q True → Equal Bool p True)
+      → Equal Bool p q =
+  match p {
+    True ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. Proved;
+          False ↦ λforward. λbackward. absurd (forward Proved)
+        };
+    False ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. absurd (backward Proved);
+          False ↦ λforward. λbackward. Proved
+        }
+  }
+
 theorem rational_distrib_r
       (x : Rational) (y : Rational) (z : Rational)
     : rational_equiv
@@ -2148,6 +2290,20 @@ To carry a member of either half into the whole, compose
 `interval_inside_sound`. Direct inclusion of just the lower half needs
 only `m ≤ hi`; direct inclusion of just the upper half needs only `lo ≤ m`.
 
+### Shifting by a point (§24)
+
+`interval_add_point_exact i t x` equates the Boolean membership of `x + t`
+in `interval_add i (interval_point t)` with that of `x` in `i`. Unlike
+`interval_add_encloses`, it also transports membership back to the original
+interval. It needs no endpoint-order premise: the proof cancels the same
+shift in each comparison, even for inverted intervals. This is equality of
+membership decisions, not of stored endpoint spellings.
+
+For `[1, 2]` shifted by `1`, membership of `x + 1` in `[2, 3]` implies
+membership of `x` in `[1, 2]`, even when `x` is unknown. An unshifted
+member need not belong to the shifted interval: `1` belongs to `[1, 2]`
+but not to `[2, 3]`.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -2189,12 +2345,14 @@ interval subtraction are not.
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
    `interval_hull`, `interval_intersect`, `interval_inside` and
-   `interval_split_covers` form the public contract with sixty-three checked
+   `interval_split_covers` form the public contract with sixty-four checked
    public theorems, including `interval_width_mul`, `interval_width_inside`,
    `interval_width_bounds_sub`, `interval_width_zero_equiv`,
    `interval_split_width`, `interval_split_hull_inside` and
    `interval_inside_split_hull`. Section 23 adds two theorems and leaves the
    nine public functions and all operation and law types from §§1–22 unchanged.
+   Section 24 adds `interval_add_point_exact` and leaves the nine public
+   functions and all operation and law types from §§1–23 unchanged.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
@@ -2203,6 +2361,11 @@ interval subtraction are not.
    four point-unit inclusions, two point-zero absorption inclusions,
    and the point, ordered-addition, inside-monotonicity, zero-width
    member-equivalence and split-width proofs.
+   [Shifting by a point](#shifting-by-a-point-24) explains the exact
+   membership law. The definition places the law between `interval_mul_point`
+   and `interval_width_point`, and groups its six helpers from
+   `rational_add_leq_shift` through `bool_eq_from_iff` before
+   `rational_distrib_r`. The helpers are not part of the public API.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -2243,7 +2406,15 @@ interval subtraction are not.
    new helper or import.
    [Reassembling a split](#reassembling-a-split-23) uses `interval_hull_least`
    and the public Rational min/max bound laws without new helpers.
-4. **Trusted-base delta.** Zero: all sixty-three theorems and the split cover
+   The point-shift proof uses `rational_add_leq_shift` on both bounds.
+   Its forward implication uses addition monotonicity; its converse,
+   `rational_add_leq_cancel_r`, uses subtraction monotonicity and transports
+   both results along `rational_add_sub_cancel`. For that cancellation,
+   `rational_leq_add_left` supplies the premise that prevents truncation,
+   using `rational_zero_leq` and Nat multiplication's left-zero law.
+   `bool_eq_from_iff` joins the two implications. Those six helpers are
+   not part of the public API; no new import or Rational export is needed.
+4. **Trusted-base delta.** Zero: all sixty-four theorems and the split cover
    function have checked bodies, and the package declares no `Axiom` or new
    primitive. Imported rational, natural-number and logical providers retain
    their inherited trust.
@@ -2306,5 +2477,13 @@ interval subtraction are not.
    equal-value-but-different-spelling claim. The split-cover package test
    checks an open client, both exclusive halves, exterior and endpoint splits,
    rejection of a false lower-half claim, and unchanged trusted identities.
+   The [§24 seed][add-point-exact-seed] pairs an open converse with two
+   dropped-shift refusals. The point-shift package test checks these cases,
+   the owned law and its use in the converse, helper privacy, and unchanged
+   trusted identities through Rational and RationalInterval. Its closed
+   exclusion also computes without the law, so it is a usage example,
+   not evidence for the converse.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
+
+[add-point-exact-seed]: ../../../../conformance/stdlib/numerical/seed-interval-add-point-exact.md
