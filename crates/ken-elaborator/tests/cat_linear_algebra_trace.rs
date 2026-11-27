@@ -1,4 +1,4 @@
-//! Square-matrix trace: spec/50-stdlib/65-linear-algebra.md §18.
+//! Square-matrix trace: spec/50-stdlib/65-linear-algebra.md §§18 and 24.
 //! Promise class: durable invariant. Open law applications and kernel-checked
 //! bodies establish generic obligations; closed independent values and false
 //! same-form claims distinguish diagonal trace from row sum and addition.
@@ -134,6 +134,34 @@ theorem trace_identity_closed : Equal Nat (trace three (identity three)) three =
 theorem trace_scale_value : Equal Nat (trace three (matrix_scale three three three a)) (mul three (add six nine)) = Proved
 "#;
 
+const TRACE_ZERO_ACCEPTED: &str = r#"
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+import Algorithm.LinearAlgebra.NatMatrix (matrix_zero, trace, trace_zero, trace_identity, identity)
+
+const three : Nat = Suc (Suc (Suc Zero))
+
+theorem open_trace_zero (n : Nat) : Equal Nat (trace n (matrix_zero n n)) Zero =
+  trace_zero n
+
+theorem closed_trace_zero : Equal Nat (trace three (matrix_zero three three)) Zero = Proved
+
+theorem closed_trace_zero_by_law : Equal Nat (trace three (matrix_zero three three)) Zero =
+  trace_zero three
+
+theorem closed_trace_identity : Equal Nat (trace three (identity three)) three = Proved
+"#;
+
+const TRACE_ZERO_OPEN_WRONG_BY_LAW: &str = r#"theorem open_trace_zero_is_dimension (n : Nat) : Equal Nat (trace n (matrix_zero n n)) n =
+  trace_zero n
+"#;
+
+const TRACE_ZERO_OPEN_WRONG_BY_PROVED: &str = r#"theorem open_trace_zero_is_dimension_proved (n : Nat) : Equal Nat (trace n (matrix_zero n n)) n = Proved
+"#;
+
+const TRACE_ZERO_CLOSED_WRONG: &str = r#"theorem closed_trace_zero_is_dimension : Equal Nat (trace three (matrix_zero three three)) three = Proved
+"#;
+
 const X_ROW: &str =
     "theorem trace_first_row : Equal Nat (trace three a) (add (add one two) three) = Proved\n";
 const X_SCALE: &str = "theorem trace_scale_as_add : Equal Nat (trace three (matrix_scale three three three a)) (add three (trace three a)) = Proved\n";
@@ -265,5 +293,104 @@ fn accepted_diagonal_values_and_laws_refuse_two_false_own_claims() {
             span.start <= terminal && terminal + "Proved".len() <= span.end,
             "{name} error must enclose its own Proved: {span:?}"
         );
+    }
+}
+
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §24, Architect AC-0 and AC-2.
+/// PROMISE CLASS: durable invariant. MEASURED: provider-relative trust sets
+/// match, the open and closed applications cite the owned Transparent law,
+/// its proof cites the three checked dependencies, and the checked Gram
+/// body does not reference the same-spelled global. All three twins refuse
+/// inside their own theorem after fresh copies of the full accepted prefix.
+/// CLAIMED: zero matrices have zero trace for open dimensions, with no new
+/// trust or capture of the Gram premise. THE GAP: closed controls compute
+/// even without the law; the open pair distinguishes zero from dimension.
+/// Proof citation and no-capture checks inspect checked bodies, not spelling.
+#[test]
+fn zero_trace_is_owned_and_checked_without_new_trust_or_gram_capture() {
+    let (mut env, before, after, owned) = loaded();
+    eprintln!(
+        "NatMatrix trusted GlobalIds: {} → {}",
+        before.len(),
+        after.len()
+    );
+    assert_eq!(
+        after, before,
+        "trace_zero adds no trusted GlobalId identity"
+    );
+
+    let law = env.globals[&format!("{MATRIX}.trace_zero")];
+    assert!(owned.contains(&law), "trace_zero belongs to NatMatrix");
+    let (_, body) = env
+        .env
+        .transparent_body(law)
+        .expect("trace_zero has a checked Transparent body");
+    for dependency in [
+        format!("{MATRIX}.matrix_scale_zero"),
+        format!("{MATRIX}.trace_scale"),
+        "Data.Numeric.Nat.Arithmetic.mul::zero_l".to_owned(),
+    ] {
+        assert!(
+            has_const(&body, env.globals[&dependency]),
+            "trace_zero must cite {dependency}"
+        );
+    }
+    let gram = env.globals[&format!("{MATRIX}.matrix_zero_of_trace_gram_zero")];
+    assert!(owned.contains(&gram), "Gram law belongs to NatMatrix");
+    let (_, gram_body) = env
+        .env
+        .transparent_body(gram)
+        .expect("Gram law has a checked Transparent body");
+    assert!(
+        !has_const(&gram_body, law),
+        "Gram proof must not reference the global trace_zero"
+    );
+
+    env.elaborate_file(TRACE_ZERO_ACCEPTED)
+        .expect("full accepted trace-zero client checks");
+    for client in ["open_trace_zero", "closed_trace_zero_by_law"] {
+        let (_, body) = env
+            .env
+            .transparent_body(env.globals[client])
+            .expect("trace-zero client has a checked body");
+        assert!(has_const(&body, law), "{client} must cite owned trace_zero");
+    }
+
+    for (name, row) in [
+        ("open_trace_zero_is_dimension", TRACE_ZERO_OPEN_WRONG_BY_LAW),
+        (
+            "open_trace_zero_is_dimension_proved",
+            TRACE_ZERO_OPEN_WRONG_BY_PROVED,
+        ),
+        ("closed_trace_zero_is_dimension", TRACE_ZERO_CLOSED_WRONG),
+    ] {
+        let decls = parse_decls(row).expect("trace-zero twin parses");
+        assert_eq!(decls.len(), 1, "{name} must be exactly one theorem");
+        let SourceDecl::TheoremDecl {
+            name: actual,
+            span: claim,
+            ..
+        } = &decls[0]
+        else {
+            panic!("{name} must be a theorem");
+        };
+        assert_eq!(actual, name);
+        let (mut fresh, _, _, _) = loaded();
+        fresh
+            .elaborate_file(TRACE_ZERO_ACCEPTED)
+            .unwrap_or_else(|error| panic!("{name} fresh accepted prefix: {error:?}"));
+        match fresh.elaborate_file(row) {
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                span,
+            }) => {
+                assert!(
+                    claim.start <= span.start && span.start < span.end && span.end <= claim.end,
+                    "{name} must refuse inside its own theorem: {span:?} vs {claim:?}"
+                );
+                eprintln!("{name}: KernelRejected(TypeMismatch) at {span:?}");
+            }
+            other => panic!("{name} must kernel-refuse at its own theorem: {other:?}"),
+        }
     }
 }

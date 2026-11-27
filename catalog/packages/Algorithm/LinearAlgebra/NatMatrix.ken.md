@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and sixty-six algebraic laws have checked proofs.
+all arithmetic is exact, and sixty-seven algebraic laws have checked proofs.
 
 ## Contents
 
@@ -39,11 +39,11 @@ laws and a private squared-head step. `matrix_scale` maps vector scaling over
 rows; its eight scaling laws connect matrix addition, factor arithmetic,
 transpose and multiplication, and a ninth cancels successor scaling. `trace`
 sums the diagonal of a square matrix by recursion on its dimension, adding
-the corner entry to the trace of the trailing minor. Its four checked laws
-make it additive over `matrix_add`,
-homogeneous under `matrix_scale`, invariant under `transpose` and equal to
-the dimension on `identity`. A fifth law exchanges factors of a product
-under the trace, including rectangular factors. The named private stages
+the corner entry to the trace of the trailing minor. Its five checked laws
+make it additive over `matrix_add`, homogeneous under `matrix_scale`,
+invariant under `transpose`, equal to the dimension on `identity` and zero
+on `matrix_zero`. A sixth law exchanges factors of a product under the
+trace, including rectangular factors. The named private stages
 build columns and row products; no second matrix carrier or numeric primitive
 is needed.
 
@@ -2202,6 +2202,31 @@ pub theorem trace_identity (n : Nat) : Equal Nat (trace n (identity n)) n =
             (drop_column_prepend_zero k k (identity k)))
           (cong Nat Nat (trace k (identity k)) k (λs. add s (Suc Zero)) (trace_identity k))
   }
+
+pub theorem trace_zero (n : Nat) : Equal Nat (trace n (matrix_zero n n)) Zero =
+  let
+    zeros = matrix_zero n n;
+    scaled = matrix_scale n n Zero zeros
+  in
+    trans
+      Nat
+      (trace n zeros)
+      (mul Zero (trace n zeros))
+      Zero
+      (trans
+        Nat
+        (trace n zeros)
+        (trace n scaled)
+        (mul Zero (trace n zeros))
+        (cong
+          (Vec (Vec Nat n) n)
+          Nat
+          zeros
+          scaled
+          (trace n)
+          (sym (Vec (Vec Nat n) n) scaled zeros (matrix_scale_zero n n zeros)))
+        (trace_scale n Zero zeros))
+      ((proof zero_l for mul) (trace n zeros))
 
 pub theorem trace_product_comm
       (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat m) n)
@@ -5132,7 +5157,11 @@ unchanged, private `drop_column_prepend` removes the prepended column, and the
 hypothesis at the minor closes the step. `trace_identity` drops the zero
 column with private `drop_column_prepend_zero`; adding the unit corner on the
 right reduces to the successor. All four laws hold at dimension zero and need
-no premise.
+no premise. `trace_zero` needs no induction: `matrix_scale_zero` rewrites the
+zero matrix as its own scaling by zero, `trace_scale` moves that factor out
+of the trace, and the public `proof zero_l for mul` closes `mul Zero` over the
+open trace, which does not reduce because `mul` recurses on its second
+argument.
 
 The product trace law identifies each product's diagonal with a private sum
 of row-wise dot products. Transposing both inputs exchanges the row and
@@ -5183,8 +5212,8 @@ by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–23 owns
-seventy-eight public names across twelve operations and sixty-six laws. The
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–24 owns
+seventy-nine public names across twelve operations and sixty-seven laws. The
 [original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
 [distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md),
 [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md),
@@ -5218,9 +5247,10 @@ are imported from Nat Arithmetic as `add::eq_zero_l` and `add::eq_zero_r`.
 `transpose_identity`, and its two new proof helpers stay private.
 `matrix_vector_scale` follows `matrix_product_scale_right` as a public law,
 uses `dot_scale` for its row step and adds no private helper. `trace` follows
-`matrix_scale`, and its four laws follow `matrix_vector_scale` as their
-public family. `trace_product_comm` follows `trace_identity`; its nine
-row-pairing helpers stay private. The final two public laws are
+`matrix_scale`, and its public law family follows `matrix_vector_scale`.
+`trace_zero` follows `trace_identity` and adds no helper;
+`trace_product_comm` follows `trace_zero`, and its nine row-pairing helpers
+stay private. The final two public laws are
 `matrix_zero_of_trace_gram_zero` and `transpose_gram`. The first uses
 `trace_row_dot_sum` and `transpose_invol` to rewrite the Gram trace as a
 sum of row self-dots. The private `row_dot_sum_self_zero` splits the zero
@@ -5238,7 +5268,7 @@ private `vector_add_eq_zero_cons` and `matrix_add_eq_zero_cons` follow
 `matrix_add_cancel_cons`. `vector_scale_cancel` follows
 `vector_add_eq_zero_right`, and `matrix_scale_cancel` follows
 `matrix_add_eq_zero_right`. The scaling proofs' `map_injective`, `map_view`
-and `mul_cancel_left` helpers remain private. All sixty-six laws have
+and `mul_cancel_left` helpers remain private. All sixty-seven laws have
 checked bodies.
 This package adds no Axiom, postulate, primitive, `Float` or trusted-base
 entry; dependencies retain their own trust posture. Root-loaded acceptance
@@ -5276,12 +5306,16 @@ this package test does not execute that client. The
 [trace seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-trace.md)
 is authored, not officially conformance-run; its package test checks the
 four open law types, the closed 3 × 3 values and both isolated
-refusals. The trace-product-commutation seed is authored but not officially
-conformance-run; `cat_linear_algebra_trace_product_comm` applies its generic
-law, checks rectangular and square trace and product values, and isolates
-the false square product-equality claim. The matrix package test also checks
-generic and closed right-cancellation clients, both zero-dimensional cases,
-the exact trusted-identity set and an isolated false sum premise. The
+refusals. The [trace-zero seed][trace-zero-seed] is authored, not officially
+conformance-run. Its package test checks the open law and closed trace
+values, then isolates three false claims that the trace of the zero matrix
+is the dimension. The trace-product-commutation seed is authored but not
+officially conformance-run; `cat_linear_algebra_trace_product_comm` applies
+its generic law, checks rectangular and square trace and product values,
+and isolates the false square product-equality claim. The matrix package
+test also checks generic and closed right-cancellation clients, both
+zero-dimensional cases, the exact trusted-identity set and an isolated
+false sum premise. The
 [scale-cancellation seed](../../../../conformance/stdlib/linear-algebra/seed-scale-cancel.md)
 states generic successor-factor applications and contrasts inhabited
 factor-zero premises with false conclusions. The matrix package test checks
@@ -5295,3 +5329,4 @@ isolated refusals. These tests use root-loaded exports and are not official
 conformance-runner runs or claims of CI, publication or landing.
 
 [gram-seed]: ../../../../conformance/stdlib/linear-algebra/seed-gram-trace-zero.md
+[trace-zero-seed]: ../../../../conformance/stdlib/linear-algebra/seed-trace-zero.md
