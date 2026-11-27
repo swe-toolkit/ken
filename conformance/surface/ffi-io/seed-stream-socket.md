@@ -7,9 +7,7 @@ Spec: `spec/30-surface/38-ffi-io.md` §1.13 and
 These acceptance cases are not seed execution or official conformance
 execution. Targeted interpreter and host tests are implementation evidence
 only; they do not execute this seed. Full-workspace CI, publication, landing,
-native parity and trusted-base measurement are not claimed by this seed. The
-first slice deliberately refuses native execution for a Net-declared program
-before object emission.
+native parity and trusted-base measurement are not claimed by this seed.
 
 The root-scope rows follow the ruled RT-NET-UNIX-PATH-FS-ROOT-SCOPE AC-0.
 For existing valid Unix addresses, the harness uses a fresh short canonical
