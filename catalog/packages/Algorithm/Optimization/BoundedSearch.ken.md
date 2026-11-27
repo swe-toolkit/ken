@@ -23,7 +23,7 @@ arbitrary predicates or an unbounded search mechanism.
 
 ## Definition
 
-The public operation and its nine laws lead. The private outcome invariant
+The public operation and its ten laws lead. The private outcome invariant
 records either the absence of every earlier hit or a least satisfying witness.
 
 ```ken
@@ -128,6 +128,33 @@ pub theorem find_below_stable
                 found
           }
   }
+
+pub theorem find_below_none_shrink
+      (p : Nat → Bool) (bound : Nat) (larger : Nat)
+    : Equal Bool (leq_nat bound larger) True
+      → Equal (Option Nat) (find_below p larger) (None Nat)
+      → Equal (Option Nat) (find_below p bound) (None Nat) =
+  λwithin.
+    λmissing.
+      find_below_refuted
+        p
+        bound
+        (λm.
+          λearlier.
+            find_below_complete
+              p
+              larger
+              missing
+              m
+              ((proof from_leq_suc for lt_nat)
+                m
+                larger
+                ((proof trans for leq_nat)
+                  (Suc m)
+                  bound
+                  larger
+                  ((proof to_leq_suc for lt_nat) m bound earlier)
+                  within)))
 
 pub theorem find_below_ext
       (p : Nat → Bool) (q : Nat → Bool) (bound : Nat)
@@ -626,8 +653,13 @@ the actual result equality.
 `find_below_stable` proves that an observed `Some n` persists when the bound
 grows. Its proof inducts over the larger bound: an earlier bound fits within
 the predecessor and reuses the induction hypothesis, or equals the new bound
-and transports the observed result. No corresponding `None` law holds: a
-larger range can contain a new hit.
+and transports the observed result. `None` does not persist upward: a larger
+range can contain a new hit. It persists downward: `find_below_none_shrink`
+takes `None` below a larger bound to `None` below any bound it bounds.
+Completeness at the larger bound refutes every candidate below it, `lt_nat`'s
+`to_leq_suc` and `from_leq_suc` with `leq_nat`'s `trans` carry `m < bound` and
+`bound <= larger` to `m < larger`, and `find_below_refuted` closes the smaller
+search. It needs no induction or private helper.
 
 `find_below_ext` proves that two predicates agreeing at every candidate strictly
 below the bound yield the same result. It inducts over the bound, restricting
@@ -705,7 +737,7 @@ range and can return `None`.
 ## Trust & derivation
 
 The source implements the contract in `spec/50-stdlib/72-optimization.md` §2.
-Its public interface consists of `find_below` and the nine named laws above;
+Its public interface consists of `find_below` and the ten named laws above;
 all invariant and proof helpers are private. For the operation and its proof
 family, read Definition; for a closed client, follow Using it; for proof
 structure and scope, read Laws & proofs and Design notes.
@@ -749,5 +781,12 @@ checks a shifted hit, two empty parts, and a split whose first part already
 hits. The offset-split package test checks both open laws, private-helper
 visibility, and unchanged trusted `GlobalId` identities. It also checks both
 closed outcomes and isolates the refusal at the false first-part premise.
+The [none-shrink seed](
+  ../../../../conformance/stdlib/optimization/seed-bounded-search-none-shrink.md)
+applies the law with an open predicate; its same-form converse refuses at
+the order premise. The [none-shrink package test](
+  ../../../../crates/ken-elaborator/tests/cat_optimization_bounded_search_none_shrink.rs)
+checks the generic §2.9 type, package ownership, unchanged trusted `GlobalId`
+identities, and both seed clients.
 These package tests do not establish official conformance execution. No time,
 space, or predicate-call-count guarantee is claimed.
