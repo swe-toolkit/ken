@@ -857,16 +857,19 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// The six sources are (a) predeclared units containing the seat, (b)
+/// The seven sources are (a) predeclared units containing the seat, (b)
 /// continuation specializations whose selected case body contains it, (c)
 /// Specialized response rows under their base owner, (d) Deferred responses
 /// handled by another owner, (e) returned-Vis successors performed by the
-/// pending-Vis loop under each successor row's base owner, and (f) a marked
-/// bracket's host effect under its row's base-owner authority at every S copy.
-/// Those are the
+/// pending-Vis loop under each successor row's base owner, (f) a marked
+/// bracket's host effect under its row's base-owner authority at every S copy,
+/// and (g) every planned generated context under its enclosing specialization
+/// at seats in its raw owner's emission (synthesized aggregates only; not
+/// relays). Those are the
 /// emission populations lowering enters, not a reconstruction from response
-/// disposition alone. Generated continuation contexts are a narrower,
-/// post-hoc population and cannot authorize the records by themselves.
+/// disposition alone. Generated continuation contexts authorize
+/// synthesized-aggregate records through (g), keyed on the planned context
+/// population lowering stages; they do not authorize relay frames.
 ///
 /// This authority applies to synthesized aggregates constructed inline at
 /// `seat`: host-result constructors and unit-boundary environments. A checked-IH
@@ -1005,6 +1008,23 @@ fn inline_synthesized_seat_emission_owners(
                     owners.push(response.base_owner());
                 }
             }
+        }
+    }
+    // (g) A generated context re-emits its raw owner's source emission under
+    // its enclosing specialization: lowering stages each planned context by
+    // binding `Specialization(enclosing)` and lowering `worker_body_origin`
+    // (units.rs `stage_continuation_context_bodies`). Read that same planned
+    // population, through the raw owner's own emission traversal. Relay
+    // minting does not read this source: its frame owner is keyed by the
+    // emission owner, and a context's pending-Vis frame is `Context(id)`.
+    for context in &plan.continuation_contexts {
+        if plan
+            .emission_source_origins(context.raw_owner(), context.worker_body_origin())?
+            .contains(&seat)
+        {
+            owners.push(ContinuationEmissionOwner::Specialization(
+                context.enclosing_specialization(),
+            ));
         }
     }
     owners.sort();
