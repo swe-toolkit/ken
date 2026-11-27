@@ -158,6 +158,9 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRole {
     /// A defunctionalized recursive-position residual: forwarded child,
     /// worker Parameter tail, then the complete context Capture run.
     RecursivePositionResidual,
+    /// Entry 17: the `ITree::Ret` a K context wraps around one predeclared
+    /// unit's direct-style answer at one unit-answer Call occurrence.
+    KContextUnitAnswerRet,
 }
 
 /// One parent-field disposition shared by the producer and both consumers.
@@ -3456,6 +3459,8 @@ pub(in crate::cranelift_backend) enum SynthesizedAggregateRoot {
     BoundaryClosureEnvironment,
     RecursivePositionResidual,
     PrimitiveResult,
+    /// Entry 17: rooted at one K context's unit-answer Call occurrence.
+    KContextUnitAnswerRet,
 }
 /// One step from a synthesized aggregate to one of its ordered children.
 ///
@@ -3472,12 +3477,9 @@ pub(in crate::cranelift_backend::planning::static_transition) enum SynthesizedAg
     /// One alternative of a dynamic constructor, by its ordered position in the
     /// closed alternative list.
     ///
-    /// ⚠ The POSITION, not the ABI discriminator tag. `ResourceKind`'s two tags
-    /// are wire-schema facts (`wire.resource_kind_fs_handle`), so a path keyed
-    /// on them would depend on a value this planner does not own and could not
-    /// state without importing the host's wire layout. The position is the same
-    /// fact on both sides, and the emitter's own alternative list is checked
-    /// against it at construction.
+    /// The position, not the ABI discriminator tag. For `ResourceKind`, both
+    /// sides use the position in the host's ordered catalog population; the
+    /// emitter separately compares the generated wire tag at that position.
     Alternative(u32),
 }
 /// The exact position of one synthesized aggregate in its compiler-built tree.
@@ -3749,16 +3751,18 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
     };
     /// The closed `ResourceKind` set, at wire tags this module does not spell —
     /// reached by POSITION, per [`SynthesizedAggregateStep`].
+    const RESOURCE_KIND_ALTERNATIVES: [SynthesizedAggregateNode; ken_host::RESOURCE_KIND_COUNT_V1] = {
+        use super::semantic_ir::{RESOURCE_KIND_POPULATION, resource_kind_role};
+        let mut alternatives = [N::Absent; ken_host::RESOURCE_KIND_COUNT_V1];
+        let mut position = 0;
+        while position < alternatives.len() {
+            alternatives[position] = N::nullary(resource_kind_role(RESOURCE_KIND_POPULATION[position].0));
+            position += 1;
+        }
+        alternatives
+    };
     const RESOURCE_KIND: SynthesizedAggregateNode =
-        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
-            N::nullary(R::ResourceKindFsHandle),
-            N::nullary(R::ResourceKindBuffer),
-            N::nullary(R::ResourceKindMapping),
-            N::nullary(R::ResourceKindSpawnPlan),
-            N::nullary(R::ResourceKindChildProcess),
-            N::nullary(R::ResourceKindPipeRead),
-            N::nullary(R::ResourceKindPipeWrite),
-        ]));
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&RESOURCE_KIND_ALTERNATIVES));
     const IO_ERRORS: SynthesizedAggregateNode = N::Dynamic(SynthesizedDynamicSet::IoErrors);
 
     /// The twelve-alternative resource surface, in the emitter's own order.
@@ -4036,6 +4040,25 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
             },
         ]));
 
+    const SOCKET_BYTES: SynthesizedAggregateNode = N::HostResponseReferent {
+        class: BoundaryClass::Bytes,
+    };
+    const SOCKET_ADDRESS: SynthesizedAggregateNode =
+        N::Dynamic(SynthesizedDynamicSet::Alternatives(&[
+            N::Fixed {
+                role: R::SocketAddressIPv4,
+                children: &[SOCKET_BYTES, N::native_int()],
+            },
+            N::Fixed {
+                role: R::SocketAddressIPv6,
+                children: &[SOCKET_BYTES, N::native_int()],
+            },
+            N::Fixed {
+                role: R::SocketAddressUnix,
+                children: &[SOCKET_BYTES],
+            },
+        ]));
+
     let (error, ok) = match operation {
         // Returns a `Bool` before any synthesized producer runs, so neither arm
         // exists. Not a gap: the early return is above the synthesis entirely.
@@ -4077,8 +4100,11 @@ pub(in crate::cranelift_backend::planning::static_transition) fn host_effect_rec
         }
         Op::ProcessPlanPush | Op::ProcessSignal => (RESOURCE_SURFACE, UNIT),
         Op::ProcessWait => (RESOURCE_SURFACE, CHILD_EXIT),
-        Op::ResourceStreamRead => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
-        Op::ResourceStreamWrite => (RESOURCE_SURFACE, WROTE),
+        Op::ResourceStreamRead | Op::NetReceive => (RESOURCE_SURFACE, STREAM_READ_PROGRESS),
+        Op::ResourceStreamWrite | Op::NetSend => (RESOURCE_SURFACE, WROTE),
+        Op::NetListen | Op::NetConnect | Op::NetAccept => (RESOURCE_SURFACE, N::Absent),
+        Op::NetShutdown => (RESOURCE_SURFACE, UNIT),
+        Op::NetLocalAddress => (RESOURCE_SURFACE, SOCKET_ADDRESS),
         // Not an admitted consumer; `lower_process_host_effect` refuses it
         // before any synthesized producer runs.
         _ => (N::Absent, N::Absent),
@@ -4127,7 +4153,8 @@ impl SynthesizedHostResultTree {
             | SynthesizedAggregateRoot::CheckedIhCapturedEnvironment
             | SynthesizedAggregateRoot::BoundaryClosureEnvironment
             | SynthesizedAggregateRoot::RecursivePositionResidual
-            | SynthesizedAggregateRoot::PrimitiveResult => {
+            | SynthesizedAggregateRoot::PrimitiveResult
+            | SynthesizedAggregateRoot::KContextUnitAnswerRet => {
                 SynthesizedAggregateNode::Absent
             }
         }
@@ -6204,6 +6231,61 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_aggregate
                 shape: PlannedAggregateShape::Constructor,
                 declared_children: Some(Cow::Borrowed(declared)),
                 children: children.clone(),
+                meet,
+                allocation,
+            });
+        }
+    }
+    // Entry 17: one `ITree::Ret` record per K context unit-answer Call
+    // occurrence, keyed on the context's emission owner (its enclosing
+    // specialization). Its one child is the unit's answer, whose lifetime and
+    // referent owners come from the Call occurrence's own authority.
+    let mut unit_answer_keys = BTreeSet::new();
+    for answer in plan.k_context_unit_answer_calls()? {
+        let owner = ContinuationEmissionOwner::Specialization(answer.enclosing);
+        for &seat in &answer.calls {
+            if !unit_answer_keys.insert((owner, seat)) {
+                continue;
+            }
+            let authority = occurrence_authority(plan, seat)?;
+            let child_authority = PlannedOccurrenceChildAuthority {
+                origin: seat,
+                position: 0,
+                owner: authority.owner,
+                lifetime: authority.lifetime,
+            };
+            let owners = aggregate_child_referent_owners(plan, &child_authority)?;
+            let escapes = owners.contains(&BoundaryReferentOwner::InvocationArena);
+            let children = vec![PlannedAggregateChild {
+                position: 0,
+                origin: Some(seat),
+                field_identity: None,
+                lifetime: if escapes {
+                    PlannedReferentLifetime::ActivationOwned
+                } else {
+                    PlannedReferentLifetime::Persistent
+                },
+                owners,
+            }];
+            let (meet, allocation) = if escapes {
+                (PlannedReferentLifetime::ActivationOwned, PlannedAggregateAllocation::InvocationAggregate)
+            } else {
+                (PlannedReferentLifetime::Persistent, PlannedAggregateAllocation::PersistentGround)
+            };
+            records.push(PlannedAggregateOwnership {
+                id: AggregateOccurrenceId(0),
+                producer: AggregateOccurrenceProducer::SynthesizedUse {
+                    owner,
+                    seat,
+                    path: SynthesizedAggregatePath::root(
+                        SynthesizedAggregateRoot::KContextUnitAnswerRet,
+                    ),
+                    role: SynthesizedAggregateRole::KContextUnitAnswerRet,
+                },
+                owner: plan.semantic.function_owner(seat)?,
+                shape: PlannedAggregateShape::Constructor,
+                declared_children: Some(Cow::Borrowed(positional_capture_declared_children(1)?)),
+                children,
                 meet,
                 allocation,
             });
@@ -11204,6 +11286,21 @@ impl<'src> StaticTransitionPlan<'src> {
             })
             .map(|record| record.id)
     }
+    /// Entry 17: the planned `ITree::Ret` record for one K context
+    /// unit-answer Call occurrence under its emission owner.
+    pub(in crate::cranelift_backend) fn k_context_unit_answer_ret_occurrence(
+        &self,
+        owner: ContinuationEmissionOwner,
+        seat: StaticOriginId,
+    ) -> Result<AggregateOccurrenceId, CraneliftBackendError> {
+        self.synthesized_aggregate_record(
+            owner,
+            seat,
+            &SynthesizedAggregatePath::root(SynthesizedAggregateRoot::KContextUnitAnswerRet),
+            SynthesizedAggregateRole::KContextUnitAnswerRet,
+        )
+        .map(|record| record.id)
+    }
     /// The record of one synthesized use, found by the full four-part key.
     ///
     /// ⛔ The path is part of the LOOKUP, not a field checked afterwards. A
@@ -12888,6 +12985,8 @@ mod tests {
                     R::ResourceKindChildProcess,
                     R::ResourceKindPipeRead,
                     R::ResourceKindPipeWrite,
+                    R::ResourceKindSocketListener,
+                    R::ResourceKindSocketStream,
                 ]
                     .into_iter()
                     .enumerate()
@@ -13526,6 +13625,8 @@ mod tests {
                 Fixed(R::ResourceKindChildProcess),
                 Fixed(R::ResourceKindPipeRead),
                 Fixed(R::ResourceKindPipeWrite),
+                Fixed(R::ResourceKindSocketListener),
+                Fixed(R::ResourceKindSocketStream),
             ],
         );
 

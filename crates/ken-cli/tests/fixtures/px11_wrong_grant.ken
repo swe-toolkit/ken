@@ -30,15 +30,25 @@ fn typed_denied_address (address : SocketAddress) (identity : IOError) : Bool =
     MkSystemError _ _ _ _ ↦ False
   }
 
+fn last_argument (arguments : List Bytes) : Option Bytes =
+  match arguments {
+    Nil ↦ None Bytes;
+    Cons first rest ↦
+      match last_argument rest {
+        None ↦ Some Bytes first;
+        Some last ↦ Some Bytes last
+      }
+  }
+
 proc main
       (input : ProcessInput) (caps : ProgramCaps AFull)
     : HostIO AFull ExitCode
     visits [Net] =
   match input {
     MkProcessInput arguments _ _ ↦
-      match arguments {
-        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
-        Cons path _ ↦
+      match last_argument arguments {
+        None ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Some path ↦
           match socket_unix_path path {
             Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
             Ok address ↦
@@ -52,8 +62,8 @@ proc main
                     (λoutcome.
                       match outcome {
                         Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
-                        Err (ResourceError.ResourceHostIO identity) ↦
-                          match typed_denied_address address identity {
+                        Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦
+                          match typed_denied_address address IOError.CapabilityDenied {
                             True ↦ host_pure AFull ExitCode ExitCode.Success;
                             False ↦ host_pure AFull ExitCode (ExitCode.Failure 77)
                           };

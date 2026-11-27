@@ -2670,24 +2670,6 @@ fn prepare_native_program_from_elaborated(
         .map_err(NativeProgramBuildError::Driver)?;
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
-    // Arm I: no native socket opcode exists. Reject a declared Net grant
-    // before planning or object emission, even when its first operation is
-    // hidden behind a checked helper rather than visible at the entrypoint.
-    if plan.net_scope != 0 {
-        let unavailable = ken_host::HostOpV1::ALL
-            .into_iter()
-            .filter(|operation| {
-                crate::export::host_operation_family_v1(*operation)
-                    == crate::export::HostOpFamilyV1::Net
-            })
-            .map(|operation| format!("{operation:?}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(NativeProgramBuildError::Unavailable(UnavailableLane::new(
-            "host_effect_lowering_unavailable",
-            format!("{unavailable} are RepresentedUnavailable for native execution (declared Net)"),
-        )));
-    }
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
     // Gate 4a: retained on the preparation so a control can compare the EMBEDDED
     // plan bytes against a full native build's, rather than recomputing them.
@@ -3306,9 +3288,9 @@ fn emit_native_program_preparation(
                 directory_entries: host_spine.directory_entries.to_string(),
                 directory_end: host_spine.directory_end.to_string(),
                 resource_mapping_limit: host_spine.resource_mapping_limit.to_string(),
-                resource_kind_mapping: host_spine.resource_kind_mapping.to_string(),
-                px10_kind_symbols: host_spine.px10_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 px10_exit_symbols: host_spine.px10_exit_symbols.clone().map(|symbol| symbol.to_string()),
+                px11_address_symbols: host_spine.px11_address_symbols.clone().map(|symbol| symbol.to_string()),
+                resource_kind_symbols: host_spine.resource_kind_symbols.clone().map(|symbol| symbol.to_string()),
                 io_errors: host_spine
                     .io_errors
                     .iter()
@@ -3325,8 +3307,6 @@ fn emit_native_program_preparation(
                 resource_invalid_offset: host_spine.resource_invalid_offset.to_string(),
                 resource_invalid_bounds: host_spine.resource_invalid_bounds.to_string(),
                 resource_no_progress: host_spine.resource_no_progress.to_string(),
-                resource_kind_fs_handle: host_spine.resource_kind_fs_handle.to_string(),
-                resource_kind_buffer: host_spine.resource_kind_buffer.to_string(),
                 resource_trace_identity: host_spine.resource_trace_identity.to_string(),
                 nat_zero: host_spine.nat_zero.to_string(),
                 nat_suc: host_spine.nat_suc.to_string(),
@@ -4287,32 +4267,11 @@ fn validate_bracket_release_host_operation(
     }
 }
 
-fn checked_host_spine_v1(
+fn checked_host_operation_pairs(
     prelude: &crate::prelude::PreludeEnv,
-    symbols: &BTreeMap<GlobalId, StableSymbol>,
-) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
-    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
-    // by the immutable canonical `GlobalId` captured at prelude registration and
-    // then mapped through this exact stable-symbol table.
-    //
-    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
-    // Package source has been elaborated by the time either producer runs, so a
-    // role spelling can denote a package declaration rather than the prelude's.
-    // Narrowing the parameter makes `env.globals` unnameable here: source-name
-    // authority cannot be reintroduced by an ordinary edit, only by widening
-    // this signature, which a reviewer sees and the compiler forces through
-    // every call site. An earlier revision took the whole `ElabEnv` and leaned
-    // on a test enumerating today's roles — that proved the roles *reviewed*
-    // were sound, not that no other role could be added.
+) -> impl Iterator<Item = (GlobalId, ken_host::HostOpV1)> {
     let roles = &prelude.runtime_roles;
-    let resolve_id = |id: GlobalId| {
-        symbols
-            .get(&id)
-            .cloned()
-            .ok_or(CompilerDriverError::MissingStableSymbol { id })
-    };
-    let mut operations = BTreeMap::new();
-    for (id, operation) in [
+    [
         (roles.op_console_read, ken_host::HostOpV1::ConsoleRead),
         (roles.op_console_write, ken_host::HostOpV1::ConsoleWrite),
         (roles.op_console_flush, ken_host::HostOpV1::ConsoleFlush),
@@ -4348,10 +4307,6 @@ fn checked_host_spine_v1(
         ),
         (roles.op_fs_rename, ken_host::HostOpV1::FsRename),
         (roles.op_fs_change_mode, ken_host::HostOpV1::FsChangeMode),
-    ] {
-        operations.insert(resolve_id(id)?, operation);
-    }
-    for (id, operation) in [
         (prelude.private_fs_open_id, ken_host::HostOpV1::FsOpen),
         (prelude.private_fs_open_directory_id, ken_host::HostOpV1::FsOpenDirectory),
         (prelude.private_fs_read_directory_batch_id, ken_host::HostOpV1::FsReadDirectoryBatch),
@@ -4414,14 +4369,64 @@ fn checked_host_spine_v1(
         (prelude.px11_op_ids[4], ken_host::HostOpV1::NetSend),
         (prelude.px11_op_ids[5], ken_host::HostOpV1::NetShutdown),
         (prelude.px11_op_ids[6], ken_host::HostOpV1::NetLocalAddress),
-    ] {
+    ]
+    .into_iter()
+}
+
+fn checked_host_spine_v1(
+    prelude: &crate::prelude::PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+) -> Result<crate::erasure::CheckedHostSpineV1, CompilerDriverError> {
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Every role below is selected
+    // by the immutable canonical `GlobalId` captured at prelude registration and
+    // then mapped through this exact stable-symbol table.
+    //
+    // ⛔ **This takes `&PreludeEnv`, not `&ElabEnv`, and that is the guarantee.**
+    // Package source has been elaborated by the time either producer runs, so a
+    // role spelling can denote a package declaration rather than the prelude's.
+    // Narrowing the parameter makes `env.globals` unnameable here: source-name
+    // authority cannot be reintroduced by an ordinary edit, only by widening
+    // this signature, which a reviewer sees and the compiler forces through
+    // every call site. An earlier revision took the whole `ElabEnv` and leaned
+    // on a test enumerating today's roles — that proved the roles *reviewed*
+    // were sound, not that no other role could be added.
+    let roles = &prelude.runtime_roles;
+    let resolve_id = |id: GlobalId| {
+        symbols
+            .get(&id)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id })
+    };
+    let mut operations = BTreeMap::new();
+    for (id, operation) in checked_host_operation_pairs(prelude) {
         operations.insert(resolve_id(id)?, operation);
     }
     validate_bracket_release_host_operation(
         &resolve_id(prelude.private_bracket_release_id)?,
         &operations,
     )?;
+    let resource_kind_symbols = ken_host::resource_kind_population_v1()
+        .expect("checked host ABI resource-kind catalog")
+        .into_iter()
+        .map(|(kind, _)| {
+            use ken_host::ResourceKindV1::*;
+            resolve_id(match kind {
+                FsHandle => prelude.fs_handle_id,
+                Buffer => roles.resource_kind_buffer,
+                Mapping => roles.resource_kind_mapping,
+                SpawnPlan => prelude.px10_kind_ids[0],
+                ChildProcess => prelude.px10_kind_ids[1],
+                PipeRead => prelude.px10_kind_ids[2],
+                PipeWrite => prelude.px10_kind_ids[3],
+                SocketListener => prelude.px11_kind_ids[0],
+                SocketStream => prelude.px11_kind_ids[1],
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .expect("one checked symbol per host resource kind");
     Ok(crate::erasure::CheckedHostSpineV1 {
+        resource_kind_symbols,
         ret: resolve_id(roles.ret)?,
         vis: resolve_id(roles.vis)?,
         in_l: resolve_id(roles.in_l)?,
@@ -4455,16 +4460,14 @@ fn checked_host_spine_v1(
         directory_entries: resolve_id(roles.directory_entries)?,
         directory_end: resolve_id(roles.directory_end)?,
         resource_mapping_limit: resolve_id(roles.resource_mapping_limit)?,
-        resource_kind_mapping: resolve_id(roles.resource_kind_mapping)?,
-        px10_kind_symbols: [
-            resolve_id(prelude.px10_kind_ids[0])?,
-            resolve_id(prelude.px10_kind_ids[1])?,
-            resolve_id(prelude.px10_kind_ids[2])?,
-            resolve_id(prelude.px10_kind_ids[3])?,
-        ],
         px10_exit_symbols: [
             resolve_id(prelude.px10_exit_ids[0])?,
             resolve_id(prelude.px10_exit_ids[1])?,
+        ],
+        px11_address_symbols: [
+            resolve_id(prelude.px11_address_ids[0])?,
+            resolve_id(prelude.px11_address_ids[1])?,
+            resolve_id(prelude.px11_address_ids[2])?,
         ],
         process_take_pipe_write_constructor: resolve_id(prelude.px10_op_ids[3])?,
         // Order is the contract — the roster documents it at the capture site.
@@ -4497,8 +4500,6 @@ fn checked_host_spine_v1(
         resource_invalid_offset: resolve_id(roles.resource_invalid_offset)?,
         resource_invalid_bounds: resolve_id(roles.resource_invalid_bounds)?,
         resource_no_progress: resolve_id(roles.resource_no_progress)?,
-        resource_kind_fs_handle: resolve_id(prelude.fs_handle_id)?,
-        resource_kind_buffer: resolve_id(roles.resource_kind_buffer)?,
         resource_trace_identity: resolve_id(prelude.private_resource_trace_identity_id)?,
         nat_zero: resolve_id(prelude.zero_id)?,
         nat_suc: resolve_id(prelude.suc_id)?,
@@ -4685,8 +4686,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         &spine.resource_invalid_offset,
         &spine.resource_invalid_bounds,
         &spine.resource_no_progress,
-        &spine.resource_kind_fs_handle,
-        &spine.resource_kind_buffer,
         &spine.resource_trace_identity,
         &spine.nat_zero,
         &spine.nat_suc,
@@ -4719,11 +4718,6 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // ABI-S6 D4 appends without moving established positional identities.
         &spine.resource_mapping_limit,
         // ABI-S6 D5a appends the now-native Mapping resource-kind role.
-        &spine.resource_kind_mapping,
-        &spine.px10_kind_symbols[0],
-        &spine.px10_kind_symbols[1],
-        &spine.px10_kind_symbols[2],
-        &spine.px10_kind_symbols[3],
         &spine.px10_exit_symbols[0],
         &spine.px10_exit_symbols[1],
         &spine.option_none,
@@ -4733,7 +4727,16 @@ fn canonical_checked_host_spine_v1_bytes(spine: &crate::erasure::CheckedHostSpin
         // Clock promotion appends in that same order.
         &spine.mk_monotonic_instant,
         &spine.mk_deadline,
+        // PX11 Inc2 socket address roles append after Clock's, in the same order.
+        &spine.px11_address_symbols[0],
+        &spine.px11_address_symbols[1],
+        &spine.px11_address_symbols[2],
     ] {
+        let field = symbol.to_string();
+        out.extend_from_slice(&(field.len() as u64).to_le_bytes());
+        out.extend_from_slice(field.as_bytes());
+    }
+    for symbol in &spine.resource_kind_symbols {
         let field = symbol.to_string();
         out.extend_from_slice(&(field.len() as u64).to_le_bytes());
         out.extend_from_slice(field.as_bytes());
@@ -4970,6 +4973,244 @@ fn declaration_symbol(package_name: &str, name: &str) -> StableSymbol {
 #[cfg(test)]
 mod native_pre_source_stable_symbols {
     use super::*;
+
+    /// Promise class: durable invariant. MEASURED: each checked host
+    /// constructor's first field type agrees with host admission, and every
+    /// capability-bearing op has a constructor. CLAIMED: the explicit operand
+    /// split matches the checked surface. THE GAP: execution is not observed.
+    #[test]
+    fn host_capability_operands_agree_with_checked_constructor_types() {
+        use ken_host::HostOpV1;
+
+        let env = ElabEnv::new().expect("checked prelude");
+        let cap_id = env.prelude_env.runtime_roles.capability;
+        let (symbols, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        let mut checked_ops = BTreeSet::new();
+        for (id, operation) in checked_host_operation_pairs(&env.prelude_env) {
+            let (family, index) = env.env.constructor(id).expect("checked host constructor");
+            let first = family.constructors[index].args.first();
+            let head = first.map(|ty| term_application_spine(ty).map_or(ty, |(head, _)| head));
+            let has_cap = matches!(head, Some(Term::Const { id, .. }) if *id == cap_id);
+            assert_eq!(
+                has_cap,
+                operation.takes_capability_operand(),
+                "{} ({operation:?}, checked name {:?})",
+                symbols[&id],
+                env.prelude_env.pre_source_display_names.get(&id),
+            );
+            checked_ops.insert(operation as u16);
+        }
+        for op in HostOpV1::ALL
+            .into_iter()
+            .filter(|op| op.takes_capability_operand())
+        {
+            assert!(
+                checked_ops.contains(&(op as u16)),
+                "no checked constructor for {op:?}"
+            );
+        }
+        eprintln!(
+            "host operations: {}; operations with checked constructors: {}",
+            HostOpV1::ALL.len(),
+            checked_ops.len()
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: every emitted Net effect
+    /// in the public-wrapper fixture retains the checked semantic arity and
+    /// has a capability exactly for listen/connect. CLAIMED: erasure splits
+    /// the right operands. THE GAP: this does not exercise object emission;
+    /// the default test-thread stack overflowed during native preparation,
+    /// before any operand assertion (no finer frame was sampled).
+    #[test]
+    fn public_net_operations_keep_their_erased_operand_shapes() {
+        // Baseline provisioning: the default test stack overflowed; use the
+        // same 256 MiB as the CLI elaboration worker, not an ambient override.
+        const BUILD_STACK_BYTES: usize = 256 * 1024 * 1024;
+        std::thread::Builder::new()
+            .name("px11-erased-operand-shapes".to_owned())
+            .stack_size(BUILD_STACK_BYTES)
+            .spawn(assert_public_net_operation_shapes)
+            .expect("spawn stated-stack Net erasure fixture")
+            .join()
+            .expect("Net erasure fixture thread");
+    }
+
+    fn assert_public_net_operation_shapes() {
+        use ken_host::HostOpV1 as Op;
+        use ken_runtime::{RuntimeDeclarationKind, RuntimeExpr};
+
+        fn visit<'a>(expr: &'a RuntimeExpr, f: &mut impl FnMut(&'a RuntimeExpr)) {
+            use RuntimeExpr::*;
+            f(expr);
+            match expr {
+                CheckedBracketFinalizer { body, .. }
+                | CheckedJoinSite { body, .. }
+                | CheckedSubcontinuationFrame { body, .. }
+                | CheckedRecursiveInvocation { body, .. }
+                | CheckedComputationalIHSlots { body, .. }
+                | CheckedComputationalIHInvocation { body, .. }
+                | Project { record: body, .. }
+                | Closure { body, .. } => visit(body, f),
+                Let { value, body } => {
+                    visit(value, f);
+                    visit(body, f);
+                }
+                If {
+                    scrutinee,
+                    then_expr,
+                    else_expr,
+                } => {
+                    visit(scrutinee, f);
+                    visit(then_expr, f);
+                    visit(else_expr, f);
+                }
+                Match {
+                    scrutinee, cases, ..
+                } => {
+                    visit(scrutinee, f);
+                    for case in cases {
+                        visit(&case.body, f);
+                    }
+                }
+                ComputationalMatch {
+                    scrutinee, cases, ..
+                } => {
+                    visit(scrutinee, f);
+                    for case in cases {
+                        visit(&case.body, f);
+                    }
+                }
+                Record { fields } => {
+                    for (_, field) in fields {
+                        visit(field, f);
+                    }
+                }
+                PrimitiveCall { args, .. } | Construct { args, .. } => {
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                Call { callee, args } => {
+                    visit(callee, f);
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                LexicalClosure { body, captures, .. } => {
+                    for capture in captures {
+                        visit(capture, f);
+                    }
+                    visit(body, f);
+                }
+                Effect {
+                    capability, args, ..
+                } => {
+                    if let Some(capability) = capability {
+                        visit(&capability.value, f);
+                    }
+                    for arg in args {
+                        visit(arg, f);
+                    }
+                }
+                Value(_)
+                | Var(_)
+                | DeclarationRef { .. }
+                | ImportedDeclarationRef { .. }
+                | Trap(_) => {}
+            }
+        }
+
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../catalog/packages");
+        let source = include_str!("../tests/fixtures/px11_erased_operand_shape.ken");
+        let prepared = prepare_native_program_sources(
+            "native-program",
+            vec![CompilerSource::new("src/main.ken", source).with_roots(vec![root])],
+        )
+        .expect("erased public Net program");
+        let env = ElabEnv::new().expect("checked prelude for the arity oracle");
+        let expected = checked_host_operation_pairs(&env.prelude_env)
+            .filter_map(|(id, op)| {
+                let has_cap = match op {
+                    Op::NetListen | Op::NetConnect => true,
+                    Op::NetAccept
+                    | Op::NetReceive
+                    | Op::NetSend
+                    | Op::NetShutdown
+                    | Op::NetLocalAddress => false,
+                    _ => return None,
+                };
+                let (family, index) = env.env.constructor(id).expect("checked Net constructor");
+                Some((op as u16, (has_cap, family.constructors[index].args.len())))
+            })
+            .collect::<BTreeMap<_, _>>();
+        // The required set is independent of the production registration table.
+        let required = [
+            Op::NetListen,
+            Op::NetConnect,
+            Op::NetAccept,
+            Op::NetReceive,
+            Op::NetSend,
+            Op::NetShutdown,
+            Op::NetLocalAddress,
+        ]
+        .map(|op| op as u16);
+        let mut seen = BTreeSet::new();
+        for decl in &prepared.runtime_program().declarations {
+            if let RuntimeDeclarationKind::Transparent { body } = &decl.kind {
+                visit(body, &mut |expr| {
+                    if let RuntimeExpr::Effect {
+                        operation,
+                        capability,
+                        args,
+                        ..
+                    } = expr
+                    {
+                        if required.contains(&(*operation as u16)) {
+                            let (has_cap, field_count) = expected[&(*operation as u16)];
+                            assert_eq!(capability.is_some(), has_cap, "{operation:?}");
+                            assert_eq!(
+                                args.len(),
+                                field_count - usize::from(has_cap),
+                                "{operation:?}"
+                            );
+                            seen.insert(*operation as u16);
+                        }
+                    }
+                });
+            }
+        }
+        assert_eq!(seen, BTreeSet::from(required));
+    }
+
+    /// Promise class: durable invariant. MEASURED: stable symbol suffixes of
+    /// the five registered prelude IDs. CLAIMED: the Net seat planner can
+    /// select the checked constructors without exposing private names.
+    /// THE GAP: this does not run the lowering observer.
+    #[test]
+    fn px11_socket_seat_constructors_have_checked_symbol_suffixes() {
+        let env = ElabEnv::new().expect("checked prelude");
+        let (symbols, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        for (id, suffix) in env
+            .prelude_env
+            .px11_address_ids
+            .into_iter()
+            .chain(env.prelude_env.px11_target_ids)
+            .zip([
+                "::SocketAddress::PrivateSocketIPv4",
+                "::SocketAddress::PrivateSocketIPv6",
+                "::SocketAddress::PrivateSocketUnix",
+                "::SocketTarget::ListeningSocket",
+                "::SocketTarget::ConnectedSocket",
+            ])
+        {
+            let symbol = &symbols[&id];
+            assert!(
+                symbol.to_string().ends_with(suffix),
+                "{symbol} must end with {suffix}"
+            );
+        }
+    }
 
     /// Promise class: durable invariant. MEASURED: every compiler declaration
     /// and every checked constructor is a key in the pre-source snapshot.
@@ -9367,7 +9608,7 @@ mod d1b_role_c1_roster_identity {
             ),
             (
                 "resource_kind_buffer",
-                record.spine.resource_kind_buffer.clone(),
+                record.spine.resource_kind_symbols[1].clone(),
             ),
             ("read_some", record.spine.read_some.clone()),
             ("read_eof", record.spine.read_eof.clone()),
@@ -9425,7 +9666,7 @@ mod d1b_role_c1_roster_identity {
             ),
             (
                 "resource_kind_mapping",
-                record.spine.resource_kind_mapping.clone(),
+                record.spine.resource_kind_symbols[2].clone(),
             ),
             ("io_error_not_found", record.spine.io_errors[0].clone()),
             (

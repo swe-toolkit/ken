@@ -279,26 +279,13 @@ impl HostOpV1 {
             | Self::NetReceive
             | Self::NetSend
             | Self::NetShutdown
-            | Self::NetLocalAddress => HostOpAvailabilityV1::RepresentedUnavailable,
+            | Self::NetLocalAddress => HostOpAvailabilityV1::NativeTested,
         }
     }
 
-    /// Only the seven PX11 Net operations may execute without native parity;
-    /// a declared Net grant is separately refused before native object emission.
+    /// The shared executor admits exactly the native-tested partition.
     pub const fn executor_admits(self) -> bool {
-        match self.availability() {
-            HostOpAvailabilityV1::NativeTested => true,
-            HostOpAvailabilityV1::RepresentedUnavailable => matches!(
-                self,
-                Self::NetListen
-                    | Self::NetAccept
-                    | Self::NetConnect
-                    | Self::NetReceive
-                    | Self::NetSend
-                    | Self::NetShutdown
-                    | Self::NetLocalAddress
-            ),
-        }
+        matches!(self.availability(), HostOpAvailabilityV1::NativeTested)
     }
 
     /// **`ABI-R3` `D2` -- exhaustive, no wildcard.**
@@ -368,7 +355,7 @@ pub const PX5_PLANNED_NATIVE_TARGETS: [HostOpV1; 5] = [
     HostOpV1::FsWriteFile,
 ];
 
-pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 40] = [
+pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 47] = [
     HostOpV1::ConsoleRead,
     HostOpV1::ConsoleWrite,
     HostOpV1::ConsoleFlush,
@@ -409,6 +396,13 @@ pub const NATIVE_TESTED_TARGETS_V1: [HostOpV1; 40] = [
     HostOpV1::ProcessTakePipe,
     HostOpV1::ProcessWait,
     HostOpV1::ProcessSignal,
+    HostOpV1::NetListen,
+    HostOpV1::NetAccept,
+    HostOpV1::NetConnect,
+    HostOpV1::NetReceive,
+    HostOpV1::NetSend,
+    HostOpV1::NetShutdown,
+    HostOpV1::NetLocalAddress,
 ];
 
 pub const HOST_EFFECT_ABI_V1_SCHEMA_VERSION: u32 = 1;
@@ -477,6 +471,7 @@ pub struct HostEffectWireLayoutV1 {
     pub reply_read_progress_tag: u64,
     pub reply_write_progress_tag: u64,
     pub reply_child_exit_tag: u64,
+    pub reply_socket_address_tag: u64,
     pub resource_error_closed: u64,
     pub resource_error_malformed: u64,
     pub resource_error_right_not_held: u64,
@@ -487,13 +482,7 @@ pub struct HostEffectWireLayoutV1 {
     pub resource_error_invalid_offset: u64,
     pub resource_error_invalid_bounds: u64,
     pub resource_error_no_progress: u64,
-    pub resource_kind_fs_handle: u64,
-    pub resource_kind_buffer: u64,
-    pub resource_kind_mapping: u64,
-    pub resource_kind_spawn_plan: u64,
-    pub resource_kind_child_process: u64,
-    pub resource_kind_pipe_read: u64,
-    pub resource_kind_pipe_write: u64,
+    pub resource_kinds: [(ResourceKindV1, u64); RESOURCE_KIND_COUNT_V1],
     pub resource_error_reply_schema: u64,
     pub resource_error_mapping_limit: u64,
 }
@@ -545,13 +534,36 @@ fn generated_layout_fact(name: &str) -> Result<u64, TerminalErrorV1> {
         .ok_or(TerminalErrorV1::HostEffectAbiMismatch)
 }
 
+const fn binding_key_eq(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut position = 0;
+    while position < left.len() {
+        if left[position] != right[position] {
+            return false;
+        }
+        position += 1;
+    }
+    true
+}
+
+const fn find_generated_binding(kind: &str, name: &str) -> Option<u64> {
+    let mut position = 0;
+    while position < HOST_EFFECT_ABI_V1_BINDINGS.len() {
+        let (bound_kind, bound_name, value) = HOST_EFFECT_ABI_V1_BINDINGS[position];
+        if binding_key_eq(bound_kind, kind) && binding_key_eq(bound_name, name) {
+            return Some(value);
+        }
+        position += 1;
+    }
+    None
+}
+
 fn generated_binding(kind: &str, name: &str) -> Result<u64, TerminalErrorV1> {
-    HOST_EFFECT_ABI_V1_BINDINGS
-        .iter()
-        .find_map(|(bound_kind, bound_name, value)| {
-            (*bound_kind == kind && *bound_name == name).then_some(*value)
-        })
-        .ok_or(TerminalErrorV1::HostEffectAbiMismatch)
+    find_generated_binding(kind, name).ok_or(TerminalErrorV1::HostEffectAbiMismatch)
 }
 
 fn checked_u32(value: u64) -> Result<u32, TerminalErrorV1> {
@@ -758,28 +770,36 @@ pub fn host_effect_wire_layout_v1(
                 checked_u32(field("span_origin")?)?,
             ]
         }
-        // **`ABI-R3` `D4` -- the request/reply schema axis, made a build break.**
-        //
-        // This was a `_` wildcard. Unlike the three defaults `D2` closed it did
-        // NOT classify silently -- it returned `OperationUnavailable`, so it
-        // failed closed. But failing closed at RUNTIME is not the same as
-        // failing at BUILD, and §5 requires each axis to be a build break to
-        // omit. Naming the operations that legitimately carry no wire layout
-        // turns a new operation from a runtime refusal into `error[E0004]`.
-        //
-        // These operations are exactly the `RepresentedUnavailable` set, and
-        // the operations matched above are exactly the `NativeTested` set. That
-        // correspondence is asserted by name in the tests rather than left as
-        // a coincidence of two lists.
-        HostOpV1::NetListen
-        | HostOpV1::NetAccept
-        | HostOpV1::NetConnect
-        | HostOpV1::NetReceive
-        | HostOpV1::NetSend
-        | HostOpV1::NetShutdown
-        | HostOpV1::NetLocalAddress => {
-            return Err(TerminalErrorV1::OperationUnavailable(operation));
+        HostOpV1::NetListen | HostOpV1::NetConnect => {
+            let base = field("address")?;
+            let address = |name| offset("SocketAddressRecordV1", name).map(|n| base + n);
+            let bytes = address("bytes")?;
+            vec![
+                checked_u32(field("capability")?)?,
+                checked_u32(address("family")?)?,
+                checked_u32(bytes + slice_data)?,
+                checked_u32(bytes + slice_len)?,
+                checked_u32(address("port")?)?,
+            ]
         }
+        HostOpV1::NetAccept => vec![checked_u32(field("listener")?)?],
+        HostOpV1::NetReceive => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+        ],
+        HostOpV1::NetSend => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("buffer")?)?,
+            checked_u32(field("buffer_start")?)?,
+            checked_u32(field("length")?)?,
+            checked_u32(field("span_origin")?)?,
+        ],
+        HostOpV1::NetShutdown => vec![checked_u32(field("stream")?)?, checked_u32(field("how")?)?],
+        HostOpV1::NetLocalAddress => vec![checked_u32(field("target")?)?],
+        // Every operation has a wire layout above. There is deliberately no
+        // wildcard: a new operation is a build break here until it gets one.
     };
     let reply_bytes = offset("HostReplyV1", "bytes")?;
     let reply_resource_error = offset("HostReplyV1", "resource_error")?;
@@ -829,6 +849,7 @@ pub fn host_effect_wire_layout_v1(
         reply_read_progress_tag: generated_binding("tag", "reply.read_progress")?,
         reply_write_progress_tag: generated_binding("tag", "reply.write_progress")?,
         reply_child_exit_tag: generated_binding("tag", "reply.child_exit")?,
+        reply_socket_address_tag: generated_binding("tag", "reply.socket_address")?,
         resource_error_closed: generated_binding("error", "resource.Closed")?,
         resource_error_malformed: generated_binding("error", "resource.MalformedResource")?,
         resource_error_right_not_held: generated_binding("error", "resource.RightNotHeld")?,
@@ -839,13 +860,7 @@ pub fn host_effect_wire_layout_v1(
         resource_error_invalid_offset: generated_binding("error", "resource.InvalidOffset")?,
         resource_error_invalid_bounds: generated_binding("error", "resource.InvalidBounds")?,
         resource_error_no_progress: generated_binding("error", "resource.NoProgress")?,
-        resource_kind_fs_handle: generated_binding("tag", "resource_kind.FsHandle")?,
-        resource_kind_buffer: generated_binding("tag", "resource_kind.Buffer")?,
-        resource_kind_mapping: generated_binding("tag", "resource_kind.Mapping")?,
-        resource_kind_spawn_plan: generated_binding("tag", "resource_kind.SpawnPlan")?,
-        resource_kind_child_process: generated_binding("tag", "resource_kind.ChildProcess")?,
-        resource_kind_pipe_read: generated_binding("tag", "resource_kind.PipeRead")?,
-        resource_kind_pipe_write: generated_binding("tag", "resource_kind.PipeWrite")?,
+        resource_kinds: resource_kind_population_v1().ok_or(TerminalErrorV1::HostEffectAbiMismatch)?,
         resource_error_reply_schema: generated_binding("lifetime", "resource_error_reply_schema")?,
         resource_error_mapping_limit: generated_binding("error", "resource.MappingLimit")?,
     })
@@ -1057,6 +1072,59 @@ pub enum ResourceKindV1 {
     PipeWrite,
     SocketListener,
     SocketStream,
+}
+
+impl ResourceKindV1 {
+    // The encoder is independently exhaustive. This inventory binds the host
+    // kinds to their generated catalog tags, in wire order.
+    const fn catalog_entry(self) -> (&'static str, Option<Self>) {
+        match self {
+            Self::FsHandle => ("resource_kind.FsHandle", Some(Self::Buffer)),
+            Self::Buffer => ("resource_kind.Buffer", Some(Self::Mapping)),
+            Self::Mapping => ("resource_kind.Mapping", Some(Self::SpawnPlan)),
+            Self::SpawnPlan => ("resource_kind.SpawnPlan", Some(Self::ChildProcess)),
+            Self::ChildProcess => ("resource_kind.ChildProcess", Some(Self::PipeRead)),
+            Self::PipeRead => ("resource_kind.PipeRead", Some(Self::PipeWrite)),
+            Self::PipeWrite => ("resource_kind.PipeWrite", Some(Self::SocketListener)),
+            Self::SocketListener => ("resource_kind.SocketListener", Some(Self::SocketStream)),
+            Self::SocketStream => ("resource_kind.SocketStream", None),
+        }
+    }
+}
+
+const fn resource_kind_count_v1() -> usize {
+    let mut count = 0;
+    let mut next = Some(ResourceKindV1::FsHandle);
+    while let Some(kind) = next {
+        count += 1;
+        next = kind.catalog_entry().1;
+    }
+    count
+}
+
+pub const RESOURCE_KIND_COUNT_V1: usize = resource_kind_count_v1();
+
+/// The closed native ResourceKind population, in catalog-tag order.
+pub const fn resource_kind_population_v1()
+    -> Option<[(ResourceKindV1, u64); RESOURCE_KIND_COUNT_V1]>
+{
+    let mut population = [(ResourceKindV1::FsHandle, 0); RESOURCE_KIND_COUNT_V1];
+    let mut next = Some(ResourceKindV1::FsHandle);
+    let mut position = 0;
+    while let Some(kind) = next {
+        let (binding, successor) = kind.catalog_entry();
+        let tag = match find_generated_binding("tag", binding) {
+            Some(tag) => tag,
+            None => return None,
+        };
+        if position != 0 && population[position - 1].1 >= tag {
+            return None;
+        }
+        population[position] = (kind, tag);
+        position += 1;
+        next = successor;
+    }
+    Some(population)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -2939,6 +3007,13 @@ enum ResourceAdmissionRequirementV1 {
 }
 
 impl HostOpV1 {
+    /// Whether the checked constructor carries an explicit `Cap a` at field 0.
+    /// In V1 this holds exactly when the host demands a capability. The
+    /// elaborator's cross-plane test checks this against the constructor types.
+    pub const fn takes_capability_operand(self) -> bool {
+        !matches!(self.capability_requirement(), CapabilityRequirementV1::None)
+    }
+
     /// Exhaustive classification at the ABI-R3 inventory boundary. A new host
     /// operation cannot silently skip capability admission: it must acquire a
     /// classification here before this crate compiles.
@@ -6262,23 +6337,23 @@ mod tests {
     /// no native-unavailable operation gains executor admission. THE GAP:
     /// the shared dispatcher must use executor_admits for each operation.
     #[test]
-    fn executor_admits_exactly_native_tested_plus_px11_interpreter_set() {
-        use std::collections::BTreeSet;
-        // Transition sentinel: the immediate native-parity successor retires
-        // this exact seven-operation exception, not the admission invariant.
-        let px11 = [
-            HostOpV1::NetListen, HostOpV1::NetAccept, HostOpV1::NetConnect,
-            HostOpV1::NetReceive, HostOpV1::NetSend, HostOpV1::NetShutdown,
+    fn executor_admits_exactly_native_tested() {
+        for op in HostOpV1::ALL {
+            assert_eq!(op.executor_admits(), op.availability() == HostOpAvailabilityV1::NativeTested,
+                "executor admission of {op:?}");
+        }
+        for op in [
+            HostOpV1::NetListen,
+            HostOpV1::NetAccept,
+            HostOpV1::NetConnect,
+            HostOpV1::NetReceive,
+            HostOpV1::NetSend,
+            HostOpV1::NetShutdown,
             HostOpV1::NetLocalAddress,
-        ].into_iter().collect::<BTreeSet<_>>();
-        let interpreter_only = HostOpV1::ALL.into_iter().filter(|op| {
-            op.executor_admits()
-                && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
-        }).collect::<BTreeSet<_>>();
-        assert_eq!(interpreter_only, px11, "exact PX11 interpreter-only set");
-        assert!(HostOpV1::ALL.into_iter().all(|op| {
-            op.availability() != HostOpAvailabilityV1::NativeTested || op.executor_admits()
-        }));
+        ] {
+            assert!(NATIVE_TESTED_TARGETS_V1.contains(&op), "missing {op:?}");
+            assert!(op.executor_admits(), "unavailable {op:?}");
+        }
     }
 
     #[cfg(target_os = "linux")]

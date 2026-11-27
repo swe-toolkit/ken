@@ -1,9 +1,9 @@
 //! Bracket roles are extracted only from normalized checked constructor and
 //! binder structure, not from runtime host-operation resemblance.
 
-use ken_elaborator::compiler_driver::{prepare_native_program_sources, CompilerSource};
+use ken_elaborator::compiler_driver::{CompilerSource, prepare_native_program_sources};
 
-fn regions(source: &str) -> Vec<ken_elaborator::compiler_driver::NormalizedBracketRegion> {
+fn prepare(source: &str) -> ken_elaborator::compiler_driver::NativeProgramPreparationV1 {
     prepare_native_program_sources(
         "rt-bracket-region",
         vec![CompilerSource::new("region.ken", source).with_roots(vec![
@@ -11,8 +11,10 @@ fn regions(source: &str) -> Vec<ken_elaborator::compiler_driver::NormalizedBrack
         ])],
     )
     .unwrap_or_else(|err| panic!("checked bracket preparation: {err:?}"))
-    .bracket_regions()
-    .to_vec()
+}
+
+fn regions(source: &str) -> Vec<ken_elaborator::compiler_driver::NormalizedBracketRegion> {
+    prepare(source).bracket_regions().to_vec()
 }
 
 /// Promise class: durable non-forgery invariant. The one canonical bracket
@@ -88,13 +90,64 @@ fn nested_brackets_with_multiple_inner_ret_leaves_have_two_binder_groups() {
     );
     // P2: the outer acquire is an ancestor of the inner, so an outermost-Ok
     // selector would give both finalizers one owner instead of two.
-    assert!(rows.iter().any(
-        |outer| rows.iter().any(|inner| outer.ok_resource_binder_path
-            != inner.ok_resource_binder_path
+    assert!(rows.iter().any(|outer| rows.iter().any(|inner| {
+        outer.ok_resource_binder_path != inner.ok_resource_binder_path
             && inner
                 .ok_resource_binder_path
-                .starts_with(&outer.ok_resource_binder_path))
-    ));
+                .starts_with(&outer.ok_resource_binder_path)
+    })));
+}
+
+/// Promise class: durable binder pairing for the three Net acquisitions.
+/// MEASURED: the public wrappers yield three checked acquire identities,
+/// each with one finalizer, and the accept Vis lies under the listener's Ok.
+/// CLAIMED: nested socket brackets keep their own acquisition and finalizer.
+/// THE GAP: region extraction does not execute any socket operation.
+#[test]
+fn socket_brackets_pair_each_checked_acquisition_with_its_finalizer() {
+    use ken_host::HostOpV1;
+
+    let prepared = prepare(include_str!("fixtures/rt_bracket_region_net.ken"));
+    let rows = prepared.bracket_regions();
+    assert_eq!(rows.len(), 3, "{rows:?}");
+    // Hidden constructors may receive anonymous stable symbols. Resolve the
+    // expected identity through the checked host-spine binding, not its spelling.
+    let operations = &prepared
+        .runtime_program()
+        .erased_core
+        .metadata
+        .checked_core
+        .runtime_symbols
+        .as_ref()
+        .expect("checked host-spine bindings")
+        .spine
+        .operations;
+    let find = |operation: HostOpV1| {
+        let mut symbols = operations
+            .iter()
+            .filter_map(|(symbol, id)| (*id == operation as u16).then_some(symbol));
+        let symbol = symbols.next().expect("missing checked acquisition binding");
+        assert!(
+            symbols.next().is_none(),
+            "ambiguous binding for {operation:?}"
+        );
+        rows.iter()
+            .find(|row| row.acquire_constructor.to_string() == *symbol)
+            .unwrap_or_else(|| panic!("missing checked acquisition {symbol}: {rows:?}"))
+    };
+    let listener = find(HostOpV1::NetListen);
+    let accept = find(HostOpV1::NetAccept);
+    let connect = find(HostOpV1::NetConnect);
+    for row in [listener, accept, connect] {
+        assert_eq!(row.finalizer_paths.len(), 1, "{row:?}");
+    }
+    assert_eq!(accept.owner, listener.owner);
+    assert!(accept.acquire_vis_path.len() > listener.ok_resource_binder_path.len());
+    assert!(
+        accept
+            .acquire_vis_path
+            .starts_with(&listener.ok_resource_binder_path)
+    );
 }
 
 /// Promise class: durable owner disambiguation. Three canonical producers

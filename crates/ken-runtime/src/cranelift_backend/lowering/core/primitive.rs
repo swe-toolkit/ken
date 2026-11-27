@@ -31,6 +31,7 @@ pub(super) enum NativePrimitive {
     BytesEncode,
     BytesDecode,
     BytesToList,
+    ListToBytes,
     ListCharToString,
     ByteLength,
     CharLength,
@@ -54,7 +55,7 @@ pub(super) enum OperandRoute {
 }
 
 impl NativePrimitive {
-    pub(super) const ALL: [Self; 21] = [
+    pub(super) const ALL: [Self; 22] = [
         Self::AddInt,
         Self::SubInt,
         Self::MulInt,
@@ -73,6 +74,7 @@ impl NativePrimitive {
         Self::BytesEncode,
         Self::BytesDecode,
         Self::BytesToList,
+        Self::ListToBytes,
         Self::ListCharToString,
         Self::ByteLength,
         Self::CharLength,
@@ -99,6 +101,7 @@ impl NativePrimitive {
             Self::BytesEncode => "bytes_encode",
             Self::BytesDecode => "bytes_decode",
             Self::BytesToList => "bytes_to_list",
+            Self::ListToBytes => "list_to_bytes",
             Self::ListCharToString => "list_char_to_string",
             Self::ByteLength => "byte_length",
             Self::CharLength => "char_length",
@@ -130,6 +133,7 @@ impl NativePrimitive {
             Self::BytesEncode => OperandRoute::SpecializedOnly,
             Self::BytesDecode => OperandRoute::SpecializedOnly,
             Self::BytesToList => OperandRoute::Emitted,
+            Self::ListToBytes => OperandRoute::Emitted,
             Self::ListCharToString => OperandRoute::SpecializedOnly,
             Self::ByteLength => OperandRoute::SpecializedOnly,
             Self::CharLength => OperandRoute::SpecializedOnly,
@@ -162,6 +166,7 @@ mod operand_table_tests {
             "bytes_encode",
             "bytes_decode",
             "bytes_to_list",
+            "list_to_bytes",
             "list_char_to_string",
             "byte_length",
             "char_length",
@@ -193,6 +198,7 @@ mod operand_table_tests {
             (NativePrimitive::BytesEncode, OperandRoute::SpecializedOnly),
             (NativePrimitive::BytesDecode, OperandRoute::SpecializedOnly),
             (NativePrimitive::BytesToList, OperandRoute::Emitted),
+            (NativePrimitive::ListToBytes, OperandRoute::Emitted),
             (NativePrimitive::ListCharToString, OperandRoute::SpecializedOnly),
             (NativePrimitive::ByteLength, OperandRoute::SpecializedOnly),
             (NativePrimitive::CharLength, OperandRoute::SpecializedOnly),
@@ -293,6 +299,16 @@ impl<'a> Lowering<'a> {
         let native = NativePrimitive::from_symbol(&primitive.symbol);
         let route = native.map(NativePrimitive::operand_route);
         if let Some(OperandRoute::Emitted) = route {
+            if native == Some(NativePrimitive::ListToBytes) {
+                let [operand] = lowered_args.as_slice() else {
+                    return Err(unsupported(
+                        LoweringCause::PlannerInvariant,
+                        "PrimitiveCall",
+                        "list_to_bytes requires exactly one list operand",
+                    ));
+                };
+                return self.lower_list_to_bytes(builder, static_origin, operand);
+            }
             if native == Some(NativePrimitive::BytesToList) {
                 let [operand] = lowered_args.as_slice() else {
                     return Err(unsupported(
@@ -510,6 +526,7 @@ impl<'a> Lowering<'a> {
             NativePrimitive::ByteLength => self.lower_string_byte_length(builder, lowered_args),
             NativePrimitive::CharLength => self.lower_string_char_length(builder, lowered_args),
             NativePrimitive::BytesToList => unreachable!("the emitted bytes_to_list returned above"),
+            NativePrimitive::ListToBytes => unreachable!("the emitted list_to_bytes returned above"),
         };
         // ⭐ Back onto the spine: a primitive's result is a fresh specialized
         // value re-entering the phase sum.
@@ -728,46 +745,10 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         word: CarriedBoundaryWord,
     ) -> Result<Lowered, CraneliftBackendError> {
-        use cranelift_codegen::ir::condcodes::IntCC;
-        let refs = self.carrier_refs()?;
         let arena = self.carrier_arena()?;
         let pointer_type = builder.func.dfg.value_type(arena);
-        let class = self.emit_carrier_class(builder, word)?;
-        let borrowed = builder.create_block();
-        let persistent = builder.create_block();
-        let done = builder.create_block();
-        builder.append_block_param(done, pointer_type);
-        builder.append_block_param(done, types::I64);
-        let is_borrowed =
-            builder
-                .ins()
-                .icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
-        builder
-            .ins()
-            .brif(is_borrowed, borrowed, &[], persistent, &[]);
-
-        builder.switch_to_block(borrowed);
-        let pointer = self.emit_carrier_scalar(builder, word)?;
-        let (data, len) = Self::borrowed_bytes_view(builder, pointer);
-        builder.ins().jump(done, &[data.into(), len.into()]);
-
-        builder.switch_to_block(persistent);
-        Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
-        let slot =
-            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-        let view = builder.ins().stack_addr(pointer_type, slot, 0);
-        let call = builder
-            .ins()
-            .call(refs.bytes_view, &[arena, word.word, view]);
-        let status = builder.inst_results(call)[0];
-        Self::require_i64(builder, status, BOUNDARY_OK);
-        let data = builder.ins().stack_load(pointer_type, slot, 0);
-        let len = builder.ins().stack_load(types::I64, slot, 8);
-        builder.ins().jump(done, &[data.into(), len.into()]);
-
-        builder.switch_to_block(done);
-        let data = builder.block_params(done)[0];
-        let len = builder.block_params(done)[1];
+        let (data, len, outcome) = self.view_carried_bytes_word(builder, word)?;
+        Self::require_i64(builder, outcome, 0);
         let valid = builder.ins().iconst(types::I8, 1);
         Ok(Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
             builder,
@@ -778,7 +759,7 @@ impl<'a> Lowering<'a> {
         )))
     }
 
-    fn borrowed_bytes_view(
+    pub(in crate::cranelift_backend::lowering) fn borrowed_bytes_view(
         builder: &mut FunctionBuilder<'_>,
         pointer: cranelift_codegen::ir::Value,
     ) -> (cranelift_codegen::ir::Value, cranelift_codegen::ir::Value) {
@@ -882,7 +863,6 @@ impl<'a> Lowering<'a> {
         seat: StaticOriginId,
         operand: &LoweringOperand,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        use cranelift_codegen::ir::condcodes::IntCC;
         let constructors = self.bytes_list_constructors(seat)?;
         match operand {
             LoweringOperand::Specialized(Lowered::ResponseBytes(span)) => {
@@ -901,38 +881,20 @@ impl<'a> Lowering<'a> {
                 Ok(tail)
             }
             LoweringOperand::Carried(word) => {
-                let class = self.emit_carrier_class(builder, *word)?;
-                let borrowed = builder.create_block();
-                let persistent = builder.create_block();
-                let done = builder.create_block();
-                builder.append_block_param(done, types::I64);
-                let is_borrowed = builder.ins().icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
-                builder.ins().brif(is_borrowed, borrowed, &[], persistent, &[]);
-
-                builder.switch_to_block(borrowed);
-                let pointer = self.emit_carrier_scalar(builder, *word)?;
-                let (data, len) = Self::borrowed_bytes_view(builder, pointer);
-                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |_, _| Ok(data))?;
-                builder.ins().jump(done, &[list.word.into()]);
-
-                builder.switch_to_block(persistent);
-                Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
-                let arena = self.carrier_arena()?;
-                let pointer_type = builder.func.dfg.value_type(arena);
-                let slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
-                let out = builder.ins().stack_addr(pointer_type, slot, 0);
-                self.emit_bytes_list_view(builder, *word, out)?;
-                let len = builder.ins().stack_load(types::I64, slot, 8);
-                let list = self.build_bytes_list_loop(builder, seat, constructors, len, |lowering, builder| {
+                // Entry 18: the one carried-Bytes class dispatch, shared with the
+                // host-seat observer and the primitive operand view. The checked
+                // Bytes operand is this caller's authority for the borrowed arm.
+                let word = *word;
+                let (_, len, outcome) = self.view_carried_bytes_word(builder, word)?;
+                Self::require_i64(builder, outcome, 0);
+                self.build_bytes_list_loop(builder, seat, constructors, len, move |lowering, builder| {
                     // Only the length survives the previous view. Materializing a
-                    // Cons can invalidate the data pointer, so read it afresh.
-                    lowering.emit_bytes_list_view(builder, *word, out)?;
-                    Ok(builder.ins().stack_load(pointer_type, slot, 0))
-                })?;
-                builder.ins().jump(done, &[list.word.into()]);
-
-                builder.switch_to_block(done);
-                Ok(CarriedBoundaryWord { word: builder.block_params(done)[0] })
+                    // Cons can invalidate a persistent data pointer, so view
+                    // afresh; the borrowed record's pointer is invocation-stable.
+                    let (data, _, outcome) = lowering.view_carried_bytes_word(builder, word)?;
+                    Self::require_i64(builder, outcome, 0);
+                    Ok(data)
+                })
             }
             LoweringOperand::Residual(_) => Err(CraneliftBackendError::ResidualRepresentationRequired {
                 site: "bytes_to_list requires an ordinary bytes value",
@@ -942,17 +904,6 @@ impl<'a> Lowering<'a> {
                 "bytes_to_list only supports Bytes arguments in native lowering",
             )),
         }
-    }
-
-    fn emit_bytes_list_view(
-        &self,
-        builder: &mut FunctionBuilder<'_>,
-        word: CarriedBoundaryWord,
-        out: cranelift_codegen::ir::Value,
-    ) -> Result<(), CraneliftBackendError> {
-        let call = builder.ins().call(self.carrier_refs()?.bytes_view, &[self.carrier_arena()?, word.word, out]);
-        Self::require_i64(builder, builder.inst_results(call)[0], BOUNDARY_OK);
-        Ok(())
     }
 
     fn build_bytes_list_loop(
@@ -1225,6 +1176,285 @@ impl<'a> Lowering<'a> {
         })
     }
 
+    /// Walk only the compiler's list template, not a list in the runtime heap.
+    fn lower_list_to_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        operand: &LoweringOperand,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let wrong_shape = || {
+            unsupported(
+                LoweringCause::Fragment,
+                "PrimitiveCall",
+                "list_to_bytes requires a statically shaped List UInt8 in native lowering",
+            )
+        };
+        let mut node = match operand {
+            LoweringOperand::Specialized(node @ Lowered::Constructor { .. }) => node,
+            LoweringOperand::Specialized(_) => return Err(wrong_shape()),
+            LoweringOperand::Carried(word) => {
+                return self.lower_carried_list_to_bytes(builder, seat, *word);
+            }
+            LoweringOperand::Residual(_) => {
+                return Err(CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "list_to_bytes requires an ordinary list value",
+                });
+            }
+        };
+        let mut elements = Vec::new();
+        loop {
+            let Lowered::Constructor {
+                constructor, args, ..
+            } = node
+            else {
+                return Err(wrong_shape());
+            };
+            match args.as_slice() {
+                [] if constructor == &self.process_symbols.list_nil => break,
+                [head, tail] if constructor == &self.process_symbols.list_cons => {
+                    let Lowered::Int { value, known } =
+                        head.specialized_at("a list_to_bytes element")?
+                    else {
+                        return Err(wrong_shape());
+                    };
+                    elements.push((*value, *known));
+                    node = tail.specialized_at("a list_to_bytes tail")?;
+                }
+                _ => return Err(wrong_shape()),
+            }
+        }
+        if elements.iter().all(|(_, known)| known.is_some()) {
+            let bytes = elements
+                .into_iter()
+                .map(|(_, known)| {
+                    u8::try_from(known.expect("all elements are known")).map_err(|_| {
+                        unsupported(
+                            LoweringCause::PlannerInvariant,
+                            "PrimitiveCall",
+                            "a list_to_bytes element is outside UInt8",
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(LoweringOperand::Specialized(Lowered::Bytes(bytes)));
+        }
+        let length = i64::try_from(elements.len()).map_err(|_| {
+            unsupported(
+                LoweringCause::Capacity,
+                "PrimitiveCall",
+                "a list_to_bytes spine is longer than the ABI can name",
+            )
+        })?;
+        let length = builder.ins().iconst(types::I64, length);
+        let (tag, class) = Self::carrier_handle_disposition(&Lowered::Bytes(Vec::new()))?;
+        let word = self.emit_carrier_bytes_claim(builder, tag, class, length)?;
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        for (index, (value, known)) in elements.into_iter().enumerate() {
+            // Every index fits in the checked length above.
+            let position = builder.ins().iconst(types::I64, index as i64);
+            let value = match known {
+                Some(value) => {
+                    let byte = u8::try_from(value).map_err(|_| {
+                        unsupported(
+                            LoweringCause::PlannerInvariant,
+                            "PrimitiveCall",
+                            "a list_to_bytes element is outside UInt8",
+                        )
+                    })?;
+                    builder.ins().iconst(types::I64, i64::from(byte))
+                }
+                None => {
+                    // The Small/Big distinction is in the tag, not the payload:
+                    // a Big payload is a slot, so its magnitude proves nothing.
+                    let tag = self.native_int_tag(builder, value, None)?;
+                    Self::require_i64(builder, tag, crate::NATIVE_INT_SMALL_TAG_V1 as i64);
+                    Self::require_octet(builder, value);
+                    value
+                }
+            };
+            let write = builder
+                .ins()
+                .call(refs.store_byte, &[arena, word.word, position, value]);
+            Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+        }
+        Ok(LoweringOperand::Carried(word))
+    }
+
+    /// Fail closed unless `value` is an unsigned octet.
+    fn require_octet(builder: &mut FunctionBuilder<'_>, value: cranelift_codegen::ir::Value) {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let octet = builder.ins().icmp_imm(IntCC::UnsignedLessThan, value, 256);
+        let octet = builder.ins().uextend(types::I64, octet);
+        Self::require_i64(builder, octet, 1);
+    }
+
+    /// Fail closed unless `node` is a canonical constructor handle: a
+    /// Constructor admits only PersistentGround in the persistent region and
+    /// InvocationAggregate in the invocation region, so after this guard the
+    /// whole word is the node's identity. It runs before any read through the
+    /// word.
+    fn require_canonical_list_node(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        node: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let tag = builder
+            .ins()
+            .band_imm(node.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+        let persistent =
+            builder.ins().icmp_imm(IntCC::Equal, tag, BoundaryTag::PersistentGround as i64);
+        let invocation =
+            builder.ins().icmp_imm(IntCC::Equal, tag, BoundaryTag::InvocationAggregate as i64);
+        let canonical = builder.ins().bor(persistent, invocation);
+        let canonical = builder.ins().uextend(types::I64, canonical);
+        Self::require_i64(builder, canonical, 1);
+        let class = self.emit_carrier_class(builder, node)?;
+        Self::require_i64(builder, class, BoundaryClass::Constructor as i64);
+        Ok(())
+    }
+
+    /// Read a run-time List UInt8 word into fresh Bytes.
+    ///
+    /// Pass 1 counts the spine with a Floyd walk, because the store admits a
+    /// cycle and adoption, which refuses one, is not on this path. Pass 2
+    /// re-reads the spine from the word after the claim: words are handles, so
+    /// no pointer crosses the claim. Every malformed node fails closed through
+    /// `require_i64` at run time; nothing here is a build-time shape refusal.
+    fn lower_carried_list_to_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        word: CarriedBoundaryWord,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let nil = self.synthesized_fixed_identity(Role::ListNil)?.tag_abi_word()?;
+        let cons = self.synthesized_fixed_identity(Role::ListCons)?.tag_abi_word()?;
+        #[cfg(test)]
+        let word = self.test_list_to_bytes_carried_seam(builder, seat, word)?;
+        #[cfg(not(test))]
+        let _ = seat;
+
+        // Pass 1: (hare, tortoise, count, parity), starting at (word, word, 0, 0).
+        let visit = builder.create_block();
+        for _ in 0..4 {
+            builder.append_block_param(visit, types::I64);
+        }
+        let nil_node = builder.create_block();
+        let cons_node = builder.create_block();
+        let advance_tortoise = builder.create_block();
+        let step = builder.create_block();
+        builder.append_block_param(step, types::I64);
+        let counted = builder.create_block();
+        builder.append_block_param(counted, types::I64);
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder
+            .ins()
+            .jump(visit, &[word.word.into(), word.word.into(), zero.into(), zero.into()]);
+
+        builder.switch_to_block(visit);
+        let hare = CarriedBoundaryWord { word: builder.block_params(visit)[0] };
+        let tortoise = CarriedBoundaryWord { word: builder.block_params(visit)[1] };
+        let count = builder.block_params(visit)[2];
+        let parity = builder.block_params(visit)[3];
+        self.require_canonical_list_node(builder, hare)?;
+        let tag = self.emit_carrier_tag(builder, hare)?;
+        let fields = self.emit_carrier_field_count(builder, hare)?;
+        let nil_tag = Self::carrier_identity_immediate(builder, nil);
+        let is_nil = builder.ins().icmp(IntCC::Equal, tag, nil_tag);
+        builder.ins().brif(is_nil, nil_node, &[], cons_node, &[]);
+
+        builder.switch_to_block(nil_node);
+        Self::require_i64(builder, fields, 0);
+        builder.ins().jump(counted, &[count.into()]);
+
+        builder.switch_to_block(cons_node);
+        let cons_tag = Self::carrier_identity_immediate(builder, cons);
+        let is_cons = builder.ins().icmp(IntCC::Equal, tag, cons_tag);
+        let is_cons = builder.ins().uextend(types::I64, is_cons);
+        Self::require_i64(builder, is_cons, 1);
+        Self::require_i64(builder, fields, 2);
+        let next_hare = self.emit_carrier_field(builder, hare, 1)?;
+        let next_count = builder.ins().iadd_imm(count, 1);
+        let slow = builder.ins().icmp_imm(IntCC::Equal, parity, 1);
+        builder
+            .ins()
+            .brif(slow, advance_tortoise, &[], step, &[tortoise.word.into()]);
+
+        builder.switch_to_block(advance_tortoise);
+        let next_tortoise = self.emit_carrier_field(builder, tortoise, 1)?;
+        builder.ins().jump(step, &[next_tortoise.word.into()]);
+
+        builder.switch_to_block(step);
+        let next_tortoise = builder.block_params(step)[0];
+        let next_parity = builder.ins().bxor_imm(parity, 1);
+        let same = builder.ins().icmp(IntCC::Equal, next_hare.word, next_tortoise);
+        let same = builder.ins().uextend(types::I64, same);
+        Self::require_i64(builder, same, 0);
+        builder.ins().jump(
+            visit,
+            &[
+                next_hare.word.into(),
+                next_tortoise.into(),
+                next_count.into(),
+                next_parity.into(),
+            ],
+        );
+
+        builder.switch_to_block(counted);
+        let count = builder.block_params(counted)[0];
+        let (tag, class) = Self::carrier_handle_disposition(&Lowered::Bytes(Vec::new()))?;
+        let out = self.emit_carrier_bytes_claim(builder, tag, class, count)?;
+
+        // Pass 2: (node, index) from (word, 0), stopping at index == count.
+        let store = builder.create_block();
+        builder.append_block_param(store, types::I64);
+        builder.append_block_param(store, types::I64);
+        let body = builder.create_block();
+        let stored = builder.create_block();
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().jump(store, &[word.word.into(), zero.into()]);
+
+        builder.switch_to_block(store);
+        let node = CarriedBoundaryWord { word: builder.block_params(store)[0] };
+        let index = builder.block_params(store)[1];
+        let finished = builder.ins().icmp(IntCC::Equal, index, count);
+        builder.ins().brif(finished, stored, &[], body, &[]);
+
+        builder.switch_to_block(body);
+        self.require_canonical_list_node(builder, node)?;
+        let tag = self.emit_carrier_tag(builder, node)?;
+        let cons_tag = Self::carrier_identity_immediate(builder, cons);
+        let is_cons = builder.ins().icmp(IntCC::Equal, tag, cons_tag);
+        let is_cons = builder.ins().uextend(types::I64, is_cons);
+        Self::require_i64(builder, is_cons, 1);
+        let fields = self.emit_carrier_field_count(builder, node)?;
+        Self::require_i64(builder, fields, 2);
+        let head = self.emit_carrier_field(builder, node, 0)?;
+        // Every UInt8 is in 0..=255, so an immediate is its only lawful
+        // carried form; a boxed head is never decoded and its slot never read.
+        let head_tag = builder
+            .ins()
+            .band_imm(head.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
+        Self::require_i64(builder, head_tag, BoundaryTag::ImmediateInt as i64);
+        let value = self.emit_carrier_scalar(builder, head)?;
+        Self::require_octet(builder, value);
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let write = builder
+            .ins()
+            .call(refs.store_byte, &[arena, out.word, index, value]);
+        Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+        let tail = self.emit_carrier_field(builder, node, 1)?;
+        let next = builder.ins().iadd_imm(index, 1);
+        builder.ins().jump(store, &[tail.word.into(), next.into()]);
+
+        builder.switch_to_block(stored);
+        Ok(LoweringOperand::Carried(out))
+    }
+
     fn lower_bytes_concat(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {
         let (lhs, rhs) = expect_two_args(NativePrimitive::BytesConcat.symbol(), args)?;
         let (Lowered::Bytes(mut lhs), Lowered::Bytes(rhs)) = (lhs, rhs) else {
@@ -1494,5 +1724,253 @@ impl<'a> Lowering<'a> {
             value: builder.ins().iconst(types::I64, len),
             known: Some(len),
         })
+    }
+}
+
+/// Test-only corruptions of a carried `list_to_bytes` operand, applied at the
+/// carried arm's entry before pass 1. Each writes through the ordinary carrier
+/// ABI; the seam's own failures return [`LIST_TO_BYTES_SEAM_FAILED`], never the
+/// arm's `-1`.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ListToBytesSeam {
+    /// Store the first node as the tail of the last Cons.
+    Cycle,
+    /// Replace head 0 with a carried Big Int (2^64) word.
+    BoxedHead,
+    /// Rebuild the first two Cons nodes in the invocation region, with the
+    /// first node's tail naming the second under the non-canonical
+    /// InvocationBorrowed tag, and lower from the rebuilt first node.
+    AliasTail,
+    /// Build the AliasTail prefix, then return `n0_tag << 8 | alias_tag`
+    /// instead of lowering, to report that the fixture reached the
+    /// invocation region.
+    ReportTailTag,
+}
+
+#[cfg(test)]
+pub(super) const LIST_TO_BYTES_SEAM_FAILED: i64 = -77;
+
+#[cfg(test)]
+std::thread_local! {
+    static LIST_TO_BYTES_SEAM: std::cell::Cell<Option<ListToBytesSeam>> =
+        const { std::cell::Cell::new(None) };
+}
+
+#[cfg(test)]
+pub(super) fn with_list_to_bytes_seam<T>(seam: ListToBytesSeam, body: impl FnOnce() -> T) -> T {
+    let old = LIST_TO_BYTES_SEAM.with(|cell| cell.replace(Some(seam)));
+    let result = body();
+    LIST_TO_BYTES_SEAM.with(|cell| cell.set(old));
+    result
+}
+
+#[cfg(test)]
+impl<'a> Lowering<'a> {
+    fn seam_require_ok(builder: &mut FunctionBuilder<'_>, status: cranelift_codegen::ir::Value) {
+        let ok = builder.create_block();
+        let failed = builder.create_block();
+        let matches = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            status,
+            BOUNDARY_OK,
+        );
+        builder.ins().brif(matches, ok, &[], failed, &[]);
+        builder.switch_to_block(failed);
+        let marker = builder.ins().iconst(types::I64, LIST_TO_BYTES_SEAM_FAILED);
+        builder.ins().return_(&[marker]);
+        builder.switch_to_block(ok);
+    }
+
+    fn seam_field(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        node: cranelift_codegen::ir::Value,
+        position: i64,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let pointer = builder.func.dfg.value_type(arena);
+        let (slot, out) = Self::carrier_out_slot(builder, pointer);
+        let index = builder.ins().iconst(types::I64, position);
+        let call = builder.ins().call(refs.field, &[arena, node, index, out]);
+        Self::seam_require_ok(builder, builder.inst_results(call)[0]);
+        Ok(builder.ins().stack_load(types::I64, slot, 0))
+    }
+
+    fn seam_store_field(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        node: cranelift_codegen::ir::Value,
+        position: i64,
+        child: cranelift_codegen::ir::Value,
+    ) -> Result<(), CraneliftBackendError> {
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let index = builder.ins().iconst(types::I64, position);
+        let call = builder.ins().call(refs.store_field, &[arena, node, index, child]);
+        Self::seam_require_ok(builder, builder.inst_results(call)[0]);
+        Ok(())
+    }
+
+    fn seam_require_one(builder: &mut FunctionBuilder<'_>, value: cranelift_codegen::ir::Value) {
+        let ok = builder.create_block();
+        let failed = builder.create_block();
+        let matches = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::Equal, value, 1);
+        builder.ins().brif(matches, ok, &[], failed, &[]);
+        builder.switch_to_block(failed);
+        let marker = builder.ins().iconst(types::I64, LIST_TO_BYTES_SEAM_FAILED);
+        builder.ins().return_(&[marker]);
+        builder.switch_to_block(ok);
+    }
+
+    /// A fresh invocation-region ListCons node, `[field0, field1]`.
+    fn seam_invocation_cons(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        field0: cranelift_codegen::ir::Value,
+        field1: cranelift_codegen::ir::Value,
+    ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let pointer = builder.func.dfg.value_type(arena);
+        let cons = self.synthesized_fixed_identity(Role::ListCons)?.tag_abi_word()?;
+        let (slot, out) = Self::carrier_out_slot(builder, pointer);
+        let tag = builder.ins().iconst(types::I64, BoundaryTag::InvocationAggregate as i64);
+        let class = builder.ins().iconst(types::I64, BoundaryClass::Constructor as i64);
+        let two = builder.ins().iconst(types::I64, 2);
+        let alloc = builder.ins().call(refs.alloc, &[arena, tag, class, two, out]);
+        Self::seam_require_ok(builder, builder.inst_results(alloc)[0]);
+        let node = builder.ins().stack_load(types::I64, slot, 0);
+        let identity = Self::carrier_identity_immediate(builder, cons);
+        let call = builder.ins().call(refs.store_tag_id, &[arena, node, identity]);
+        Self::seam_require_ok(builder, builder.inst_results(call)[0]);
+        self.seam_store_field(builder, node, 0, field0)?;
+        self.seam_store_field(builder, node, 1, field1)?;
+        Ok(node)
+    }
+
+    /// Rebuild the first two Cons nodes in the invocation region, with n0's
+    /// tail naming n1 under the non-canonical InvocationBorrowed tag. Returns
+    /// `(n0, alias)`.
+    fn seam_invocation_alias_prefix(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+    ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError> {
+        let h0 = self.seam_field(builder, word.word, 0)?;
+        let w1 = self.seam_field(builder, word.word, 1)?;
+        let h1 = self.seam_field(builder, w1, 0)?;
+        let w2 = self.seam_field(builder, w1, 1)?;
+        let n1 = self.seam_invocation_cons(builder, h1, w2)?;
+        let index_bits = builder
+            .ins()
+            .band_imm(n1, !(crate::boundary_value::BOUNDARY_TAG_MASK as i64));
+        let alias = builder
+            .ins()
+            .bor_imm(index_bits, BoundaryTag::InvocationBorrowed as i64);
+        let n0 = self.seam_invocation_cons(builder, h0, alias)?;
+        Ok((n0, alias))
+    }
+
+    fn test_list_to_bytes_carried_seam(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        seat: StaticOriginId,
+        word: CarriedBoundaryWord,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let Some(seam) = LIST_TO_BYTES_SEAM.with(std::cell::Cell::get) else {
+            return Ok(word);
+        };
+        match seam {
+            ListToBytesSeam::Cycle => {
+                let refs = self.carrier_refs()?;
+                let arena = self.carrier_arena()?;
+                let pointer = builder.func.dfg.value_type(arena);
+                let walk = builder.create_block();
+                builder.append_block_param(walk, types::I64);
+                let close = builder.create_block();
+                let next = builder.create_block();
+                let done = builder.create_block();
+                builder.ins().jump(walk, &[word.word.into()]);
+                builder.switch_to_block(walk);
+                let node = builder.block_params(walk)[0];
+                let tail = self.seam_field(builder, node, 1)?;
+                let (slot, out) = Self::carrier_out_slot(builder, pointer);
+                let call = builder.ins().call(refs.field_count, &[arena, tail, out]);
+                Self::seam_require_ok(builder, builder.inst_results(call)[0]);
+                let count = builder.ins().stack_load(types::I64, slot, 0);
+                let last = builder.ins().icmp_imm(IntCC::Equal, count, 0);
+                builder.ins().brif(last, close, &[], next, &[]);
+                builder.switch_to_block(next);
+                builder.ins().jump(walk, &[tail.into()]);
+                builder.switch_to_block(close);
+                self.seam_store_field(builder, node, 1, word.word)?;
+                builder.ins().jump(done, &[]);
+                builder.switch_to_block(done);
+            }
+            ListToBytesSeam::BoxedHead => {
+                // A Big Int head for 2^64: limbs little-endian (0, 1), sign 0,
+                // interned through the function-local NativeIntV1 helper.
+                let native_arena = self.function_local.native_int_arena.ok_or_else(|| {
+                    unsupported(LoweringCause::PlannerInvariant, "PrimitiveCall",
+                        "the boxed-head seam has no native Int arena")
+                })?;
+                let intern = self.function_local.native_int_intern.ok_or_else(|| {
+                    unsupported(LoweringCause::PlannerInvariant, "PrimitiveCall",
+                        "the boxed-head seam has no native Int intern helper")
+                })?;
+                let pointer = builder.func.dfg.value_type(native_arena);
+                let limbs =
+                    builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+                let low = builder.ins().iconst(types::I64, 0);
+                let high = builder.ins().iconst(types::I64, 1);
+                builder.ins().stack_store(low, limbs, 0);
+                builder.ins().stack_store(high, limbs, 8);
+                let limbs = builder.ins().stack_addr(pointer, limbs, 0);
+                let output =
+                    builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+                let output_pointer = builder.ins().stack_addr(pointer, output, 0);
+                let sign = builder.ins().iconst(types::I64, 0);
+                let len = builder.ins().iconst(types::I64, 2);
+                let call = builder
+                    .ins()
+                    .call(intern, &[native_arena, sign, limbs, len, output_pointer]);
+                let interned = builder.inst_results(call)[0];
+                let interned = builder.ins().icmp_imm(IntCC::Equal, interned, 0);
+                let interned = builder.ins().uextend(types::I64, interned);
+                Self::seam_require_one(builder, interned);
+                let tag = builder.ins().stack_load(types::I64, output, 0);
+                let payload = builder.ins().stack_load(types::I64, output, 8);
+                let big = builder
+                    .ins()
+                    .icmp_imm(IntCC::Equal, tag, crate::NATIVE_INT_BIG_TAG_V1 as i64);
+                let big = builder.ins().uextend(types::I64, big);
+                Self::seam_require_one(builder, big);
+                let value = self.lowered_from_scalar_pair(
+                    ScalarMergeKind::Int,
+                    NativeScalarPairV1 { tag, payload },
+                );
+                let boxed = self.emit_carrier_transfer(builder, seat, &value)?;
+                self.seam_store_field(builder, word.word, 0, boxed.word)?;
+            }
+            ListToBytesSeam::AliasTail => {
+                let (n0, _alias) = self.seam_invocation_alias_prefix(builder, word)?;
+                return Ok(CarriedBoundaryWord { word: n0 });
+            }
+            ListToBytesSeam::ReportTailTag => {
+                let (n0, alias) = self.seam_invocation_alias_prefix(builder, word)?;
+                let mask = crate::boundary_value::BOUNDARY_TAG_MASK as i64;
+                let n0_tag = builder.ins().band_imm(n0, mask);
+                let alias_tag = builder.ins().band_imm(alias, mask);
+                let n0_tag = builder.ins().ishl_imm(n0_tag, 8);
+                let tags = builder.ins().bor(n0_tag, alias_tag);
+                builder.ins().return_(&[tags]);
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+            }
+        }
+        Ok(word)
     }
 }
