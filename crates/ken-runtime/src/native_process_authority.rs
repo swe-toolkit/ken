@@ -640,8 +640,6 @@ fn native_process_symbols_from_record(
         resource_invalid_offset: spine.resource_invalid_offset.clone(),
         resource_invalid_bounds: spine.resource_invalid_bounds.clone(),
         resource_no_progress: spine.resource_no_progress.clone(),
-        resource_kind_fs_handle: spine.resource_kind_fs_handle.clone(),
-        resource_kind_buffer: spine.resource_kind_buffer.clone(),
         resource_trace_identity: spine.resource_trace_identity.clone(),
         nat_zero: spine.nat_zero.clone(),
         nat_suc: spine.nat_suc.clone(),
@@ -674,14 +672,13 @@ fn native_process_symbols_from_record(
         directory_entries: spine.directory_entries.clone(),
         directory_end: spine.directory_end.clone(),
         resource_mapping_limit: spine.resource_mapping_limit.clone(),
-        resource_kind_mapping: spine.resource_kind_mapping.clone(),
-        px10_kind_symbols: [
-            spine.px10_kind_spawn_plan.clone(),
-            spine.px10_kind_child_process.clone(),
-            spine.px10_kind_pipe_read.clone(),
-            spine.px10_kind_pipe_write.clone(),
-        ],
         px10_exit_symbols: [spine.px10_exit_exited.clone(), spine.px10_exit_signaled.clone()],
+        resource_kind_symbols: spine.resource_kind_symbols.clone(),
+        px11_address_symbols: [
+            spine.px11_address_ipv4.clone(),
+            spine.px11_address_ipv6.clone(),
+            spine.px11_address_unix.clone(),
+        ],
     }
 }
 

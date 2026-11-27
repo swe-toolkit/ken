@@ -3182,18 +3182,6 @@ mod tests {
             .insert("host.io".to_string());
     }
 
-    fn replace_target_body_with_effect(program: &mut RuntimeProgram) {
-        program.declarations[0].kind = RuntimeDeclarationKind::Transparent {
-            body: RuntimeExpr::Effect {
-                bracket_acquire: None,
-                family: "Net".to_string(),
-                operation: ken_host::HostOpV1::NetListen,
-                capability: None,
-                args: Vec::new(),
-            },
-        };
-    }
-
     fn packaged_entrypoint(program: &RuntimeProgram) -> crate::RuntimeExecutableEntrypointPackage {
         let report = summarize_runtime_ir_program(program);
         let target = program.declarations[0].symbol.clone();
@@ -3992,37 +3980,14 @@ mod tests {
     }
 
     #[test]
-    fn hidden_deferred_effect_body_reports_named_unavailable_without_native_execution() {
-        let base_program = starter_program(43);
-        let run_report = runtime_ir_run_report(&base_program);
-        let output_dir = temp_output_dir("nc25-hidden-effect-body");
-        let package = package_for(&base_program, &run_report, &output_dir);
-        let mut program = base_program.clone();
-        replace_target_body_with_effect(&mut program);
-
-        let report = run_native_execution_differential(
-            &program,
-            &package,
-            &run_report,
-            &output_dir,
-            interpreter_available(&program, &run_report),
-            "native differential unit test",
-        )
-        .expect("hidden deferred effect is a represented-unavailable policy report");
-
-        assert!(matches!(
-            report.effect_foreign_policy.status,
-            NativeEffectForeignExecutableStatus::RepresentedUnavailable { ref reason }
-                if reason.contains("NetListen")
-        ));
-        assert!(report
-            .effect_foreign_policy
-            .facts
-            .contains("runtime_expr.host_op=0701:NetListen"));
-        assert!(matches!(
-            report.native,
-            NativeExecutionLaneReport::Unavailable { .. }
-        ));
+    fn represented_unavailable_host_operation_population_is_empty() {
+        assert!(
+            ken_host::HostOpV1::ALL
+                .iter()
+                .all(|op| op.availability() == ken_host::HostOpAvailabilityV1::NativeTested),
+            "the represented-unavailable effect-policy rows were retired at PX11 Inc2 because \
+             their population is empty; restore them with a real subject when it is not"
+        );
     }
 
     #[test]
@@ -4519,45 +4484,6 @@ mod tests {
             ),
             NativeExecutablePhaseStatus::Unavailable { reason }
                 if reason.contains("interpreter lane intentionally unavailable")
-        ));
-    }
-
-    #[test]
-    fn closeout_classifies_deferred_effect_policy_as_unavailable() {
-        let base_program = starter_program(53);
-        let run_report = runtime_ir_run_report(&base_program);
-        let output_dir = temp_output_dir("nc27-closeout-effect-unsupported");
-        let package = package_for(&base_program, &run_report, &output_dir);
-        let mut program = base_program.clone();
-        replace_target_body_with_effect(&mut program);
-        let report = run_native_execution_differential(
-            &program,
-            &package,
-            &run_report,
-            &output_dir,
-            interpreter_available(&program, &run_report),
-            "native differential unit test",
-        )
-        .expect("effect policy unsupported report materializes");
-
-        let closeout =
-            close_native_executable_phase([&report], std::iter::empty(), "nc27 unit test");
-
-        assert!(closeout.corpus.positive_cases.is_empty());
-        assert_eq!(closeout.corpus.blockers.len(), 1);
-        assert!(matches!(
-            closeout.corpus.blockers[0].status,
-            NativeExecutablePhaseStatus::Unavailable { ref reason }
-                if reason.contains("NetListen")
-        ));
-        assert!(matches!(
-            closeout_claim_status(
-                &closeout,
-                &report.target.target_symbol,
-                &NativeExecutableEvidenceClaim::EffectForeignExecutablePolicy
-            ),
-            NativeExecutablePhaseStatus::Unavailable { reason }
-                if reason.contains("NetListen")
         ));
     }
 

@@ -167,6 +167,7 @@ macro_rules! runtime_host_spine_v1 {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct RuntimeCheckedHostSpineV1 {
             $( pub $field: RuntimeSymbol, )*
+            pub resource_kind_symbols: [RuntimeSymbol; ken_host::RESOURCE_KIND_COUNT_V1],
             /// The thirteen IO errors, in the order the record carries them.
             pub io_errors: Vec<RuntimeSymbol>,
             /// Public host operations as `(symbol, HostOpV1 tag)`.
@@ -185,6 +186,7 @@ macro_rules! runtime_host_spine_v1 {
             /// every role by one and still produce a well-formed record.
             pub fn from_ordered(
                 ordered: Vec<RuntimeSymbol>,
+                resource_kind_symbols: [RuntimeSymbol; ken_host::RESOURCE_KIND_COUNT_V1],
                 io_errors: Vec<RuntimeSymbol>,
                 operations: Vec<(RuntimeSymbol, u16)>,
             ) -> Option<Self> {
@@ -194,6 +196,7 @@ macro_rules! runtime_host_spine_v1 {
                 let mut next = ordered.into_iter();
                 Some(Self {
                     $( $field: next.next()?, )*
+                    resource_kind_symbols,
                     io_errors,
                     operations,
                 })
@@ -203,6 +206,9 @@ macro_rules! runtime_host_spine_v1 {
             pub fn roles(&self) -> Vec<(&'static str, &RuntimeSymbol)> {
                 let mut out: Vec<(&'static str, &RuntimeSymbol)> =
                     vec![ $( (stringify!($field), &self.$field), )* ];
+                for symbol in &self.resource_kind_symbols {
+                    out.push(("resource_kind", symbol));
+                }
                 for symbol in &self.io_errors {
                     out.push(("io_error", symbol));
                 }
@@ -243,8 +249,6 @@ runtime_host_spine_v1! {
     resource_invalid_offset,
     resource_invalid_bounds,
     resource_no_progress,
-    resource_kind_fs_handle,
-    resource_kind_buffer,
     resource_trace_identity,
     nat_zero,
     nat_suc,
@@ -278,12 +282,7 @@ runtime_host_spine_v1! {
     // ABI-S6 D4 appends without moving established positional identities.
     resource_mapping_limit,
     // ABI-S6 D5a makes the third resource kind native-reifiable.
-    resource_kind_mapping,
     // PX10 typed resource kinds and wait results, appended to preserve prior roles.
-    px10_kind_spawn_plan,
-    px10_kind_child_process,
-    px10_kind_pipe_read,
-    px10_kind_pipe_write,
     px10_exit_exited,
     px10_exit_signaled,
     option_none,
@@ -292,6 +291,10 @@ runtime_host_spine_v1! {
     // Clock promotion appends checked constructor roles.
     mk_monotonic_instant,
     mk_deadline,
+    // PX11 Inc2 socket address roles append after Clock's.
+    px11_address_ipv4,
+    px11_address_ipv6,
+    px11_address_unix,
 }
 
 /// The decoded, validated checked-runtime role record.

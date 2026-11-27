@@ -119,10 +119,10 @@ operation|ProcessSpawn|0603|native|ProcessSpawnRequestV1|1|HostReplyV1|1
 operation|ProcessTakePipe|0604|native|ProcessTakePipeRequestV1|2|HostReplyV1|1
 operation|ProcessWait|0605|native|ProcessWaitRequestV1|1|HostReplyV1|1
 operation|ProcessSignal|0606|native|ProcessSignalRequestV1|2|HostReplyV1|1
-operation|NetListen|0701|unavailable|NetListenRequestV1|2|HostReplyV1|1
-operation|NetAccept|0702|unavailable|NetAcceptRequestV1|1|HostReplyV1|1
-operation|NetConnect|0703|unavailable|NetConnectRequestV1|2|HostReplyV1|1
-operation|NetReceive|0704|unavailable|NetReceiveRequestV1|4|HostReplyV1|1
-operation|NetSend|0705|unavailable|NetSendRequestV1|5|HostReplyV1|1
-operation|NetShutdown|0706|unavailable|NetShutdownRequestV1|2|HostReplyV1|1
-operation|NetLocalAddress|0707|unavailable|NetLocalAddressRequestV1|1|HostReplyV1|1
+operation|NetListen|0701|native|NetListenRequestV1|2|HostReplyV1|1
+operation|NetAccept|0702|native|NetAcceptRequestV1|1|HostReplyV1|1
+operation|NetConnect|0703|native|NetConnectRequestV1|2|HostReplyV1|1
+operation|NetReceive|0704|native|NetReceiveRequestV1|4|HostReplyV1|1
+operation|NetSend|0705|native|NetSendRequestV1|5|HostReplyV1|1
+operation|NetShutdown|0706|native|NetShutdownRequestV1|2|HostReplyV1|1
+operation|NetLocalAddress|0707|native|NetLocalAddressRequestV1|1|HostReplyV1|1

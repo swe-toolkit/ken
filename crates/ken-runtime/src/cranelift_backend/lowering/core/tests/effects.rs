@@ -133,6 +133,7 @@ fn run_checked_bounded_nat_fixture(
             generated_context_captures: None,
             checked_ih_generated_entry_access: None,
             generated_constructor_authorities: BTreeMap::new(),
+            k_unit_answer_wraps: BTreeMap::new(),
             pending_call_result_obligations: Vec::new(),
             statically_unselected_roots: BTreeMap::new(),
             lowered_construct_origins: BTreeSet::new(),
@@ -1751,6 +1752,56 @@ fn abi_s6_mapping_kind_fixture(symbols: &crate::NativeProcessSymbols) -> Runtime
     }
 }
 
+const PX11_SCRIPTED_RELEASE_FAILED: u64 = 256;
+
+fn px11_release_kind_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeExpr {
+    let trap = || RuntimeTrap {
+        code: RuntimeTrapCode::PatternMatchFailure,
+        message: "PX11 release kind projection".to_string(),
+    };
+    RuntimeExpr::Match {
+        scrutinee: Box::new(abi_s6_mapping_allocate()),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: symbols.result_err.clone(),
+            binders: 1,
+            body: RuntimeExpr::Match {
+                scrutinee: Box::new(RuntimeExpr::Var(0)),
+                cases: vec![crate::RuntimeMatchCase {
+                    constructor: symbols.resource_release_failed.clone(),
+                    binders: 3,
+                    body: RuntimeExpr::Match {
+                        scrutinee: Box::new(RuntimeExpr::Var(0)),
+                        cases: symbols.resource_kind_symbols.iter().enumerate().map(|(position, constructor)| {
+                            crate::RuntimeMatchCase {
+                                constructor: constructor.clone(),
+                                binders: 0,
+                                body: px8n_failure(symbols, RuntimeExpr::Value(
+                                    RuntimeValue::Int((100 + position as i64).into()),
+                                )),
+                            }
+                        }).collect(),
+                        default: trap(),
+                    },
+                }],
+                default: trap(),
+            },
+        }],
+        default: trap(),
+    }
+}
+
+/// Durable invariant. MEASURED: the native guard, aggregate plan and reifier
+/// deliver each injected ReleaseFailed kind as its checked constructor.
+/// CLAIMED: the native closed kind set admits every host member.
+/// THE GAP: the host reply is scripted; this does not require a real failed close.
+#[test]
+fn px11_every_catalog_resource_kind_reifies_through_native_reply_validation() {
+    for (position, (kind, tag)) in ken_host::resource_kind_population_v1().unwrap().into_iter().enumerate() {
+        assert_eq!(run_abi_s6_d5a_reifier_fixture(PX11_SCRIPTED_RELEASE_FAILED + tag, px11_release_kind_fixture),
+            100 + position as i64, "kind {kind:?} with wire tag {tag}");
+    }
+}
+
 fn run_abi_s6_d5a_reifier_fixture(
     scenario: u64,
     expression: fn(&crate::NativeProcessSymbols) -> RuntimeExpr,
@@ -1821,6 +1872,7 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
     };
     store(wire.reply_tag_offset, wire.reply_resource_error_tag);
     let scenario = unsafe { *host_context.cast::<u64>() };
+    let kind_tag = |kind| wire.resource_kinds.iter().find(|(k, _)| *k == kind).unwrap().1;
     match scenario {
         ABI_S6_D5A_MAPPING_LIMIT => {
             store(wire.reply_detail_offset, wire.resource_error_mapping_limit);
@@ -1829,12 +1881,20 @@ extern "C" fn abi_s6_d5a_scripted_dispatch(
             store(wire.reply_detail_offset, wire.resource_error_kind_mismatch);
             store(
                 wire.reply_resource_error_expected_kind_offset,
-                wire.resource_kind_mapping,
+                kind_tag(ken_host::ResourceKindV1::Mapping),
             );
             store(
                 wire.reply_resource_error_actual_kind_offset,
-                wire.resource_kind_buffer,
+                kind_tag(ken_host::ResourceKindV1::Buffer),
             );
+        }
+        code if code >= PX11_SCRIPTED_RELEASE_FAILED => {
+            store(wire.reply_detail_offset, wire.resource_error_release_failed);
+            store(wire.reply_resource_error_schema_offset, wire.resource_error_reply_schema);
+            store(wire.reply_resource_error_kind_offset, code - PX11_SCRIPTED_RELEASE_FAILED);
+            store(wire.reply_resource_error_identity_offset, 42);
+            // Existing IOError wire known answer: NotFound.
+            store(wire.reply_resource_error_io_offset, 0);
         }
         _ => return -1,
     }
@@ -2207,8 +2267,8 @@ fn dynamic_host_result_residual_carries_the_planner_trap_identity() {
 }
 
 /// The native-tested host operations this Cranelift lowering represents,
-/// read from the closed host inventory. PX11's seven interpreter-admitted Net
-/// operations remain RepresentedUnavailable and have no native seat contract.
+/// read from the closed host inventory. Since PX11 Inc2 every operation is
+/// NativeTested, so none lacks a native seat contract.
 /// Native F rows and ResourceStreamWrite tests, not this set, prove execution.
 fn native_tested_host_operations() -> BTreeSet<ken_host::HostOpV1> {
     ken_host::HostOpV1::ALL
@@ -2299,12 +2359,11 @@ fn live_effect_emitter_inventory_and_generated_layout_mutations_are_closed() {
         let mut changed = layout.clone();
         changed.resource_error_release_failed ^= 1;
         mutations.push(changed);
-        let mut changed = layout.clone();
-        changed.resource_kind_fs_handle ^= 1;
-        mutations.push(changed);
-        let mut changed = layout.clone();
-        changed.resource_kind_mapping ^= 1;
-        mutations.push(changed);
+        for index in 0..layout.resource_kinds.len() {
+            let mut changed = layout.clone();
+            changed.resource_kinds[index].1 ^= 1;
+            mutations.push(changed);
+        }
         let mut changed = layout.clone();
         changed.resource_error_reply_schema ^= 1;
         mutations.push(changed);
@@ -3735,13 +3794,14 @@ fn d7_non_unit_fixed_role_reaches_ordinary_aggregate_allocation() {
 /// set, and it is derived from the operation and the slot alone.**
 ///
 /// This is a static table check, not an execution case. Every native-tested
-/// operation, not the interpreter-only Net family, needs a Cranelift seat.
+/// operation needs a Cranelift seat.
 ///
 /// MEASURED: for each native-tested operation the ordinals with a contract
 /// are exactly `0..n`; ClockWallNow alone is zero-arity, other native-tested
-/// operations have `n >= 1`, and only the eleven FS-path operations and
-/// ProcessPlanOpen carry a capability slot. No native-unavailable lane has
-/// a seat contract.
+/// operations have `n >= 1`, and only the eleven FS-path operations,
+/// ProcessPlanOpen, NetListen and NetConnect carry a capability slot. A
+/// represented-unavailable operation, if any, has no seat contract; since
+/// PX11 Inc2 there is none, so that loop is vacuous until one exists.
 ///
 /// CLAIMED: no native-tested operation is missing a seat contract.
 /// THE GAP: the ledger's per-body occurrence completeness law, not this
@@ -3766,6 +3826,8 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
         ken_host::HostOpV1::FsChangeMode,
         ken_host::HostOpV1::FsOpen,
         ken_host::HostOpV1::ProcessPlanOpen,
+        ken_host::HostOpV1::NetListen,
+        ken_host::HostOpV1::NetConnect,
     ];
     assert_eq!(
         host_effect_seat_contract_of(
@@ -3875,6 +3937,9 @@ fn every_native_tested_host_operation_has_a_gapless_seat_contract_derived_from_i
             "{operation:?} argument seats are not a gapless 0..n range"
         );
     }
+    // Vacuous while every operation is NativeTested (PX11 Inc2); the
+    // emptiness row in this module names that. Keyed on availability, so
+    // it regains a population without an edit.
     for operation in ken_host::HostOpV1::ALL.into_iter().filter(|op|
         op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
     ) {
@@ -6286,144 +6351,25 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     );
 }
 
-/// **`RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` -- the MANDATORY negative control, as
-/// a non-degenerate PAIR.**
-///
-/// The pair is the whole point. One fixture showing "a dead arm compiles" is
-/// green-vs-green under the mutation this exists to catch: a predicate that
-/// answered DEAD for everything would pass it. These two programs are
-/// **structurally identical and differ in exactly one constructor SYMBOL** --
-/// the `Let` value in the sibling arm names either the refusing arm's own
-/// constructor or an unrelated one -- so a predicate that stopped
-/// discriminating inverts BOTH rows rather than neither.
-///
-/// The refusing arm holds a represented-unavailable-lane effect. That is one of
-/// the two sites this node gates, and both consult the identical
-/// `effect_arm_is_provably_dead`, so this pair exercises the predicate that
-/// governs both.
-///
-/// **Dispatched through a CALLED CLOSURE, and that is a measured necessity
-/// rather than a stylistic choice.** With the match applied to a scrutinee
-/// lowering can resolve statically, the unselected arm is folded and its effect
-/// is never lowered at all -- instrumenting `lower_process_host_effect` on an
-/// earlier draft showed only the `BufferAllocate` calls and no
-/// `NetListen` whatever. Both rows then compiled for the same trivial
-/// reason and the control proved nothing. Routing the value through a closure parameter forces
-/// the runtime tag dispatch that lowers EVERY arm, which is the shape the real
-/// `FSOp` request handler has.
-#[cfg(test)]
-fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
-    let symbols = crate::NativeProcessSymbols::legacy_prelude();
-    const REQUEST: &str = "ctor:fixture::DeadArmRequest::ReadDirectory";
-    // Only these two answer identities change; the request and the arm's
-    // unavailable-lane effect remain the deadness discriminator.
-    const SIBLING: &str = crate::EXIT_SUCCESS_CONSTRUCTOR;
-    const UNRELATED: &str = crate::EXIT_FAILURE_CONSTRUCTOR;
-    let exit_success = || RuntimeExpr::Construct {
-        constructor: crate::EXIT_SUCCESS_CONSTRUCTOR.to_string(),
-        args: Vec::new(),
-    };
-    let trap = || RuntimeTrap {
-        code: RuntimeTrapCode::PatternMatchFailure,
-        message: "dead-arm pair default".to_string(),
-    };
-    // THE ONE DIFFERENCE between the two programs.
-    let constructed = RuntimeExpr::Construct {
-        constructor: if request_is_constructed {
-            REQUEST.to_string()
-        } else {
-            UNRELATED.to_string()
-        },
-        args: Vec::new(),
-    };
-    // A runtime-chosen request. Neither branch names `REQUEST`, which is what
-    // leaves its arm dead in the baseline while the arm is still lowered.
-    let dynamic_request = RuntimeExpr::Match {
-        scrutinee: Box::new(RuntimeExpr::Effect {
-            bracket_acquire: None,
-            family: "FS".to_string(),
-            operation: ken_host::HostOpV1::BufferAllocate,
-            capability: None,
-            args: vec![RuntimeExpr::Value(RuntimeValue::Int((4).into()))],
-        }),
-        cases: vec![
-            RuntimeMatchCase {
-                constructor: symbols.result_err.clone(),
-                binders: 1,
-                body: RuntimeExpr::Construct {
-                    constructor: SIBLING.to_string(),
-                    args: Vec::new(),
-                },
-            },
-            RuntimeMatchCase {
-                constructor: symbols.result_ok.clone(),
-                binders: 1,
-                body: RuntimeExpr::Construct {
-                    constructor: UNRELATED.to_string(),
-                    args: Vec::new(),
-                },
-            },
-        ],
-        default: trap(),
-    };
-    RuntimeExpr::Call {
-        callee: Box::new(ordinary_match_closure(
-            vec![
-                RuntimeMatchCase {
-                    constructor: REQUEST.to_string(),
-                    binders: 0,
-                    body: RuntimeExpr::Effect {
-                        bracket_acquire: None,
-                        family: "Net".to_string(),
-                        operation: ken_host::HostOpV1::NetListen,
-                        capability: None,
-                        args: Vec::new(),
-                    },
-                },
-                RuntimeMatchCase {
-                    constructor: SIBLING.to_string(),
-                    binders: 0,
-                    body: RuntimeExpr::Let {
-                        value: Box::new(constructed),
-                        body: Box::new(exit_success()),
-                    },
-                },
-                RuntimeMatchCase {
-                    constructor: UNRELATED.to_string(),
-                    binders: 0,
-                    body: exit_success(),
-                },
-            ],
-            trap(),
-        )),
-        args: vec![dynamic_request],
-    }
-}
-
-/// `AC-4`: the trap fires ONLY on a provably-dead arm, and the strict refusal
-/// SURVIVES the moment the same arm becomes reachable.
+/// The represented-unavailable population is empty: every host operation is
+/// NativeTested and every one is a Cranelift consumer. The rows whose subject
+/// had to be an unavailable or non-consumer operation, including the
+/// `RT-DEAD-ARM-EFFECT-LOWERING` `AC-4` dead-arm pair, were retired at PX11
+/// Inc2 when that population emptied. The refusal paths stay, fail-closed for
+/// the next operation, and are unexercised while the population is empty.
 #[test]
-fn a_dead_arm_traps_while_the_same_arm_constructed_still_refuses_strictly() {
-    // LIVE: the program constructs the request, so the arm can be selected and
-    // the unavailable-lane refusal must stand, loud and unchanged.
-    let refusal = match recursive_port_process_compiles(&dead_arm_pair_program(true)) {
-        Ok(()) => panic!(
-            "a reachable arm was trapped into a false pass: constructing the request must leave \
-             the strict refusal in place, or the deadness analysis has stopped discriminating"
-        ),
-        Err(error) => error.to_string(),
-    };
+fn represented_unavailable_and_non_consumer_host_operation_populations_are_empty() {
     assert!(
-        refusal.contains("represented unavailable lane"),
-        "the surviving refusal must be the ORIGINAL one, naming the lane rather than some later \
-         failure that would mask a lost refusal: {refusal}"
+        ken_host::HostOpV1::ALL
+            .iter()
+            .all(|op| op.availability() == ken_host::HostOpAvailabilityV1::NativeTested),
+        "the unavailable-lane rows were retired at PX11 Inc2 because their population is \
+         empty; restore them with a real subject when it is not"
     );
-
-    // DEAD: the identical program, differing only in which constructor the
-    // sibling arm's `Let` names, lowers -- the arm is proven unreachable, so its
-    // refusing effect becomes a trap instead of failing object emission.
-    recursive_port_process_compiles(&dead_arm_pair_program(false)).expect(
-        "the same program with the request never constructed must lower: its arm is provably \
-         dead, so its refusing effect is a trap rather than an emission failure",
+    assert_eq!(
+        CRANELIFT_HOST_EFFECT_CONSUMERS_V1.len(),
+        ken_host::HostOpV1::ALL.len(),
+        "the non-consumer rows were retired at PX11 Inc2 because their population is empty; \
+         restore them with a real subject when it is not"
     );
 }
