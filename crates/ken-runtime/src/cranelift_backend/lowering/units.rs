@@ -11735,7 +11735,7 @@ fn define_unit_body<M: Module>(
                                 known: None,
                             })],
                         },
-                    );
+                    )?;
                     builder.ins().jump(decoded, &[status.into()]);
                     builder.switch_to_block(decoded);
                     let status = builder.block_params(decoded)[0];

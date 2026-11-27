@@ -1873,7 +1873,7 @@ impl<'a> Lowering<'a> {
                 _ => None,
             };
             let word = if process_exit {
-                let status = self.emit_process_exit_status(builder, value.clone());
+                let status = self.emit_process_exit_status(builder, value.clone())?;
                 self.emit_carrier_immediate(builder, BoundaryTag::ImmediateExitStatus, status)?
             } else {
                 // The ordinary boundary walk remains fail-closed for every
@@ -2996,7 +2996,7 @@ impl<'a> Lowering<'a> {
                 let value = self.unwrap_terminal_ret(value);
                 let value = match value {
                     Lowered::ProcessExitStatus { value } => value,
-                    value => self.emit_process_exit_status(builder, value),
+                    value => self.emit_process_exit_status(builder, value)?,
                 };
                 return Ok((value, ResultDecoder::ProcessStatus));
             }
@@ -3042,6 +3042,40 @@ impl<'a> Lowering<'a> {
 
 impl<'a> Lowering<'a> {
         pub(super) fn emit_process_exit_status(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            value: Lowered,
+        ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+            let status = self.decode_process_exit_status(builder, value);
+            self.return_exit_sentinel(builder, status)
+        }
+
+        pub(super) fn return_exit_sentinel(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            status: cranelift_codegen::ir::Value,
+        ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
+            let negative = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
+                status,
+                0,
+            );
+            let sentinel = builder.create_block();
+            let decoded = builder.create_block();
+            builder.ins().brif(negative, sentinel, &[], decoded, &[]);
+            builder.switch_to_block(sentinel);
+            // Every negative status already has bit 63 set, so this is the
+            // identity on this block. It gives the return the provably
+            // nonzero form the finished-Result verifier admits; the Abort
+            // registration below is what the checked-frame validator reads.
+            let abort = builder.ins().bor_imm(status, i64::MIN);
+            builder.ins().return_(&[abort]);
+            self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+            builder.switch_to_block(decoded);
+            Ok(status)
+        }
+
+        fn decode_process_exit_status(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             value: Lowered,
@@ -3107,6 +3141,7 @@ impl<'a> Lowering<'a> {
                 value,
                 max,
             );
+            let is_zero = builder.ins().band(valid_int, is_zero);
             let valid = builder.ins().band(valid_int, positive);
             let valid = builder.ins().band(valid, within_max);
             let nonzero = builder.ins().select(valid, value, malformed);
