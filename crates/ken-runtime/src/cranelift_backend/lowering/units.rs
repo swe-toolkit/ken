@@ -11640,7 +11640,11 @@ fn define_unit_body<M: Module>(
             capture_ordinals,
         });
         let body = compiler.retained_body_occurrence(body_origin)?;
-        compiler.select_terminal_result_origins(body_origin, body.expr)?;
+        if is_root {
+            compiler.select_terminal_result_origins(body_origin, body.expr)?;
+        } else {
+            compiler.function_local.terminal_result_origins = Default::default();
+        }
         let previous_clause_body = compiler.bracket_clause_body.replace(body_origin);
         let lowered = compiler.lower_expr(&mut builder, body, &env);
         compiler.bracket_clause_body = previous_clause_body;
@@ -11733,29 +11737,8 @@ fn define_unit_body<M: Module>(
                     Lowering::require_i64(&mut builder, is_failure, 1);
                     Lowering::require_i64(&mut builder, fields, 1);
                     let field = compiler.emit_carrier_field(&mut builder, word, 0)?;
-                    let field_tag = builder
-                        .ins()
-                        .band_imm(field.word, crate::boundary_value::BOUNDARY_TAG_MASK as i64);
-                    Lowering::require_i64(
-                        &mut builder,
-                        field_tag,
-                        BoundaryTag::ImmediateInt as i64,
-                    );
-                    let code = compiler.emit_carrier_scalar(&mut builder, field)?;
-                    let small = Lowering::carrier_small_marker(&mut builder);
-                    compiler.function_local.native_int_tags.insert(code, small);
-                    let status = compiler.emit_process_exit_status(
-                        &mut builder,
-                        Lowered::Constructor {
-                            constructor: compiler.process_symbols.exit_failure.clone(),
-                            synthesized_identity: Some(failure_identity),
-                            occurrence: None,
-                            args: vec![ConstructorField::specialized(Lowered::Int {
-                                value: code,
-                                known: None,
-                            })],
-                        },
-                    )?;
+                    let carried = compiler.transfer_carried_failure_exit_status(&mut builder, field)?;
+                    let status = compiler.emit_carrier_scalar(&mut builder, carried)?;
                     builder.ins().jump(decoded, &[status.into()]);
                     builder.switch_to_block(decoded);
                     let status = builder.block_params(decoded)[0];
