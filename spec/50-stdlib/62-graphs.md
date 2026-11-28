@@ -21,7 +21,9 @@
 > SPEC-GRAPHS-UNION-REACHABLE-ABSORB §19;
 > SPEC-GRAPHS-SUCCESSOR-APPEND-UNION §20;
 > SPEC-GRAPHS-TOPO-ORDER-REVERSE §21;
-> SPEC-GRAPHS-TOPO-ORDER-UNION §22).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-TOPO-ORDER-UNION §22;
+> SPEC-GRAPHS-REACHABILITY-EDGELESS §23;
+> SPEC-GRAPHS-REACHABILITY-EDGE-EQUIV §24).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
@@ -2044,3 +2046,47 @@ The same edgeless law application claiming `True` refuses; starting at
 `True` with a client-defined edgeless graph instead gives `True` by
 conversion. These are scratch results, not assembled AC-T, official
 conformance, CI or landing evidence.
+
+## 24. Pointwise-equal edges give equal reachability
+
+`Algorithm.Graphs.Dependency` must export this public Transparent checked
+law immediately after `graph_reachable_graph_monotone` and before
+`graph_reachable_trans`:
+
+```ken
+pub theorem graph_reachable_edge_equiv
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (same : (u : q) → (v : q) → Equal Bool (edge q g u v) (edge q h u v))
+    : Equal Bool (graph_reachable q fq g s target) (graph_reachable q fq h s target)
+```
+
+For the same finite carrier, start and target, the pointwise edge equation
+`same` gives equality of the two reachability Booleans. It does not give
+`Equal (Graph q)`: `Graph` has no η (§10.1, §15.2 and §16). One-way edge
+inclusion suffices for monotonicity, but not for this equality.
+
+Apply `graph_reachable_graph_monotone` in both directions. Each inline
+inclusion uses `trans` to carry a true-edge witness across `same u v`:
+use `sym` of that equation to prove inclusion from `g` into `h`, and
+use it directly for inclusion from `h` into `g`. LawfulClasses' public
+`bool_eq_from_iff` (§51.9) closes the two truth implications. No helper
+or import is added.
+
+Architect AC-0 (`evt_553g793zejmhh`) checked the law and its open client in
+scratch on `9720876d5`, with no added `Axiom` and identical exact trusted
+`GlobalId` sets (114 → 114) after loading the eleven providers. The two
+meet graphs in the accepted client are open in a Boolean parameter, and
+the client is also open in the start and target. Neither `Proved` nor
+`Refl` alone closes that row. The one-way-inclusion twin refuses at its
+own declaration. Its claim is false: from `False`, an edgeless graph
+cannot reach `True`, but a graph with the edge `False → True` can. These
+are scratch results, not assembled AC-T, official seed execution, CI or
+landing evidence.
+
+The roster through §24 is twenty public functions, forty public theorems
+and one public constant. No §§1–23 operation or law type changes.

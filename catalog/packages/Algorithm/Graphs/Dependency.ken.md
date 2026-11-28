@@ -258,6 +258,44 @@ pub theorem graph_reachable_graph_monotone
           graph_reachable_complete q fq h s t target (walk_lift q g h included s t walk) hit
       }
 
+pub theorem graph_reachable_edge_equiv
+      (q : Type)
+      (fq : Finite q)
+      (g : Graph q)
+      (h : Graph q)
+      (s : q)
+      (target : q → Bool)
+      (same : (u : q) → (v : q) → Equal Bool (edge q g u v) (edge q h u v))
+    : Equal Bool (graph_reachable q fq g s target) (graph_reachable q fq h s target) =
+  bool_eq_from_iff
+    (graph_reachable q fq g s target)
+    (graph_reachable q fq h s target)
+    (graph_reachable_graph_monotone
+      q
+      fq
+      g
+      h
+      s
+      target
+      (λu.
+        λv.
+          λpresent.
+            trans
+              Bool
+              (edge q h u v)
+              (edge q g u v)
+              True
+              (sym Bool (edge q g u v) (edge q h u v) (same u v))
+              present))
+    (graph_reachable_graph_monotone
+      q
+      fq
+      h
+      g
+      s
+      target
+      (λu. λv. λpresent. trans Bool (edge q g u v) (edge q h u v) True (same u v) present))
+
 pub theorem graph_reachable_trans
       (q : Type) (fq : Finite q) (d : DecEq q) (g : Graph q) (s : q) (t : q) (target : q → Bool)
     : Equal Bool (graph_reachable q fq g s (d.eq t)) True
@@ -1145,6 +1183,11 @@ reachability fixed point, not another graph-specific search. Graph
 monotonicity re-types the witness walk edge by edge: the private `walk_lift`
 replaces each step's checked edge proof with the inclusion premise's proof for
 the larger graph, and completeness then decides along the lifted walk.
+`graph_reachable_edge_equiv` applies graph monotonicity in both directions.
+Each inclusion transports the proof that an edge is `True` along the
+pointwise edge equation, using `sym` when the equation points the other way.
+`bool_eq_from_iff` then closes the Boolean equality. Because `Graph` has no
+η, the law equates the reachability results, not the graphs themselves.
 Transitivity extracts the first leg's witness with the private `require_some`,
 turns its hit into `Equal q t u` by `d.sound` and `sym`, moves the walk's end
 to `t` with the private `walk_transport_end`, and carries the second leg back
@@ -3507,7 +3550,7 @@ conversion even for an open order.
 ## 7. Trust & derivation
 
 The behavioral contract is
-[graphs §§1–23](../../../../spec/50-stdlib/62-graphs.md).
+[graphs §§1–24](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
 cycle/order exclusion. The
@@ -3548,7 +3591,9 @@ checks the reversed vertex list on a one-way edge and refuses the original
 list in the same proof form. The [§23 seed][edgeless-seed] is authored, not
 officially conformance-run. It distinguishes an edgeless graph from a complete
 graph on the same vertices and checks a start that already satisfies the
-target.
+target. The [§24 seed][edge-equiv-seed] is authored, not officially
+conformance-run. It applies the law to open meet graphs whose edges agree
+by case analysis and refuses equal reachability from a one-way inclusion.
 
 The public API exports six data families (`Graph`, `Walk`, `Cycle`,
 `ReachWitness`, `TopoOrder`, `OrderOrCycle`) and eight
@@ -3559,10 +3604,11 @@ constructors (`MkGraph`, `WalkHere`, `WalkStep`, `MkCycle`, `MkReach`,
 `no_duplicates`, `all_vertices`, `all_edges_forward`, `ordered_vertices`,
 `topo_order_edge_antitone`, `topo_order_reverse`, `topo_order_union`,
 `dependency_order_or_cycle`, `graph_from_successors`, and `successors_append`.
-Its one public constant is `graph_edgeless`. Thirty-nine kernel-checked
-theorems expose the laws, including the appended-list edge equation,
-`topo_order_reverse_vertices`, `topo_order_union_vertices`, and
-`graph_reachable_edgeless`. Every other helper is private to this package.
+Its one public constant is `graph_edgeless`. Forty kernel-checked theorems
+expose the laws, including the appended-list edge equation,
+`topo_order_reverse_vertices`, `topo_order_union_vertices`,
+`graph_reachable_edgeless`, and `graph_reachable_edge_equiv`. Every other
+helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -3617,8 +3663,11 @@ values, refuses each operand-alone claim on a fresh accepted prefix, compares
 exact trusted identities and keeps both proof helpers private. The edgeless
 reachability package test checks the generic law and closed clients, refuses
 the complete graph's result on the edgeless graph, and checks trusted
-identity equality and the private helper's import boundary. These package
+identity equality and the private helper's import boundary. The edge-equivalence
+package test checks the generic law and the open seed row, refuses the
+one-way-inclusion twin, and checks trusted identity equality. These package
 tests do not stand in for official conformance-runner execution or CI, and do
 not establish execution of the §2 seed.
 
 [edgeless-seed]: ../../../../conformance/stdlib/graphs/seed-reachability-edgeless.md
+[edge-equiv-seed]: ../../../../conformance/stdlib/graphs/seed-reachability-edge-equiv.md
