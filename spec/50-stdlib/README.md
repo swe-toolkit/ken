@@ -601,7 +601,7 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–24 (DRAFT v0;
+**`68-numerical.md`** §§1–25 (DRAFT v0;
 SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
 SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
@@ -625,7 +625,8 @@ SPEC-NUMERICAL-INTERVAL-WIDTH-ZERO-MEMBERS-EQUIV §20;
 SPEC-NUMERICAL-INTERVAL-SPLIT-COVERS §21;
 SPEC-NUMERICAL-INTERVAL-SPLIT-WIDTH-SUM §22;
 SPEC-NUMERICAL-INTERVAL-SPLIT-HULL §23;
-SPEC-NUMERICAL-INTERVAL-ADD-POINT-EXACT §24). The
+SPEC-NUMERICAL-INTERVAL-ADD-POINT-EXACT §24;
+SPEC-NUMERICAL-INTERVAL-MUL-POINT-EXACT §25). The
 `Algorithm.Numeric.RationalInterval` operations and ten checked laws
 of §§1–2, their seeds, and the required Rational monotonicity/min-max
 exports are present on main. Non-negative `Rational` endpoints admit

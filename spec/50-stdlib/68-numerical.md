@@ -2117,3 +2117,49 @@ CI or landing evidence.
 Section 24 raises the public theorem count from sixty-three to sixty-four
 and leaves the public function count at nine. No operation or law type
 from §§1–23 changes.
+
+## 25. Multiplying by a positive point preserves membership exactly
+
+`Algorithm.Numeric.RationalInterval` must export this public Transparent
+checked theorem immediately after `interval_add_point_exact` and before
+`interval_width_point`:
+
+```ken
+pub theorem interval_mul_point_exact
+      (i : Interval) (t : Rational) (x : Rational)
+    : IsTrue (leq_nat (Suc Zero) (numerator t))
+      → Equal Bool
+        (interval_contains (interval_mul i (interval_point t)) (rational_mul x t))
+        (interval_contains i x)
+```
+
+The sole premise is that `t` has a nonzero numerator. There is no
+endpoint-order premise, so the law covers inverted intervals as well.
+It compares membership Booleans, not interval structure. Unlike the
+multiplication enclosure law, it also lets a client recover membership
+of `x` from membership of `x * t` in the scaled interval.
+
+The proof preserves both endpoint comparisons by `rational_mul_mono`
+and reflects them by cancelling the common positive factor in the
+cross-multiplied Nat comparisons with `leq_nat_mul_right_cancel`.
+LawfulClasses' `bool_eq_from_iff` joins the two directions, and
+congruence lifts the comparison equalities through `bool_and`. The
+four supporting helpers stay private. RationalInterval adds selective
+imports of the existing `add` and `leq_nat_mul_right_cancel` names;
+there is no new export outside RationalInterval or new `Axiom`.
+
+Architect AC-0 (`evt_3s9zqsqyw97w9`) checked the law in scratch on
+`88a611593` with unchanged exact trusted `GlobalId` sets (114 → 114).
+Its open client transports membership of `x * 2` in `[2, 4]` back to
+membership of `x` in `[1, 2]`; direct computation and the enclosure-only
+proof do not close that row. The zero-scale twin refuses because its
+positivity argument cannot be supplied. The closed controls establish
+the counterexample separately: scaling `[1, 2]` by zero includes
+`5 * 0`, but `[1, 2]` excludes `5`. The checked necessity arm derives
+`Equal Bool True False` from the premise-free claim without citing
+this law. These are scratch results, not assembled AC-T, official
+conformance, CI or landing evidence.
+
+Section 25 raises the public theorem count from sixty-four to sixty-five
+and leaves the public function count at nine. No operation or law type
+from §§1–24 changes.
