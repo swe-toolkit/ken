@@ -322,11 +322,11 @@ fn matrix_env() -> ElabEnv {
 /// PROMISE CLASS: transition sentinel for the exact published API: the next
 /// approved public declaration requires a reviewed inventory update. The
 /// trust, ownership and generic-law checks are durable invariants.
-/// MEASURED: the exact set of seventy-nine public identities is selectively
+/// MEASURED: the exact set of eighty public identities is selectively
 /// importable, all have transparent bodies, and generic clients instantiate
 /// seventeen earlier propositions; the eight §16 laws have their own clients;
 /// the §14 law has a separate exact generic client in its named test;
-/// the §17, §22 and §23 laws have separate open-dimension clients.
+/// the §17, §22, §23 and §25 laws have separate open-dimension clients.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// Private proof refactoring stays green; missing or extra exports and a
 /// changed trusted identity set fail.
@@ -405,6 +405,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "trace_product_comm",
         "matrix_zero_of_trace_gram_zero",
         "transpose_gram",
+        "matrix_vector_zero_of_gram_vector_zero",
         "matrix_add_comm",
         "matrix_add_assoc",
         "vector_scale_distrib",
@@ -468,7 +469,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     }
     assert_eq!(
         visible, expected,
-        "the exact public set has seventy-nine checked names and no private helper"
+        "the exact public set has eighty checked names and no private helper"
     );
     env.elaborate_file(
         r#"
