@@ -196,19 +196,24 @@ fn px11_option_program_without_net_is_refused_before_listen() {
 /// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2 (AC-1 R7).
 /// Promise class: durable invariant. MEASURED: a program applying
 /// set_stream_option to a Resource ResourceKind.SocketListener is refused
-/// with a type-mismatch diagnostic naming SocketStream, it never runs (no
-/// inode at the listener path it would bind), and a native build of it
-/// emits no artifact. CLAIMED: option calls on a listener are excluded by
-/// type. THE GAP: one wrong kind; the datagram exclusion is the same index
-/// and is not separately run.
+/// at elaboration with a K0004 kernel TypeMismatch, it never runs (no inode
+/// at the listener path it would bind), and a native build of it emits no
+/// artifact. The well-typed twin, the same call on a SocketStream, is the
+/// readback fixture, which elaborates and runs. CLAIMED: option calls on a listener are excluded by
+/// type. THE GAP: the diagnostic prints kernel identities, not kind names,
+/// so the row does not pin which kinds mismatched; one wrong kind, and the
+/// datagram exclusion is the same index and is not separately run.
 #[test]
 fn px11_option_call_on_listener_fails_elaboration() {
     let (_root, canonical, path) = root_with_path("typed.sock");
     let output = run("px11_option_listener_type.ken", &canonical, &[path.to_str().unwrap()]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_ne!(output.status.code(), Some(0), "{}", describe(&output));
-    assert!(stderr.contains("mismatch"), "a type mismatch: {}", describe(&output));
-    assert!(stderr.contains("SocketStream"), "names the expected kind: {}", describe(&output));
+    assert!(
+        stderr.contains("error[K0004]") && stderr.contains("TypeMismatch"),
+        "an elaboration type mismatch: {}",
+        describe(&output)
+    );
     assert!(std::fs::symlink_metadata(&path).is_err(), "the program never ran");
     let work = tempfile::tempdir().unwrap();
     let (built, build_dir) = native_build("px11_option_listener_type.ken", work.path());

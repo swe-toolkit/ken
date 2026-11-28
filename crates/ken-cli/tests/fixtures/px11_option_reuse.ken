@@ -49,21 +49,21 @@ fn first_byte_is (mode : Bytes) (byte : Int) : Bool =
     Some first ↦ eq_int (uint8_to_int first) byte
   }
 
--- One classification for every second acquisition: 0 acquired, 98 address
--- in use, 22 InvalidInput, 84 CapabilityDenied, 92 another OS error,
--- 90 another refusal, 91 another bracket result.
-fn classify (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit)) : UInt8 =
+-- One classification for every second acquisition: exit 0 acquired, 98
+-- address in use, 22 InvalidInput, 84 CapabilityDenied, 92 another OS
+-- error, 90 another refusal, 91 another bracket result.
+fn classify (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit)) : ExitCode =
   match outcome {
-    Ok (ResourceBracketOk _) ↦ (0 : UInt8);
-    Ok _ ↦ (91 : UInt8);
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok _ ↦ ExitCode.Failure 91;
     Err (ResourceError.ResourceHostIO (IOError.Other errno)) ↦
       match eq_int errno (98 : Int) {
-        True ↦ (98 : UInt8);
-        False ↦ (92 : UInt8)
+        True ↦ ExitCode.Failure 98;
+        False ↦ ExitCode.Failure 92
       };
-    Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ (22 : UInt8);
-    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ (84 : UInt8);
-    Err _ ↦ (90 : UInt8)
+    Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ ExitCode.Failure 22;
+    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ ExitCode.Failure 84;
+    Err _ ↦ ExitCode.Failure 90
   }
 
 const settled : HostIO AFull (ResourceBodyResult UInt8 Unit) =
@@ -158,12 +158,6 @@ proc first_round (reuse : Bool) (cap : Cap AFull)
     False ↦ with_socket_listener AFull UInt8 SocketAddress cap address4 (first_body cap)
   }
 
-fn code_exit (code : UInt8) : ExitCode =
-  match eq_int (uint8_to_int code) (0 : Int) {
-    True ↦ ExitCode.Success;
-    False ↦ ExitCode.Failure code
-  }
-
 -- Modes "rr", "pp" and "pr": the first listener (r reusable, p plain)
 -- accepts one connection and is released; the second rebinds its port.
 -- The exit code classifies the second acquisition.
@@ -181,7 +175,7 @@ proc rebind (mode : Bytes) (cap : Cap AFull) : HostIO AFull ExitCode visits [Net
             (Result ResourceError (ResourceBracketResult UInt8 Unit))
             ExitCode
             (listen_and_settle (reusable_at mode (1 : Int)) cap bound)
-            (λsecond. host_pure AFull ExitCode (code_exit (classify second)));
+            (λsecond. host_pure AFull ExitCode (classify second));
         Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦
           host_pure AFull ExitCode (ExitCode.Failure code);
         Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 66);
@@ -191,39 +185,42 @@ proc rebind (mode : Bytes) (cap : Cap AFull) : HostIO AFull ExitCode visits [Net
 -- Mode "live": a second reusable listener on a live reusable listener's
 -- port, inside the first one's bracket.
 proc live_body (cap : Cap AFull) (listener : Resource ResourceKind.SocketListener)
-    : HostIO AFull (ResourceBodyResult UInt8 UInt8)
+    : HostIO AFull (ResourceBodyResult UInt8 ExitCode)
     visits [Net] =
   host_bind
     AFull
     (Result ResourceError SocketAddress)
-    (ResourceBodyResult UInt8 UInt8)
+    (ResourceBodyResult UInt8 ExitCode)
     (socket_local_address AFull (ListeningSocket listener))
     (λlocal.
       match local {
         Err _ ↦
-          host_pure AFull (ResourceBodyResult UInt8 UInt8) (ResourceBodyErr UInt8 UInt8 (63 : UInt8));
+          host_pure
+            AFull
+            (ResourceBodyResult UInt8 ExitCode)
+            (ResourceBodyErr UInt8 ExitCode (63 : UInt8));
         Ok bound ↦
           host_bind
             AFull
             (Result ResourceError (ResourceBracketResult UInt8 Unit))
-            (ResourceBodyResult UInt8 UInt8)
+            (ResourceBodyResult UInt8 ExitCode)
             (listen_and_settle True cap bound)
             (λsecond.
               host_pure
                 AFull
-                (ResourceBodyResult UInt8 UInt8)
-                (ResourceBodyOk UInt8 UInt8 (classify second)))
+                (ResourceBodyResult UInt8 ExitCode)
+                (ResourceBodyOk UInt8 ExitCode (classify second)))
       })
 
 proc live (cap : Cap AFull) : HostIO AFull ExitCode visits [Net] =
   host_bind
     AFull
-    (Result ResourceError (ResourceBracketResult UInt8 UInt8))
+    (Result ResourceError (ResourceBracketResult UInt8 ExitCode))
     ExitCode
-    (with_reusable_socket_listener AFull UInt8 UInt8 cap address4 (live_body cap))
+    (with_reusable_socket_listener AFull UInt8 ExitCode cap address4 (live_body cap))
     (λfirst.
       match first {
-        Ok (ResourceBracketOk code) ↦ host_pure AFull ExitCode (code_exit code);
+        Ok (ResourceBracketOk exit) ↦ host_pure AFull ExitCode exit;
         Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦
           host_pure AFull ExitCode (ExitCode.Failure code);
         Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 66);
@@ -240,7 +237,7 @@ proc unix_listen (cap : Cap AFull) (path : Bytes) : HostIO AFull ExitCode visits
         (Result ResourceError (ResourceBracketResult UInt8 Unit))
         ExitCode
         (listen_and_settle True cap address)
-        (λoutcome. host_pure AFull ExitCode (code_exit (classify outcome)))
+        (λoutcome. host_pure AFull ExitCode (classify outcome))
   }
 
 fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =

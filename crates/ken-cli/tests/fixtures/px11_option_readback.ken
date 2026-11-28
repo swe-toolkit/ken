@@ -150,7 +150,66 @@ proc cycle
                   }))
         }))
 
--- On a Unix stream both set and get must refuse ResourceHostIO InvalidInput.
+-- 0 for ResourceHostIO InvalidInput, 95 for an OS error from a reached
+-- leaf, and `code` for any other refusal.
+fn cause_code (cause : IOError) (code : UInt8) : UInt8 =
+  match cause {
+    IOError.InvalidInput ↦ (0 : UInt8);
+    IOError.Other _ ↦ (95 : UInt8);
+    IOError.NotFound ↦ code;
+    IOError.PermissionDenied ↦ code;
+    IOError.CapabilityDenied ↦ code;
+    IOError.BrokenPipe ↦ code;
+    IOError.Interrupted ↦ code;
+    IOError.AlreadyExists ↦ code;
+    IOError.IsDirectory ↦ code;
+    IOError.NotDirectory ↦ code;
+    IOError.NotEmpty ↦ code;
+    IOError.Unsupported ↦ code;
+    IOError.Revoked ↦ code
+  }
+
+fn refusal_code (error : ResourceError) (code : UInt8) : UInt8 =
+  match error {
+    ResourceError.ResourceHostIO cause ↦ cause_code cause code;
+    ResourceError.Closed ↦ code;
+    ResourceError.MalformedResource ↦ code;
+    ResourceError.RightNotHeld _ _ ↦ code;
+    ResourceError.ReleaseFailed _ _ _ ↦ code;
+    ResourceError.ResourceKindMismatch _ _ ↦ code;
+    ResourceError.BufferLimit ↦ code;
+    ResourceError.AllocationFailed ↦ code;
+    ResourceError.InvalidOffset ↦ code;
+    ResourceError.InvalidBounds ↦ code;
+    ResourceError.NoProgress ↦ code;
+    ResourceError.MappingLimit ↦ code
+  }
+
+fn is_zero (code : UInt8) : Bool = eq_int (uint8_to_int code) (0 : Int)
+
+-- On a Unix stream the get must refuse ResourceHostIO InvalidInput.
+proc refuse_unix_read
+      (stream : Resource ResourceKind.SocketStream) (option : StreamOption) (code : UInt8)
+      (next : HostIO AFull (ResourceBodyResult UInt8 Unit))
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Bool)
+    (ResourceBodyResult UInt8 Unit)
+    (stream_option AFull stream option)
+    (λread.
+      match read {
+        Ok _ ↦ failed_at code;
+        Err error ↦
+          match is_zero (refusal_code error code) {
+            True ↦ next;
+            False ↦ failed_at (refusal_code error code)
+          }
+      })
+
+-- On a Unix stream the set must refuse ResourceHostIO InvalidInput, then
+-- the get must too. A set that succeeds is 96.
 proc refuse_unix
       (stream : Resource ResourceKind.SocketStream) (option : StreamOption) (code : UInt8)
       (next : HostIO AFull (ResourceBodyResult UInt8 Unit))
@@ -163,21 +222,12 @@ proc refuse_unix
     (set_stream_option AFull stream option True)
     (λset.
       match set {
-        Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦
-          host_bind
-            AFull
-            (Result ResourceError Bool)
-            (ResourceBodyResult UInt8 Unit)
-            (stream_option AFull stream option)
-            (λread.
-              match read {
-                Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ next;
-                Err _ ↦ failed_at code;
-                Ok _ ↦ failed_at code
-              });
-        Err (ResourceError.ResourceHostIO (IOError.Other _)) ↦ failed_at (95 : UInt8);
-        Err _ ↦ failed_at code;
-        Ok _ ↦ failed_at (96 : UInt8)
+        Ok _ ↦ failed_at (96 : UInt8);
+        Err error ↦
+          match is_zero (refusal_code error code) {
+            True ↦ refuse_unix_read stream option code next;
+            False ↦ failed_at (refusal_code error code)
+          }
       })
 
 -- Codes: 10/11 outbound NoDelay/KeepAlive, 20/21 accepted.
