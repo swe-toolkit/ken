@@ -14901,7 +14901,9 @@ impl<'a> Lowering<'a> {
         args: &[LoweringOperand],
         emission_env: Option<&[LoweringEnvironmentBinding]>,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        if constructor == self.process_symbols.exit_failure {
+        if constructor == self.process_symbols.exit_failure
+            && self.function_local.terminal_result_origins.contains(&origin)
+        {
             if let [code] = args {
                 match code {
                     LoweringOperand::Carried(code) => {
@@ -15140,7 +15142,7 @@ impl<'a> Lowering<'a> {
     /// the immediate arm reads the scalar through the carrier ABI and applies
     /// the same `0 -> 1`, `1..=255 -> self`, otherwise `-3` mapping used by
     /// `emit_process_exit_status`.
-    fn transfer_carried_failure_exit_status(
+    pub(super) fn transfer_carried_failure_exit_status(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         code: CarriedBoundaryWord,
