@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-REACHABILITY-EDGE-EQUIV
 title: "Spec 62 says reachability grows with the graph under pointwise true-edge inclusion (graph_reachable_graph_monotone), and each union law proves its Boolean equality by applying that monotonicity both ways, but no law says that two graphs whose edge functions agree pointwise have equal reachability: Graph has no η, so a client holding two edge functions that agree at every pair cannot rewrite one search into the other without re-deriving both inclusions. Rule from a checked D0 at zero trust that pointwise-equal edges give equal graph_reachable, and state it with a seed whose accepted row is open"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: PX11-SOCKET-OPTION-FAMILIES
 title: "PX11's committed scope requires explicit socket option families rather than integer (level, optname) pairs, but spec 38 §1.13 sets no option at all (its sockets carry no implicit SO_REUSEADDR or other option) and lists typed option families as subsequent work, so a Ken server cannot rebind a port in TIME_WAIT or disable Nagle on a stream. Admit a closed set of typed option families on the host and interpreter lanes: set and read back each option on the resource kinds it applies to, under the Net capability, with the native lane refusing the new operations by a typed build-time cause until a parity node lands"
-status: ready
+status: merged
 owner: language
 size: M
 tier: T1
