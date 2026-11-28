@@ -27,7 +27,7 @@ without requiring either interval to contain a member.
 ## 2. Definition
 
 `Interval` holds two rational values and exports `MkInterval` so clients can
-construct boxes directly. The seven arithmetic and point laws, together with
+construct boxes directly. The arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
 source; their operations follow. The width operation and seven checked laws,
 including `interval_width_mul`, `interval_width_inside`,
