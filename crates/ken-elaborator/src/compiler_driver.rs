@@ -4373,6 +4373,9 @@ fn checked_host_operation_pairs(
         (prelude.px11_op_ids[8], ken_host::HostOpV1::NetDatagramSendTo),
         (prelude.px11_op_ids[9], ken_host::HostOpV1::NetDatagramReceiveFrom),
         (prelude.px11_op_ids[10], ken_host::HostOpV1::NetDatagramLocalAddress),
+        (prelude.px11_op_ids[11], ken_host::HostOpV1::NetListenReusable),
+        (prelude.px11_op_ids[12], ken_host::HostOpV1::NetStreamOptionSet),
+        (prelude.px11_op_ids[13], ken_host::HostOpV1::NetStreamOptionGet),
     ]
     .into_iter()
 }
@@ -5022,9 +5025,10 @@ mod native_pre_source_stable_symbols {
     }
 
     /// Promise class: durable invariant. MEASURED: every emitted Net effect
-    /// in the public-wrapper fixture, the four datagram operations included,
-    /// retains the checked semantic arity and has a capability exactly for
-    /// listen, connect and datagram bind. CLAIMED: erasure splits
+    /// in the public-wrapper fixture, the four datagram and three option-family
+    /// operations included, retains the checked semantic arity and has a
+    /// capability exactly for listen, connect, datagram bind and the reusable
+    /// listen. CLAIMED: erasure splits
     /// the right operands. THE GAP: this does not exercise object emission;
     /// the default test-thread stack overflowed during native preparation,
     /// before any operand assertion (no finer frame was sampled).
@@ -5138,7 +5142,8 @@ mod native_pre_source_stable_symbols {
         let expected = checked_host_operation_pairs(&env.prelude_env)
             .filter_map(|(id, op)| {
                 let has_cap = match op {
-                    Op::NetListen | Op::NetConnect | Op::NetDatagramBind => true,
+                    Op::NetListen | Op::NetConnect | Op::NetDatagramBind
+                    | Op::NetListenReusable => true,
                     Op::NetAccept
                     | Op::NetReceive
                     | Op::NetSend
@@ -5146,7 +5151,9 @@ mod native_pre_source_stable_symbols {
                     | Op::NetLocalAddress
                     | Op::NetDatagramSendTo
                     | Op::NetDatagramReceiveFrom
-                    | Op::NetDatagramLocalAddress => false,
+                    | Op::NetDatagramLocalAddress
+                    | Op::NetStreamOptionSet
+                    | Op::NetStreamOptionGet => false,
                     _ => return None,
                 };
                 let (family, index) = env.env.constructor(id).expect("checked Net constructor");
@@ -5166,6 +5173,9 @@ mod native_pre_source_stable_symbols {
             Op::NetDatagramSendTo,
             Op::NetDatagramReceiveFrom,
             Op::NetDatagramLocalAddress,
+            Op::NetListenReusable,
+            Op::NetStreamOptionSet,
+            Op::NetStreamOptionGet,
         ]
         .map(|op| op as u16);
         let mut seen = BTreeSet::new();

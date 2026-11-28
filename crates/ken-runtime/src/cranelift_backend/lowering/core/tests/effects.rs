@@ -6351,22 +6351,27 @@ fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     );
 }
 
-/// Promise class: transition sentinel, named for the datagram boundary.
-/// MEASURED: the RepresentedUnavailable host operations, and the host
-/// operations absent from `CRANELIFT_HOST_EFFECT_CONSUMERS_V1`, are each
-/// exactly the four PX11 datagram operations. CLAIMED: native lowering has a
-/// typed refusal seat for exactly those four and a consumer for every other
-/// operation. THE GAP: the datagram native-parity node retires this row by
-/// promoting the four, which must edit this inventory; the refusal itself is
-/// measured by `px11_datagram_programs_refuse_native_build_by_typed_cause`.
+/// Promise class: transition sentinel, named for the PX11 interpreter-only
+/// boundary. MEASURED: the RepresentedUnavailable host operations, and the
+/// host operations absent from `CRANELIFT_HOST_EFFECT_CONSUMERS_V1`, are each
+/// exactly the four PX11 datagram operations and the three option-family
+/// operations. CLAIMED: native lowering has a typed refusal seat for exactly
+/// those seven and a consumer for every other operation. THE GAP: the
+/// datagram and option-family native-parity nodes retire this row by
+/// promoting them, which must edit this inventory; the refusal itself is
+/// measured by `px11_datagram_programs_refuse_native_build_by_typed_cause`
+/// and `px11_option_programs_refuse_native_build_by_typed_cause`.
 #[test]
-fn represented_unavailable_and_non_consumer_host_operations_are_exactly_the_datagram_four() {
+fn represented_unavailable_and_non_consumer_host_operations_are_exactly_the_px11_seven() {
     use std::collections::BTreeSet;
     let datagram = [
         ken_host::HostOpV1::NetDatagramBind,
         ken_host::HostOpV1::NetDatagramSendTo,
         ken_host::HostOpV1::NetDatagramReceiveFrom,
         ken_host::HostOpV1::NetDatagramLocalAddress,
+        ken_host::HostOpV1::NetListenReusable,
+        ken_host::HostOpV1::NetStreamOptionSet,
+        ken_host::HostOpV1::NetStreamOptionGet,
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();

@@ -83,7 +83,9 @@ export SocketOperation,
   ShutdownSocket,
   LocalSocketAddress,
   CloseSocket,
-  BindSocket
+  BindSocket,
+  SetSocketOption,
+  GetSocketOption
 
 data SocketOperation =
   ListenSocket
@@ -95,6 +97,8 @@ data SocketOperation =
   | LocalSocketAddress
   | CloseSocket
   | BindSocket
+  | SetSocketOption
+  | GetSocketOption
 
 export Operation, FilesystemOp, ProcessOp, SocketOp
 
@@ -226,7 +230,9 @@ pub fn operation_idempotence (operation : Operation) : Idempotence =
         ShutdownSocket ↦ NonIdempotent;
         LocalSocketAddress ↦ Idempotent;
         CloseSocket ↦ NonIdempotent;
-        BindSocket ↦ NonIdempotent
+        BindSocket ↦ NonIdempotent;
+        SetSocketOption ↦ Idempotent;
+        GetSocketOption ↦ Idempotent
       }
   }
 

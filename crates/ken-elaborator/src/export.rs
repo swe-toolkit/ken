@@ -642,7 +642,10 @@ pub(crate) const fn host_operation_family_v1(
         | ken_host::HostOpV1::NetDatagramBind
         | ken_host::HostOpV1::NetDatagramSendTo
         | ken_host::HostOpV1::NetDatagramReceiveFrom
-        | ken_host::HostOpV1::NetDatagramLocalAddress => HostOpFamilyV1::Net,
+        | ken_host::HostOpV1::NetDatagramLocalAddress
+        | ken_host::HostOpV1::NetListenReusable
+        | ken_host::HostOpV1::NetStreamOptionSet
+        | ken_host::HostOpV1::NetStreamOptionGet => HostOpFamilyV1::Net,
     }
 }
 
@@ -752,6 +755,9 @@ pub const fn canonical_host_perform_signature_v1(operation: ken_host::HostOpV1) 
         ken_host::HostOpV1::NetDatagramSendTo => "NetDatagramSendTo",
         ken_host::HostOpV1::NetDatagramReceiveFrom => "NetDatagramReceiveFrom",
         ken_host::HostOpV1::NetDatagramLocalAddress => "NetDatagramLocalAddress",
+        ken_host::HostOpV1::NetListenReusable => "NetListenReusable",
+        ken_host::HostOpV1::NetStreamOptionSet => "NetStreamOptionSet",
+        ken_host::HostOpV1::NetStreamOptionGet => "NetStreamOptionGet",
     }
 }
 
@@ -1063,10 +1069,12 @@ const SOCKET_LISTENER_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 3] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetLocalAddress, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
-const SOCKET_STREAM_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 5] = [
+const SOCKET_STREAM_REQUIRE_SAME_AT: [ResourceLifetimeBindingPoint; 7] = [
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetReceive, role: ken_host::ResourceBindingRole::File },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetSend, role: ken_host::ResourceBindingRole::File },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetShutdown, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetStreamOptionSet, role: ken_host::ResourceBindingRole::Target },
+    ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetStreamOptionGet, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::NetLocalAddress, role: ken_host::ResourceBindingRole::Target },
     ResourceLifetimeBindingPoint { operation: ken_host::HostOpV1::ResourceRelease, role: ken_host::ResourceBindingRole::Target },
 ];
@@ -1176,6 +1184,7 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
         }
     }
     if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
+        && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListenReusable)
         && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept) {
         return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
             resource_kind: ken_host::ResourceKindV1::SocketListener,
@@ -1183,6 +1192,7 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
         });
     }
     if !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListen)
+        && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListenReusable)
         && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
         && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect)
         && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetLocalAddress) {
@@ -1195,7 +1205,8 @@ fn validate_resource_use_acquisitions(alphabet: &BTreeSet<String>) -> Result<(),
         && !alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect) {
         if let Some(operation) = first_reachable_operation(alphabet, &[
             ken_host::HostOpV1::NetReceive, ken_host::HostOpV1::NetSend,
-            ken_host::HostOpV1::NetShutdown,
+            ken_host::HostOpV1::NetShutdown, ken_host::HostOpV1::NetStreamOptionSet,
+            ken_host::HostOpV1::NetStreamOptionGet,
         ]) {
             return Err(ExportError::ResourceLifetimeUseWithoutAcquire {
                 resource_kind: ken_host::ResourceKindV1::SocketStream, operation,
@@ -1243,6 +1254,7 @@ fn project_resource_lifetime_obligation(
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetConnect)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)
         || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetDatagramBind)
+        || alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListenReusable)
     {
         Ok(Some(project_resource_lifetime_obligation_body(alphabet)))
     } else {
@@ -1299,6 +1311,7 @@ fn project_resource_lifetime_obligation_body(
         (ken_host::ResourceKindV1::PipeRead, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_READ_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::PipeWrite, ken_host::HostOpV1::ProcessTakePipe, ken_host::ResourceBindingRole::Buffer, PIPE_WRITE_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketListener, ken_host::HostOpV1::NetListen, ken_host::ResourceBindingRole::Target, SOCKET_LISTENER_REQUIRE_SAME_AT.as_slice()),
+        (ken_host::ResourceKindV1::SocketListener, ken_host::HostOpV1::NetListenReusable, ken_host::ResourceBindingRole::Target, SOCKET_LISTENER_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetAccept, ken_host::ResourceBindingRole::File, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketStream, ken_host::HostOpV1::NetConnect, ken_host::ResourceBindingRole::Target, SOCKET_STREAM_REQUIRE_SAME_AT.as_slice()),
         (ken_host::ResourceKindV1::SocketDatagram, ken_host::HostOpV1::NetDatagramBind, ken_host::ResourceBindingRole::Target, SOCKET_DATAGRAM_REQUIRE_SAME_AT.as_slice()),
@@ -1348,7 +1361,7 @@ fn validate_resource_lifetime_selection(
         ken_host::HostOpV1::ProcessTakePipe].into_iter()
         .any(|operation| alphabet_contains_host_op(alphabet, operation));
     let has_socket = [ken_host::HostOpV1::NetListen, ken_host::HostOpV1::NetAccept,
-        ken_host::HostOpV1::NetConnect].into_iter()
+        ken_host::HostOpV1::NetConnect, ken_host::HostOpV1::NetListenReusable].into_iter()
         .any(|operation| alphabet_contains_host_op(alphabet, operation));
     let has_datagram = alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetDatagramBind);
 
@@ -1413,7 +1426,9 @@ fn validate_resource_lifetime_obligation(
         };
         if (alphabet_contains_host_op(alphabet, acquisition)
             || (resource_kind == ken_host::ResourceKindV1::SocketStream
-                && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept)))
+                && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetAccept))
+            || (resource_kind == ken_host::ResourceKindV1::SocketListener
+                && alphabet_contains_host_op(alphabet, ken_host::HostOpV1::NetListenReusable)))
             && !value
                 .plans
                 .iter()
@@ -1839,6 +1854,87 @@ mod resource_lifetime_hash_tests {
             Err(ExportError::ResourceLifetimeUseWithoutAcquire {
                 resource_kind: ken_host::ResourceKindV1::SocketListener,
                 operation: ken_host::HostOpV1::NetAccept,
+            })
+        );
+    }
+
+    /// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2.
+    /// Promise class: durable invariant. MEASURED: an option-family alphabet
+    /// with a reusable listener and no plain one projects a SocketListener
+    /// plan bound at NetListenReusable's Target and both SocketStream plans,
+    /// each stream plan requiring the same identity at NetStreamOptionSet and
+    /// NetStreamOptionGet (Target); the three operations are FSOp/Net;
+    /// removing the reusable listener refuses NetAccept, and an option call
+    /// with no stream acquisition refuses at the first option operation.
+    /// CLAIMED: the reusable listener is an ordinary bracket-owned listener
+    /// acquisition and option calls are uses of a live stream identity. THE
+    /// GAP: Ward's monitor is not run.
+    #[test]
+    fn px11_option_lifetimes_bind_reusable_listener_and_stream_option_uses() {
+        let alphabet = [
+            ken_host::HostOpV1::NetListenReusable,
+            ken_host::HostOpV1::NetAccept,
+            ken_host::HostOpV1::NetConnect,
+            ken_host::HostOpV1::NetStreamOptionSet,
+            ken_host::HostOpV1::NetStreamOptionGet,
+            ken_host::HostOpV1::ResourceRelease,
+        ]
+        .map(|operation| canonical_host_perform_signature_v1(operation).to_string())
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        let projected = project_resource_lifetime_obligation(&alphabet)
+            .expect("checked option alphabet")
+            .expect("reusable listener projects lifetimes");
+        assert_eq!(
+            projected.plans.iter().map(|plan| plan.resource_kind).collect::<Vec<_>>(),
+            [
+                ken_host::ResourceKindV1::SocketListener,
+                ken_host::ResourceKindV1::SocketStream,
+                ken_host::ResourceKindV1::SocketStream,
+            ]
+        );
+        let binding = |op, role| ResourceLifetimeBindingPoint { operation: op, role };
+        assert_eq!(
+            projected.plans[0].bind_at,
+            binding(ken_host::HostOpV1::NetListenReusable, ken_host::ResourceBindingRole::Target)
+        );
+        for stream in &projected.plans[1..] {
+            for operation in [ken_host::HostOpV1::NetStreamOptionSet, ken_host::HostOpV1::NetStreamOptionGet] {
+                assert!(stream.require_same_at.contains(&binding(
+                    operation,
+                    ken_host::ResourceBindingRole::Target,
+                )), "{operation:?}");
+            }
+        }
+        assert_eq!(validate_resource_lifetime_obligation(&projected, &alphabet), Ok(()));
+        for operation in [
+            ken_host::HostOpV1::NetListenReusable,
+            ken_host::HostOpV1::NetStreamOptionSet,
+            ken_host::HostOpV1::NetStreamOptionGet,
+        ] {
+            assert_eq!(host_operation_family(operation), ("FSOp", "Net"), "{operation:?}");
+        }
+        let mut missing_listener = alphabet.clone();
+        missing_listener.remove(canonical_host_perform_signature_v1(ken_host::HostOpV1::NetListenReusable));
+        assert_eq!(
+            project_resource_lifetime_obligation(&missing_listener),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketListener,
+                operation: ken_host::HostOpV1::NetAccept,
+            })
+        );
+        let options_only = [
+            ken_host::HostOpV1::NetStreamOptionSet,
+            ken_host::HostOpV1::NetStreamOptionGet,
+        ]
+        .map(|operation| canonical_host_perform_signature_v1(operation).to_string())
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        assert_eq!(
+            validate_resource_lifetime_selection(None, &options_only),
+            Err(ExportError::ResourceLifetimeUseWithoutAcquire {
+                resource_kind: ken_host::ResourceKindV1::SocketStream,
+                operation: ken_host::HostOpV1::NetStreamOptionSet,
             })
         );
     }

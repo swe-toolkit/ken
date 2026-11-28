@@ -3,6 +3,7 @@ program capabilities FS AFull, Net Unix, RootExecution Allow
 import Capability.Net.Stream
   (socket_unix_path, with_socket_listener, with_socket_accept, with_socket_connection)
 import Capability.Net.Datagram (with_datagram_socket)
+import Capability.Net.Option (with_reusable_socket_listener)
 import Capability.Process.Exit (host_bind, host_pure)
 import Capability.System.Resource
   (ResourceBodyResult, ResourceBodyOk, ResourceBodyErr, ResourceBracketResult)
@@ -12,6 +13,10 @@ fn settled (_stream : Resource ResourceKind.SocketStream)
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
 fn datagram_settled (_socket : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn reusable_settled (_listener : Resource ResourceKind.SocketListener)
     : HostIO AFull (ResourceBodyResult Unit Unit) =
   host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
 
@@ -54,8 +59,12 @@ proc main (input : ProcessInput) (caps : ProgramCaps AFull)
                     Cons _ more ↦ match more {
                       Nil ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
                         (with_socket_connection AFull Unit Unit cap address settled) finish;
-                      Cons _ _ ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-                        (with_datagram_socket AFull Unit Unit cap address datagram_settled) finish
+                      Cons _ rest ↦ match rest {
+                        Nil ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+                          (with_datagram_socket AFull Unit Unit cap address datagram_settled) finish;
+                        Cons _ _ ↦ host_bind AFull (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+                          (with_reusable_socket_listener AFull Unit Unit cap address reusable_settled) finish
+                      }
                     }
                   }
               }

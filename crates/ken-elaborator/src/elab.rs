@@ -23093,7 +23093,8 @@ fn row_label_summand(label: &str) -> Option<RowSummand> {
         | ProcessPlanOpen | ProcessPlanPush | ProcessSpawn | ProcessTakePipe
         | ProcessWait | ProcessSignal | NetListen | NetAccept | NetConnect
         | NetReceive | NetSend | NetShutdown | NetLocalAddress | NetDatagramBind
-        | NetDatagramSendTo | NetDatagramReceiveFrom | NetDatagramLocalAddress => RowSummand::HostAuth,
+        | NetDatagramSendTo | NetDatagramReceiveFrom | NetDatagramLocalAddress
+        | NetListenReusable | NetStreamOptionSet | NetStreamOptionGet => RowSummand::HostAuth,
     })
 }
 

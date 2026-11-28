@@ -388,7 +388,8 @@ mod tests {
         );
         assert!(native.is_disjoint(&unavailable));
         // Transition sentinel: the deferred population is exactly the four
-        // PX11 datagram operations until their native-parity node lands.
+        // PX11 datagram operations and the three option-family operations
+        // until their native-parity nodes land.
         assert_eq!(
             unavailable,
             [
@@ -396,6 +397,9 @@ mod tests {
                 HostOpV1::NetDatagramSendTo,
                 HostOpV1::NetDatagramReceiveFrom,
                 HostOpV1::NetDatagramLocalAddress,
+                HostOpV1::NetListenReusable,
+                HostOpV1::NetStreamOptionSet,
+                HostOpV1::NetStreamOptionGet,
             ]
             .into_iter()
             .collect::<BTreeSet<_>>()

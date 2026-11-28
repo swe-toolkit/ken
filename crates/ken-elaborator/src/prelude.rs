@@ -334,13 +334,14 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_mapping_write_view_id: z,
         private_mapping_acquire_file_id: z,
         px10_op_ids: [z; 9],
-        px11_op_ids: [z; 11],
+        px11_op_ids: [z; 14],
         px10_kind_ids: [z; 4],
         px11_kind_ids: [z; 3],
         px11_address_ids: [z; 3],
         px11_target_ids: [z; 2],
         px11_how_ids: [z; 3],
         px11_datagram_ids: [z; 4],
+        px11_option_ids: [z; 2],
         px10_exit_ids: [z; 2],
         private_buffer_handle_id: z,
         buffer_handle_resource_id: z,
@@ -516,7 +517,7 @@ pub struct PreludeEnv {
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
     pub px10_op_ids: [GlobalId; 9],
-    pub px11_op_ids: [GlobalId; 11],
+    pub px11_op_ids: [GlobalId; 14],
     pub px10_kind_ids: [GlobalId; 4],
     pub px11_kind_ids: [GlobalId; 3],
     pub px11_address_ids: [GlobalId; 3],
@@ -524,6 +525,8 @@ pub struct PreludeEnv {
     pub px11_how_ids: [GlobalId; 3],
     /// `WholeDatagram`, `TruncatedDatagram`, `EmptyDatagram`, `ReceivedDatagram`.
     pub px11_datagram_ids: [GlobalId; 4],
+    /// `NoDelay`, `KeepAlive`, in option-code order 0 and 1.
+    pub px11_option_ids: [GlobalId; 2],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_buffer_handle_id: GlobalId,
     pub buffer_handle_resource_id: GlobalId,
@@ -915,7 +918,7 @@ struct PreludeOperationIds {
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
     px10_op_ids: [GlobalId; 9],
-    px11_op_ids: [GlobalId; 11],
+    px11_op_ids: [GlobalId; 14],
 }
 
 struct PreludeResourceIds {
@@ -936,7 +939,7 @@ struct PreludeResourceIds {
     private_mapping_write_view_id: GlobalId,
     private_mapping_acquire_file_id: GlobalId,
     px10_op_ids: [GlobalId; 9],
-    px11_op_ids: [GlobalId; 11],
+    px11_op_ids: [GlobalId; 14],
     px10_kind_ids: [GlobalId; 4],
     px10_exit_ids: [GlobalId; 2],
     px11_kind_ids: [GlobalId; 3],
@@ -944,6 +947,7 @@ struct PreludeResourceIds {
     px11_target_ids: [GlobalId; 2],
     px11_how_ids: [GlobalId; 3],
     px11_datagram_ids: [GlobalId; 4],
+    px11_option_ids: [GlobalId; 2],
     private_buffer_handle_id: GlobalId,
     buffer_handle_resource_id: GlobalId,
     buffer_handle_capacity_id: GlobalId,
@@ -2211,6 +2215,10 @@ fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<Pr
         .map_err(|e| ElabError::Internal(format!("prelude SocketAddress failed: {e}")))?;
     elab.elaborate_decl("data SocketShutdown = ShutdownRead | ShutdownWrite | ShutdownBoth")
         .map_err(|e| ElabError::Internal(format!("prelude SocketShutdown failed: {e}")))?;
+    // PX11-SOCKET-OPTION-FAMILIES: the closed settable family over
+    // SocketStream. Address reuse is an acquisition, not a member.
+    elab.elaborate_decl("data StreamOption = NoDelay | KeepAlive")
+        .map_err(|e| ElabError::Internal(format!("prelude StreamOption failed: {e}")))?;
     elab.elaborate_decl("data SocketTarget = ListeningSocket (Resource ResourceKind.SocketListener) | ConnectedSocket (Resource ResourceKind.SocketStream)")
         .map_err(|e| ElabError::Internal(format!("prelude SocketTarget failed: {e}")))?;
     elab.elaborate_decl(
@@ -2470,6 +2478,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let resource_socket_datagram_t = resource_of_kind("ResourceKind.SocketDatagram")?;
     let socket_address_t = Term::indformer(elab.globals["SocketAddress"], vec![]);
     let socket_shutdown_t = Term::indformer(elab.globals["SocketShutdown"], vec![]);
+    let stream_option_t = Term::indformer(elab.globals["StreamOption"], vec![]);
     let socket_target_t = Term::indformer(elab.globals["SocketTarget"], vec![]);
     let mapping_prot_t = elab
         .globals
@@ -2508,7 +2517,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone()]),
-                named(vec![cap_a(), bool_t, bytes_t.clone()]),
+                named(vec![cap_a(), bool_t.clone(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), bytes_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), int_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), resource_open_mode_t]),
@@ -2591,6 +2600,10 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                     int_t,
                 ]),
                 named(vec![resource_socket_datagram_t]),
+                // PX11-SOCKET-OPTION-FAMILIES, after the datagram four.
+                named(vec![cap_a(), socket_address_t.clone()]),
+                named(vec![resource_socket_stream_t.clone(), stream_option_t.clone(), bool_t]),
+                named(vec![resource_socket_stream_t.clone(), stream_option_t]),
             ]
         },
     })
@@ -2650,6 +2663,9 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateNetDatagramSendTo",
         "PrivateNetDatagramReceiveFrom",
         "PrivateNetDatagramLocalAddress",
+        "PrivateNetListenReusable",
+        "PrivateNetStreamOptionSet",
+        "PrivateNetStreamOptionGet",
     ]
     .into_iter()
     .zip(fs_ctor_ids)
@@ -2682,7 +2698,8 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateNetListen", "PrivateNetAccept", "PrivateNetConnect", "PrivateNetReceive",
         "PrivateNetSend", "PrivateNetShutdown", "PrivateNetLocalAddress",
         "PrivateNetDatagramBind", "PrivateNetDatagramSendTo", "PrivateNetDatagramReceiveFrom",
-        "PrivateNetDatagramLocalAddress",
+        "PrivateNetDatagramLocalAddress", "PrivateNetListenReusable", "PrivateNetStreamOptionSet",
+        "PrivateNetStreamOptionGet",
     ].map(|name| elab.globals[name]);
     Ok(PreludeOperationIds {
         private_fs_open_id,
@@ -2743,6 +2760,7 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
             .map(|name| elab.globals[name]),
         px11_datagram_ids: ["WholeDatagram", "TruncatedDatagram", "EmptyDatagram", "ReceivedDatagram"]
             .map(|name| elab.globals[name]),
+        px11_option_ids: ["NoDelay", "KeepAlive"].map(|name| elab.globals[name]),
         px10_exit_ids: seed.px10_exit_ids,
         private_buffer_handle_id: buffer.private_buffer_handle_id,
         buffer_handle_resource_id: buffer.buffer_handle_resource_id,
@@ -2813,7 +2831,10 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateNetDatagramBind cap address |-> Result ResourceError (Resource ResourceKind.SocketDatagram); \
            PrivateNetDatagramSendTo socket buffer start length origin peer |-> Result ResourceError Unit; \
            PrivateNetDatagramReceiveFrom socket buffer start length |-> Result ResourceError DatagramReceipt; \
-           PrivateNetDatagramLocalAddress socket |-> Result ResourceError SocketAddress \
+           PrivateNetDatagramLocalAddress socket |-> Result ResourceError SocketAddress; \
+           PrivateNetListenReusable cap address |-> Result ResourceError (Resource ResourceKind.SocketListener); \
+           PrivateNetStreamOptionSet stream option enabled |-> Result ResourceError Unit; \
+           PrivateNetStreamOptionGet stream option |-> Result ResourceError Bool \
          }"
     )
     .map_err(|e| ElabError::Internal(format!("prelude fs_resp failed: {}", e)))?;
@@ -3339,6 +3360,9 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "PrivateNetDatagramSendTo",
         "PrivateNetDatagramReceiveFrom",
         "PrivateNetDatagramLocalAddress",
+        "PrivateNetListenReusable",
+        "PrivateNetStreamOptionSet",
+        "PrivateNetStreamOptionGet",
         "private_net_error",
         "private_net_after_acquire",
         "SpawnPlan.PrivateSpawnPlan",
@@ -3793,6 +3817,7 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         px11_target_ids: fs_ids.px11_target_ids,
         px11_how_ids: fs_ids.px11_how_ids,
         px11_datagram_ids: fs_ids.px11_datagram_ids,
+        px11_option_ids: fs_ids.px11_option_ids,
         px10_exit_ids: fs_ids.px10_exit_ids,
         private_buffer_handle_id: fs_ids.private_buffer_handle_id,
         buffer_handle_resource_id: fs_ids.buffer_handle_resource_id,

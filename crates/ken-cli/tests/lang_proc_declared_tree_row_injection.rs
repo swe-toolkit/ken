@@ -155,7 +155,8 @@ fn expected_host_trees(op: ken_host::HostOpV1) -> (HostTree, HostTree) {
         | ProcessPlanPush | ProcessSpawn | ProcessTakePipe | ProcessWait | ProcessSignal
         | NetListen | NetAccept | NetConnect | NetReceive | NetSend | NetShutdown
         | NetLocalAddress | NetDatagramBind | NetDatagramSendTo | NetDatagramReceiveFrom
-        | NetDatagramLocalAddress => (HostTree::Fs, HostTree::Console),
+        | NetDatagramLocalAddress | NetListenReusable | NetStreamOptionSet
+        | NetStreamOptionGet => (HostTree::Fs, HostTree::Console),
     }
 }
 
