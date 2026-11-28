@@ -1,7 +1,7 @@
 ---
 id: PX11-DATAGRAM-SOCKETS
 title: "Spec 38 §1.13 admits stream sockets on both lanes and leaves datagrams as subsequent work, so a Ken program cannot send or receive a UDP or Unix datagram at all. Admit datagram sockets on the host and interpreter lanes: typed bind, bounded send-to and receive-from with the peer address, under the existing Net capability and FS-root rules, with the native lane refusing the new operations by a typed build-time cause until a parity node lands"
-status: ready
+status: merged
 owner: language
 size: L
 tier: T1

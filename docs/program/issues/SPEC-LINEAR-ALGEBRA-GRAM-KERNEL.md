@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-GRAM-KERNEL
 title: "Spec 65 proves that a zero Gram trace forces a zero matrix (§22) and that a vector with zero self-dot is zero, but no law says that a vector the Gram matrix sends to zero is sent to zero by the matrix itself: a client solving with the normal equations cannot conclude that a null vector of transpose a times a is a null vector of a without re-deriving the adjoint argument. Rule from a checked D0 at zero trust that matrix_vector (transpose a times a) v = zero gives matrix_vector a v = zero, and state it with a seed whose accepted row is open"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

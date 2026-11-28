@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-EXITCODE-NONTERMINAL-UNIT-RESULT
 title: "A generated native unit whose result is an ExitCode constructor projects it into the process exit status at its own return, because transfer_unit_result_into_carrier keys the projection on process_object alone. A recursive helper returning ExitCode to a caller that inspects it therefore traps natively, exit 1, where the interpreter exits with the caller's chosen status. Project the exit status only at the root result boundary, as the carried join seat already does"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1
