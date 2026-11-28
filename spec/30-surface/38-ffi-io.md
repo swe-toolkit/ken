@@ -1902,17 +1902,34 @@ IPv6 sender is `Some` with its flowinfo dropped, because flowinfo is not
 part of the address identity; a sender with a nonzero scope ID is `None`,
 because this slice's `SocketAddress` has no scope. For Unix, the host keeps
 a per-process table from each live datagram socket's exact kernel-recorded
-name to the validated `SocketAddress` it was bound with; an entry is added
-at bind and removed at release. A received Unix sender name equal to a live
-entry is reported as that validated address. Otherwise a sender name that
-validates as a `SocketAddress` Unix path (absolute, 2–107 bytes, no zero
-byte) is reported as that path. An unnamed sender, an abstract name or a
+name to the validated `SocketAddress` it was bound with. An entry is added
+at bind. At release, its name and address move to a per-process record of
+released names, which lasts for the process lifetime. A received Unix
+sender name equal to a live entry is reported as that validated address
+only when every released record of the same name carries the same
+validated address. A later bind can record the same name as a released
+one, because it can reuse the released bind's parent descriptor number
+with the same leaf. A datagram queued before the release still carries
+that name, and the host cannot tell the two senders apart. Otherwise a
+sender name that validates as a `SocketAddress` Unix path (absolute, 2–107
+bytes, no zero byte) is reported as that path. A kernel-recorded `/proc`
+spelling reported this way names no sender a reply can reach: its
+descriptor component is a symbolic link, so Unix admission refuses a send
+to it with `CapabilityDenied`. The cost of this rule: a live socket whose
+name a released bind with a different validated address recorded earlier
+in the process is reported by its kernel-recorded spelling for its
+lifetime. An unnamed sender, an abstract name or a
 name that does not validate is `None`.
 
 The residual: if the socket file of a live entry is unlinked by a separate
 FS act and another process binds the same location through this process's
 `/proc` spelling, its datagrams report this socket's validated address.
-That address still names the location where the sender is bound.
+That address still names the location where the sender is bound. Likewise,
+a datagram from a released socket whose path was unlinked and rebound by
+this process at the same validated address is reported as that address,
+which the later socket now holds. Apart from these, a reported Unix sender
+is never the validated address of a socket other than the one that sent the
+datagram.
 
 **Kinds and errors.** A stream or listener resource passed where a
 datagram resource is required is excluded statically by the kind index; at

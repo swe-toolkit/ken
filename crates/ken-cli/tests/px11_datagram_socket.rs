@@ -200,6 +200,60 @@ fn px11_datagram_program_without_net_is_refused_before_bind() {
     assert!(std::fs::symlink_metadata(&target).is_err(), "no bind ran");
 }
 
+/// Run the stale-sender fixture in a fresh root: B at `b.sock`, A at
+/// `a/s.sock` (released after sending), C at `c/<later_leaf>`.
+fn stale_sender(later_leaf: &str) -> (Output, PathBuf, tempfile::TempDir) {
+    let root = temp_root();
+    let canonical = std::fs::canonicalize(root.path()).unwrap();
+    std::fs::write(canonical.join("px11-payload.bin"), b"PX11ok!").unwrap();
+    std::fs::create_dir(canonical.join("a")).unwrap();
+    std::fs::create_dir(canonical.join("c")).unwrap();
+    let later = canonical.join("c").join(later_leaf);
+    let output = run(
+        "px11_datagram_stale_sender.ken",
+        &canonical,
+        &[
+            canonical.join("b.sock").to_str().unwrap(),
+            canonical.join("a/s.sock").to_str().unwrap(),
+            later.to_str().unwrap(),
+        ],
+    );
+    (output, later, root)
+}
+
+/// Promise class: durable invariant. MEASURED: in one interpreter process,
+/// A at `a/s.sock` sends seven bytes to B and is released; C binds at
+/// `c/s.sock`, the same leaf, so it can record A's released kernel name.
+/// Inside C's bracket, B receives A's queued datagram and replies to the
+/// reported sender: the reply is refused with `CapabilityDenied` (exit 53),
+/// never delivered to C (exit 99 before the fix, and under the AC-2
+/// mutation). CLAIMED: a released sender's queued datagram is never
+/// reported as the later socket, so a reply cannot reach it. THE GAP: the
+/// interpreter cannot observe the recorded names; that the two names
+/// collide is shown by the mutation's exit 99 and measured directly by the
+/// host row `released_unix_datagram_name_is_not_attributed_to_a_later_bind`.
+#[test]
+fn px11_datagram_released_sender_is_not_reported_as_a_later_bind() {
+    let (output, later, _root) = stale_sender("s.sock");
+    assert_eq!(output.status.code(), Some(53), "{}", describe(&output));
+    assert!(later.exists(), "C was bound");
+}
+
+/// Promise class: durable invariant. MEASURED: the different-leaf control,
+/// C at `c/t.sock`: the recorded names differ, the queued datagram's sender
+/// is the raw `/proc` spelling, and the reply is refused with
+/// `CapabilityDenied` (exit 53), identically with and without the fix.
+/// CLAIMED: the reproducer's exit 53 is the existing refusal of a
+/// kernel-recorded spelling, not a new refusal. THE GAP: the live
+/// non-colliding sender is the Unix exchange row above and the host row
+/// `unix_datagram_live_sender_keeps_attribution_beside_a_released_name`.
+#[test]
+fn px11_datagram_released_sender_control_reports_the_raw_spelling() {
+    let (output, later, _root) = stale_sender("t.sock");
+    assert_eq!(output.status.code(), Some(53), "{}", describe(&output));
+    assert!(later.exists(), "C was bound");
+}
+
 fn assert_native_refusal(name: &str) {
     let work = tempfile::tempdir().unwrap();
     let (output, build_dir) = native_build(name, work.path());
