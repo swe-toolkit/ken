@@ -1,7 +1,7 @@
 ---
 id: PX11-DATAGRAM-UNIX-SENDER-STALE-NAME
 title: "A Unix datagram queued by a socket that has since been released is reported as coming from a later socket that reused the same kernel-recorded name, and a reply to that reported sender reaches the later socket: the per-process sender table matches the name of a released bind's /proc/<pid>/fd/<P>/<leaf> spelling once a new bind reuses descriptor P with the same leaf. Report a Unix sender only as an address that bound the name and was live when the datagram was sent, or report it unattributed, and correct spec 38 §1.13.1's sender-identity clause and residual to the rule"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1

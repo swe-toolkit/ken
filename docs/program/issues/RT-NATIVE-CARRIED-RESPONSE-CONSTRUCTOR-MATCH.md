@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-CARRIED-RESPONSE-CONSTRUCTOR-MATCH
 title: "Native lowering refuses, with N0001 'a closure cannot cross the boundary', a bracket continuation that passes a carried host-response field into a function which builds a constructor from it and matches that constructor by nested patterns, while the interpreter runs the same program; the same program with a literal in place of the field builds. Lower the form natively with interpreter-equal exit status, or, if AC-0 rules it outside the native fragment, refuse it by a typed cause that names the form"
-status: ready
+status: merged
 owner: runtime
 size: M
 tier: T1

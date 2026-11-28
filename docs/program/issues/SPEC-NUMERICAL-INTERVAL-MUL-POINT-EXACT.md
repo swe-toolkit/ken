@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-MUL-POINT-EXACT
 title: "Spec 68 §24 proves that adding a point shifts interval membership exactly (interval_add_point_exact), but its multiplicative partner is missing: §1's interval_mul_encloses gives only the forward enclosure, so a client cannot infer that x is in i from x·t being in i scaled by a positive point t. Rule from a checked D0 at zero trust that, for t with a nonzero numerator, membership of rational_mul x t in interval_mul i (interval_point t) equals membership of x in i, and state it with a seed whose accepted row is open"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
