@@ -1,0 +1,278 @@
+program capabilities FS AFull, Net Loopback Unix, RootExecution Allow
+
+import Capability.Net.Stream
+  (SocketAddress,
+    socket_ipv4,
+    socket_unix_path,
+    with_socket_listener,
+    with_socket_accept,
+    with_socket_connection,
+    socket_local_address,
+    ListeningSocket)
+
+import Capability.Net.Option (with_reusable_socket_listener)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk)
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+const address4 : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      (127 : UInt8)
+      (VCons
+        UInt8
+        (Suc (Suc Zero))
+        (0 : UInt8)
+        (VCons UInt8 (Suc Zero) (0 : UInt8) (VCons UInt8 Zero (1 : UInt8) (VNil UInt8)))))
+    (0 : UInt16)
+
+-- The byte at `index` of the mode is 'r' (reusable) or anything else (plain).
+fn reusable_at (mode : Bytes) (index : Int) : Bool =
+  match bytes_at mode index {
+    None ↦ False;
+    Some byte ↦ eq_int (uint8_to_int byte) (114 : Int)
+  }
+
+fn first_byte_is (mode : Bytes) (byte : Int) : Bool =
+  match bytes_at mode (0 : Int) {
+    None ↦ False;
+    Some first ↦ eq_int (uint8_to_int first) byte
+  }
+
+-- One classification for every second acquisition: 0 acquired, 98 address
+-- in use, 22 InvalidInput, 84 CapabilityDenied, 92 another OS error,
+-- 90 another refusal, 91 another bracket result.
+fn classify (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit)) : UInt8 =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ (0 : UInt8);
+    Ok _ ↦ (91 : UInt8);
+    Err (ResourceError.ResourceHostIO (IOError.Other errno)) ↦
+      match eq_int errno (98 : Int) {
+        True ↦ (98 : UInt8);
+        False ↦ (92 : UInt8)
+      };
+    Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ (22 : UInt8);
+    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ (84 : UInt8);
+    Err _ ↦ (90 : UInt8)
+  }
+
+const settled : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyOk UInt8 Unit MkUnit)
+
+fn listener_settled (_listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit) = settled
+
+fn accepted_settled (_accepted : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit) = settled
+
+proc listen_and_settle (reuse : Bool) (cap : Cap AFull) (address : SocketAddress)
+    : HostIO AFull (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    visits [Net] =
+  match reuse {
+    True ↦ with_reusable_socket_listener AFull UInt8 Unit cap address listener_settled;
+    False ↦ with_socket_listener AFull UInt8 Unit cap address listener_settled
+  }
+
+-- The accepted stream is released inside the client's bracket, so the
+-- server side closes first and its port enters TIME_WAIT.
+proc connected_body
+      (listener : Resource ResourceKind.SocketListener)
+      (_client : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (with_socket_accept AFull UInt8 Unit listener accepted_settled)
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ settled;
+        Ok _ ↦ host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit (61 : UInt8));
+        Err _ ↦ host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit (62 : UInt8))
+      })
+
+-- The first listener's body returns the bound address after one
+-- connection has been accepted and both of its streams released.
+proc first_body (cap : Cap AFull) (listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult UInt8 SocketAddress)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult UInt8 SocketAddress)
+    (socket_local_address AFull (ListeningSocket listener))
+    (λlocal.
+      match local {
+        Err _ ↦
+          host_pure
+            AFull
+            (ResourceBodyResult UInt8 SocketAddress)
+            (ResourceBodyErr UInt8 SocketAddress (63 : UInt8));
+        Ok bound ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 SocketAddress)
+            (with_socket_connection AFull UInt8 Unit cap bound (connected_body listener))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦
+                  host_pure
+                    AFull
+                    (ResourceBodyResult UInt8 SocketAddress)
+                    (ResourceBodyOk UInt8 SocketAddress bound);
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦
+                  host_pure
+                    AFull
+                    (ResourceBodyResult UInt8 SocketAddress)
+                    (ResourceBodyErr UInt8 SocketAddress code);
+                Ok _ ↦
+                  host_pure
+                    AFull
+                    (ResourceBodyResult UInt8 SocketAddress)
+                    (ResourceBodyErr UInt8 SocketAddress (64 : UInt8));
+                Err _ ↦
+                  host_pure
+                    AFull
+                    (ResourceBodyResult UInt8 SocketAddress)
+                    (ResourceBodyErr UInt8 SocketAddress (65 : UInt8))
+              })
+      })
+
+proc first_round (reuse : Bool) (cap : Cap AFull)
+    : HostIO AFull (Result ResourceError (ResourceBracketResult UInt8 SocketAddress))
+    visits [Net] =
+  match reuse {
+    True ↦ with_reusable_socket_listener AFull UInt8 SocketAddress cap address4 (first_body cap);
+    False ↦ with_socket_listener AFull UInt8 SocketAddress cap address4 (first_body cap)
+  }
+
+fn code_exit (code : UInt8) : ExitCode =
+  match eq_int (uint8_to_int code) (0 : Int) {
+    True ↦ ExitCode.Success;
+    False ↦ ExitCode.Failure code
+  }
+
+-- Modes "rr", "pp" and "pr": the first listener (r reusable, p plain)
+-- accepts one connection and is released; the second rebinds its port.
+-- The exit code classifies the second acquisition.
+proc rebind (mode : Bytes) (cap : Cap AFull) : HostIO AFull ExitCode visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 SocketAddress))
+    ExitCode
+    (first_round (reusable_at mode (0 : Int)) cap)
+    (λfirst.
+      match first {
+        Ok (ResourceBracketOk bound) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            ExitCode
+            (listen_and_settle (reusable_at mode (1 : Int)) cap bound)
+            (λsecond. host_pure AFull ExitCode (code_exit (classify second)));
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦
+          host_pure AFull ExitCode (ExitCode.Failure code);
+        Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 66);
+        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 67)
+      })
+
+-- Mode "live": a second reusable listener on a live reusable listener's
+-- port, inside the first one's bracket.
+proc live_body (cap : Cap AFull) (listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult UInt8 UInt8)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult UInt8 UInt8)
+    (socket_local_address AFull (ListeningSocket listener))
+    (λlocal.
+      match local {
+        Err _ ↦
+          host_pure AFull (ResourceBodyResult UInt8 UInt8) (ResourceBodyErr UInt8 UInt8 (63 : UInt8));
+        Ok bound ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 UInt8)
+            (listen_and_settle True cap bound)
+            (λsecond.
+              host_pure
+                AFull
+                (ResourceBodyResult UInt8 UInt8)
+                (ResourceBodyOk UInt8 UInt8 (classify second)))
+      })
+
+proc live (cap : Cap AFull) : HostIO AFull ExitCode visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 UInt8))
+    ExitCode
+    (with_reusable_socket_listener AFull UInt8 UInt8 cap address4 (live_body cap))
+    (λfirst.
+      match first {
+        Ok (ResourceBracketOk code) ↦ host_pure AFull ExitCode (code_exit code);
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦
+          host_pure AFull ExitCode (ExitCode.Failure code);
+        Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 66);
+        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 67)
+      })
+
+-- Mode "unix": a reusable listener on the Unix path.
+proc unix_listen (cap : Cap AFull) (path : Bytes) : HostIO AFull ExitCode visits [Net] =
+  match socket_unix_path path {
+    Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+    Ok address ↦
+      host_bind
+        AFull
+        (Result ResourceError (ResourceBracketResult UInt8 Unit))
+        ExitCode
+        (listen_and_settle True cap address)
+        (λoutcome. host_pure AFull ExitCode (code_exit (classify outcome)))
+  }
+
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
+-- Arguments are read from the end: mode, then the Unix path.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match reversed_arguments arguments (Nil Bytes) {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons unix_path rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons mode _ ↦
+              match caps {
+                ProgramCaps.MkProgramCaps cap ↦
+                  match first_byte_is mode (108 : Int) {
+                    True ↦ live cap;
+                    False ↦
+                      match first_byte_is mode (117 : Int) {
+                        True ↦ unix_listen cap unix_path;
+                        False ↦ rebind mode cap
+                      }
+                  }
+              }
+          }
+      }
+  }

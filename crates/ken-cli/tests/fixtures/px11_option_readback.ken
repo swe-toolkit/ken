@@ -1,0 +1,327 @@
+program capabilities FS AFull, Net Loopback Unix, RootExecution Allow
+
+import Capability.Net.Stream
+  (SocketAddress,
+    socket_ipv4,
+    socket_ipv6,
+    socket_unix_path,
+    with_socket_listener,
+    with_socket_accept,
+    with_socket_connection,
+    socket_local_address,
+    ListeningSocket)
+
+import Capability.Net.Option
+  (StreamOption, NoDelay, KeepAlive, set_stream_option, stream_option)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk)
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+const address4 : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      (127 : UInt8)
+      (VCons
+        UInt8
+        (Suc (Suc Zero))
+        (0 : UInt8)
+        (VCons UInt8 (Suc Zero) (0 : UInt8) (VCons UInt8 Zero (1 : UInt8) (VNil UInt8)))))
+    (0 : UInt16)
+
+fn loopback_tail (n : Nat) : Vec UInt8 (Suc n) =
+  match n {
+    Zero ↦ VCons UInt8 Zero (1 : UInt8) (VNil UInt8);
+    Suc rest ↦ VCons UInt8 (Suc rest) (0 : UInt8) (loopback_tail rest)
+  }
+
+const address6 : SocketAddress =
+  socket_ipv6
+    (loopback_tail
+      (Suc
+        (Suc
+          (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))))))))))
+    (0 : UInt16)
+
+-- Selector "4" or "6" is IP loopback; anything else is the Unix path.
+fn is_ip (selector : Bytes) : Bool =
+  match bytes_at selector (0 : Int) {
+    None ↦ False;
+    Some first ↦
+      match eq_int (uint8_to_int first) (52 : Int) {
+        True ↦ True;
+        False ↦ eq_int (uint8_to_int first) (54 : Int)
+      }
+  }
+
+fn select_address (selector : Bytes) (unix_path : Bytes) : Result IOError SocketAddress =
+  match bytes_at selector (0 : Int) {
+    None ↦ Err IOError SocketAddress IOError.InvalidInput;
+    Some first ↦
+      match eq_int (uint8_to_int first) (52 : Int) {
+        True ↦ Ok IOError SocketAddress address4;
+        False ↦
+          match eq_int (uint8_to_int first) (54 : Int) {
+            True ↦ Ok IOError SocketAddress address6;
+            False ↦ socket_unix_path unix_path
+          }
+      }
+  }
+
+const failed_at : UInt8 -> HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  λcode. host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit code)
+
+const passed : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyOk UInt8 Unit MkUnit)
+
+fn same_bool (left : Bool) (right : Bool) : Bool =
+  match left {
+    True ↦ right;
+    False ↦ match right { True ↦ False; False ↦ True }
+  }
+
+-- Read the option; it must be exactly `expected`, then `next` runs.
+proc expect_read
+      (stream : Resource ResourceKind.SocketStream)
+      (option : StreamOption)
+      (expected : Bool)
+      (code : UInt8)
+      (next : HostIO AFull (ResourceBodyResult UInt8 Unit))
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Bool)
+    (ResourceBodyResult UInt8 Unit)
+    (stream_option AFull stream option)
+    (λread.
+      match read {
+        Err _ ↦ failed_at code;
+        Ok value ↦
+          match same_bool value expected {
+            True ↦ next;
+            False ↦ failed_at code
+          }
+      })
+
+-- Default False, then set True and read True, then set False and read False.
+proc cycle
+      (stream : Resource ResourceKind.SocketStream) (option : StreamOption) (code : UInt8)
+      (next : HostIO AFull (ResourceBodyResult UInt8 Unit))
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  expect_read
+    stream
+    option
+    False
+    code
+    (host_bind
+      AFull
+      (Result ResourceError Unit)
+      (ResourceBodyResult UInt8 Unit)
+      (set_stream_option AFull stream option True)
+      (λon.
+        match on {
+          Err _ ↦ failed_at code;
+          Ok _ ↦
+            expect_read
+              stream
+              option
+              True
+              code
+              (host_bind
+                AFull
+                (Result ResourceError Unit)
+                (ResourceBodyResult UInt8 Unit)
+                (set_stream_option AFull stream option False)
+                (λoff.
+                  match off {
+                    Err _ ↦ failed_at code;
+                    Ok _ ↦ expect_read stream option False code next
+                  }))
+        }))
+
+-- On a Unix stream both set and get must refuse ResourceHostIO InvalidInput.
+proc refuse_unix
+      (stream : Resource ResourceKind.SocketStream) (option : StreamOption) (code : UInt8)
+      (next : HostIO AFull (ResourceBodyResult UInt8 Unit))
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Unit)
+    (ResourceBodyResult UInt8 Unit)
+    (set_stream_option AFull stream option True)
+    (λset.
+      match set {
+        Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦
+          host_bind
+            AFull
+            (Result ResourceError Bool)
+            (ResourceBodyResult UInt8 Unit)
+            (stream_option AFull stream option)
+            (λread.
+              match read {
+                Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ next;
+                Err _ ↦ failed_at code;
+                Ok _ ↦ failed_at code
+              });
+        Err (ResourceError.ResourceHostIO (IOError.Other _)) ↦ failed_at (95 : UInt8);
+        Err _ ↦ failed_at code;
+        Ok _ ↦ failed_at (96 : UInt8)
+      })
+
+-- Codes: 10/11 outbound NoDelay/KeepAlive, 20/21 accepted.
+proc check_ip
+      (outbound : Resource ResourceKind.SocketStream)
+      (accepted : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  cycle
+    outbound
+    NoDelay
+    (10 : UInt8)
+    (cycle
+      outbound
+      KeepAlive
+      (11 : UInt8)
+      (cycle accepted NoDelay (20 : UInt8) (cycle accepted KeepAlive (21 : UInt8) passed)))
+
+-- Codes: 30/31 outbound NoDelay/KeepAlive, 40/41 accepted; 95 an OS error
+-- from a leaf that was reached, 96 a set that succeeded.
+proc check_unix
+      (outbound : Resource ResourceKind.SocketStream)
+      (accepted : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  refuse_unix
+    outbound
+    NoDelay
+    (30 : UInt8)
+    (refuse_unix
+      outbound
+      KeepAlive
+      (31 : UInt8)
+      (refuse_unix
+        accepted
+        NoDelay
+        (40 : UInt8)
+        (refuse_unix accepted KeepAlive (41 : UInt8) passed)))
+
+proc accepted_body
+      (ip : Bool)
+      (outbound : Resource ResourceKind.SocketStream)
+      (accepted : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  match ip {
+    True ↦ check_ip outbound accepted;
+    False ↦ check_unix outbound accepted
+  }
+
+proc outbound_body
+      (ip : Bool)
+      (listener : Resource ResourceKind.SocketListener)
+      (outbound : Resource ResourceKind.SocketStream)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (with_socket_accept AFull UInt8 Unit listener (accepted_body ip outbound))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ passed;
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+        Ok _ ↦ failed_at (52 : UInt8);
+        Err _ ↦ failed_at (53 : UInt8)
+      })
+
+proc listener_body
+      (cap : Cap AFull)
+      (ip : Bool)
+      (listener : Resource ResourceKind.SocketListener)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError SocketAddress)
+    (ResourceBodyResult UInt8 Unit)
+    (socket_local_address AFull (ListeningSocket listener))
+    (λlocal.
+      match local {
+        Err _ ↦ failed_at (54 : UInt8);
+        Ok address ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_socket_connection AFull UInt8 Unit cap address (outbound_body ip listener))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+                Ok _ ↦ failed_at (55 : UInt8);
+                Err _ ↦ failed_at (56 : UInt8)
+              })
+      })
+
+fn exit_for (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ ExitCode.Failure code;
+    Ok _ ↦ ExitCode.Failure 71;
+    Err _ ↦ ExitCode.Failure 72
+  }
+
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
+-- Arguments are read from the end: selector, then the Unix path.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match reversed_arguments arguments (Nil Bytes) {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons unix_path rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons selector _ ↦
+              match select_address selector unix_path {
+                Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+                Ok address ↦
+                  match caps {
+                    ProgramCaps.MkProgramCaps cap ↦
+                      host_bind
+                        AFull
+                        (Result ResourceError (ResourceBracketResult UInt8 Unit))
+                        ExitCode
+                        (with_socket_listener
+                          AFull
+                          UInt8
+                          Unit
+                          cap
+                          address
+                          (listener_body cap (is_ip selector)))
+                        (λoutcome. host_pure AFull ExitCode (exit_for outcome))
+                  }
+              }
+          }
+      }
+  }

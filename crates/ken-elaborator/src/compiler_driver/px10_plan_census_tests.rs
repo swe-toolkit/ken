@@ -411,7 +411,8 @@ fn assert_region_exit_owners(
 /// The ABI-S2 FS dispatch adds eight nodes before the settlement and
 /// returned owner. DESCRIPTOR's checked FS dispatch change adds another 17
 /// before both; fold 12 is unchanged. PX11-DATAGRAM-SOCKETS's four FSOp
-/// constructors and their response arms add 41 before both.
+/// constructors and their response arms add 41 before both, and
+/// PX11-SOCKET-OPTION-FAMILIES's three add 28 before both.
 /// CLAIMED: the return fold and returned bracket settlement retain their
 /// checked owners. THE GAP: the artifact is not run; this proves no parity.
 #[test]
@@ -438,7 +439,7 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
         assert_region_exit_owners(
             "smoke",
             &owners,
-            &[(ReturnFold, 764, 12), (ReturnedVisSettlement, 764, 799)],
+            &[(ReturnFold, 792, 12), (ReturnedVisSettlement, 792, 827)],
         );
         let _built = built.expect("smoke emits an artifact with Process authority");
     });
@@ -463,7 +464,8 @@ fn px10_smoke_plans_past_return_fold_and_returned_settlement() {
 /// live's exits and non-fold-12 owners. DESCRIPTOR adds 17 per preceding
 /// dispatch copy, moving the same origins by 34 or 17. PX11-DATAGRAM-SOCKETS's
 /// four FSOp constructors add 41 per preceding dispatch copy, moving the same
-/// origins by 82 or 41. The checked fixture
+/// origins by 82 or 41, and PX11-SOCKET-OPTION-FAMILIES's three add 28 per
+/// copy, moving them by 56 or 28. The checked fixture
 /// paths, owner planes, and detached-result observations are unchanged.
 #[test]
 fn px10_argv_and_live_emit_below_process_gate() {
@@ -473,10 +475,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_argv_env_pipe",
             ARGV_ENV_PIPE,
             &[
-                (ReturnFold, 1442, 712),
-                (ReturnFold, 1687, 1447),
-                (ReturnedVisSettlement, 1442, 2065),
-                (ReturnedVisSettlement, 1687, 1782),
+                (ReturnFold, 1498, 740),
+                (ReturnFold, 1743, 1503),
+                (ReturnedVisSettlement, 1498, 2121),
+                (ReturnedVisSettlement, 1743, 1838),
             ][..],
             None,
         ),
@@ -484,10 +486,10 @@ fn px10_argv_and_live_emit_below_process_gate() {
             "px10_census_live_child",
             LIVE_CHILD,
             &[
-                (ReturnFold, 742, 12),
-                (ReturnFold, 987, 747),
-                (ReturnedVisSettlement, 742, 1441),
-                (ReturnedVisSettlement, 987, 1160),
+                (ReturnFold, 770, 12),
+                (ReturnFold, 1015, 775),
+                (ReturnedVisSettlement, 770, 1469),
+                (ReturnedVisSettlement, 1015, 1188),
             ][..],
             None,
         ),

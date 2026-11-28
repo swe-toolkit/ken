@@ -1575,7 +1575,8 @@ signature is homed by analogy.
 > The seven `Net` stream host operations are `NativeTested`: they
 > execute on the checked interpreter and on the native lane, and a
 > declared `Net` grant no longer refuses a native build. The four
-> datagram operations of §1.13.1 are interpreter-only. No seed execution, official
+> datagram operations of §1.13.1 and the three option-family operations
+> of §1.13.2 are interpreter-only. No seed execution, official
 > conformance, CI, publication, landing or trusted-base measurement is
 > claimed by this Spec addition.
 
@@ -1702,8 +1703,9 @@ four-way body/release distinction. A Unix pathname created by bind is
 **not** unlinked on release: deleting it is a separate FS act. Listener
 and stream resources are opaque and expose no raw descriptor. The
 backend uses blocking stream sockets, with no implicit `SO_REUSEADDR`
-or other option. A connection failure closes the newly created socket
-before returning the error.
+or other option; the only options are §1.13.2's typed families, set
+by an explicit call or acquisition. A connection failure closes the
+newly created socket before returning the error.
 
 `receive_socket` and `send_socket` have their own `Net` operation
 identities rather than reusing the Process-labelled
@@ -1736,7 +1738,7 @@ socket-error family:
 ```ken
 pub data SocketOperation = ListenSocket | AcceptSocket | ConnectSocket
   | ReceiveSocket | SendSocket | ShutdownSocket | LocalSocketAddress
-  | CloseSocket | BindSocket
+  | CloseSocket | BindSocket | SetSocketOption | GetSocketOption
 pub data Operation = FilesystemOp FileOperation
   | ProcessOp ProcessOperation | SocketOp SocketOperation
 pub data ResourceRef = FilesystemResource (Option Bytes)
@@ -1750,10 +1752,12 @@ pub fn socket_error_to_system
 ```
 
 The operation identity distinguishes the seven stream operations, the
-datagram bind of §1.13.1 (`BindSocket`, last in the sum) and resource
-closure; `LocalSocketAddress` is idempotent, while the other
-socket operations, including close, are non-idempotent for retry
-classification. The address is carried when known, never a raw fd;
+datagram bind of §1.13.1 (`BindSocket`), the option set and get of
+§1.13.2 (`SetSocketOption` and `GetSocketOption`, last in the sum) and
+resource closure; `LocalSocketAddress`, `SetSocketOption` and
+`GetSocketOption` are idempotent, while the other socket operations,
+including close, are non-idempotent for retry classification. The
+address is carried when known, never a raw fd;
 accepted peers need not disclose their remote address. Only a
 `ResourceHostIO` cause lifts into this envelope. `Closed`,
 `ResourceKindMismatch` and `InvalidBounds` remain resource errors.
@@ -1768,13 +1772,15 @@ The seven stream host operations are `NetListen`, `NetAccept`,
 `NetConnect`, `NetReceive`, `NetSend`, `NetShutdown` and
 `NetLocalAddress`. Their host-family codes are `0x0701` through `0x0707`
 in that order; the four datagram operations of §1.13.1 follow at
-`0x0708` through `0x070B`, for eleven `Net` operations in all.
+`0x0708` through `0x070B`, and the three option-family operations of
+§1.13.2 at `0x070C` through `0x070E`, for fourteen `Net` operations in
+all (`0x0701` through `0x070E`).
 `ResourceKind.SocketListener` and `ResourceKind.SocketStream` are new
 opaque resource kinds; resource release uses the existing operation.
 All seven stream operations are `NativeTested` and execute on both the
 interpreter and native lanes. A declared Net grant no longer triggers a
-native-build refusal. Typed option families, an injected resolver and DNS
-boundary, nonblocking/readiness and abstract Unix names remain subsequent work.
+native-build refusal. An injected resolver and DNS boundary,
+nonblocking/readiness and abstract Unix names remain subsequent work.
 No new kernel rule or trusted postulate is authorized. Any required trust
 growth is an operator stop.
 
@@ -1929,6 +1935,134 @@ host-effect consumer roster, the native ABI refuses them at run time, and
 its request decoder has no arm for them; no datagram code is emitted. A
 stream-only program still builds and runs natively. No new kernel rule or
 trusted postulate is authorized.
+
+#### 1.13.2 Typed socket option families (PX11-SOCKET-OPTION-FAMILIES)
+
+> **Status: specified; host and interpreter lanes only.** The three
+> option-family operations are `RepresentedUnavailable`. The shared
+> executor admits them through the same explicit interpreter-only roster
+> as §1.13.1's four, which therefore names seven operations; the native
+> ABI keeps its own `NativeTested` gate. Native parity is a successor
+> node. No seed execution, official conformance, CI, publication, landing
+> or trusted-base measurement is claimed by this Spec addition.
+
+A socket option is a member of a closed, typed family; there is no integer
+`(level, optname)` form anywhere in the surface. Two options are settable
+and readable, and one is a bind-time property given by its own listener
+acquisition:
+
+- `NoDelay` (`TCP_NODELAY`): a `Bool` on an IPv4 or IPv6
+  `Resource ResourceKind.SocketStream`, outbound or accepted. Its client
+  need is interactive request and response latency (Nagle's algorithm).
+- `KeepAlive` (`SO_KEEPALIVE`): a `Bool` on an IPv4 or IPv6
+  `Resource ResourceKind.SocketStream` only. Its client need is detecting a
+  dead network peer on an idle connection. It is refused on a Unix stream
+  even though Linux accepts it there: a Unix peer's death is reported by
+  the kernel without probes, so a readback of `True` would claim liveness
+  probing that does not exist.
+- Address reuse (`SO_REUSEADDR`): a bind-time property of an IPv4 or IPv6
+  listener, acquired with `with_reusable_socket_listener`. Its client need
+  is a server restarting onto its own port while earlier connections sit in
+  `TIME_WAIT`. It is not a member of the settable family and has no
+  readback: whether a listener reuses its address is fixed by which
+  acquisition the program called, so a readback would only echo that.
+
+Address reuse is an acquisition, not a settable option, because Linux
+rebinds a port held in `TIME_WAIT` only when both the socket that left
+`TIME_WAIT` and the rebinding socket carry `SO_REUSEADDR`, and the
+rebinding socket needs it before `bind()`. Every listener resource is
+already bound and listening when its body first sees it, so a set
+operation on a listener could never make that listener's own bind
+succeed. A datagram socket has no option family in this slice: no client
+need is named (broadcast and multicast are out of scope) and UDP has no
+`TIME_WAIT`.
+
+The `Capability.Net.Option` home publishes these identities, in this
+export order, and re-exports nothing; a client imports `SocketAddress` and
+its smart constructors from `Capability.Net.Stream`. The contract shapes
+are:
+
+```ken
+pub data StreamOption = NoDelay | KeepAlive
+export NoDelay, KeepAlive
+
+proc with_reusable_socket_listener (a : Auth) (e : Type) (r : Type)
+    (cap : Cap a) (address : SocketAddress)
+    (body : Resource ResourceKind.SocketListener
+      -> HostIO a (ResourceBodyResult e r))
+  : HostIO a (Result ResourceError (ResourceBracketResult e r)) visits [Net]
+proc set_stream_option (a : Auth) (stream : Resource ResourceKind.SocketStream)
+    (option : StreamOption) (enabled : Bool)
+  : HostIO a (Result ResourceError Unit) visits [Net]
+proc stream_option (a : Auth) (stream : Resource ResourceKind.SocketStream)
+    (option : StreamOption)
+  : HostIO a (Result ResourceError Bool) visits [Net]
+```
+
+The two settable families share both their resource kind and their value
+type, so they are one operation pair over the closed `StreamOption` sum. A
+later family with a different kind or value type gets its own typed pair,
+not a wider sum. The target is the stream resource itself, not a sum over
+listener, stream and datagram: every listener and datagram member of such
+a sum would be a call that can only refuse. An option call on a listener
+or a datagram socket is therefore excluded by type.
+
+The three host operations are `NetListenReusable`, `NetStreamOptionSet`
+and `NetStreamOptionGet`, with host-family codes `0x070C` through `0x070E`
+in that order. They are carried on the existing FSOp carrier under the
+`Net` row label, and all three declare `visits [Net]`. The option's wire
+code is 0 for `NoDelay` and 1 for `KeepAlive`; a code above 1 is
+`ResourceHostIO IOError.InvalidInput` before any syscall, as a shutdown
+direction above 2 is.
+
+**Reusable listener.** `with_reusable_socket_listener` is
+`with_socket_listener` with `SO_REUSEADDR` set to 1 after `socket()` and
+before `bind()`. Everything else is identical: the address's `Net` class,
+the revoked-grant check, the bracket and its release, close-on-exec and
+the `SOMAXCONN` backlog. A Unix address is `ResourceHostIO
+IOError.InvalidInput` after the `Net` grant is admitted and before any
+syscall, including root resolution, so a refused Unix listen leaves no
+inode; `SO_REUSEADDR` has no bind effect on a Unix socket. A reusable
+listener rebinds a port held by a closed connection only when that
+connection was accepted from a reusable listener, and it never rebinds a
+live listener's port. Address in use remains `IOError.Other 98`.
+`with_socket_listener` is unchanged and still sets no option.
+
+**Set and get.** `set_stream_option` sets the option to `enabled` (1 or 0).
+`stream_option` reads the kernel's value with `getsockopt` and returns
+`True` exactly when it is nonzero; it is never a host-cached copy of the
+last set. A fresh stream reads `False` for both options. On a Unix stream
+either option, set or get, is `ResourceHostIO IOError.InvalidInput` before
+any syscall. A released stream is the existing `Closed`, and a wrong kind
+at the host is the existing `ResourceKindMismatch`, which checked Ken
+excludes statically. On a revoked originating grant, set and get return
+`ResourceHostIO IOError.Revoked` before any guarded host leaf, as the
+stream operations do. Other OS failures map to `IOError.Other errno`.
+
+**Family record.** Each listener and stream resource records whether it
+is IP or Unix. The record is set at acquisition from the checked address
+for `NetListen`, `NetListenReusable` and `NetConnect`, and an accepted
+stream copies its listener's record. The option fit check reads only that
+record and never the descriptor.
+
+**Errors.** `Capability.System.Error`'s `SocketOperation` gains
+`SetSocketOption` and `GetSocketOption`, appended after `BindSocket` in
+both the data declaration and the export list. Both are idempotent:
+repeating a set to the same value leaves the same state.
+`with_reusable_socket_listener` reuses `ListenSocket`. No new `IOError`
+constructor is added.
+
+**Native refusal.** A native build of a program that uses an option-family
+operation fails at build time with the existing refusal: `N0001`,
+`LoweringCause::Fragment`, reason
+`effect <owner>::FSOp.<decimal code> is a represented unavailable lane`,
+where the code is one of 1804–1806. Which one is reached first is
+incidental to source order. The three operations are absent from the
+native host-effect consumer roster, the native ABI refuses them at run
+time, and its request decoder has no arm for them. A stream-only program
+still builds and runs natively. No new kernel rule, trusted postulate or
+host facility is authorized; `setsockopt` and `getsockopt` ride the
+existing socket facilities.
 
 ### 1.14 Bracketed directory batches (ABI-S2)
 
