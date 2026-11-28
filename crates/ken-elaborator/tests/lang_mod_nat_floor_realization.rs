@@ -80,8 +80,9 @@ const FLOOR_CASES: [FloorCase; 10] = [
             "ResourceKind.PipeWrite",
             "ResourceKind.SocketListener",
             "ResourceKind.SocketStream",
+            "ResourceKind.SocketDatagram",
         ],
-        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.SpawnPlan ; ResourceKind.SpawnPlan |-> ResourceKind.ChildProcess ; ResourceKind.ChildProcess |-> ResourceKind.PipeRead ; ResourceKind.PipeRead |-> ResourceKind.PipeWrite ; ResourceKind.PipeWrite |-> ResourceKind.SocketListener ; ResourceKind.SocketListener |-> ResourceKind.SocketStream ; ResourceKind.SocketStream |-> ResourceKind.FsHandle }",
+        source: "fn witness (x : ResourceKind) : ResourceKind = match x { ResourceKind.FsHandle |-> ResourceKind.Buffer ; ResourceKind.Buffer |-> ResourceKind.Mapping ; ResourceKind.Mapping |-> ResourceKind.SpawnPlan ; ResourceKind.SpawnPlan |-> ResourceKind.ChildProcess ; ResourceKind.ChildProcess |-> ResourceKind.PipeRead ; ResourceKind.PipeRead |-> ResourceKind.PipeWrite ; ResourceKind.PipeWrite |-> ResourceKind.SocketListener ; ResourceKind.SocketListener |-> ResourceKind.SocketStream ; ResourceKind.SocketStream |-> ResourceKind.SocketDatagram ; ResourceKind.SocketDatagram |-> ResourceKind.FsHandle }",
     },
     FloorCase {
         name: "Result",

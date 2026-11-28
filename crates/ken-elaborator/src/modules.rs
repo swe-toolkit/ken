@@ -340,7 +340,7 @@ pub const PRELUDE_FLOOR_NAMES: [&str; 57] = [
 /// Each checked package identity has exactly one explicit-import home. The
 /// pre-source ID is bound only in that home's scope, then published by its
 /// ordinary `export`; it does not become an ambient floor binding.
-pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 191] = [
+pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 201] = [
     ("Capability.Console.Text", "IO"),
     ("Capability.Console.Text", "write"),
     ("Capability.Console.Text", "read"),
@@ -532,6 +532,16 @@ pub const PRELUDE_PACKAGE_HOMES: [(&str, &str); 191] = [
     ("Capability.Net.Stream", "send_socket"),
     ("Capability.Net.Stream", "shutdown_socket"),
     ("Capability.Net.Stream", "socket_local_address"),
+    ("Capability.Net.Datagram", "DatagramFit"),
+    ("Capability.Net.Datagram", "WholeDatagram"),
+    ("Capability.Net.Datagram", "TruncatedDatagram"),
+    ("Capability.Net.Datagram", "DatagramReceipt"),
+    ("Capability.Net.Datagram", "EmptyDatagram"),
+    ("Capability.Net.Datagram", "ReceivedDatagram"),
+    ("Capability.Net.Datagram", "with_datagram_socket"),
+    ("Capability.Net.Datagram", "send_datagram"),
+    ("Capability.Net.Datagram", "receive_datagram"),
+    ("Capability.Net.Datagram", "datagram_local_address"),
 ];
 
 /// Checked bindings admitted with the exact compiler-bootstrap `Pair` type.

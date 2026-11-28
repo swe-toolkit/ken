@@ -464,8 +464,9 @@ is a **surface error** (`24`) — it never reaches the kernel:
   `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
   `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
   `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
-  `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and
-  `ResourceKind.SocketStream` are its nine public paths. None is a bare
+  `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`,
+  `ResourceKind.SocketStream`, and `ResourceKind.SocketDatagram` are its ten
+  public paths. None is a bare
   reserved name.
   `ExitCode` is scoped: `ExitCode.Success` and `ExitCode.Failure` resolve,
   but bare `Success` and `Failure` do not enter B. `ProgramCaps` is scoped:

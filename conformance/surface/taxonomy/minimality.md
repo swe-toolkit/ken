@@ -73,7 +73,7 @@ Neither arm is a catch-all (`64 §1`).
 | **`eqChar`** | internal provision: comparator required by `Char ==` and character-literal matching (`30-taxonomy §4`, `37 §2.5`) | checked `Char → Char → Bool` operation with an exact registered ID; not a type or constructor family. |
 | **`List`** | signature: `String ↔ List Char` and `Bytes ↔ List UInt8` | ordinary checked `data List`; signature-named at two independent primitive surfaces. |
 | **`Option`** | signature: `bytes_at` and `bytes_slice` results | ordinary checked `data Option a = None \| Some a`; strict source must name and eliminate the exact result family. |
-| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping \| SpawnPlan \| ChildProcess \| PipeRead \| PipeWrite \| SocketListener \| SocketStream`; the opaque primitive former needs this exact parameter identity. Source uses the nine scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and `ResourceKind.SocketStream`. |
+| **`ResourceKind`** | signature: `Resource : ResourceKind → Type` | ordinary checked `data ResourceKind = FsHandle \| Buffer \| Mapping \| SpawnPlan \| ChildProcess \| PipeRead \| PipeWrite \| SocketListener \| SocketStream \| SocketDatagram`; the opaque primitive former needs this exact parameter identity. Source uses the ten scoped paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, `ResourceKind.SocketStream`, and `ResourceKind.SocketDatagram`. |
 | **`Result`** | signature: `bytes_decode : Bytes → Result Utf8Error String` | ordinary checked `data Result e a = Err e \| Ok a`; strict source must eliminate the exact result family. |
 | **`SocketAddress`** | internal provision: the checked Net operations and System.Error envelope require one source identity from both homes, without an import edge | keyed pre-source type identity; Stream re-exports the same identity. `PrivateSocketIPv4`, `PrivateSocketIPv6`, and `PrivateSocketUnix` are private at their qualified paths, and none is bare-reserved. |
 | **`MonotonicInstant`** | internal provision: the `monotonic_now` result and native response use the exact checked floor type (`38 §1.15`) | exact checked type identity; `MonotonicInstant.MkMonotonicInstant` is its only public qualified constructor path. |
@@ -136,11 +136,12 @@ includes the `eqChar` comparator operation and adds no primitive or
 `trusted_base()` entry.
 For every inductive member, the floor
 admits constructors only by matching their kernel-recorded parent `GlobalId`.
-`ResourceKind` is scoped: its nine constructors are available only as
+`ResourceKind` is scoped: its ten constructors are available only as
 `ResourceKind.FsHandle`, `ResourceKind.Buffer`, `ResourceKind.Mapping`,
 `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
-`ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and
-`ResourceKind.SocketStream`, not as bare names. `SocketAddress` is a floor type;
+`ResourceKind.PipeWrite`, `ResourceKind.SocketListener`,
+`ResourceKind.SocketStream`, and `ResourceKind.SocketDatagram`, not as bare
+names. `SocketAddress` is a floor type;
 its representation constructors are private at qualified paths and have no
 bare source names. `ConsoleStream` is scoped:
 its complete family is `ConsoleStream.Stdin`, `ConsoleStream.Stdout`, and
@@ -249,11 +250,12 @@ possession.
   `ConsoleOp.Read`, `ConsoleOp.Write`, `ConsoleOp.Flush`, and
   `ConsoleOp.IsTerminal`. These retain their exact parents and do not reserve
   bare scoped leaves. `ResourceKind` contributes exactly
-  the nine qualified paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
+  the ten qualified paths `ResourceKind.FsHandle`, `ResourceKind.Buffer`,
   `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`, `ResourceKind.ChildProcess`,
   `ResourceKind.PipeRead`, `ResourceKind.PipeWrite`,
-  `ResourceKind.SocketListener`, and `ResourceKind.SocketStream`; none is a
-  bare constructor path. `SocketAddress` is source-visible as a floor type;
+  `ResourceKind.SocketListener`, `ResourceKind.SocketStream`, and
+  `ResourceKind.SocketDatagram`; none is a bare constructor path.
+  `SocketAddress` is source-visible as a floor type;
   `SocketAddress.PrivateSocketIPv4`, `SocketAddress.PrivateSocketIPv6`, and
   `SocketAddress.PrivateSocketUnix` are private at qualified paths, and none
   is bare-reserved. Each bare `ResourceKind` leaf in value position is refused

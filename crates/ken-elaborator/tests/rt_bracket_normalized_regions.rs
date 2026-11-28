@@ -98,9 +98,10 @@ fn nested_brackets_with_multiple_inner_ret_leaves_have_two_binder_groups() {
     })));
 }
 
-/// Promise class: durable binder pairing for the three Net acquisitions.
-/// MEASURED: the public wrappers yield three checked acquire identities,
-/// each with one finalizer, and the accept Vis lies under the listener's Ok.
+/// Promise class: durable binder pairing for the four Net acquisitions.
+/// MEASURED: the public wrappers yield four checked acquire identities,
+/// listener, accept, connect and datagram bind, each with one finalizer,
+/// and the accept Vis lies under the listener's Ok.
 /// CLAIMED: nested socket brackets keep their own acquisition and finalizer.
 /// THE GAP: region extraction does not execute any socket operation.
 #[test]
@@ -109,7 +110,7 @@ fn socket_brackets_pair_each_checked_acquisition_with_its_finalizer() {
 
     let prepared = prepare(include_str!("fixtures/rt_bracket_region_net.ken"));
     let rows = prepared.bracket_regions();
-    assert_eq!(rows.len(), 3, "{rows:?}");
+    assert_eq!(rows.len(), 4, "{rows:?}");
     // Hidden constructors may receive anonymous stable symbols. Resolve the
     // expected identity through the checked host-spine binding, not its spelling.
     let operations = &prepared
@@ -138,7 +139,8 @@ fn socket_brackets_pair_each_checked_acquisition_with_its_finalizer() {
     let listener = find(HostOpV1::NetListen);
     let accept = find(HostOpV1::NetAccept);
     let connect = find(HostOpV1::NetConnect);
-    for row in [listener, accept, connect] {
+    let datagram = find(HostOpV1::NetDatagramBind);
+    for row in [listener, accept, connect, datagram] {
         assert_eq!(row.finalizer_paths.len(), 1, "{row:?}");
     }
     assert_eq!(accept.owner, listener.owner);

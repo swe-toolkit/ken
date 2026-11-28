@@ -3979,14 +3979,29 @@ mod tests {
         assert!(err.reason.contains("stale or missing"));
     }
 
+    /// Promise class: transition sentinel, named for the datagram boundary.
+    /// MEASURED: the RepresentedUnavailable host operations are exactly the
+    /// four PX11 datagram operations. CLAIMED: the effect-policy population
+    /// this report classifies as unavailable is that set. THE GAP: the
+    /// datagram native-parity node retires this row by promoting the four.
     #[test]
-    fn represented_unavailable_host_operation_population_is_empty() {
-        assert!(
-            ken_host::HostOpV1::ALL
-                .iter()
-                .all(|op| op.availability() == ken_host::HostOpAvailabilityV1::NativeTested),
-            "the represented-unavailable effect-policy rows were retired at PX11 Inc2 because \
-             their population is empty; restore them with a real subject when it is not"
+    fn represented_unavailable_host_operations_are_exactly_the_datagram_four() {
+        let unavailable = ken_host::HostOpV1::ALL
+            .into_iter()
+            .filter(|op| {
+                op.availability() == ken_host::HostOpAvailabilityV1::RepresentedUnavailable
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            unavailable,
+            [
+                ken_host::HostOpV1::NetDatagramBind,
+                ken_host::HostOpV1::NetDatagramSendTo,
+                ken_host::HostOpV1::NetDatagramReceiveFrom,
+                ken_host::HostOpV1::NetDatagramLocalAddress,
+            ]
+            .into_iter()
+            .collect::<std::collections::BTreeSet<_>>()
         );
     }
 

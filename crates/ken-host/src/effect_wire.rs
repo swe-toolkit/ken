@@ -311,6 +311,12 @@ fn put_request(
         CanonicalRequestV1::NetSend { buffer_start, length } => { put_u8(out, 47); put_u64(out, *buffer_start); put_u64(out, *length); }
         CanonicalRequestV1::NetShutdown { how } => { put_u8(out, 48); put_u64(out, *how); }
         CanonicalRequestV1::NetLocalAddress => put_u8(out, 49),
+        CanonicalRequestV1::NetDatagramBind { address } => { put_u8(out, 52); put_socket_address(out, address)?; }
+        CanonicalRequestV1::NetDatagramSendTo { buffer_start, length, peer } => {
+            put_u8(out, 53); put_u64(out, *buffer_start); put_u64(out, *length); put_socket_address(out, peer)?;
+        }
+        CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start, length } => { put_u8(out, 54); put_u64(out, *buffer_start); put_u64(out, *length); }
+        CanonicalRequestV1::NetDatagramLocalAddress => put_u8(out, 55),
     }
     Ok(())
 }
@@ -451,6 +457,28 @@ fn put_reply(out: &mut Vec<u8>, reply: &CanonicalReplyV1) -> Result<(), EffectTr
             put_u8(out, 16);
             put_socket_address(out, address)?;
         }
+        CanonicalReplyV1::DatagramReceipt(receipt) => {
+            put_u8(out, 18);
+            let put_sender = |out: &mut Vec<u8>, sender: &Option<crate::SocketAddressV1>| match sender {
+                None => { put_u8(out, 0); Ok(()) }
+                Some(address) => { put_u8(out, 1); put_socket_address(out, address) }
+            };
+            match receipt {
+                crate::DatagramReceiptV1::Empty { sender } => {
+                    put_u8(out, 0);
+                    put_sender(out, sender)?;
+                }
+                crate::DatagramReceiptV1::Received { span, transferred, truncated, sender } => {
+                    put_u8(out, 1);
+                    put_u64(out, span.start());
+                    put_u64(out, span.length());
+                    put_u64(out, transferred.get());
+                    put_u64(out, transferred.effective_request());
+                    put_u8(out, u8::from(*truncated));
+                    put_sender(out, sender)?;
+                }
+            }
+        }
         CanonicalReplyV1::ChildExit(exit) => {
             put_u8(out, 15);
             match exit {
@@ -473,6 +501,7 @@ fn put_resource_kind(out: &mut Vec<u8>, kind: ResourceKindV1) {
         ResourceKindV1::PipeWrite => put_u8(out, 6),
         ResourceKindV1::SocketListener => put_u8(out, 7),
         ResourceKindV1::SocketStream => put_u8(out, 8),
+        ResourceKindV1::SocketDatagram => put_u8(out, 9),
     }
 }
 
@@ -996,6 +1025,12 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         47 => CanonicalRequestV1::NetSend { buffer_start: cursor.u64()?, length: cursor.u64()? },
         48 => CanonicalRequestV1::NetShutdown { how: cursor.u64()? },
         49 => CanonicalRequestV1::NetLocalAddress,
+        52 => CanonicalRequestV1::NetDatagramBind { address: get_socket_address(cursor)? },
+        53 => CanonicalRequestV1::NetDatagramSendTo {
+            buffer_start: cursor.u64()?, length: cursor.u64()?, peer: get_socket_address(cursor)?,
+        },
+        54 => CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start: cursor.u64()?, length: cursor.u64()? },
+        55 => CanonicalRequestV1::NetDatagramLocalAddress,
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -1034,6 +1069,7 @@ fn validate_transfer_request_bound(
             CanonicalRequestV1::FsReadAt { length, .. }
             | CanonicalRequestV1::ResourceStreamRead { length, .. }
             | CanonicalRequestV1::NetReceive { length, .. }
+            | CanonicalRequestV1::NetDatagramReceiveFrom { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -1159,6 +1195,31 @@ fn get_reply(cursor: &mut Cursor<'_>) -> Result<CanonicalReplyV1, EffectTraceWir
                 .ok_or(EffectTraceWireError)?;
             CanonicalReplyV1::WriteProgress(crate::WriteProgressV1::Wrote(transferred))
         }
+        18 => {
+            let get_sender = |cursor: &mut Cursor<'_>| get_option(cursor, get_socket_address);
+            let receipt = match cursor.u8()? {
+                0 => crate::DatagramReceiptV1::Empty { sender: get_sender(cursor)? },
+                1 => {
+                    let start = cursor.u64()?;
+                    let length = cursor.u64()?;
+                    let transferred = cursor.u64()?;
+                    let effective_request = cursor.u64()?;
+                    if length != transferred {
+                        return Err(EffectTraceWireError);
+                    }
+                    let transferred = crate::TransferCountV1::new(transferred, effective_request)
+                        .ok_or(EffectTraceWireError)?;
+                    crate::DatagramReceiptV1::Received {
+                        span: crate::BufferSpanV1 { start, length },
+                        transferred,
+                        truncated: get_bool(cursor)?,
+                        sender: get_sender(cursor)?,
+                    }
+                }
+                _ => return Err(EffectTraceWireError),
+            };
+            CanonicalReplyV1::DatagramReceipt(receipt)
+        }
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -1174,6 +1235,7 @@ fn get_resource_kind(cursor: &mut Cursor<'_>) -> Result<ResourceKindV1, EffectTr
         6 => Ok(ResourceKindV1::PipeWrite),
         7 => Ok(ResourceKindV1::SocketListener),
         8 => Ok(ResourceKindV1::SocketStream),
+        9 => Ok(ResourceKindV1::SocketDatagram),
         _ => Err(EffectTraceWireError),
     }
 }
@@ -1905,6 +1967,63 @@ mod tests {
         assert_eq!(cursor.position, bytes.len());
     }
 
+    /// Promise class: normative compatibility vector. MEASURED: the four
+    /// datagram requests take tags 52 to 55 in operation order after the
+    /// stream tags and the directory batch's 51, and round-trip; the receipt
+    /// reply takes tag 18 and round-trips in both arms with and without a
+    /// sender; a receipt whose span length differs from its count, or whose
+    /// fit byte is not 0 or 1, is rejected. CLAIMED: the datagram trace wire
+    /// extends the tag tables without renumbering and fails closed. THE GAP:
+    /// opaque resource tokens travel in resource bindings, covered by
+    /// dispatch tests.
+    #[test]
+    fn px11_datagram_wire_tags_extend_without_renumbering_and_fail_closed() {
+        let ipv4 = crate::SocketAddressV1::Inet4 { octets: [127, 0, 0, 1], port: 0x0123 };
+        let unix = crate::SocketAddressV1::Unix { path: b"/tmp/d".to_vec() };
+        for (request, tag) in [
+            (CanonicalRequestV1::NetDatagramBind { address: unix.clone() }, 52),
+            (CanonicalRequestV1::NetDatagramSendTo { buffer_start: 2, length: 7, peer: ipv4.clone() }, 53),
+            (CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start: 1, length: 6 }, 54),
+            (CanonicalRequestV1::NetDatagramLocalAddress, 55),
+        ] {
+            let mut bytes = Vec::new();
+            put_request(&mut bytes, &request).unwrap();
+            assert_eq!(bytes[0], tag, "{request:?} tag");
+            let mut cursor = Cursor { bytes: &bytes, position: 0 };
+            assert_eq!(get_request(&mut cursor), Ok(request));
+            assert_eq!(cursor.position, bytes.len());
+        }
+        let received = |truncated, sender| CanonicalReplyV1::DatagramReceipt(crate::DatagramReceiptV1::Received {
+            span: crate::BufferSpanV1 { start: 3, length: 6 },
+            transferred: crate::TransferCountV1::new(6, 6).unwrap(),
+            truncated,
+            sender,
+        });
+        for reply in [
+            CanonicalReplyV1::DatagramReceipt(crate::DatagramReceiptV1::Empty { sender: None }),
+            CanonicalReplyV1::DatagramReceipt(crate::DatagramReceiptV1::Empty { sender: Some(unix.clone()) }),
+            received(true, Some(ipv4.clone())),
+            received(false, None),
+        ] {
+            let mut bytes = Vec::new();
+            put_reply(&mut bytes, &reply).unwrap();
+            assert_eq!(bytes[0], 18, "{reply:?} tag");
+            let mut cursor = Cursor { bytes: &bytes, position: 0 };
+            assert_eq!(get_reply(&mut cursor), Ok(reply));
+            assert_eq!(cursor.position, bytes.len());
+        }
+        let mut bytes = Vec::new();
+        put_reply(&mut bytes, &received(true, None)).unwrap();
+        // tag, arm, start (8), length (8), count (8), effective (8), fit, sender.
+        assert_eq!(bytes.len(), 1 + 1 + 32 + 1 + 1);
+        let mut bad_fit = bytes.clone();
+        bad_fit[34] = 2;
+        assert_eq!(get_reply(&mut Cursor { bytes: &bad_fit, position: 0 }), Err(EffectTraceWireError));
+        let mut bad_length = bytes;
+        bad_length[10] = 5;
+        assert_eq!(get_reply(&mut Cursor { bytes: &bad_length, position: 0 }), Err(EffectTraceWireError));
+    }
+
     /// Promise class: normative compatibility vector. MEASURED: all three D3
     /// Mapping requests round-trip with distinct append-only request tags,
     /// ReadOnly/Writable encode as 0/1, and an unknown protection byte is
@@ -2147,6 +2266,7 @@ mod tests {
             (ResourceKindV1::PipeWrite, "resource_kind.PipeWrite", 6),
             (ResourceKindV1::SocketListener, "resource_kind.SocketListener", 7),
             (ResourceKindV1::SocketStream, "resource_kind.SocketStream", 8),
+            (ResourceKindV1::SocketDatagram, "resource_kind.SocketDatagram", 9),
         ];
         for (kind, name, tag) in kinds {
             match kind {
@@ -2158,7 +2278,8 @@ mod tests {
                 | ResourceKindV1::PipeRead
                 | ResourceKindV1::PipeWrite
                 | ResourceKindV1::SocketListener
-                | ResourceKindV1::SocketStream => {}
+                | ResourceKindV1::SocketStream
+                | ResourceKindV1::SocketDatagram => {}
             }
             let catalog_tag = crate::HOST_EFFECT_ABI_V1_BINDINGS
                 .iter()

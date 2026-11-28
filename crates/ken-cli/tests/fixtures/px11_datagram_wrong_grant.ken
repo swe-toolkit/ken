@@ -1,0 +1,134 @@
+program capabilities FS AFull, Net Loopback, RootExecution Allow
+
+import Capability.Net.Datagram
+  (SocketAddress, socket_ipv4, with_datagram_socket, send_datagram)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+
+import Capability.System.IO (readAt)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk,
+    withBuffer,
+    withResource)
+
+import Data.Vector.Vector (Vec, VNil, VCons)
+
+fn ipv4 (a : UInt8) (b : UInt8) (c : UInt8) (d : UInt8) (port : UInt16) : SocketAddress =
+  socket_ipv4
+    (VCons
+      UInt8
+      (Suc (Suc (Suc Zero)))
+      a
+      (VCons UInt8 (Suc (Suc Zero)) b (VCons UInt8 (Suc Zero) c (VCons UInt8 Zero d (VNil UInt8)))))
+    port
+
+const loopback : SocketAddress = ipv4 (127 : UInt8) (0 : UInt8) (0 : UInt8) (1 : UInt8) (0 : UInt16)
+
+-- TEST-NET-1: an Inet address outside the Loopback class.
+const documentation_peer : SocketAddress =
+  ipv4 (192 : UInt8) (0 : UInt8) (2 : UInt8) (1 : UInt8) (9 : UInt16)
+
+const failed_at : UInt8 -> HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  λcode. host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit code)
+
+const passed : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyOk UInt8 Unit MkUnit)
+
+-- The carried error identity is matched by pattern, never converted.
+proc socket_body
+      (payload : BufferHandle) (span : BufferSpan) (socket : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Unit)
+    (ResourceBodyResult UInt8 Unit)
+    (send_datagram AFull socket documentation_peer payload span)
+    (λsent.
+      match sent {
+        Ok _ ↦ failed_at (81 : UInt8);
+        Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ failed_at (84 : UInt8);
+        Err _ ↦ failed_at (86 : UInt8)
+      })
+
+proc buffer_body
+      (cap : Cap AFull) (file : Resource ResourceKind.FsHandle) (payload : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (ResourceBodyResult UInt8 Unit)
+    (readAt AFull file (0 : Int) payload (MkBufferWindow (0 : Int) (7 : Int)))
+    (λread_result.
+      match read_result {
+        Err _ ↦ failed_at (30 : UInt8);
+        Ok ReadProgress.ReadEof ↦ failed_at (31 : UInt8);
+        Ok (ReadProgress.ReadSome span _) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_datagram_socket AFull UInt8 Unit cap loopback (socket_body payload span))
+            (λoutcome.
+              match outcome {
+                Ok (ResourceBracketOk _) ↦ passed;
+                Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+                Ok _ ↦ failed_at (32 : UInt8);
+                Err _ ↦ failed_at (33 : UInt8)
+              })
+      })
+
+proc file_body
+      (cap : Cap AFull) (file : Resource ResourceKind.FsHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (withBuffer AFull UInt8 Unit (16 : Int) (buffer_body cap file))
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk _) ↦ passed;
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+        Ok _ ↦ failed_at (21 : UInt8);
+        Err _ ↦ failed_at (22 : UInt8)
+      })
+
+fn exit_for (outcome : Result FileError (ResourceBracketResult UInt8 Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ ExitCode.Failure code;
+    Ok _ ↦ ExitCode.Failure 71;
+    Err _ ↦ ExitCode.Failure 72
+  }
+
+-- A Loopback grant binds a loopback socket, then sends to an Inet peer.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Net] =
+  match caps {
+    ProgramCaps.MkProgramCaps cap ↦
+      host_bind
+        AFull
+        (Result FileError (ResourceBracketResult UInt8 Unit))
+        ExitCode
+        (withResource
+          AFull
+          UInt8
+          Unit
+          cap
+          (bytes_encode "px11-payload.bin")
+          ResourceOpenMode.ResourceRead
+          (file_body cap))
+        (λoutcome. host_pure AFull ExitCode (exit_for outcome))
+  }

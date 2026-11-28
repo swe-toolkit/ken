@@ -67,6 +67,9 @@ struct NetReceiveRequestV1 { uint64_t stream; uint64_t buffer; uint64_t buffer_s
 struct NetSendRequestV1 { uint64_t stream; uint64_t buffer; uint64_t buffer_start; uint64_t length; uint64_t span_origin; };
 struct NetShutdownRequestV1 { uint64_t stream; uint64_t how; };
 struct NetLocalAddressRequestV1 { uint64_t target; };
+struct NetDatagramBindRequestV1 { uint64_t capability; struct SocketAddressRecordV1 address; };
+struct NetDatagramSendToRequestV1 { uint64_t socket; uint64_t buffer; uint64_t buffer_start; uint64_t length; uint64_t span_origin; struct SocketAddressRecordV1 peer; };
+struct NetDatagramReceiveFromRequestV1 { uint64_t socket; uint64_t buffer; uint64_t buffer_start; uint64_t length; };
 struct ResourceErrorReplyV1 {
     uint64_t schema_version;
     uint64_t resource_kind;
@@ -152,6 +155,9 @@ int main(void) {
     FACT_SIZE(NetSendRequestV1); FACT_ALIGN(NetSendRequestV1); FACT_OFFSET(NetSendRequestV1, stream); FACT_OFFSET(NetSendRequestV1, buffer); FACT_OFFSET(NetSendRequestV1, buffer_start); FACT_OFFSET(NetSendRequestV1, length); FACT_OFFSET(NetSendRequestV1, span_origin);
     FACT_SIZE(NetShutdownRequestV1); FACT_ALIGN(NetShutdownRequestV1); FACT_OFFSET(NetShutdownRequestV1, stream); FACT_OFFSET(NetShutdownRequestV1, how);
     FACT_SIZE(NetLocalAddressRequestV1); FACT_ALIGN(NetLocalAddressRequestV1); FACT_OFFSET(NetLocalAddressRequestV1, target);
+    FACT_SIZE(NetDatagramBindRequestV1); FACT_ALIGN(NetDatagramBindRequestV1); FACT_OFFSET(NetDatagramBindRequestV1, capability); FACT_OFFSET(NetDatagramBindRequestV1, address);
+    FACT_SIZE(NetDatagramSendToRequestV1); FACT_ALIGN(NetDatagramSendToRequestV1); FACT_OFFSET(NetDatagramSendToRequestV1, socket); FACT_OFFSET(NetDatagramSendToRequestV1, buffer); FACT_OFFSET(NetDatagramSendToRequestV1, buffer_start); FACT_OFFSET(NetDatagramSendToRequestV1, length); FACT_OFFSET(NetDatagramSendToRequestV1, span_origin); FACT_OFFSET(NetDatagramSendToRequestV1, peer);
+    FACT_SIZE(NetDatagramReceiveFromRequestV1); FACT_ALIGN(NetDatagramReceiveFromRequestV1); FACT_OFFSET(NetDatagramReceiveFromRequestV1, socket); FACT_OFFSET(NetDatagramReceiveFromRequestV1, buffer); FACT_OFFSET(NetDatagramReceiveFromRequestV1, buffer_start); FACT_OFFSET(NetDatagramReceiveFromRequestV1, length);
     FACT_SIZE(ResourceErrorReplyV1); FACT_ALIGN(ResourceErrorReplyV1); FACT_OFFSET(ResourceErrorReplyV1, schema_version); FACT_OFFSET(ResourceErrorReplyV1, resource_kind); FACT_OFFSET(ResourceErrorReplyV1, identity); FACT_OFFSET(ResourceErrorReplyV1, io); FACT_OFFSET(ResourceErrorReplyV1, required); FACT_OFFSET(ResourceErrorReplyV1, held); FACT_OFFSET(ResourceErrorReplyV1, expected_kind); FACT_OFFSET(ResourceErrorReplyV1, actual_kind);
     FACT_SIZE(FileMetadataReplyV1); FACT_ALIGN(FileMetadataReplyV1);
     FACT_OFFSET(FileMetadataReplyV1, present);

@@ -4016,7 +4016,8 @@ impl StaticTransitionPlan<'_> {
                 let minting = candidate.static_response_continuations.iter()
                     .find(|row| row.id() == pair.minting_row)
                     .ok_or_else(|| planner_error("relay pair has no hypothetical minting owner"))?;
-                let protocol = candidate.returned_vis_protocol(minting.vis_origin())?;
+                let protocol = candidate.returned_vis_protocol(minting.vis_origin())
+                    .map_err(super::returned_vis::ReturnedVisRefusal::into_error)?;
                 let already_performed = !relay_members_at_source(
                     std::iter::once(minting).chain(
                         protocol.contexts.iter().flat_map(|context| &context.members)

@@ -1,5 +1,6 @@
-//! PX11 checked stream-socket operations. The carrier is the existing FSOp;
-//! `Net` is its separately admitted effect-row label, not another authority.
+//! PX11 checked stream- and datagram-socket operations. The carrier is the
+//! existing FSOp; `Net` is its separately admitted effect-row label, not
+//! another authority.
 
 use crate::{error::ElabError, ElabEnv};
 
@@ -141,6 +142,13 @@ pub(super) fn register_prelude_net(elab: &mut ElabEnv) -> Result<(), ElabError> 
             "(address : SocketAddress)",
             "PrivateNetConnect a cap address",
         ),
+        (
+            "with_datagram_socket",
+            "SocketDatagram",
+            "(cap : Cap a)",
+            "(address : SocketAddress)",
+            "PrivateNetDatagramBind a cap address",
+        ),
     ] {
         let declaration = format!(
             r#"
@@ -212,7 +220,66 @@ pub(super) fn register_prelude_net(elab: &mut ElabEnv) -> Result<(), ElabError> 
               (Result ResourceError WriteProgress) response)
     "#,
     )?;
+    checked(
+        elab,
+        "send_datagram",
+        r#"
+        proc send_datagram (a : Auth) (socket : Resource ResourceKind.SocketDatagram)
+          (peer : SocketAddress) (buffer : BufferHandle) (span : BufferSpan)
+          : HostIO a (Result ResourceError Unit) visits [Net] =
+          Vis (Coproduct (FSOp a) AmbientOp)
+            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+            (Result ResourceError Unit)
+            (InL (FSOp a) AmbientOp (PrivateNetDatagramSendTo a socket
+              (buffer_handle_resource buffer) (buffer_span_start span)
+              (buffer_span_length span) (buffer_span_origin span) peer))
+            (\response. Ret (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError Unit) response)
+    "#,
+    )?;
+    // A datagram socket has no end of stream, so a zero effective window is
+    // InvalidBounds without a host call rather than ReadEof.
+    checked(
+        elab,
+        "receive_datagram",
+        r#"
+        proc receive_datagram (a : Auth) (socket : Resource ResourceKind.SocketDatagram)
+          (buffer : BufferHandle) (window : BufferWindow)
+          : HostIO a (Result ResourceError DatagramReceipt) visits [Net] =
+          match leq_int (0 : Int) (buffer_window_start window) {
+            False |-> private_net_error a DatagramReceipt InvalidBounds;
+            True |-> match leq_int (0 : Int) (buffer_window_length window) {
+              False |-> private_net_error a DatagramReceipt InvalidBounds;
+              True |-> match leq_int (buffer_window_start window)
+                  (buffer_handle_capacity buffer) {
+                False |-> private_net_error a DatagramReceipt InvalidBounds;
+                True |-> let effective = buffer_min_int (buffer_window_length window)
+                    (sub_int (buffer_handle_capacity buffer) (buffer_window_start window)) in
+                  match eq_int effective (0 : Int) {
+                    True |-> private_net_error a DatagramReceipt InvalidBounds;
+                    False |-> Vis (Coproduct (FSOp a) AmbientOp)
+                      (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+                      (Result ResourceError DatagramReceipt)
+                      (InL (FSOp a) AmbientOp (PrivateNetDatagramReceiveFrom a socket
+                        (buffer_handle_resource buffer) (buffer_window_start window)
+                        effective))
+                      (\response. Ret (Coproduct (FSOp a) AmbientOp)
+                        (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+                        (Result ResourceError DatagramReceipt) response)
+                  }
+              }
+            }
+          }
+    "#,
+    )?;
     for (name, ty, operand, result) in [
+        (
+            "datagram_local_address",
+            "(socket : Resource ResourceKind.SocketDatagram)",
+            "PrivateNetDatagramLocalAddress a socket",
+            "SocketAddress",
+        ),
         (
             "shutdown_socket",
             "(stream : Resource ResourceKind.SocketStream) (how : SocketShutdown)",

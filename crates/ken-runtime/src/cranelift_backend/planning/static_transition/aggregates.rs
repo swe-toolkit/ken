@@ -12987,6 +12987,7 @@ mod tests {
                     R::ResourceKindPipeWrite,
                     R::ResourceKindSocketListener,
                     R::ResourceKindSocketStream,
+                    R::ResourceKindSocketDatagram,
                 ]
                     .into_iter()
                     .enumerate()
@@ -13627,6 +13628,7 @@ mod tests {
                 Fixed(R::ResourceKindPipeWrite),
                 Fixed(R::ResourceKindSocketListener),
                 Fixed(R::ResourceKindSocketStream),
+                Fixed(R::ResourceKindSocketDatagram),
             ],
         );
 

@@ -448,6 +448,20 @@ pub(in crate::cranelift_backend) fn set_effect_seat_plan_mutation(
     EFFECT_SEAT_PLAN_MUTATION.with(|cell| cell.set(mutation));
 }
 
+/// The typed refusal for a represented host operation that has no native
+/// emitter. Both the planner's returned-Vis seat check and object emission
+/// refuse with this one value.
+pub(in crate::cranelift_backend) fn represented_unavailable_lane(
+    family: &str,
+    operation: ken_host::HostOpV1,
+) -> CraneliftBackendError {
+    crate::cranelift_backend::surface::unsupported(
+        crate::cranelift_backend::surface::LoweringCause::Fragment,
+        "Effect",
+        format!("effect {family}.{} is a represented unavailable lane", operation as u16),
+    )
+}
+
 /// **The host operations this backend represents as consumers.**
 ///
 /// ⛔ It lives in PLANNING because the seat population is derived here and the
@@ -583,6 +597,12 @@ fn host_effect_seat_contract(
                 | Op::NetAccept
                 | Op::NetReceive | Op::NetSend | Op::NetShutdown
                 | Op::NetLocalAddress => None,
+                // PX11-DATAGRAM-SOCKETS: RepresentedUnavailable, no native
+                // seat. Native lowering refuses them before any seat exists.
+                Op::NetDatagramBind
+                | Op::NetDatagramSendTo
+                | Op::NetDatagramReceiveFrom
+                | Op::NetDatagramLocalAddress => None,
             };
         }
         EffectSeatSlot::Argument(ordinal) => ordinal,
@@ -820,7 +840,12 @@ fn host_effect_seat_contract(
             | Op::NetReceive
             | Op::NetSend
             | Op::NetShutdown
-            | Op::NetLocalAddress,
+            | Op::NetLocalAddress
+            // PX11-DATAGRAM-SOCKETS: no native seat; see the capability arm.
+            | Op::NetDatagramBind
+            | Op::NetDatagramSendTo
+            | Op::NetDatagramReceiveFrom
+            | Op::NetDatagramLocalAddress,
             _,
         ) => None,
     }

@@ -159,6 +159,7 @@ pub(in crate::cranelift_backend) enum SynthesizedFixedConstructorRole {
     SocketAddressUnix,
     ResourceKindSocketListener,
     ResourceKindSocketStream,
+    ResourceKindSocketDatagram,
 }
 
 pub(super) const RESOURCE_KIND_POPULATION:
@@ -183,11 +184,12 @@ pub(in crate::cranelift_backend) const fn resource_kind_role(
         Kind::PipeWrite => Role::ResourceKindPipeWrite,
         Kind::SocketListener => Role::ResourceKindSocketListener,
         Kind::SocketStream => Role::ResourceKindSocketStream,
+        Kind::SocketDatagram => Role::ResourceKindSocketDatagram,
     }
 }
 
 impl SynthesizedFixedConstructorRole {
-    pub(super) const ALL: [Self; 62] = [
+    pub(super) const ALL: [Self; 63] = [
         Self::FileError,
         Self::FileOperationRead,
         Self::FileOperationWrite,
@@ -250,6 +252,7 @@ impl SynthesizedFixedConstructorRole {
         Self::SocketAddressUnix,
         Self::ResourceKindSocketListener,
         Self::ResourceKindSocketStream,
+        Self::ResourceKindSocketDatagram,
     ];
 
     fn spelling<'a>(self, symbols: &'a crate::NativeProcessSymbols) -> &'a str {
@@ -262,7 +265,8 @@ impl SynthesizedFixedConstructorRole {
             | Self::ResourceKindPipeRead
             | Self::ResourceKindPipeWrite
             | Self::ResourceKindSocketListener
-            | Self::ResourceKindSocketStream => {
+            | Self::ResourceKindSocketStream
+            | Self::ResourceKindSocketDatagram => {
                 let position = RESOURCE_KIND_POPULATION.iter()
                     .position(|&(kind, _)| resource_kind_role(kind) == self)
                     .expect("mapped resource kind role");

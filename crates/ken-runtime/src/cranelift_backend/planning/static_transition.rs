@@ -300,7 +300,7 @@ pub(in crate::cranelift_backend) use effects::{
     host_effect_seat_contract_of, EffectSeatAvail, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
     PlannedEffectSeatField,
-    CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
+    represented_unavailable_lane, CRANELIFT_HOST_EFFECT_CONSUMERS_V1,
 };
 #[cfg(test)]
 pub(in crate::cranelift_backend) use effects::{set_effect_seat_plan_mutation, EffectSeatPlanMutation};
@@ -1614,11 +1614,11 @@ fn record_static_response_feasibility_diagnostic(
                     excluded_by_relay: protocol.excluded_by_relay,
                     error: None,
                 },
-                Err(error) => ReturnedVisProtocolObservation {
+                Err(refusal) => ReturnedVisProtocolObservation {
                     owner_origin,
                     contexts: Vec::new(),
                     excluded_by_relay: false,
-                    error: Some(error.to_string()),
+                    error: Some(refusal.into_error().to_string()),
                 },
             }
         }).collect()

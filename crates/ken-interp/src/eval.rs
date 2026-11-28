@@ -5496,11 +5496,13 @@ pub struct FSIds {
     pub private_mapping_acquire_file_id: GlobalId,
     pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
-    pub px11_kind_ids: [GlobalId; 2],
-    pub px11_op_ids: [GlobalId; 7],
+    pub px11_kind_ids: [GlobalId; 3],
+    pub px11_op_ids: [GlobalId; 11],
     pub px11_address_ids: [GlobalId; 3],
     pub px11_target_ids: [GlobalId; 2],
     pub px11_how_ids: [GlobalId; 3],
+    /// `WholeDatagram`, `TruncatedDatagram`, `EmptyDatagram`, `ReceivedDatagram`.
+    pub px11_datagram_ids: [GlobalId; 4],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
     pub private_bracket_release_id: GlobalId,
@@ -5595,6 +5597,7 @@ impl FSIds {
             px11_address_ids: prelude.px11_address_ids,
             px11_target_ids: prelude.px11_target_ids,
             px11_how_ids: prelude.px11_how_ids,
+            px11_datagram_ids: prelude.px11_datagram_ids,
             px10_exit_ids: prelude.px10_exit_ids,
             private_resource_release_id: prelude.private_resource_release_id,
             private_bracket_release_id: prelude.private_bracket_release_id,
@@ -6372,6 +6375,7 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
                 ken_host::ResourceKindV1::SocketListener => make_ctor(fs.px11_kind_ids[0], vec![], store),
                 ken_host::ResourceKindV1::SocketStream => make_ctor(fs.px11_kind_ids[1], vec![], store),
+                ken_host::ResourceKindV1::SocketDatagram => make_ctor(fs.px11_kind_ids[2], vec![], store),
             };
             let trace = make_ctor(
                 fs.private_resource_trace_identity_id,
@@ -6395,6 +6399,7 @@ fn resource_error_value_v1(
                 ken_host::ResourceKindV1::PipeWrite => make_ctor(fs.px10_kind_ids[3], vec![], store),
                 ken_host::ResourceKindV1::SocketListener => make_ctor(fs.px11_kind_ids[0], vec![], store),
                 ken_host::ResourceKindV1::SocketStream => make_ctor(fs.px11_kind_ids[1], vec![], store),
+                ken_host::ResourceKindV1::SocketDatagram => make_ctor(fs.px11_kind_ids[2], vec![], store),
             };
             let expected = kind(expected, store);
             let actual = kind(actual, store);
@@ -6884,6 +6889,26 @@ fn fs_dispatch<H: HostHandler>(
     } else if op_id == fs.px11_op_ids[6] {
         (ken_host::HostOpV1::NetLocalAddress,
          ken_host::CanonicalRequestV1::NetLocalAddress, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[7] {
+        let address = decode_socket_address_v1(args.get(2)?, fs)?;
+        (ken_host::HostOpV1::NetDatagramBind,
+         ken_host::CanonicalRequestV1::NetDatagramBind { address }, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[8] || op_id == fs.px11_op_ids[9] {
+        let buffer_start = narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        let length = narrow_host_u64(args.get(4)?, ken_host::ResourceErrorV1::InvalidBounds).ok()?;
+        if op_id == fs.px11_op_ids[8] {
+            let peer = decode_socket_address_v1(args.get(6)?, fs)?;
+            (ken_host::HostOpV1::NetDatagramSendTo,
+             ken_host::CanonicalRequestV1::NetDatagramSendTo { buffer_start, length, peer },
+             fs.op_metadata_id)
+        } else {
+            (ken_host::HostOpV1::NetDatagramReceiveFrom,
+             ken_host::CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start, length },
+             fs.op_metadata_id)
+        }
+    } else if op_id == fs.px11_op_ids[10] {
+        (ken_host::HostOpV1::NetDatagramLocalAddress,
+         ken_host::CanonicalRequestV1::NetDatagramLocalAddress, fs.op_metadata_id)
     } else if op_id == fs.private_resource_release_id || op_id == fs.private_bracket_release_id {
         (
             ken_host::HostOpV1::ResourceRelease,
@@ -6921,6 +6946,9 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::NetSend
             | ken_host::HostOpV1::NetShutdown
             | ken_host::HostOpV1::NetLocalAddress
+            | ken_host::HostOpV1::NetDatagramSendTo
+            | ken_host::HostOpV1::NetDatagramReceiveFrom
+            | ken_host::HostOpV1::NetDatagramLocalAddress
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6946,6 +6974,7 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::ProcessSignal
             | ken_host::HostOpV1::NetAccept
             | ken_host::HostOpV1::NetShutdown
+            | ken_host::HostOpV1::NetDatagramLocalAddress
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
@@ -6969,12 +6998,14 @@ fn fs_dispatch<H: HostHandler>(
         None
     };
     let resource_inputs = match operation {
-        ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive => match (args.get(1), args.get(2)) {
+        ken_host::HostOpV1::ResourceStreamRead | ken_host::HostOpV1::NetReceive
+        | ken_host::HostOpV1::NetDatagramReceiveFrom => match (args.get(1), args.get(2)) {
             (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer))) =>
                 ken_host::ResourceInputsV1::FileBuffer { file: *stream, buffer: *buffer },
             _ => return Some(Err(())),
         },
-        ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend => match (args.get(1), args.get(2), args.get(5)) {
+        ken_host::HostOpV1::ResourceStreamWrite | ken_host::HostOpV1::NetSend
+        | ken_host::HostOpV1::NetDatagramSendTo => match (args.get(1), args.get(2), args.get(5)) {
             (Some(EvalVal::ResourceToken(stream)), Some(EvalVal::ResourceToken(buffer)),
              Some(EvalVal::ResourceToken(origin))) => ken_host::ResourceInputsV1::FileBufferSpan {
                 file: *stream, target_buffer: *buffer, span_origin: *origin,
@@ -7103,6 +7134,7 @@ fn validate_transfer_request_bound(
             ken_host::CanonicalRequestV1::FsReadAt { length, .. }
             | ken_host::CanonicalRequestV1::ResourceStreamRead { length, .. }
             | ken_host::CanonicalRequestV1::NetReceive { length, .. }
+            | ken_host::CanonicalRequestV1::NetDatagramReceiveFrom { length, .. }
                 if transferred.effective_request() <= *length =>
             {
                 Ok(())
@@ -7229,6 +7261,59 @@ fn reify_host_reply_v1(
         }) => EvalVal::ResourceToken(resource_token.ok_or(())?),
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::SocketAddress(address)) => {
             socket_address_value_v1(address, fs, store)
+        },
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::DatagramReceipt(receipt)) => {
+            // The sender's `Option` is indexed by the checked SocketAddress type.
+            let address_type = globals
+                .constructor(fs.px11_address_ids[2])
+                .and_then(|(decl, index)| decl.constructors.get(index))
+                .map(|ctor| checked_type_value(checked_codomain(&ctor.type_), globals, store))
+                .ok_or(())?;
+            let sender = |sender: Option<ken_host::SocketAddressV1>, store: &mut EvalStore| match sender {
+                Some(address) => {
+                    let address = socket_address_value_v1(address, fs, store);
+                    make_ctor(fs.some_id, vec![address_type.clone(), address], store)
+                }
+                None => make_ctor(fs.none_id, vec![address_type.clone()], store),
+            };
+            match receipt {
+                ken_host::DatagramReceiptV1::Empty { sender: from } => {
+                    let from = sender(from, store);
+                    make_ctor(fs.px11_datagram_ids[2], vec![from], store)
+                }
+                ken_host::DatagramReceiptV1::Received { span, transferred, truncated, sender: from } => {
+                    // Shape correlation and `effective_request <= raw length`
+                    // are enforced up front by `validate_transfer_request_bound`.
+                    let budget = buffer_nat_value(span.length(), fs, store)?;
+                    let origin = span_origin.ok_or(())?;
+                    let span = make_ctor(
+                        fs.private_buffer_span_id,
+                        vec![
+                            EvalVal::ResourceToken(origin),
+                            EvalVal::BigInt(BigInt::from(span.start())),
+                            budget,
+                        ],
+                        store,
+                    );
+                    let count = transferred.get();
+                    let effective = transferred.effective_request();
+                    let predecessor = buffer_nat_value(count.checked_sub(1).ok_or(())?, fs, store)?;
+                    let remaining =
+                        buffer_nat_value(effective.checked_sub(count).ok_or(())?, fs, store)?;
+                    let count = make_ctor(
+                        fs.private_transfer_count_id,
+                        vec![predecessor, remaining],
+                        store,
+                    );
+                    let fit = make_ctor(
+                        fs.px11_datagram_ids[if truncated { 1 } else { 0 }],
+                        vec![],
+                        store,
+                    );
+                    let from = sender(from, store);
+                    make_ctor(fs.px11_datagram_ids[3], vec![span, count, fit, from], store)
+                }
+            }
         },
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ChildExit(exit)) => {
             let (ctor, value) = match exit {
@@ -8379,6 +8464,7 @@ mod px5b_effect_observation_tests {
             px11_address_ids: std::array::from_fn(|_| id()),
             px11_target_ids: std::array::from_fn(|_| id()),
             px11_how_ids: std::array::from_fn(|_| id()),
+            px11_datagram_ids: std::array::from_fn(|_| id()),
             px10_exit_ids: std::array::from_fn(|_| id()),
             private_resource_release_id: id(),
             private_bracket_release_id: id(),

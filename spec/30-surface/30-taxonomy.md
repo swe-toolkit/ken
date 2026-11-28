@@ -244,7 +244,9 @@ constructor-private: `PrivateSocketIPv4`, `PrivateSocketIPv6` and
 `PrivateSocketUnix` are hidden at their qualified paths, no bare
 constructor name enters B, and values come only from the Stream smart
 constructors. `Capability.Net.Stream`'s `export SocketAddress`
-republishes the same checked identity and allocates none. Floor
+republishes the same checked identity and allocates none, as does
+`Capability.Net.Datagram`'s (`38 §1.13.1`), which also re-exports the
+Stream smart constructors. Floor
 admission alone adds no postulate or `trusted_base()` entry.
 
 The entrypoint-ABI contract (`33 §3.2.1`) adds five checked, pre-source
@@ -408,8 +410,9 @@ the exact floor identity. Abstract or constructor-private visibility still appli
 `ResourceKind` floor is scoped: `ResourceKind.FsHandle`,
 `ResourceKind.Buffer`, `ResourceKind.Mapping`, `ResourceKind.SpawnPlan`,
 `ResourceKind.ChildProcess`, `ResourceKind.PipeRead`,
-`ResourceKind.PipeWrite`, `ResourceKind.SocketListener`, and
-`ResourceKind.SocketStream` are the nine public constructor paths, not
+`ResourceKind.PipeWrite`, `ResourceKind.SocketListener`,
+`ResourceKind.SocketStream`, and `ResourceKind.SocketDatagram` are the
+ten public constructor paths, not
 additional bare names in B. `ExitCode` is scoped:
 `ExitCode.Success` and `ExitCode.Failure` are available, not bare
 `Success`/`Failure`. `ProgramCaps` is scoped: its runner-minted

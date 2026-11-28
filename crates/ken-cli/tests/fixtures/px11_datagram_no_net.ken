@@ -1,0 +1,57 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Net.Datagram (SocketAddress, socket_unix_path, with_datagram_socket)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, ResourceBracketOk)
+
+fn bound_body
+      (_socket : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn classify (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok _ ↦ ExitCode.Failure 81;
+    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ ExitCode.Failure 84;
+    Err _ ↦ ExitCode.Failure 86
+  }
+
+fn last_argument (arguments : List Bytes) : Option Bytes =
+  match arguments {
+    Nil ↦ None Bytes;
+    Cons first rest ↦
+      match last_argument rest {
+        None ↦ Some Bytes first;
+        Some last ↦ Some Bytes last
+      }
+  }
+
+-- No Net declaration: a main that visits Net is refused before it runs.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match last_argument arguments {
+        None ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+        Some path ↦
+          match socket_unix_path path {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+            Ok address ↦
+              match caps {
+                ProgramCaps.MkProgramCaps cap ↦
+                  host_bind
+                    AFull
+                    (Result ResourceError (ResourceBracketResult Unit Unit))
+                    ExitCode
+                    (with_datagram_socket AFull Unit Unit cap address bound_body)
+                    (λoutcome. host_pure AFull ExitCode (classify outcome))
+              }
+          }
+      }
+  }
