@@ -575,12 +575,16 @@ struct BoundDatagramNameV1 {
 }
 
 /// The per-process table from each live Unix datagram socket's exact bound
-/// name to its validated address. An entry lives from bind to release.
-static BOUND_DATAGRAM_NAMES: std::sync::Mutex<(u64, Vec<BoundDatagramNameV1>)> =
-    std::sync::Mutex::new((0, Vec::new()));
+/// name to its validated address. An entry lives from bind to release; a
+/// released entry's name and address are kept for the process lifetime,
+/// because a datagram it sent can still be queued when a later bind reuses
+/// the same descriptor number and leaf.
+static BOUND_DATAGRAM_NAMES: std::sync::Mutex<DatagramNameTableV1> =
+    std::sync::Mutex::new((0, Vec::new(), Vec::new()));
 
-fn bound_datagram_names(
-) -> std::sync::MutexGuard<'static, (u64, Vec<BoundDatagramNameV1>)> {
+type DatagramNameTableV1 = (u64, Vec<BoundDatagramNameV1>, Vec<(Vec<u8>, SocketAddressV1)>);
+
+fn bound_datagram_names() -> std::sync::MutexGuard<'static, DatagramNameTableV1> {
     BOUND_DATAGRAM_NAMES
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -612,7 +616,14 @@ impl Drop for DatagramSocketV1 {
     fn drop(&mut self) {
         if let Some(serial) = self.registration.take() {
             let mut names = bound_datagram_names();
-            names.1.retain(|entry| entry.serial != serial);
+            if let Some(index) = names.1.iter().position(|entry| entry.serial == serial) {
+                let entry = names.1.remove(index);
+                if !names.2.iter().any(|(name, address)| {
+                    *name == entry.name && *address == entry.address
+                }) {
+                    names.2.push((entry.name, entry.address));
+                }
+            }
         }
     }
 }
@@ -848,8 +859,14 @@ fn datagram_sender(
             let end = raw.iter().position(|byte| *byte == 0).unwrap_or(raw.len());
             let name = raw[..end].iter().map(|byte| *byte as u8).collect::<Vec<_>>();
             let names = bound_datagram_names();
+            // A name is attributed only when every bind that has recorded it in
+            // this process carries the same validated address.
             if let Some(entry) = names.1.iter().rev().find(|entry| entry.name == name) {
-                return Some(entry.address.clone());
+                if names.2.iter().all(|(released, address)| {
+                    *released != name || *address == entry.address
+                }) {
+                    return Some(entry.address.clone());
+                }
             }
             drop(names);
             let path = SocketAddressV1::Unix { path: name };
@@ -1321,6 +1338,131 @@ mod tests {
             "a released name is no longer a live entry, so it is reported as spelled"
         );
         assert!(dir.0.join("named.sock").exists(), "release does not unlink");
+    }
+
+    /// The kernel-recorded name of a bound Unix datagram socket, read by
+    /// `getsockname` independently of the sender table.
+    fn recorded_unix_name(socket: &DatagramSocketV1) -> Vec<u8> {
+        let mut storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+        let mut length = size_of::<libc::sockaddr_storage>() as libc::socklen_t;
+        assert_eq!(
+            unsafe {
+                libc::getsockname(
+                    socket.as_raw_fd_for_test(),
+                    &mut storage as *mut _ as *mut libc::sockaddr,
+                    &mut length,
+                )
+            },
+            0
+        );
+        let SocketAddressV1::Unix { path } = SocketAddressV1::from_sockaddr(&storage, length)
+            .unwrap()
+        else {
+            unreachable!()
+        };
+        path
+    }
+
+    /// Promise class: durable invariant. MEASURED: A at `a<i>/stale-s.sock`
+    /// sends seven bytes to B and is released; C is then bound at
+    /// `c<i>/stale-s.sock`, retried over fresh directories until
+    /// `getsockname` shows C recorded exactly A's released name (the
+    /// parent descriptor number was reused). B then receives A's queued
+    /// datagram: its sender is the raw `/proc` spelling, not C's validated
+    /// address; replying to it is `CapabilityDenied`, and nothing reaches C.
+    /// C's own datagram is also reported by its raw spelling, the cost the
+    /// spec states. CLAIMED: a released bind's name is never attributed to a
+    /// later socket of a different validated address, so a reply cannot
+    /// reach a socket that did not send the datagram. THE GAP: the collision
+    /// is constructed in one process by descriptor reuse; a foreign
+    /// process's bind through this process's `/proc` spelling is the spec's
+    /// residual and is not exercised.
+    #[test]
+    fn released_unix_datagram_name_is_not_attributed_to_a_later_bind() {
+        let dir = DatagramDir::new("stale");
+        let root = dir.root();
+        let b_address = dir.unix("stale-b.sock");
+        let b = datagram_bind(&root, &b_address).unwrap();
+        let mut buffer = [0u8; 16];
+        let mut collided = None;
+        for attempt in 0..64 {
+            std::fs::create_dir(dir.0.join(format!("a{attempt}"))).unwrap();
+            std::fs::create_dir(dir.0.join(format!("c{attempt}"))).unwrap();
+            let a = datagram_bind(&root, &dir.unix(&format!("a{attempt}/stale-s.sock"))).unwrap();
+            let a_name = recorded_unix_name(&a);
+            datagram_send_to(&a, &root, &b_address, b"PX11ok!").unwrap();
+            drop(a);
+            let c_address = dir.unix(&format!("c{attempt}/stale-s.sock"));
+            let c = datagram_bind(&root, &c_address).unwrap();
+            if recorded_unix_name(&c) == a_name {
+                collided = Some((a_name, c, c_address));
+                break;
+            }
+            // Another thread took the descriptor; drain A's datagram.
+            let drained = datagram_receive_from(&b, &mut buffer).unwrap();
+            assert_eq!(drained.sender, Some(SocketAddressV1::Unix { path: a_name }));
+        }
+        let (a_name, c, c_address) = collided.expect("a later bind reuses the released name");
+        let stale = datagram_receive_from(&b, &mut buffer).unwrap();
+        assert_eq!(&buffer[..7], b"PX11ok!");
+        assert_ne!(stale.sender, Some(c_address.clone()), "never the later socket");
+        assert_eq!(stale.sender, Some(SocketAddressV1::Unix { path: a_name.clone() }));
+        assert_eq!(
+            datagram_send_to(&b, &root, stale.sender.as_ref().unwrap(), b"reply!!").unwrap_err(),
+            IoErrorIdentityV1::CapabilityDenied
+        );
+        unsafe { libc::fcntl(c.as_raw_fd_for_test(), libc::F_SETFL, libc::O_NONBLOCK) };
+        assert!(datagram_receive_from(&c, &mut buffer).is_err(), "nothing reached C");
+        datagram_send_to(&c, &root, &b_address, b"live!!!").unwrap();
+        let live = datagram_receive_from(&b, &mut buffer).unwrap();
+        assert_eq!(live.sender, Some(SocketAddressV1::Unix { path: a_name }), "the stated cost");
+    }
+
+    /// Promise class: durable invariant. MEASURED: the different-leaf
+    /// control (A at `a/fresh-s.sock` released, C at `c/fresh-t.sock`, so
+    /// the recorded names differ) reports A's queued datagram by its raw
+    /// `/proc` spelling and refuses the reply with `CapabilityDenied`; the
+    /// live C, whose name no released bind recorded, is reported as its
+    /// validated address; and a socket unlinked and rebound by this process
+    /// at the same validated path keeps that attribution. CLAIMED: the
+    /// released-name rule removes attribution only where a released bind of
+    /// a different validated address shares the name, never from a live
+    /// sender in the ordinary case. THE GAP: in-process host boundary; the
+    /// interpreter rows are the CLI reproducer, control and Unix exchange.
+    #[test]
+    fn unix_datagram_live_sender_keeps_attribution_beside_a_released_name() {
+        let dir = DatagramDir::new("fresh");
+        std::fs::create_dir(dir.0.join("a")).unwrap();
+        std::fs::create_dir(dir.0.join("c")).unwrap();
+        let root = dir.root();
+        let b_address = dir.unix("fresh-b.sock");
+        let b = datagram_bind(&root, &b_address).unwrap();
+        let mut buffer = [0u8; 16];
+        let a = datagram_bind(&root, &dir.unix("a/fresh-s.sock")).unwrap();
+        let a_name = recorded_unix_name(&a);
+        datagram_send_to(&a, &root, &b_address, b"PX11ok!").unwrap();
+        drop(a);
+        let c_address = dir.unix("c/fresh-t.sock");
+        let c = datagram_bind(&root, &c_address).unwrap();
+        assert_ne!(recorded_unix_name(&c), a_name, "the leaves differ");
+        let stale = datagram_receive_from(&b, &mut buffer).unwrap();
+        assert_eq!(stale.sender, Some(SocketAddressV1::Unix { path: a_name }));
+        assert_eq!(
+            datagram_send_to(&b, &root, stale.sender.as_ref().unwrap(), b"reply!!").unwrap_err(),
+            IoErrorIdentityV1::CapabilityDenied
+        );
+        datagram_send_to(&c, &root, &b_address, b"live!!!").unwrap();
+        let live = datagram_receive_from(&b, &mut buffer).unwrap();
+        assert_eq!(live.sender, Some(c_address.clone()), "a live non-colliding sender");
+        datagram_send_to(&b, &root, &c_address, b"reply!!").unwrap();
+        assert_eq!(datagram_receive_from(&c, &mut buffer).unwrap().delivered, 7);
+        let d_address = dir.unix("fresh-d.sock");
+        drop(datagram_bind(&root, &d_address).unwrap());
+        std::fs::remove_file(dir.0.join("fresh-d.sock")).unwrap();
+        let d = datagram_bind(&root, &d_address).unwrap();
+        datagram_send_to(&d, &root, &b_address, b"rebound").unwrap();
+        let rebound = datagram_receive_from(&b, &mut buffer).unwrap();
+        assert_eq!(rebound.sender, Some(d_address), "same-address rebind keeps attribution");
     }
 
     /// Promise class: durable invariant. MEASURED: the sender decoder maps an

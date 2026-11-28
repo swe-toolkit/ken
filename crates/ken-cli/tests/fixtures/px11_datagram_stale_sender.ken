@@ -1,0 +1,295 @@
+program capabilities FS AFull, Net Unix, RootExecution Allow
+
+import Capability.Net.Datagram
+  (SocketAddress,
+    socket_unix_path,
+    DatagramReceipt,
+    with_datagram_socket,
+    send_datagram,
+    receive_datagram)
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle, MkBufferWindow)
+
+import Capability.System.IO (readAt)
+
+import Capability.System.Resource
+  (ResourceBodyResult,
+    ResourceBodyOk,
+    ResourceBodyErr,
+    ResourceBracketResult,
+    ResourceBracketOk,
+    withBuffer,
+    withResource)
+
+-- B binds first. Inside B's bracket, A binds, sends the seven-byte payload
+-- to B and is released; then C binds, and inside C's bracket B receives
+-- A's queued datagram and replies to its reported sender. Exit 53: the
+-- reply is refused with CapabilityDenied. Exit 99: the reply reached C.
+
+const failed_at : UInt8 -> HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  λcode. host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyErr UInt8 Unit code)
+
+const passed : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  host_pure AFull (ResourceBodyResult UInt8 Unit) (ResourceBodyOk UInt8 Unit MkUnit)
+
+fn settle (outcome : Result ResourceError (ResourceBracketResult UInt8 Unit)) (bracket_failed : UInt8)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit) =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ passed;
+    Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+    Ok _ ↦ failed_at bracket_failed;
+    Err _ ↦ failed_at bracket_failed
+  }
+
+fn refusal_code (sent : Result ResourceError Unit) : UInt8 =
+  match sent {
+    Ok _ ↦ 57 : UInt8;
+    Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ 53 : UInt8;
+    Err _ ↦ 58 : UInt8
+  }
+
+fn landed_code (received : Result ResourceError DatagramReceipt) : UInt8 =
+  match received {
+    Ok (DatagramReceipt.ReceivedDatagram _ _ _ _) ↦ 99 : UInt8;
+    Ok _ ↦ 59 : UInt8;
+    Err _ ↦ 60 : UInt8
+  }
+
+proc reply_to_reported
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (later : Resource ResourceKind.SocketDatagram)
+      (incoming : BufferHandle)
+      (span : BufferSpan)
+      (reported : SocketAddress)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Unit)
+    (ResourceBodyResult UInt8 Unit)
+    (send_datagram AFull receiver reported incoming span)
+    (λsent.
+      match sent {
+        Err _ ↦ failed_at (refusal_code sent);
+        Ok _ ↦
+          host_bind
+            AFull
+            (Result ResourceError DatagramReceipt)
+            (ResourceBodyResult UInt8 Unit)
+            (receive_datagram AFull later incoming (MkBufferWindow (0 : Int) (16 : Int)))
+            (λreceived. failed_at (landed_code received))
+      })
+
+proc receive_stale
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (later : Resource ResourceKind.SocketDatagram)
+      (incoming : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError DatagramReceipt)
+    (ResourceBodyResult UInt8 Unit)
+    (receive_datagram AFull receiver incoming (MkBufferWindow (0 : Int) (16 : Int)))
+    (λreceived.
+      match received {
+        Err _ ↦ failed_at (50 : UInt8);
+        Ok receipt ↦
+          match receipt {
+            DatagramReceipt.EmptyDatagram _ ↦ failed_at (51 : UInt8);
+            DatagramReceipt.ReceivedDatagram span _ _ reported ↦
+              match reported {
+                None ↦ failed_at (52 : UInt8);
+                Some from ↦ reply_to_reported receiver later incoming span from
+              }
+          }
+      })
+
+proc later_body
+      (receiver : Resource ResourceKind.SocketDatagram)
+      (later : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (withBuffer AFull UInt8 Unit (16 : Int) (receive_stale receiver later))
+    (λoutcome. settle outcome (48 : UInt8))
+
+proc released_body
+      (receiver_address : SocketAddress)
+      (payload : BufferHandle)
+      (payload_span : BufferSpan)
+      (released : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [Net] =
+  host_bind
+    AFull
+    (Result ResourceError Unit)
+    (ResourceBodyResult UInt8 Unit)
+    (send_datagram AFull released receiver_address payload payload_span)
+    (λsent.
+      match sent {
+        Err _ ↦ failed_at (45 : UInt8);
+        Ok _ ↦ passed
+      })
+
+proc receiver_body
+      (cap : Cap AFull)
+      (receiver_address : SocketAddress)
+      (released_address : SocketAddress)
+      (later_address : SocketAddress)
+      (payload : BufferHandle)
+      (payload_span : BufferSpan)
+      (receiver : Resource ResourceKind.SocketDatagram)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (with_datagram_socket
+      AFull
+      UInt8
+      Unit
+      cap
+      released_address
+      (released_body receiver_address payload payload_span))
+    (λreleased.
+      match released {
+        Ok (ResourceBracketOk _) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_datagram_socket AFull UInt8 Unit cap later_address (later_body receiver))
+            (λoutcome. settle outcome (44 : UInt8));
+        Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ failed_at code;
+        Ok _ ↦ failed_at (42 : UInt8);
+        Err _ ↦ failed_at (43 : UInt8)
+      })
+
+proc buffer_body
+      (cap : Cap AFull)
+      (receiver_address : SocketAddress)
+      (released_address : SocketAddress)
+      (later_address : SocketAddress)
+      (file : Resource ResourceKind.FsHandle)
+      (payload : BufferHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError ReadProgress)
+    (ResourceBodyResult UInt8 Unit)
+    (readAt AFull file (0 : Int) payload (MkBufferWindow (0 : Int) (7 : Int)))
+    (λread_result.
+      match read_result {
+        Err _ ↦ failed_at (30 : UInt8);
+        Ok ReadProgress.ReadEof ↦ failed_at (31 : UInt8);
+        Ok (ReadProgress.ReadSome span _) ↦
+          host_bind
+            AFull
+            (Result ResourceError (ResourceBracketResult UInt8 Unit))
+            (ResourceBodyResult UInt8 Unit)
+            (with_datagram_socket
+              AFull
+              UInt8
+              Unit
+              cap
+              receiver_address
+              (receiver_body cap receiver_address released_address later_address payload span))
+            (λoutcome. settle outcome (32 : UInt8))
+      })
+
+proc file_body
+      (cap : Cap AFull)
+      (receiver_address : SocketAddress)
+      (released_address : SocketAddress)
+      (later_address : SocketAddress)
+      (file : Resource ResourceKind.FsHandle)
+    : HostIO AFull (ResourceBodyResult UInt8 Unit)
+    visits [FS, Net] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult UInt8 Unit))
+    (ResourceBodyResult UInt8 Unit)
+    (withBuffer
+      AFull
+      UInt8
+      Unit
+      (16 : Int)
+      (buffer_body cap receiver_address released_address later_address file))
+    (λoutcome. settle outcome (21 : UInt8))
+
+fn reversed_arguments (arguments : List Bytes) (reversed : List Bytes) : List Bytes =
+  match arguments {
+    Nil ↦ reversed;
+    Cons first rest ↦ reversed_arguments rest (Cons Bytes first reversed)
+  }
+
+fn exit_for (outcome : Result FileError (ResourceBracketResult UInt8 Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦ ExitCode.Success;
+    Ok (ResourceBracketResult.ResourceBracketBodyError code) ↦ ExitCode.Failure code;
+    Ok _ ↦ ExitCode.Failure 71;
+    Err _ ↦ ExitCode.Failure 72
+  }
+
+proc run_paths
+      (cap : Cap AFull) (receiver_path : Bytes) (released_path : Bytes) (later_path : Bytes)
+    : HostIO AFull ExitCode
+    visits [FS, Net] =
+  match socket_unix_path receiver_path {
+    Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+    Ok receiver_address ↦
+      match socket_unix_path released_path {
+        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 77);
+        Ok released_address ↦
+          match socket_unix_path later_path {
+            Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 78);
+            Ok later_address ↦
+              host_bind
+                AFull
+                (Result FileError (ResourceBracketResult UInt8 Unit))
+                ExitCode
+                (withResource
+                  AFull
+                  UInt8
+                  Unit
+                  cap
+                  (bytes_encode "px11-payload.bin")
+                  ResourceOpenMode.ResourceRead
+                  (file_body cap receiver_address released_address later_address))
+                (λoutcome. host_pure AFull ExitCode (exit_for outcome))
+          }
+      }
+  }
+
+-- Arguments are read from the end: B's path, A's path, C's path.
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS, Net] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match reversed_arguments arguments (Nil Bytes) {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons later_path rest ↦
+          match rest {
+            Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 74);
+            Cons released_path rest_two ↦
+              match rest_two {
+                Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 75);
+                Cons receiver_path _ ↦
+                  match caps {
+                    ProgramCaps.MkProgramCaps cap ↦
+                      run_paths cap receiver_path released_path later_path
+                  }
+              }
+          }
+      }
+  }
