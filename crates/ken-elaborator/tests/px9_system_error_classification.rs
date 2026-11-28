@@ -20,7 +20,7 @@ const SYSTEM_ERROR_IMPORT: &str =
     Idempotence, Idempotent, NonIdempotent, RetryGuidance, RetryAdvised, \
     RetryUnsafeNonIdempotent, DoNotRetryPermanent, Operation, FilesystemOp, \
     ProcessOp, SignalChild, SocketOperation, SocketOp, ConnectSocket, \
-    LocalSocketAddress, BindSocket, SocketResource, \
+    LocalSocketAddress, BindSocket, SetSocketOption, GetSocketOption, SocketResource, \
     ResourceRef, FilesystemResource, SafeContext, NoSafeContext, RedactedSafeContext, \
     SystemError, MkSystemError, file_error_to_system, error_transience, \
     operation_idempotence, retry_guidance)";
@@ -270,7 +270,9 @@ fn system_error_shape_wraps_filesystem_slots_and_preserves_ioerror_identity() {
             "ShutdownSocket",
             "LocalSocketAddress",
             "CloseSocket",
-            "BindSocket"
+            "BindSocket",
+            "SetSocketOption",
+            "GetSocketOption"
         ]
     );
     assert_eq!(
@@ -404,6 +406,8 @@ theorem px9_signal_child : Equal Idempotence (operation_idempotence (ProcessOp S
 theorem px11_connect_socket : Equal Idempotence (operation_idempotence (SocketOp ConnectSocket)) NonIdempotent = Proved
 theorem px11_local_socket_address : Equal Idempotence (operation_idempotence (SocketOp LocalSocketAddress)) Idempotent = Proved
 theorem px11_bind_socket : Equal Idempotence (operation_idempotence (SocketOp BindSocket)) NonIdempotent = Proved
+theorem px11_set_socket_option : Equal Idempotence (operation_idempotence (SocketOp SetSocketOption)) Idempotent = Proved
+theorem px11_get_socket_option : Equal Idempotence (operation_idempotence (SocketOp GetSocketOption)) Idempotent = Proved
 
 theorem px9_transient_idempotent : Equal RetryGuidance (retry_guidance Transient Idempotent) RetryAdvised = Proved
 theorem px9_transient_nonidempotent : Equal RetryGuidance (retry_guidance Transient NonIdempotent) RetryUnsafeNonIdempotent = Proved

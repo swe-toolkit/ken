@@ -1,6 +1,6 @@
-//! PX11 checked stream- and datagram-socket operations. The carrier is the
-//! existing FSOp; `Net` is its separately admitted effect-row label, not
-//! another authority.
+//! PX11 checked stream- and datagram-socket operations and the typed stream
+//! option families. The carrier is the existing FSOp; `Net` is its
+//! separately admitted effect-row label, not another authority.
 
 use crate::{error::ElabError, ElabEnv};
 
@@ -149,6 +149,15 @@ pub(super) fn register_prelude_net(elab: &mut ElabEnv) -> Result<(), ElabError> 
             "(address : SocketAddress)",
             "PrivateNetDatagramBind a cap address",
         ),
+        // PX11-SOCKET-OPTION-FAMILIES: address reuse is a bind-time
+        // property, so it is an acquisition rather than a settable option.
+        (
+            "with_reusable_socket_listener",
+            "SocketListener",
+            "(cap : Cap a)",
+            "(address : SocketAddress)",
+            "PrivateNetListenReusable a cap address",
+        ),
     ] {
         let declaration = format!(
             r#"
@@ -291,6 +300,18 @@ pub(super) fn register_prelude_net(elab: &mut ElabEnv) -> Result<(), ElabError> 
             "(target : SocketTarget)",
             "PrivateNetLocalAddress a target",
             "SocketAddress",
+        ),
+        (
+            "set_stream_option",
+            "(stream : Resource ResourceKind.SocketStream) (option : StreamOption) (enabled : Bool)",
+            "PrivateNetStreamOptionSet a stream option enabled",
+            "Unit",
+        ),
+        (
+            "stream_option",
+            "(stream : Resource ResourceKind.SocketStream) (option : StreamOption)",
+            "PrivateNetStreamOptionGet a stream option",
+            "Bool",
         ),
     ] {
         let declaration = format!(

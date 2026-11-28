@@ -603,6 +603,9 @@ fn host_effect_seat_contract(
                 | Op::NetDatagramSendTo
                 | Op::NetDatagramReceiveFrom
                 | Op::NetDatagramLocalAddress => None,
+                // PX11-SOCKET-OPTION-FAMILIES: the same posture as the
+                // datagram four.
+                Op::NetListenReusable | Op::NetStreamOptionSet | Op::NetStreamOptionGet => None,
             };
         }
         EffectSeatSlot::Argument(ordinal) => ordinal,
@@ -845,7 +848,11 @@ fn host_effect_seat_contract(
             | Op::NetDatagramBind
             | Op::NetDatagramSendTo
             | Op::NetDatagramReceiveFrom
-            | Op::NetDatagramLocalAddress,
+            | Op::NetDatagramLocalAddress
+            // PX11-SOCKET-OPTION-FAMILIES: no native seat either.
+            | Op::NetListenReusable
+            | Op::NetStreamOptionSet
+            | Op::NetStreamOptionGet,
             _,
         ) => None,
     }

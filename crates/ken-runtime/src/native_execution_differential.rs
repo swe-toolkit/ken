@@ -3979,13 +3979,15 @@ mod tests {
         assert!(err.reason.contains("stale or missing"));
     }
 
-    /// Promise class: transition sentinel, named for the datagram boundary.
-    /// MEASURED: the RepresentedUnavailable host operations are exactly the
-    /// four PX11 datagram operations. CLAIMED: the effect-policy population
+    /// Promise class: transition sentinel, named for the PX11
+    /// interpreter-only boundary. MEASURED: the RepresentedUnavailable host
+    /// operations are exactly the four PX11 datagram operations and the
+    /// three option-family operations. CLAIMED: the effect-policy population
     /// this report classifies as unavailable is that set. THE GAP: the
-    /// datagram native-parity node retires this row by promoting the four.
+    /// datagram and option-family native-parity nodes retire this row by
+    /// promoting the seven.
     #[test]
-    fn represented_unavailable_host_operations_are_exactly_the_datagram_four() {
+    fn represented_unavailable_host_operations_are_exactly_the_px11_interpreter_seven() {
         let unavailable = ken_host::HostOpV1::ALL
             .into_iter()
             .filter(|op| {
@@ -3999,6 +4001,9 @@ mod tests {
                 ken_host::HostOpV1::NetDatagramSendTo,
                 ken_host::HostOpV1::NetDatagramReceiveFrom,
                 ken_host::HostOpV1::NetDatagramLocalAddress,
+                ken_host::HostOpV1::NetListenReusable,
+                ken_host::HostOpV1::NetStreamOptionSet,
+                ken_host::HostOpV1::NetStreamOptionGet,
             ]
             .into_iter()
             .collect::<std::collections::BTreeSet<_>>()

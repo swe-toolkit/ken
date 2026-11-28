@@ -525,22 +525,25 @@ bound.
 - promise class: normative compatibility vector — exact mapping of the closed
   `SocketOperation` family.
 - spec: §1.13 `SocketOperation` and operation idempotence; §1.13.1
-  `BindSocket`; `38 §1.8` retry guidance.
+  `BindSocket`; §1.13.2 `SetSocketOption` and `GetSocketOption`; `38 §1.8`
+  retry guidance.
 - given: import the public `SocketOperation` constructors, `Operation`,
   `SocketOp`, `Idempotent`, `NonIdempotent`, `RetryAdvised`,
   `RetryUnsafeNonIdempotent`, `operation_idempotence`, `retry_guidance` and
   `Transient` from `Capability.System.Error`; construct one value for each of
   `ListenSocket`, `AcceptSocket`, `ConnectSocket`, `ReceiveSocket`,
   `SendSocket`,
-  `ShutdownSocket`, `LocalSocketAddress`, `CloseSocket` and `BindSocket`. Use
-  an exhaustive match with one arm per constructor and no catch-all, and evaluate
+  `ShutdownSocket`, `LocalSocketAddress`, `CloseSocket`, `BindSocket`,
+  `SetSocketOption` and `GetSocketOption`. Use an exhaustive match with one
+  arm per constructor and no catch-all, and evaluate
   `operation_idempotence (SocketOp operation)` in each arm. Also pass the
   `LocalSocketAddress` and `ListenSocket` results to `retry_guidance` with the
   same `Transient` input.
 - expect: the exact mapping is `ListenSocket`, `AcceptSocket`,
   `ConnectSocket`, `ReceiveSocket`, `SendSocket`, `ShutdownSocket`,
-  `CloseSocket` and `BindSocket` to `NonIdempotent`; `LocalSocketAddress`
-  maps to `Idempotent`. For the shared `Transient` input, the LocalSocketAddress and
+  `CloseSocket` and `BindSocket` to `NonIdempotent`; `LocalSocketAddress`,
+  `SetSocketOption` and `GetSocketOption` map to `Idempotent`. For the shared
+  `Transient` input, the LocalSocketAddress and
   ListenSocket retry results are respectively `RetryAdvised` and
   `RetryUnsafeNonIdempotent`.
 - control: `LocalSocketAddress` is the positive idempotence arm;
@@ -548,7 +551,8 @@ bound.
   mapping that makes all socket operations idempotent or all non-idempotent
   cannot produce both expected retry verdicts.
 - why: the exact inventory asserts the classification of every current socket
-  operation, including `CloseSocket` and the datagram `BindSocket`. The
+  operation, including `CloseSocket`, the datagram `BindSocket` and the
+  option-family `SetSocketOption` and `GetSocketOption`. The
   exhaustive match makes the case require an explicit arm if the closed
   family changes.
 

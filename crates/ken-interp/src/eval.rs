@@ -5497,12 +5497,14 @@ pub struct FSIds {
     pub px10_op_ids: [GlobalId; 9],
     pub px10_kind_ids: [GlobalId; 4],
     pub px11_kind_ids: [GlobalId; 3],
-    pub px11_op_ids: [GlobalId; 11],
+    pub px11_op_ids: [GlobalId; 14],
     pub px11_address_ids: [GlobalId; 3],
     pub px11_target_ids: [GlobalId; 2],
     pub px11_how_ids: [GlobalId; 3],
     /// `WholeDatagram`, `TruncatedDatagram`, `EmptyDatagram`, `ReceivedDatagram`.
     pub px11_datagram_ids: [GlobalId; 4],
+    /// `NoDelay`, `KeepAlive`: option codes 0 and 1, matched by checked id.
+    pub px11_option_ids: [GlobalId; 2],
     pub px10_exit_ids: [GlobalId; 2],
     pub private_resource_release_id: GlobalId,
     pub private_bracket_release_id: GlobalId,
@@ -5598,6 +5600,7 @@ impl FSIds {
             px11_target_ids: prelude.px11_target_ids,
             px11_how_ids: prelude.px11_how_ids,
             px11_datagram_ids: prelude.px11_datagram_ids,
+            px11_option_ids: prelude.px11_option_ids,
             px10_exit_ids: prelude.px10_exit_ids,
             private_resource_release_id: prelude.private_resource_release_id,
             private_bracket_release_id: prelude.private_bracket_release_id,
@@ -6909,6 +6912,30 @@ fn fs_dispatch<H: HostHandler>(
     } else if op_id == fs.px11_op_ids[10] {
         (ken_host::HostOpV1::NetDatagramLocalAddress,
          ken_host::CanonicalRequestV1::NetDatagramLocalAddress, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[11] {
+        let address = decode_socket_address_v1(args.get(2)?, fs)?;
+        (ken_host::HostOpV1::NetListenReusable,
+         ken_host::CanonicalRequestV1::NetListenReusable { address }, fs.op_metadata_id)
+    } else if op_id == fs.px11_op_ids[12] || op_id == fs.px11_op_ids[13] {
+        // Spec 38 §1.13.2: the option is decoded by its checked constructor
+        // identity, never by spelling; its position is the wire code.
+        let option = match args.get(2) {
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.px11_option_ids[0] => 0,
+            Some(EvalVal::Ctor { id, .. }) if *id == fs.px11_option_ids[1] => 1,
+            _ => return Some(Err(())),
+        };
+        if op_id == fs.px11_op_ids[12] {
+            let enabled = match args.get(3) {
+                Some(EvalVal::Ctor { id, .. }) if *id == ids.true_id => true,
+                Some(EvalVal::Ctor { id, .. }) if *id == ids.false_id => false,
+                _ => return Some(Err(())),
+            };
+            (ken_host::HostOpV1::NetStreamOptionSet,
+             ken_host::CanonicalRequestV1::NetStreamOptionSet { option, enabled }, fs.op_metadata_id)
+        } else {
+            (ken_host::HostOpV1::NetStreamOptionGet,
+             ken_host::CanonicalRequestV1::NetStreamOptionGet { option }, fs.op_metadata_id)
+        }
     } else if op_id == fs.private_resource_release_id || op_id == fs.private_bracket_release_id {
         (
             ken_host::HostOpV1::ResourceRelease,
@@ -6949,6 +6976,8 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::NetDatagramSendTo
             | ken_host::HostOpV1::NetDatagramReceiveFrom
             | ken_host::HostOpV1::NetDatagramLocalAddress
+            | ken_host::HostOpV1::NetStreamOptionSet
+            | ken_host::HostOpV1::NetStreamOptionGet
             | ken_host::HostOpV1::ResourceRelease
     ) {
         None
@@ -6975,6 +7004,8 @@ fn fs_dispatch<H: HostHandler>(
             | ken_host::HostOpV1::NetAccept
             | ken_host::HostOpV1::NetShutdown
             | ken_host::HostOpV1::NetDatagramLocalAddress
+            | ken_host::HostOpV1::NetStreamOptionSet
+            | ken_host::HostOpV1::NetStreamOptionGet
     ) {
         match args.get(1) {
             Some(EvalVal::ResourceToken(token)) => Some(*token),
@@ -7315,6 +7346,12 @@ fn reify_host_reply_v1(
                 }
             }
         },
+        // PX11-SOCKET-OPTION-FAMILIES: `stream_option`'s kernel readback.
+        // The ambient path has its own unwrapped Bool arm; this FS arm's
+        // value is wrapped in `Ok` below like every other FS success.
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bool(value)) => {
+            make_ctor(if value { ids.true_id } else { ids.false_id }, vec![], store)
+        }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ChildExit(exit)) => {
             let (ctor, value) = match exit {
                 ken_host::ChildExitV1::Exited(code) => (fs.px10_exit_ids[0], code),
@@ -8465,6 +8502,7 @@ mod px5b_effect_observation_tests {
             px11_target_ids: std::array::from_fn(|_| id()),
             px11_how_ids: std::array::from_fn(|_| id()),
             px11_datagram_ids: std::array::from_fn(|_| id()),
+            px11_option_ids: std::array::from_fn(|_| id()),
             px10_exit_ids: std::array::from_fn(|_| id()),
             private_resource_release_id: id(),
             private_bracket_release_id: id(),

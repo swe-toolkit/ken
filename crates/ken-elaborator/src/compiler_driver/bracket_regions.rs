@@ -113,6 +113,7 @@ impl<'a> Collector<'a> {
             self.prelude.px11_op_ids[1],
             self.prelude.px11_op_ids[2],
             self.prelude.px11_op_ids[7],
+            self.prelude.px11_op_ids[11],
         ]
         .contains(&op)
         {

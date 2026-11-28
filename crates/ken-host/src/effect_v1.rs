@@ -106,6 +106,9 @@ pub enum HostOpV1 {
     NetDatagramSendTo = 0x0709,
     NetDatagramReceiveFrom = 0x070A,
     NetDatagramLocalAddress = 0x070B,
+    NetListenReusable = 0x070C,
+    NetStreamOptionSet = 0x070D,
+    NetStreamOptionGet = 0x070E,
 }
 
 impl HostOpV1 {
@@ -218,7 +221,10 @@ impl HostOpV1 {
             Self::NetDatagramBind => Some(Self::NetDatagramSendTo),
             Self::NetDatagramSendTo => Some(Self::NetDatagramReceiveFrom),
             Self::NetDatagramReceiveFrom => Some(Self::NetDatagramLocalAddress),
-            Self::NetDatagramLocalAddress => None,
+            Self::NetDatagramLocalAddress => Some(Self::NetListenReusable),
+            Self::NetListenReusable => Some(Self::NetStreamOptionSet),
+            Self::NetStreamOptionSet => Some(Self::NetStreamOptionGet),
+            Self::NetStreamOptionGet => None,
         }
     }
 
@@ -294,6 +300,11 @@ impl HostOpV1 {
             | Self::NetDatagramSendTo
             | Self::NetDatagramReceiveFrom
             | Self::NetDatagramLocalAddress => HostOpAvailabilityV1::RepresentedUnavailable,
+            // PX11-SOCKET-OPTION-FAMILIES: host and interpreter lanes only,
+            // refused natively by the same typed cause as the datagram four.
+            Self::NetListenReusable
+            | Self::NetStreamOptionSet
+            | Self::NetStreamOptionGet => HostOpAvailabilityV1::RepresentedUnavailable,
         }
     }
 
@@ -309,6 +320,9 @@ impl HostOpV1 {
                     | Self::NetDatagramSendTo
                     | Self::NetDatagramReceiveFrom
                     | Self::NetDatagramLocalAddress
+                    | Self::NetListenReusable
+                    | Self::NetStreamOptionSet
+                    | Self::NetStreamOptionGet
             ),
         }
     }
@@ -358,6 +372,7 @@ impl HostOpV1 {
             | Self::NetSend | Self::NetShutdown | Self::NetLocalAddress => false,
             Self::NetDatagramBind | Self::NetDatagramSendTo | Self::NetDatagramReceiveFrom
             | Self::NetDatagramLocalAddress => false,
+            Self::NetListenReusable | Self::NetStreamOptionSet | Self::NetStreamOptionGet => false,
         }
     }
 }
@@ -797,7 +812,7 @@ pub fn host_effect_wire_layout_v1(
                 checked_u32(field("span_origin")?)?,
             ]
         }
-        HostOpV1::NetListen | HostOpV1::NetConnect => {
+        HostOpV1::NetListen | HostOpV1::NetConnect | HostOpV1::NetListenReusable => {
             let base = field("address")?;
             let address = |name| offset("SocketAddressRecordV1", name).map(|n| base + n);
             let bytes = address("bytes")?;
@@ -860,6 +875,15 @@ pub fn host_effect_wire_layout_v1(
             checked_u32(field("length")?)?,
         ],
         HostOpV1::NetDatagramLocalAddress => vec![checked_u32(field("target")?)?],
+        HostOpV1::NetStreamOptionSet => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("option")?)?,
+            checked_u32(field("enabled")?)?,
+        ],
+        HostOpV1::NetStreamOptionGet => vec![
+            checked_u32(field("stream")?)?,
+            checked_u32(field("option")?)?,
+        ],
         // Every operation has a wire layout above. There is deliberately no
         // wildcard: a new operation is a build break here until it gets one.
     };
@@ -1564,13 +1588,19 @@ pub enum ResourceOwnerV1 {
     Child(ChildOwnerV1),
     PipeRead(std::os::fd::OwnedFd),
     PipeWrite(std::os::fd::OwnedFd),
+    /// `family` is recorded at mint from the checked address; the stream
+    /// option fit check reads it and never the descriptor (spec 38 §1.13.2).
     SocketListener {
         fd: std::os::fd::OwnedFd,
         address: Option<crate::SocketAddressV1>,
+        family: crate::net_v1::SocketFamilyV1,
     },
+    /// `family` is the checked connect address's, or the accepting
+    /// listener's record copied at NetAccept.
     SocketStream {
         fd: std::os::fd::OwnedFd,
         address: Option<crate::SocketAddressV1>,
+        family: crate::net_v1::SocketFamilyV1,
     },
     /// A bound datagram socket with the originating grant's Net scope and
     /// root, against which every send's peer is admitted.
@@ -1744,10 +1774,11 @@ impl ResourceTableV1 {
         kind: ResourceKindV1,
         provenance: crate::revocation_v1::RevocationNodeId,
         address: Option<crate::SocketAddressV1>,
+        family: crate::net_v1::SocketFamilyV1,
     ) -> (ResourceTokenV1, ResourceTraceIdentityV1) {
         let owner = match kind {
-            ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener { fd, address },
-            ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream { fd, address },
+            ResourceKindV1::SocketListener => ResourceOwnerV1::SocketListener { fd, address, family },
+            ResourceKindV1::SocketStream => ResourceOwnerV1::SocketStream { fd, address, family },
             _ => unreachable!("socket insertion needs a socket kind"),
         };
         self.insert_owner(owner, kind, crate::RightSet::NONE, Some(provenance))
@@ -2992,6 +3023,18 @@ pub trait HostEffectBackendV1 {
         crate::net_v1::local_address(stream).map_err(|error| io_error_identity_v1(&error))
     }
 
+    fn net_listen_reusable(&mut self, root: &crate::FsHandle, address: &crate::SocketAddressV1) -> Result<std::os::fd::OwnedFd, IoErrorIdentityV1> {
+        crate::net_v1::listen_reusable(root, address)
+    }
+
+    fn net_set_stream_option(&mut self, stream: &std::os::fd::OwnedFd, option: crate::net_v1::StreamOptionV1, enabled: bool) -> Result<(), IoErrorIdentityV1> {
+        crate::net_v1::set_stream_option(stream, option, enabled).map_err(|error| io_error_identity_v1(&error))
+    }
+
+    fn net_stream_option(&mut self, stream: &std::os::fd::OwnedFd, option: crate::net_v1::StreamOptionV1) -> Result<bool, IoErrorIdentityV1> {
+        crate::net_v1::stream_option(stream, option).map_err(|error| io_error_identity_v1(&error))
+    }
+
     fn net_datagram_bind(&mut self, root: &crate::FsHandle, address: &crate::SocketAddressV1) -> Result<crate::net_v1::DatagramSocketV1, IoErrorIdentityV1> {
         crate::net_v1::datagram_bind(root, address)
     }
@@ -3192,7 +3235,8 @@ impl HostOpV1 {
                 crate::AUTH_FULL,
             ),
             Self::FsOpen => CapabilityRequirementV1::FsOpen,
-            Self::NetListen | Self::NetConnect | Self::NetDatagramBind => CapabilityRequirementV1::Net,
+            Self::NetListen | Self::NetConnect | Self::NetDatagramBind
+            | Self::NetListenReusable => CapabilityRequirementV1::Net,
             Self::ProcessPlanOpen => CapabilityRequirementV1::Fixed(
                 crate::FsCapabilityOperation::Spawn,
                 crate::AUTH_FULL,
@@ -3232,6 +3276,8 @@ impl HostOpV1 {
             | Self::NetDatagramSendTo
             | Self::NetDatagramReceiveFrom
             | Self::NetDatagramLocalAddress
+            | Self::NetStreamOptionSet
+            | Self::NetStreamOptionGet
             | Self::EntropyRandomBytes => CapabilityRequirementV1::None,
         }
     }
@@ -3254,7 +3300,9 @@ impl HostOpV1 {
             | Self::NetAccept
             | Self::NetShutdown
             | Self::NetLocalAddress
-            | Self::NetDatagramLocalAddress => ResourceAdmissionRequirementV1::Target,
+            | Self::NetDatagramLocalAddress
+            | Self::NetStreamOptionSet
+            | Self::NetStreamOptionGet => ResourceAdmissionRequirementV1::Target,
             Self::FsReadAt | Self::ResourceStreamRead | Self::NetReceive
             | Self::NetDatagramReceiveFrom => ResourceAdmissionRequirementV1::FileBuffer,
             Self::FsWriteAt | Self::ResourceStreamWrite | Self::NetSend
@@ -3284,6 +3332,7 @@ impl HostOpV1 {
             | Self::NetListen
             | Self::NetConnect
             | Self::NetDatagramBind
+            | Self::NetListenReusable
             | Self::ResourceRelease
             | Self::BufferAllocate
             | Self::MappingAllocate => ResourceAdmissionRequirementV1::None,
@@ -3385,7 +3434,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
     request: &CanonicalRequestV1,
 ) -> Result<HostDispatchReplyV1, TerminalErrorV1> {
     let required_net = match (operation.capability_requirement(), request) {
-        (CapabilityRequirementV1::Net, CanonicalRequestV1::NetListen { address } | CanonicalRequestV1::NetConnect { address } | CanonicalRequestV1::NetDatagramBind { address }) => Some(address),
+        (CapabilityRequirementV1::Net, CanonicalRequestV1::NetListen { address } | CanonicalRequestV1::NetListenReusable { address } | CanonicalRequestV1::NetConnect { address } | CanonicalRequestV1::NetDatagramBind { address }) => Some(address),
         (CapabilityRequirementV1::Net, _) => return Err(TerminalErrorV1::MalformedHostAbiField),
         _ => None,
     };
@@ -3478,7 +3527,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
         ) | (HostOpV1::MappingAcquireFile, ResourceInputsV1::Target(_))
             | (HostOpV1::FsReadAt | HostOpV1::ResourceStreamRead | HostOpV1::NetReceive | HostOpV1::NetDatagramReceiveFrom, ResourceInputsV1::FileBuffer { .. })
             | (HostOpV1::FsWriteAt | HostOpV1::ResourceStreamWrite | HostOpV1::NetSend | HostOpV1::NetDatagramSendTo, ResourceInputsV1::FileBufferSpan { .. })
-            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait | HostOpV1::ProcessSignal | HostOpV1::NetAccept | HostOpV1::NetShutdown | HostOpV1::NetLocalAddress | HostOpV1::NetDatagramLocalAddress, ResourceInputsV1::Target(_))
+            | (HostOpV1::ProcessPlanPush | HostOpV1::ProcessSpawn | HostOpV1::ProcessTakePipe | HostOpV1::ProcessWait | HostOpV1::ProcessSignal | HostOpV1::NetAccept | HostOpV1::NetShutdown | HostOpV1::NetLocalAddress | HostOpV1::NetDatagramLocalAddress | HostOpV1::NetStreamOptionSet | HostOpV1::NetStreamOptionGet, ResourceInputsV1::Target(_))
             | (
                 HostOpV1::BufferAllocate
                     | HostOpV1::MappingAllocate
@@ -3504,7 +3553,8 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     | HostOpV1::ProcessPlanOpen
                     | HostOpV1::NetListen
                     | HostOpV1::NetConnect
-                    | HostOpV1::NetDatagramBind,
+                    | HostOpV1::NetDatagramBind
+                    | HostOpV1::NetListenReusable,
                 ResourceInputsV1::None
             )
     );
@@ -3594,6 +3644,9 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             | (HostOpV1::NetDatagramSendTo, CanonicalRequestV1::NetDatagramSendTo { .. })
             | (HostOpV1::NetDatagramReceiveFrom, CanonicalRequestV1::NetDatagramReceiveFrom { .. })
             | (HostOpV1::NetDatagramLocalAddress, CanonicalRequestV1::NetDatagramLocalAddress)
+            | (HostOpV1::NetListenReusable, CanonicalRequestV1::NetListenReusable { .. })
+            | (HostOpV1::NetStreamOptionSet, CanonicalRequestV1::NetStreamOptionSet { .. })
+            | (HostOpV1::NetStreamOptionGet, CanonicalRequestV1::NetStreamOptionGet { .. })
             | (
                 HostOpV1::FsHandleMetadata,
                 CanonicalRequestV1::FsHandleMetadata
@@ -4170,19 +4223,26 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
             )
         }
         (HostOpV1::NetListen, CanonicalRequestV1::NetListen { address })
+        | (HostOpV1::NetListenReusable, CanonicalRequestV1::NetListenReusable { address })
         | (HostOpV1::NetConnect, CanonicalRequestV1::NetConnect { address }) => {
             let grant = grant.expect("validated Net grant");
             let root = &grant.capability.scope().root;
-            let acquired = if operation == HostOpV1::NetListen {
-                backend.net_listen(root, address)
-            } else {
-                backend.net_connect(root, address)
+            let acquired = match operation {
+                HostOpV1::NetListen => backend.net_listen(root, address),
+                // A reusable listener is IP only: a Unix address refuses
+                // after Net grant admission and before any syscall or root
+                // resolution (spec 38 §1.13.2).
+                HostOpV1::NetListenReusable => match address {
+                    crate::SocketAddressV1::Unix { .. } => Err(IoErrorIdentityV1::InvalidInput),
+                    _ => backend.net_listen_reusable(root, address),
+                },
+                _ => backend.net_connect(root, address),
             };
             acquired.map(|fd| {
-                let kind = if operation == HostOpV1::NetListen {
-                    ResourceKindV1::SocketListener
-                } else {
+                let kind = if operation == HostOpV1::NetConnect {
                     ResourceKindV1::SocketStream
+                } else {
+                    ResourceKindV1::SocketListener
                 };
                 let requested_address = match (kind, address) {
                     (ResourceKindV1::SocketListener, crate::SocketAddressV1::Unix { .. }) =>
@@ -4191,6 +4251,7 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 };
                 let (token, identity) = resources.insert_socket(
                     fd, kind, grant.revocation_node, requested_address,
+                    crate::net_v1::SocketFamilyV1::of(address),
                 );
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::Target, identity));
@@ -4208,14 +4269,14 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                     .map_err(SemanticErrorV1::Resource)?;
                 let provenance = provenance.ok_or(SemanticErrorV1::Resource(ResourceErrorV1::MalformedResource))?;
                 resource_bindings.push((ResourceBindingRole::Target, identity));
-                let ResourceOwnerV1::SocketListener { fd, address } = owner else { unreachable!("validated socket kind") };
+                let ResourceOwnerV1::SocketListener { fd, address, family } = owner else { unreachable!("validated socket kind") };
                 backend.net_accept(fd)
-                    .map(|fd| (fd, provenance, address.clone()))
+                    .map(|fd| (fd, provenance, address.clone(), *family))
                     .map_err(SemanticErrorV1::Io)
             })();
-            accepted.map(|(fd, provenance, address)| {
+            accepted.map(|(fd, provenance, address, family)| {
                 let (token, identity) = resources.insert_socket(
-                    fd, ResourceKindV1::SocketStream, provenance, address,
+                    fd, ResourceKindV1::SocketStream, provenance, address, family,
                 );
                 minted_resource = Some(token);
                 resource_bindings.push((ResourceBindingRole::File, identity));
@@ -4237,6 +4298,37 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 backend.net_shutdown(fd, *how).map(|()| CanonicalReplyV1::Unit).map_err(SemanticErrorV1::Io)
             })()
         }
+        (HostOpV1::NetStreamOptionSet, CanonicalRequestV1::NetStreamOptionSet { option, .. })
+        | (HostOpV1::NetStreamOptionGet, CanonicalRequestV1::NetStreamOptionGet { option }) => {
+            let ResourceInputsV1::Target(token) = resource else { unreachable!("validated resource shape") };
+            let set_to = match request {
+                CanonicalRequestV1::NetStreamOptionSet { enabled, .. } => Some(*enabled),
+                _ => None,
+            };
+            (|| {
+                // Spec 38 §1.13.2: a code above 1 refuses before any syscall,
+                // as NetShutdown treats `how > 2`.
+                let Some(option) = crate::net_v1::StreamOptionV1::from_code(*option) else {
+                    return Err(SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput));
+                };
+                let (owner, identity, _) = resources.typed_owner(token, ResourceKindV1::SocketStream)
+                    .map_err(SemanticErrorV1::Resource)?;
+                resource_bindings.push((ResourceBindingRole::Target, identity));
+                let ResourceOwnerV1::SocketStream { fd, family, .. } = owner else { unreachable!("validated socket kind") };
+                // The fit check: both families are IP stream options. It reads
+                // the recorded family only, never the descriptor.
+                if *family != crate::net_v1::SocketFamilyV1::Ip {
+                    return Err(SemanticErrorV1::Io(IoErrorIdentityV1::InvalidInput));
+                }
+                match set_to {
+                    Some(enabled) => backend
+                        .net_set_stream_option(fd, option, enabled)
+                        .map(|()| CanonicalReplyV1::Unit),
+                    None => backend.net_stream_option(fd, option).map(CanonicalReplyV1::Bool),
+                }
+                .map_err(SemanticErrorV1::Io)
+            })()
+        }
         (HostOpV1::NetLocalAddress, CanonicalRequestV1::NetLocalAddress) => {
             let ResourceInputsV1::Target(token) = resource else { unreachable!("validated resource shape") };
             (|| {
@@ -4250,8 +4342,8 @@ pub(crate) fn dispatch_host_op_v1_for_promotion_evidence<B: HostEffectBackendV1>
                 let address = match owner {
                     ResourceOwnerV1::SocketListener { address: Some(address), .. }
                     | ResourceOwnerV1::SocketStream { address: Some(address), .. } => address.clone(),
-                    ResourceOwnerV1::SocketListener { fd, address: None }
-                    | ResourceOwnerV1::SocketStream { fd, address: None } =>
+                    ResourceOwnerV1::SocketListener { fd, address: None, .. }
+                    | ResourceOwnerV1::SocketStream { fd, address: None, .. } =>
                         backend.net_local_address(fd).map_err(SemanticErrorV1::Io)?,
                     _ => unreachable!("validated socket kind"),
                 };
@@ -4823,6 +4915,11 @@ pub enum CanonicalRequestV1 {
     NetDatagramSendTo { buffer_start: u64, length: u64, peer: crate::SocketAddressV1 },
     NetDatagramReceiveFrom { buffer_start: u64, length: u64 },
     NetDatagramLocalAddress,
+    NetListenReusable { address: crate::SocketAddressV1 },
+    /// `option` is the wire code (0 no-delay, 1 keep-alive); a code above 1
+    /// refuses `InvalidInput` in the executor before any syscall.
+    NetStreamOptionSet { option: u64, enabled: bool },
+    NetStreamOptionGet { option: u64 },
     ResourceRelease,
 }
 
@@ -5383,6 +5480,9 @@ mod px10_tests;
 #[cfg(all(test, target_os = "linux"))]
 mod px11_datagram_tests;
 
+#[cfg(all(test, target_os = "linux"))]
+mod px11_option_tests;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5818,6 +5918,7 @@ mod tests {
             HostOpV1::NetListen,
             HostOpV1::NetConnect,
             HostOpV1::NetDatagramBind,
+            HostOpV1::NetListenReusable,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -5858,6 +5959,8 @@ mod tests {
             HostOpV1::NetDatagramSendTo,
             HostOpV1::NetDatagramReceiveFrom,
             HostOpV1::NetDatagramLocalAddress,
+            HostOpV1::NetStreamOptionSet,
+            HostOpV1::NetStreamOptionGet,
         ];
         for operation in HostOpV1::ALL {
             let capability_admitted = expected.contains(&operation);
@@ -5923,6 +6026,8 @@ mod tests {
             HostOpV1::NetDatagramSendTo,
             HostOpV1::NetDatagramReceiveFrom,
             HostOpV1::NetDatagramLocalAddress,
+            HostOpV1::NetStreamOptionSet,
+            HostOpV1::NetStreamOptionGet,
         ];
         let classified = HostOpV1::ALL
             .into_iter()
@@ -6276,7 +6381,7 @@ mod tests {
         ];
         // PX11's socket operations acquire or borrow SocketListener,
         // SocketStream and SocketDatagram resources, so none is a
-        // pre-resource operation.
+        // pre-resource operation; the option families are among them.
         let px11_net = [
             HostOpV1::NetListen,
             HostOpV1::NetAccept,
@@ -6289,6 +6394,9 @@ mod tests {
             HostOpV1::NetDatagramSendTo,
             HostOpV1::NetDatagramReceiveFrom,
             HostOpV1::NetDatagramLocalAddress,
+            HostOpV1::NetListenReusable,
+            HostOpV1::NetStreamOptionSet,
+            HostOpV1::NetStreamOptionGet,
         ];
         let pre_resource = HostOpV1::ALL
             .into_iter()
@@ -6596,22 +6704,27 @@ mod tests {
 
     /// SOURCE: spec/40-runtime/45-native-backend.md §3; spec/40-runtime/42-evaluation.md §6;
     /// spec/30-surface/38-ffi-io.md §1.13.1.
+    /// spec/30-surface/38-ffi-io.md §1.13.2.
     /// Promise class: durable invariant plus a transition sentinel. MEASURED:
     /// over the full HostOp inventory the executor admits every NativeTested
     /// operation, and the RepresentedUnavailable operations it admits are
-    /// exactly the four datagram operations. CLAIMED: no other
-    /// native-unavailable operation gains executor admission. THE GAP: the
-    /// shared dispatcher must use executor_admits for each operation. The
-    /// sentinel half is retired by the datagram native-parity node, which
-    /// promotes the four and empties the exception.
+    /// exactly the four datagram operations and the three option-family
+    /// operations. CLAIMED: no other native-unavailable operation gains
+    /// executor admission. THE GAP: the shared dispatcher must use
+    /// executor_admits for each operation. The sentinel half is retired by
+    /// the native-parity nodes for datagrams and option families, which
+    /// promote the seven and empty the exception.
     #[test]
-    fn executor_admits_exactly_native_tested_plus_datagram_interpreter_set() {
+    fn executor_admits_exactly_native_tested_plus_px11_interpreter_set() {
         use std::collections::BTreeSet;
         let datagram = [
             HostOpV1::NetDatagramBind,
             HostOpV1::NetDatagramSendTo,
             HostOpV1::NetDatagramReceiveFrom,
             HostOpV1::NetDatagramLocalAddress,
+            HostOpV1::NetListenReusable,
+            HostOpV1::NetStreamOptionSet,
+            HostOpV1::NetStreamOptionGet,
         ]
         .into_iter()
         .collect::<BTreeSet<_>>();
@@ -6622,7 +6735,7 @@ mod tests {
                     && op.availability() == HostOpAvailabilityV1::RepresentedUnavailable
             })
             .collect::<BTreeSet<_>>();
-        assert_eq!(interpreter_only, datagram, "exact datagram interpreter-only set");
+        assert_eq!(interpreter_only, datagram, "exact PX11 interpreter-only set");
         for op in HostOpV1::ALL {
             if op.availability() == HostOpAvailabilityV1::NativeTested {
                 assert!(op.executor_admits(), "executor admission of {op:?}");
@@ -6936,6 +7049,7 @@ mod tests {
             ResourceKindV1::SocketStream,
             provenance,
             None,
+            crate::net_v1::SocketFamilyV1::Ip,
         );
         let (buffer, _) = resources.insert_buffer(16).unwrap();
         let mut backend = AllOpsBackend::default();

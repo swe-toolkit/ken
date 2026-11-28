@@ -53,7 +53,10 @@ pub use abi_v1::{
 pub use capability::*;
 pub use effect_v1::*;
 #[cfg(target_os = "linux")]
-pub use net_v1::{DatagramReceivedV1, DatagramSocketV1, SocketAddressV1, DATAGRAM_PAYLOAD_MAX_V1};
+pub use net_v1::{
+    DatagramReceivedV1, DatagramSocketV1, SocketAddressV1, SocketFamilyV1, StreamOptionV1,
+    DATAGRAM_PAYLOAD_MAX_V1,
+};
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 pub use process_v1::{ChildExitV1, ChildProcessV1, ChildStdioV1, SpawnPlanV1};
 pub use effect_wire::*;
