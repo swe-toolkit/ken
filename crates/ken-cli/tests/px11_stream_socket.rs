@@ -132,7 +132,7 @@ fn px11_all_three_families_exchange_exact_bytes_and_observe_eof() {
 /// the runtime match observes the envelope's constructor and cause.
 /// the typed conversion is applied to the pattern-matched identity;
 /// converting a carried response identity inside a bracket continuation is a
-/// native lowering limit shared with FS brackets (separate follow-up).
+/// form now built natively; rt_native_carried_response_match covers it.
 #[test]
 fn px11_missing_unix_listener_has_typed_socket_error() {
     let dir = tempfile::Builder::new()
@@ -154,7 +154,7 @@ fn px11_missing_unix_listener_has_typed_socket_error() {
 /// denial precedes the socket syscall; an eventual NotFound must not suffice.
 /// the typed conversion is applied to the pattern-matched identity;
 /// converting a carried response identity inside a bracket continuation is a
-/// native lowering limit shared with FS brackets (separate follow-up).
+/// form now built natively; rt_native_carried_response_match covers it.
 #[test]
 fn px11_wrong_grant_refuses_unix_connect() {
     let dir = tempfile::Builder::new()

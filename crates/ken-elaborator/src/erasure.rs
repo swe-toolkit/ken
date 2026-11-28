@@ -3678,8 +3678,8 @@ fn lower_body_term_with_plans(
                     parent_oriented_frame,
                 )?]
             };
-            Ok(RuntimeExpr::Call {
-                callee: Box::new(lower_body_term_with_plans(
+            Ok(apply_runtime_callee(
+                lower_body_term_with_plans(
                     function,
                     declarations,
                     semantic,
@@ -3690,9 +3690,9 @@ fn lower_body_term_with_plans(
                     &function_path,
                     native_plans,
                     parent_oriented_frame,
-                )?),
+                )?,
                 args,
-            })
+            ))
         }
         CheckedCoreBodyTerm::Let {
             value,
@@ -4636,10 +4636,7 @@ fn lower_checked_host_computation(
                     context_depth,
                     branch_remap,
                 )?;
-                RuntimeExpr::Call {
-                    callee: Box::new(shift_runtime_vars(callee, 1, 0)),
-                    args: vec![RuntimeExpr::Var(0)],
-                }
+                apply_runtime_callee(shift_runtime_vars(callee, 1, 0), vec![RuntimeExpr::Var(0)])
             };
             let decoded = match select_checked_host_operation(operation_term, spine, root, true)? {
                 CheckedHostOperationSelection::Static(decoded) => decoded,
@@ -6070,8 +6067,8 @@ fn lower_body_term_inner(
                     branch_remap,
                 )?]
             };
-            Ok(RuntimeExpr::Call {
-                callee: Box::new(lower_body_term_inner(
+            Ok(apply_runtime_callee(
+                lower_body_term_inner(
                     function,
                     declarations,
                     semantic,
@@ -6079,9 +6076,9 @@ fn lower_body_term_inner(
                     root_symbol,
                     context_depth,
                     branch_remap,
-                )?),
+                )?,
                 args,
-            })
+            ))
         }
         CheckedCoreBodyTerm::Let {
             value,
@@ -6248,6 +6245,77 @@ fn runtime_int_from_big_int(value: &BigInt) -> RuntimeIntV1 {
         num_bigint::Sign::NoSign | num_bigint::Sign::Plus => ken_runtime::Sign::NonNegative,
     };
     RuntimeIntV1::from_canonical_parts(sign, limbs)
+}
+
+/// Applying a dynamic match whose every arm is a lexical closure of exactly
+/// the applied arity is the same computation as the match whose arms apply
+/// their own closure. The match compiler produces the applied form when it
+/// reverts tail columns over a scrutinee erasure cannot reduce, such as a
+/// carried host-response field. Commuting keeps the closure out of the
+/// match's value, so native lowering never joins on a closure. Call-by-value
+/// order is unchanged: the scrutinee selects one arm (or the default traps),
+/// that arm builds its closure, then the arguments are evaluated and applied.
+/// Each arm receives a copy of the arguments, so only duplicable arguments
+/// commute; a partial application never does.
+fn apply_runtime_callee(callee: RuntimeExpr, args: Vec<RuntimeExpr>) -> RuntimeExpr {
+    match callee {
+        RuntimeExpr::Match {
+            scrutinee,
+            cases,
+            default,
+        } if application_commutes_into_arms(&cases, &args) => RuntimeExpr::Match {
+            scrutinee,
+            cases: cases
+                .into_iter()
+                .map(|case| {
+                    let binders = case.binders as u32;
+                    RuntimeMatchCase {
+                        constructor: case.constructor,
+                        binders: case.binders,
+                        body: RuntimeExpr::Call {
+                            callee: Box::new(case.body),
+                            args: args
+                                .iter()
+                                .cloned()
+                                .map(|arg| shift_runtime_vars(arg, binders, 0))
+                                .collect(),
+                        },
+                    }
+                })
+                .collect(),
+            default,
+        },
+        callee => RuntimeExpr::Call {
+            callee: Box::new(callee),
+            args,
+        },
+    }
+}
+
+fn application_commutes_into_arms(cases: &[RuntimeMatchCase], args: &[RuntimeExpr]) -> bool {
+    !cases.is_empty()
+        && !args.is_empty()
+        && args.iter().all(runtime_arg_is_duplicable)
+        && cases.iter().all(|case| {
+            matches!(&case.body, RuntimeExpr::LexicalClosure { params, body, .. }
+                if params.len() == args.len()
+                    && !matches!(body.as_ref(), RuntimeExpr::LexicalClosure { .. }))
+        })
+}
+
+fn runtime_arg_is_duplicable(arg: &RuntimeExpr) -> bool {
+    match arg {
+        RuntimeExpr::Value(_)
+        | RuntimeExpr::Var(_)
+        | RuntimeExpr::DeclarationRef { .. }
+        | RuntimeExpr::ImportedDeclarationRef { .. } => true,
+        RuntimeExpr::Construct { args, .. } => args.iter().all(runtime_arg_is_duplicable),
+        RuntimeExpr::Record { fields } => {
+            fields.iter().all(|(_, field)| runtime_arg_is_duplicable(field))
+        }
+        RuntimeExpr::Project { record, .. } => runtime_arg_is_duplicable(record),
+        _ => false,
+    }
 }
 
 fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
