@@ -318,8 +318,8 @@ block43:
 
 block42:
     v96 = stack_load.i64 ss8
-    v97 = iconst.i64 0x0db7_0000_0020
-    v98 = icmp eq v96, v97  ; v97 = 0x0db7_0000_0020
+    v97 = iconst.i64 0x0de8_0000_0020
+    v98 = icmp eq v96, v97  ; v97 = 0x0de8_0000_0020
     brif v98, block39, block36(v82)
 
 block39:
