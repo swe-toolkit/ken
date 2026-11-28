@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-AREA-SPLIT-X-SUM
 title: "Spec 67 bounds box area by inclusion (area_inside) and computes it for point and inverted boxes, but no law says that cutting a box along a vertical line divides its area between the two pieces: a client that tiles a box into column strips cannot sum their areas without unfolding the private axis span. Rule from a checked D0 at zero trust that, when lx <= Suc m and m <= hx, the areas of the boxes [lx, m] and [Suc m, hx] on the same y range add to the area of [lx, hx], and state it with a seed whose accepted row is open"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
