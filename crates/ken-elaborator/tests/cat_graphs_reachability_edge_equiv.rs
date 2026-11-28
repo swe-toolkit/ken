@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole, Span,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole, Span,
 };
 use ken_kernel::{Decl, GlobalId, KernelError, Term};
 
@@ -90,9 +90,13 @@ impl Row<'_> {
     }
 }
 
-// Locate a declaration by identity, regardless of fence order. Two matches
-// are ambiguous even if they happen to be in the same fence.
-fn seed_row<'a>(seed: &'a str, theorem: &str) -> Row<'a> {
+// Separate the authored applications from the standalone terminal probes
+// that deliberately reuse their names. Reject ambiguous matching rows.
+fn seed_row<'a>(
+    seed: &'a str,
+    theorem: &str,
+    is_authored: impl Fn(&[SourceDecl], &Expr) -> bool,
+) -> Row<'a> {
     let mut selected = None;
     for fence in extract_ken_md(seed)
         .expect("§24 seed Ken fences extract")
@@ -101,23 +105,35 @@ fn seed_row<'a>(seed: &'a str, theorem: &str) -> Row<'a> {
         .filter(|fence| fence.role == KenMdFenceRole::Source)
     {
         let source = &seed[fence.body_range];
-        for decl in parse_decls(source).expect("§24 seed source parses") {
+        let decls = parse_decls(source).expect("§24 seed source parses");
+        for decl in &decls {
             if let SourceDecl::TheoremDecl {
                 name, span, body, ..
             } = decl
             {
-                if name == theorem {
-                    assert!(selected.is_none(), "duplicate seed theorem {theorem}");
+                if name == theorem && is_authored(&decls, body) {
+                    assert!(
+                        selected.is_none(),
+                        "duplicate authored seed theorem {theorem}"
+                    );
                     selected = Some(Row {
                         fence: source,
-                        declaration: span,
+                        declaration: span.clone(),
                         body: body.span().clone(),
                     });
                 }
             }
         }
     }
-    selected.unwrap_or_else(|| panic!("missing seed theorem {theorem}"))
+    selected.unwrap_or_else(|| panic!("missing authored seed theorem {theorem}"))
+}
+
+fn accepted_row(seed: &str) -> Row<'_> {
+    seed_row(seed, OPEN_ROW, |decls, _| {
+        decls.iter().any(|decl| {
+            matches!(decl, SourceDecl::TheoremDecl { name, .. } if name == "meet_edges_agree")
+        })
+    })
 }
 
 fn fresh_prefix(accepted: &Row<'_>) -> ElabEnv {
@@ -192,7 +208,7 @@ fn generic_edge_equiv_is_owned_public_and_adds_no_trust() {
 #[test]
 fn authored_open_row_checks_and_controls_do_not_cite_the_law() {
     let seed = read_seed();
-    let accepted = seed_row(&seed, OPEN_ROW);
+    let accepted = accepted_row(&seed);
     let mut env = graph_env();
     let before = trusted(&env);
     env.elaborate_file(accepted.fence)
@@ -217,7 +233,7 @@ fn authored_open_row_checks_and_controls_do_not_cite_the_law() {
 #[test]
 fn authored_open_row_does_not_close_by_computation() {
     let seed = read_seed();
-    let accepted = seed_row(&seed, OPEN_ROW);
+    let accepted = accepted_row(&seed);
     let (proved, _) = accepted.by("Proved");
     assert_kernel_refuses(
         &mut fresh_prefix(&accepted),
@@ -245,8 +261,8 @@ fn authored_open_row_does_not_close_by_computation() {
 #[test]
 fn authored_inclusion_twin_and_its_proved_claim_refuse() {
     let seed = read_seed();
-    let accepted = seed_row(&seed, OPEN_ROW);
-    let twin = seed_row(&seed, TWIN);
+    let accepted = accepted_row(&seed);
+    let twin = seed_row(&seed, TWIN, |_, body| matches!(body, Expr::EApp(..)));
     assert_kernel_refuses(&mut fresh_prefix(&accepted), twin.source(), TWIN);
 
     let (proved, _) = twin.by("Proved");
