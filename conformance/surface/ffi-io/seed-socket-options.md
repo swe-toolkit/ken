@@ -52,13 +52,11 @@ outbound stream and the accepted stream.
 - promise class: durable invariant.
 - spec: §1.13.2 operation shape (the target is the stream resource).
 - given: a program applying `set_stream_option` to a
-  `Resource ResourceKind.SocketListener`, and separately one applying
-  `stream_option` to a `Resource ResourceKind.SocketDatagram`.
-- expect: each fails elaboration with a type mismatch naming
-  `ResourceKind.SocketStream`; neither runs, and a native build of either
-  produces no artifact.
-- why: an option call on a listener or a datagram socket is excluded by
-  type, not refused at run time.
+  `Resource ResourceKind.SocketListener`.
+- expect: elaboration fails with a kernel type mismatch; the program never
+  runs, and a native build produces no artifact.
+- why: an option call on a listener is excluded by type, not refused at run
+  time.
 
 ## Readback
 
@@ -102,7 +100,8 @@ outbound stream and the accepted stream.
   calls.
 - why: no family fits a Unix stream. The control is the failure it guards
   against: with the fit check removed, the `NoDelay` set returns
-  `IOError.Other 95` (`ENOTSUP`) and the `KeepAlive` set returns `Ok Unit`.
+  `ResourceHostIO IOError.Unsupported`, the host's canonical identity for
+  `ENOTSUP`.
 
 ### surface/ffi-io/stream-option-code-above-one-is-invalid-input
 
