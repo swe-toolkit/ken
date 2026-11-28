@@ -11321,6 +11321,7 @@ mod cat_numeric_interval_public_export_tests {
             "interval_add_point",
             "interval_mul_point",
             "interval_add_point_exact",
+            "interval_mul_point_exact",
             "interval_width_point",
             "interval_width_add",
             "interval_width_mul",
