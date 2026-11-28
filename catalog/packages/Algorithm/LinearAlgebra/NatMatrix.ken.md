@@ -2329,38 +2329,41 @@ pub theorem matrix_vector_zero_of_gram_vector_zero
         (vector_zero n)
       → Equal (Vec Nat m) (matrix_vector m n a v) (vector_zero m) =
   λgram_zero.
-    vector_zero_of_dot_self_zero
-      m
-      (matrix_vector m n a v)
-      (trans
-        Nat
-        (dot m (matrix_vector m n a v) (matrix_vector m n a v))
-        (dot n v (matrix_vector n m (transpose m n a) (matrix_vector m n a v)))
-        Zero
-        (transpose_adjoint m n a v (matrix_vector m n a v))
+    let image =
+      matrix_vector m n a v
+    in
+      vector_zero_of_dot_self_zero
+        m
+        image
         (trans
           Nat
-          (dot n v (matrix_vector n m (transpose m n a) (matrix_vector m n a v)))
-          (dot n v (vector_zero n))
+          (dot m image image)
+          (dot n v (matrix_vector n m (transpose m n a) image))
           Zero
-          (cong
-            (Vec Nat n)
+          (transpose_adjoint m n a v image)
+          (trans
             Nat
-            (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
-            (vector_zero n)
-            (dot n v)
-            (trans
+            (dot n v (matrix_vector n m (transpose m n a) image))
+            (dot n v (vector_zero n))
+            Zero
+            (cong
               (Vec Nat n)
-              (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
-              (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+              Nat
+              (matrix_vector n m (transpose m n a) image)
               (vector_zero n)
-              (sym
+              (dot n v)
+              (trans
                 (Vec Nat n)
+                (matrix_vector n m (transpose m n a) image)
                 (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
-                (matrix_vector n m (transpose m n a) (matrix_vector m n a v))
-                (matrix_vector_product n m n (transpose m n a) a v))
-              gram_zero))
-          (dot_zero_right n v)))
+                (vector_zero n)
+                (sym
+                  (Vec Nat n)
+                  (matrix_vector n n (matrix_product n m n (transpose m n a) a) v)
+                  (matrix_vector n m (transpose m n a) image)
+                  (matrix_vector_product n m n (transpose m n a) a v))
+                gram_zero))
+            (dot_zero_right n v)))
 
 theorem matrix_add_assoc_cons
       (k : Nat)
