@@ -1,0 +1,66 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle)
+
+import Capability.System.Error
+  (SystemError, MkSystemError, ProcessOp, SpawnChild, ProcessResource, NoSafeContext, process_error_to_system)
+
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, ResourceBracketOk, withBuffer)
+
+fn buffer_body (_buffer : BufferHandle) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  host_pure AFull (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn typed_denied_program (prog : Bytes) (identity : IOError) : Bool =
+  match process_error_to_system SpawnChild (Some Bytes prog) identity {
+    MkSystemError
+      (ProcessOp SpawnChild)
+      (ProcessResource (Some _))
+      IOError.CapabilityDenied NoSafeContext ↦
+      True;
+    MkSystemError _ _ _ _ ↦ False
+  }
+
+fn pick (flag : Bool) (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk _) ↦
+      match flag {
+        True ↦ ExitCode.Success;
+        False ↦ ExitCode.Failure 82
+      };
+    Ok _ ↦ ExitCode.Failure 81;
+    Err _ ↦ ExitCode.Failure 86
+  }
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS] =
+  match input {
+    MkProcessInput arguments _ _ ↦
+      match arguments {
+        Nil ↦ host_pure AFull ExitCode (ExitCode.Failure 73);
+        Cons first _ ↦
+          match bytes_at first (0 : Int) {
+            None ↦ host_pure AFull ExitCode (ExitCode.Failure 76);
+            Some byte ↦
+              host_bind
+                AFull
+                (Result ResourceError (ResourceBracketResult Unit Unit))
+                ExitCode
+                (withBuffer AFull Unit Unit (16 : Int) buffer_body)
+                (λoutcome.
+                  match outcome {
+                    Ok _ ↦ host_pure AFull ExitCode ExitCode.Success;
+                    Err (ResourceError.ResourceHostIO identity) ↦
+                      match typed_denied_program first identity {
+                        True ↦ host_pure AFull ExitCode ExitCode.Success;
+                        False ↦ host_pure AFull ExitCode (ExitCode.Failure 77)
+                      };
+                    Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 78)
+                  })
+          }
+      }
+  }

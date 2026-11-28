@@ -1,0 +1,37 @@
+program capabilities FS AFull, RootExecution Allow
+
+import Capability.Process.Exit (host_bind, host_pure)
+
+import Capability.System.Buffer (BufferHandle)
+
+import Capability.System.Resource
+  (ResourceBodyResult, ResourceBodyOk, ResourceBracketResult, ResourceBracketOk, withBuffer)
+
+fn negate (b : Bool) : Bool =
+  match b {
+    True ↦ False;
+    False ↦ True
+  }
+
+fn closure_body (_buffer : BufferHandle) : HostIO AFull (ResourceBodyResult Unit (Bool → Bool)) =
+  host_pure AFull (ResourceBodyResult Unit (Bool → Bool)) (ResourceBodyOk Unit (Bool → Bool) negate)
+
+proc main
+      (input : ProcessInput) (caps : ProgramCaps AFull)
+    : HostIO AFull ExitCode
+    visits [FS] =
+  host_bind
+    AFull
+    (Result ResourceError (ResourceBracketResult Unit (Bool → Bool)))
+    ExitCode
+    (withBuffer AFull Unit (Bool → Bool) (16 : Int) closure_body)
+    (λoutcome.
+      match outcome {
+        Ok (ResourceBracketOk f) ↦
+          match f True {
+            True ↦ host_pure AFull ExitCode (ExitCode.Failure 79);
+            False ↦ host_pure AFull ExitCode ExitCode.Success
+          };
+        Ok _ ↦ host_pure AFull ExitCode (ExitCode.Failure 81);
+        Err _ ↦ host_pure AFull ExitCode (ExitCode.Failure 86)
+      })
