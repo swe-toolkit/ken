@@ -58,6 +58,23 @@ outbound stream and the accepted stream.
 - why: an option call on a listener is excluded by type, not refused at run
   time.
 
+### surface/ffi-io/option-call-on-datagram-is-ill-typed
+
+- promise class: durable invariant.
+- spec: §1.13.2 operation shape (the target is the stream resource).
+- given: under `Net Loopback`, two programs that differ only in the resource
+  passed to `stream_option AFull r NoDelay`. In the first, `r` is the
+  `Resource ResourceKind.SocketDatagram` bound by `with_datagram_socket` on
+  `127.0.0.1` port 0; in the second, its twin, `r` is the outbound
+  `Resource ResourceKind.SocketStream` of a connected pair on `127.0.0.1`.
+  Each program exits 0 when the call returns `Ok False`.
+- expect: the datagram program fails elaboration with a kernel type
+  mismatch, never runs, and a native build of it produces no artifact. The
+  stream twin elaborates and runs with exit 0.
+- why: an option call on a datagram socket is excluded by type. The twin
+  differs only in the resource kind, so the refusal is the kind index and
+  not a defect of the program around the call.
+
 ## Readback
 
 ### surface/ffi-io/stream-options-read-back-on-ip-streams
@@ -70,7 +87,30 @@ outbound stream and the accepted stream.
 - expect: every set returns `Ok Unit`; the three reads on every stream and
   option are `Ok False`, `Ok True`, `Ok False` in that order.
 - why: both options apply to an IPv4 or IPv6 stream of either origin, and a
-  fresh stream reads `False`.
+  fresh stream reads `False`. This row alone cannot tell the two options
+  apart: a host that swapped them consistently would pass it. The mapping
+  row below separates them.
+
+### surface/ffi-io/stream-option-codes-name-their-kernel-options
+
+- promise class: normative compatibility vector — the option code and its
+  kernel option are the contract.
+- spec: §1.13.2 the families and their wire codes.
+- given: at the host boundary under `Net Loopback`, two fresh IPv4 outbound
+  streams. On the first, set option code 0 to `True`; on the second, set
+  option code 1 to `True`. After each set, read both `TCP_NODELAY` (level
+  `IPPROTO_TCP`) and `SO_KEEPALIVE` (level `SOL_SOCKET`) on that stream's
+  descriptor by `getsockopt`, independently of the operations under test.
+  Then, through checked Ken on a third fresh stream, set `NoDelay` to `True`
+  and read `KeepAlive`, and on a fourth set `KeepAlive` to `True` and read
+  `NoDelay`.
+- expect: after code 0, `TCP_NODELAY` reads nonzero and `SO_KEEPALIVE`
+  reads 0; after code 1, `SO_KEEPALIVE` reads nonzero and `TCP_NODELAY`
+  reads 0. Through checked Ken, each cross read is `Ok False`.
+- why: each code sets exactly its own kernel option and leaves the other
+  unset, and each `StreamOption` constructor reaches only its own code. A
+  swapped or aliased mapping fails one of the four independent reads or a
+  cross read.
 
 ### surface/ffi-io/stream-option-readback-is-the-kernel-value
 
@@ -135,15 +175,18 @@ outbound stream and the accepted stream.
   program. The accepted stream is released inside the client's bracket, so
   the server side closes first; the client is released next and the first
   listener last. A second listener is then acquired on the first listener's
-  port. Run three arms: both listeners reusable; both plain
-  (`with_socket_listener`); the first plain and the second reusable.
-- expect: with both reusable, the second acquisition succeeds; with both
-  plain, and with the first plain, it returns
-  `ResourceHostIO (IOError.Other 98)`.
+  port. Run four arms: both listeners reusable; both plain
+  (`with_socket_listener`); the first plain and the second reusable; and the
+  first reusable and the second plain.
+- expect: with both reusable, the second acquisition succeeds; in each of
+  the other three arms it returns `ResourceHostIO (IOError.Other 98)`.
 - why: Linux rebinds a port in `TIME_WAIT` only when both the closed
   connection's socket and the rebinding socket carry the option. The plain
-  twin and the mixed arm are the failing configurations the reusable arm
-  must differ from.
+  twin and the two mixed arms are the failing configurations the reusable
+  arm must differ from. The reusable-first, plain-second arm fails an
+  implementation that sets reuse on every listener; the plain-first,
+  reusable-second arm fails one that sets it only on the socket leaving
+  `TIME_WAIT`.
 
 ### surface/ffi-io/reusable-listener-never-takes-a-live-port
 
@@ -187,12 +230,16 @@ outbound stream and the accepted stream.
 
 - promise class: durable invariant.
 - spec: §1.13.2 native refusal.
-- given: native-build the readback program, the Unix-stream program and the
-  reusable-listener program of the rows above. As a control, native-build
-  the stream-only exchange program of the stream seed.
-- expect: each option program fails at build time with `N0001`, reason
-  `effect <owner>::FSOp.<code> is a represented unavailable lane` where
-  `<code>` is one of 1804, 1805 and 1806, and emits no artifact. The
-  stream-only control builds and its artifact runs with exit 0.
+- given: three programs, each using exactly one option-family operation
+  and otherwise only stream operations: one acquires a reusable listener on
+  `127.0.0.1` port 0; one sets `NoDelay` on the outbound stream of a
+  connected pair on `127.0.0.1`; one reads `NoDelay` on such a stream.
+  Native-build each. As a control, native-build the stream-only exchange
+  program of the stream seed.
+- expect: each program fails at build time with `N0001`, reason
+  `effect <owner>::FSOp.<code> is a represented unavailable lane`, where
+  `<code>` is 1804 for the reusable listener, 1805 for the set and 1806 for
+  the read, and emits no artifact. The stream-only control builds and its
+  artifact runs with exit 0.
 - why: the native lane refuses option-family operations by a typed cause
   and never miscompiles, while stream parity is unchanged.
