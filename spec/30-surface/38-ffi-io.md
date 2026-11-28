@@ -2038,8 +2038,9 @@ at the host is the existing `ResourceKindMismatch`, which checked Ken
 excludes statically. On a revoked originating grant, set and get return
 `ResourceHostIO IOError.Revoked` before any guarded host leaf, as the
 stream operations do. Other OS failures map through the host's canonical
-identity mapping, as for streams: `ENOTSUP` is `IOError.Unsupported`, and an
-errno with no named identity is `IOError.Other errno`.
+identity mapping, as for streams: if a host call returns `ENOTSUP`, it maps
+to `IOError.Unsupported`; an errno with no named identity maps to
+`IOError.Other errno`.
 
 **Family record.** Each listener and stream resource records whether it
 is IP or Unix. The record is set at acquisition from the checked address

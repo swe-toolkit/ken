@@ -138,10 +138,7 @@ outbound stream and the accepted stream.
   streams are acquired, so `R/listener.sock` exists; every set and read
   returns `ResourceHostIO IOError.InvalidInput`, with zero backend option
   calls.
-- why: no family fits a Unix stream. The control is the failure it guards
-  against: with the fit check removed, the `NoDelay` set returns
-  `ResourceHostIO IOError.Unsupported`, the host's canonical identity for
-  `ENOTSUP`.
+- why: no family fits a Unix stream, and the refusal precedes any syscall.
 
 ### surface/ffi-io/stream-option-code-above-one-is-invalid-input
 
