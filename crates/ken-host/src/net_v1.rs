@@ -1,6 +1,7 @@
 //! Linux stream-socket leaves. Every descriptor is acquired atomically close-on-exec.
 //! Address validation precedes the first socket syscall; a failed connect drops
-//! the newly created descriptor. No resolver or socket option enters this slice.
+//! the newly created descriptor. No resolver enters this slice, and the only
+//! socket options are the typed families of spec 38 §1.13.2.
 
 #![allow(unsafe_code)]
 
@@ -434,6 +435,131 @@ pub fn local_address(socket: &OwnedFd) -> io::Result<SocketAddressV1> {
         return Err(io::Error::last_os_error());
     }
     SocketAddressV1::from_sockaddr(&storage, length)
+}
+
+/// Whether a stream-socket resource is IP (IPv4 or IPv6) or Unix. Every
+/// listener and stream resource records it at mint from its checked
+/// address, and an accepted stream copies its listener's record. The stream
+/// option fit check reads only this record, never the descriptor (spec 38
+/// §1.13.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SocketFamilyV1 {
+    Ip,
+    Unix,
+}
+
+impl SocketFamilyV1 {
+    pub fn of(address: &SocketAddressV1) -> Self {
+        match address {
+            SocketAddressV1::Inet4 { .. } | SocketAddressV1::Inet6 { .. } => Self::Ip,
+            SocketAddressV1::Unix { .. } => Self::Unix,
+        }
+    }
+}
+
+/// One settable stream option (spec 38 §1.13.2). Each names one fixed
+/// kernel option; there is no integer `(level, optname)` form.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StreamOptionV1 {
+    /// `TCP_NODELAY`, code 0.
+    NoDelay,
+    /// `SO_KEEPALIVE`, code 1.
+    KeepAlive,
+}
+
+impl StreamOptionV1 {
+    /// The option for a wire code, or `None` for a code above 1.
+    pub const fn from_code(code: u64) -> Option<Self> {
+        match code {
+            0 => Some(Self::NoDelay),
+            1 => Some(Self::KeepAlive),
+            _ => None,
+        }
+    }
+
+    pub const fn code(self) -> u64 {
+        match self {
+            Self::NoDelay => 0,
+            Self::KeepAlive => 1,
+        }
+    }
+
+    const fn level_and_name(self) -> (libc::c_int, libc::c_int) {
+        match self {
+            Self::NoDelay => (libc::IPPROTO_TCP, libc::TCP_NODELAY),
+            Self::KeepAlive => (libc::SOL_SOCKET, libc::SO_KEEPALIVE),
+        }
+    }
+}
+
+fn set_int_option(
+    fd: &OwnedFd,
+    level: libc::c_int,
+    name: libc::c_int,
+    value: libc::c_int,
+) -> io::Result<()> {
+    if unsafe {
+        libc::setsockopt(
+            fd.as_raw_fd(),
+            level,
+            name,
+            &value as *const libc::c_int as *const libc::c_void,
+            size_of::<libc::c_int>() as libc::socklen_t,
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+/// Bind and listen with `SO_REUSEADDR` set after `socket()` and before
+/// `bind()`; otherwise identical to [`listen`]. The executor refuses a Unix
+/// address before this leaf (spec 38 §1.13.2), so the Unix arm here is the
+/// plain Unix listen: the option has no bind effect on `AF_UNIX`.
+pub fn listen_reusable(root: &FsHandle, address: &SocketAddressV1) -> NetResult<OwnedFd> {
+    address.validate().map_err(io_identity)?;
+    match address {
+        SocketAddressV1::Inet4 { .. } | SocketAddressV1::Inet6 { .. } => (|| {
+            let (raw, length) = address.as_sockaddr()?;
+            let fd = socket(address)?;
+            set_int_option(&fd, libc::SOL_SOCKET, libc::SO_REUSEADDR, 1)?;
+            bind_and_listen(fd, &raw, length)
+        })()
+        .map_err(io_identity),
+        SocketAddressV1::Unix { .. } => listen(root, address),
+    }
+}
+
+/// Set a stream option to `enabled` with one `setsockopt`.
+pub fn set_stream_option(
+    stream: &OwnedFd,
+    option: StreamOptionV1,
+    enabled: bool,
+) -> io::Result<()> {
+    let (level, name) = option.level_and_name();
+    set_int_option(stream, level, name, libc::c_int::from(enabled))
+}
+
+/// Read a stream option's kernel value with one `getsockopt`; `true`
+/// exactly when it is nonzero. Never a cached copy.
+pub fn stream_option(stream: &OwnedFd, option: StreamOptionV1) -> io::Result<bool> {
+    let (level, name) = option.level_and_name();
+    let mut value: libc::c_int = 0;
+    let mut length = size_of::<libc::c_int>() as libc::socklen_t;
+    if unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            level,
+            name,
+            &mut value as *mut libc::c_int as *mut libc::c_void,
+            &mut length,
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(value != 0)
 }
 
 /// The largest datagram payload, in bytes, for every family: the IPv4 UDP

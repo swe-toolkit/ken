@@ -317,6 +317,11 @@ fn put_request(
         }
         CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start, length } => { put_u8(out, 54); put_u64(out, *buffer_start); put_u64(out, *length); }
         CanonicalRequestV1::NetDatagramLocalAddress => put_u8(out, 55),
+        CanonicalRequestV1::NetListenReusable { address } => { put_u8(out, 56); put_socket_address(out, address)?; }
+        CanonicalRequestV1::NetStreamOptionSet { option, enabled } => {
+            put_u8(out, 57); put_u64(out, *option); put_u8(out, u8::from(*enabled));
+        }
+        CanonicalRequestV1::NetStreamOptionGet { option } => { put_u8(out, 58); put_u64(out, *option); }
     }
     Ok(())
 }
@@ -1031,6 +1036,9 @@ fn get_request(cursor: &mut Cursor<'_>) -> Result<CanonicalRequestV1, EffectTrac
         },
         54 => CanonicalRequestV1::NetDatagramReceiveFrom { buffer_start: cursor.u64()?, length: cursor.u64()? },
         55 => CanonicalRequestV1::NetDatagramLocalAddress,
+        56 => CanonicalRequestV1::NetListenReusable { address: get_socket_address(cursor)? },
+        57 => CanonicalRequestV1::NetStreamOptionSet { option: cursor.u64()?, enabled: get_bool(cursor)? },
+        58 => CanonicalRequestV1::NetStreamOptionGet { option: cursor.u64()? },
         _ => return Err(EffectTraceWireError),
     })
 }
@@ -2022,6 +2030,49 @@ mod tests {
         let mut bad_length = bytes;
         bad_length[10] = 5;
         assert_eq!(get_reply(&mut Cursor { bytes: &bad_length, position: 0 }), Err(EffectTraceWireError));
+    }
+
+    /// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2.
+    /// Promise class: normative compatibility vector. MEASURED: the three
+    /// option-family requests take tags 56 to 58 after the datagram tags and
+    /// round-trip; the set request is the tag, the little-endian u64 option
+    /// code and one enabled byte; an enabled byte other than 0 or 1 is
+    /// rejected; the get reply is the existing Bool reply. CLAIMED: the
+    /// option-family trace wire extends the tag tables without renumbering
+    /// and fails closed. THE GAP: opaque resource tokens travel in resource
+    /// bindings, covered by dispatch tests.
+    #[test]
+    fn px11_option_family_wire_tags_extend_without_renumbering_and_fail_closed() {
+        let ipv6 = crate::SocketAddressV1::Inet6 {
+            octets: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            port: 0x0456,
+        };
+        for (request, tag) in [
+            (CanonicalRequestV1::NetListenReusable { address: ipv6 }, 56),
+            (CanonicalRequestV1::NetStreamOptionSet { option: 0, enabled: true }, 57),
+            (CanonicalRequestV1::NetStreamOptionSet { option: 1, enabled: false }, 57),
+            (CanonicalRequestV1::NetStreamOptionGet { option: 1 }, 58),
+        ] {
+            let mut bytes = Vec::new();
+            put_request(&mut bytes, &request).unwrap();
+            assert_eq!(bytes[0], tag, "{request:?} tag");
+            let mut cursor = Cursor { bytes: &bytes, position: 0 };
+            assert_eq!(get_request(&mut cursor), Ok(request));
+            assert_eq!(cursor.position, bytes.len());
+        }
+        let mut set = Vec::new();
+        put_request(&mut set, &CanonicalRequestV1::NetStreamOptionSet { option: 1, enabled: true }).unwrap();
+        assert_eq!(set, [57, 1, 0, 0, 0, 0, 0, 0, 0, 1]);
+        let mut bad_enabled = set.clone();
+        bad_enabled[9] = 2;
+        assert_eq!(get_request(&mut Cursor { bytes: &bad_enabled, position: 0 }), Err(EffectTraceWireError));
+        for value in [true, false] {
+            let reply = CanonicalReplyV1::Bool(value);
+            let mut bytes = Vec::new();
+            put_reply(&mut bytes, &reply).unwrap();
+            assert_eq!(bytes, [1, u8::from(value)]);
+            assert_eq!(get_reply(&mut Cursor { bytes: &bytes, position: 0 }), Ok(reply));
+        }
     }
 
     /// Promise class: normative compatibility vector. MEASURED: all three D3

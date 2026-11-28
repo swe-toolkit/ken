@@ -440,6 +440,25 @@ struct NetDatagramReceiveFromRequestV1 {
     length: u64,
 }
 
+// PX11-SOCKET-OPTION-FAMILIES: the same dead-code posture as the datagram
+// records. NetListenReusable reuses `NetListenRequestV1`; the two option
+// records are attested but have no native decoder arm, because all three
+// operations are RepresentedUnavailable.
+#[repr(C)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct NetStreamOptionSetRequestV1 {
+    stream: u64,
+    option: u64,
+    enabled: u64,
+}
+
+#[repr(C)]
+#[cfg_attr(not(test), allow(dead_code))]
+struct NetStreamOptionGetRequestV1 {
+    stream: u64,
+    option: u64,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ResourceErrorReplyV1 {

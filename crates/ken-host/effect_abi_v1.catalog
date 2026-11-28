@@ -53,6 +53,8 @@ tag|socket_family.unix|2
 tag|socket_shutdown.read|0
 tag|socket_shutdown.write|1
 tag|socket_shutdown.both|2
+tag|stream_option.no_delay|0
+tag|stream_option.keep_alive|1
 tag|mapping_protection.read_only|0
 tag|mapping_protection.writable|1
 tag|stream.stdin|0
@@ -132,3 +134,6 @@ operation|NetDatagramBind|0708|unavailable|NetDatagramBindRequestV1|2|HostReplyV
 operation|NetDatagramSendTo|0709|unavailable|NetDatagramSendToRequestV1|6|HostReplyV1|1
 operation|NetDatagramReceiveFrom|070A|unavailable|NetDatagramReceiveFromRequestV1|4|HostReplyV1|1
 operation|NetDatagramLocalAddress|070B|unavailable|NetLocalAddressRequestV1|1|HostReplyV1|1
+operation|NetListenReusable|070C|unavailable|NetListenRequestV1|2|HostReplyV1|1
+operation|NetStreamOptionSet|070D|unavailable|NetStreamOptionSetRequestV1|3|HostReplyV1|1
+operation|NetStreamOptionGet|070E|unavailable|NetStreamOptionGetRequestV1|2|HostReplyV1|1

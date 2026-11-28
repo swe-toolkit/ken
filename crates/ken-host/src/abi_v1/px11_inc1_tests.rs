@@ -34,6 +34,8 @@ fn px11_native_net_layout_matches_c_and_stream_offsets_pairwise() {
     record!(NetDatagramBindRequestV1; capability, address);
     record!(NetDatagramSendToRequestV1; socket, buffer, buffer_start, length, span_origin, peer);
     record!(NetDatagramReceiveFromRequestV1; socket, buffer, buffer_start, length);
+    record!(NetStreamOptionSetRequestV1; stream, option, enabled);
+    record!(NetStreamOptionGetRequestV1; stream, option);
     for field in ["stream", "buffer", "buffer_start", "length"] {
         assert_eq!(
             fact(&format!("OFFSET_NetReceiveRequestV1_{field}")),
@@ -404,6 +406,69 @@ fn px11_native_abi_refuses_every_datagram_operation_at_run_time() {
     };
     assert_eq!(binding("reply.datagram_receipt"), Some(REPLY_DATAGRAM_RECEIPT));
     assert_eq!(binding("resource_kind.SocketDatagram"), Some(9));
+}
+
+/// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2.
+/// Promise class: normative compatibility vector. MEASURED: each of the
+/// three option-family operations is RepresentedUnavailable,
+/// `require_native_operation_v1` refuses it, and a well-sized, aligned record
+/// for it decodes to the default `Err(-3)`; the catalog rows are
+/// `unavailable` with request records NetListenRequestV1,
+/// NetStreamOptionSetRequestV1 and NetStreamOptionGetRequestV1, and the
+/// `stream_option` tags are 0 for no-delay and 1 for keep-alive, agreeing
+/// with the host's own code mapping. CLAIMED: the native ABI keeps refusing
+/// option-family requests at run time, and the option code is one contract
+/// across the catalog and the executor. THE GAP: build-time refusal is
+/// measured by the CLI suite; this row is the run-time second guard.
+#[test]
+fn px11_native_abi_refuses_every_option_family_operation_at_run_time() {
+    let ip = [127, 0, 0, 1];
+    let address = SocketAddressRecordV1 {
+        family: 0,
+        bytes: SliceV1 { data: ip.as_ptr(), len: ip.len() },
+        port: 0,
+    };
+    let stream = 0x0000_0004_0000_0005;
+    let decoded = [
+        unsafe { decode(HostOpV1::NetListenReusable, &NetListenRequestV1 { capability: 3, address }) }.err(),
+        unsafe {
+            decode(HostOpV1::NetStreamOptionSet, &NetStreamOptionSetRequestV1 {
+                stream, option: 0, enabled: 1,
+            })
+        }
+        .err(),
+        unsafe {
+            decode(HostOpV1::NetStreamOptionGet, &NetStreamOptionGetRequestV1 { stream, option: 1 })
+        }
+        .err(),
+    ];
+    assert_eq!(decoded, [Some(-3); 3]);
+    for (op, name, record) in [
+        (HostOpV1::NetListenReusable, "NetListenReusable", "NetListenRequestV1"),
+        (HostOpV1::NetStreamOptionSet, "NetStreamOptionSet", "NetStreamOptionSetRequestV1"),
+        (HostOpV1::NetStreamOptionGet, "NetStreamOptionGet", "NetStreamOptionGetRequestV1"),
+    ] {
+        assert_eq!(op.availability(), crate::HostOpAvailabilityV1::RepresentedUnavailable);
+        assert!(require_native_operation_v1(op).is_err(), "{op:?} is refused natively");
+        let row = crate::HOST_EFFECT_ABI_V1_CATALOG
+            .iter()
+            .find(|row| row.1 == op as u16)
+            .unwrap_or_else(|| panic!("{op:?} has a catalog row"));
+        assert_eq!((row.0, row.2, row.3), (name, "unavailable", record));
+    }
+    let binding = |name: &str| {
+        crate::HOST_EFFECT_ABI_V1_BINDINGS
+            .iter()
+            .find_map(|(kind, binding, value)| (*kind == "tag" && *binding == name).then_some(*value))
+    };
+    for (option, name) in [
+        (crate::StreamOptionV1::NoDelay, "stream_option.no_delay"),
+        (crate::StreamOptionV1::KeepAlive, "stream_option.keep_alive"),
+    ] {
+        assert_eq!(binding(name), Some(option.code()), "{name}");
+        assert_eq!(crate::StreamOptionV1::from_code(option.code()), Some(option));
+    }
+    assert_eq!(crate::StreamOptionV1::from_code(2), None);
 }
 
 /// Promise class: normative compatibility vector. MEASURED: reply tag,
