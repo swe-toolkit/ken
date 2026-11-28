@@ -150,12 +150,13 @@ proc cycle
                   }))
         }))
 
--- 0 for ResourceHostIO InvalidInput, 95 for an OS error from a reached
--- leaf, and `code` for any other refusal.
+-- 0 for ResourceHostIO InvalidInput; 95 for Unsupported, which is how
+-- the host reports a reached NoDelay leaf's ENOTSUP on AF_UNIX; 94 for an
+-- unmapped OS error; and `code` for any other refusal.
 fn cause_code (cause : IOError) (code : UInt8) : UInt8 =
   match cause {
     IOError.InvalidInput ↦ (0 : UInt8);
-    IOError.Other _ ↦ (95 : UInt8);
+    IOError.Other _ ↦ (94 : UInt8);
     IOError.NotFound ↦ code;
     IOError.PermissionDenied ↦ code;
     IOError.CapabilityDenied ↦ code;
@@ -165,7 +166,7 @@ fn cause_code (cause : IOError) (code : UInt8) : UInt8 =
     IOError.IsDirectory ↦ code;
     IOError.NotDirectory ↦ code;
     IOError.NotEmpty ↦ code;
-    IOError.Unsupported ↦ code;
+    IOError.Unsupported ↦ (95 : UInt8);
     IOError.Revoked ↦ code
   }
 
@@ -246,7 +247,7 @@ proc check_ip
       (11 : UInt8)
       (cycle accepted NoDelay (20 : UInt8) (cycle accepted KeepAlive (21 : UInt8) passed)))
 
--- Codes: 30/31 outbound NoDelay/KeepAlive, 40/41 accepted; 95 an OS error
+-- Codes: 30/31 outbound NoDelay/KeepAlive, 40/41 accepted; 95/94 an OS error
 -- from a leaf that was reached, 96 a set that succeeded.
 proc check_unix
       (outbound : Resource ResourceKind.SocketStream)

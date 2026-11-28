@@ -106,8 +106,9 @@ fn px11_option_ipv6_streams_read_back_each_option() {
 /// before any syscall. THE GAP: the CLI counts no syscalls; the zero-leaf
 /// order is the host-unit row
 /// `unix_streams_unknown_codes_revocation_and_release_refuse_before_any_leaf`.
-/// AC-3 M-fit removes the fit check and this row exits 95, the NoDelay leaf's
-/// ENOTSUP.
+/// AC-3 M-fit removes the fit check and this row exits 95: the NoDelay leaf
+/// is reached and its ENOTSUP arrives as ResourceHostIO IOError.Unsupported,
+/// by the host's canonical errno mapping.
 #[test]
 fn px11_option_unix_streams_refuse_both_options() {
     let (output, path, _root) = readback("unix");
