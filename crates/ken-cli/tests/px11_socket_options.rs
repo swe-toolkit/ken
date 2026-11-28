@@ -179,19 +179,40 @@ fn px11_option_reusable_listener_refuses_unix_without_inode() {
 
 /// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2 (AC-1 R6).
 /// Promise class: durable invariant. MEASURED: a program with no Net
-/// declaration whose main visits Net and calls the reusable listener fails
-/// before main runs, with neither exit 0 nor the CapabilityDenied branch's
-/// 84, and no inode exists at the Unix path it would bind. CLAIMED: without
-/// a Net grant no option-family acquisition is reachable. THE GAP: the
-/// refusal is program admission's, a build-time stop; the run-time
-/// CapabilityDenied without a grant is the host-unit reusable-listener row.
+/// declaration whose main visits Net and calls the reusable listener is
+/// refused by entrypoint admission, `error[X0008]` invalid entrypoint
+/// 'main', with exit 1 and no inode at the Unix path. Its admitted twin,
+/// `px11_option_no_net_twin.ken`, identical but for declaring `Net Unix`,
+/// passes admission, runs main, and exits 22, the classified InvalidInput the
+/// reusable listener returns for a Unix address, with no X0008 diagnostic.
+/// CLAIMED: without a Net grant the program never reaches main, so no
+/// option-family acquisition is reachable. THE GAP: the no-inode check
+/// alone cannot separate the two, because the reached Unix refusal creates
+/// no inode either; the X0008 assertion and the twin's exit 22 do. The
+/// run-time CapabilityDenied without a grant is the host-unit
+/// reusable-listener row.
 #[test]
 fn px11_option_program_without_net_is_refused_before_listen() {
     let (_root, canonical, path) = root_with_path("never.sock");
     let output = run("px11_option_no_net.ken", &canonical, &[path.to_str().unwrap()]);
-    assert_ne!(output.status.code(), Some(0), "{}", describe(&output));
-    assert_ne!(output.status.code(), Some(84), "refused before main: {}", describe(&output));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(1), "{}", describe(&output));
+    assert!(
+        stderr.contains("error[X0008]") && stderr.contains("invalid entrypoint 'main'"),
+        "refused by entrypoint admission: {}",
+        describe(&output)
+    );
     assert!(std::fs::symlink_metadata(&path).is_err(), "no listen ran");
+
+    // The admitted twin differs only in declaring Net Unix, and reaches main.
+    let admitted = run("px11_option_no_net_twin.ken", &canonical, &[path.to_str().unwrap()]);
+    assert_eq!(admitted.status.code(), Some(22), "the twin reaches main: {}", describe(&admitted));
+    assert!(
+        !String::from_utf8_lossy(&admitted.stderr).contains("X0008"),
+        "the twin passes admission: {}",
+        describe(&admitted)
+    );
+    assert!(std::fs::symlink_metadata(&path).is_err(), "the refused Unix listen leaves no inode");
 }
 
 /// SOURCE: spec/30-surface/38-ffi-io.md §1.13.2 (AC-1 R7).

@@ -19,6 +19,7 @@ fn classify (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) :
     Ok (ResourceBracketOk _) ↦ ExitCode.Success;
     Ok _ ↦ ExitCode.Failure 81;
     Err (ResourceError.ResourceHostIO IOError.CapabilityDenied) ↦ ExitCode.Failure 84;
+    Err (ResourceError.ResourceHostIO IOError.InvalidInput) ↦ ExitCode.Failure 22;
     Err _ ↦ ExitCode.Failure 86
   }
 
@@ -33,6 +34,8 @@ fn last_argument (arguments : List Bytes) : Option Bytes =
   }
 
 -- No Net declaration: a main that visits Net is refused before it runs.
+-- Exit 22 is reachable only after main runs and the reusable listener
+-- refuses the Unix address; the admitted twin of R6 observes it.
 proc main
       (input : ProcessInput) (caps : ProgramCaps AFull)
     : HostIO AFull ExitCode
