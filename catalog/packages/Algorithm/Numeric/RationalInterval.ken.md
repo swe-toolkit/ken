@@ -27,7 +27,7 @@ without requiring either interval to contain a member.
 ## 2. Definition
 
 `Interval` holds two rational values and exports `MkInterval` so clients can
-construct boxes directly. The seven arithmetic and point laws, together with
+construct boxes directly. The arithmetic and point laws, together with
 membership transport across rational-value equivalence, lead the checked
 source; their operations follow. The width operation and seven checked laws,
 including `interval_width_mul`, `interval_width_inside`,
@@ -62,9 +62,9 @@ import Core.Logic.Conjunction (And, and_intro)
 
 import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_eq_from_iff, leq_nat)
 
-import Data.Numeric.Nat.Arithmetic (mul)
+import Data.Numeric.Nat.Arithmetic (add, mul)
 
-import Data.Numeric.Nat.Order (sub)
+import Data.Numeric.Nat.Order (sub, leq_nat_mul_right_cancel)
 
 import Core.Logic.Transport (sym, trans, cong)
 
@@ -304,6 +304,38 @@ pub theorem interval_add_point_exact
           (rational_leq x hi)
           (λupper. bool_and (rational_leq lo x) upper)
           (rational_add_leq_shift x hi t))
+  }
+
+pub theorem interval_mul_point_exact
+      (i : Interval) (t : Rational) (x : Rational)
+    : IsTrue (leq_nat (Suc Zero) (numerator t))
+      → Equal Bool
+        (interval_contains (interval_mul i (interval_point t)) (rational_mul x t))
+        (interval_contains i x) =
+  match i {
+    MkInterval lo hi ↦
+      λpositive.
+        trans
+          Bool
+          (bool_and
+            (rational_leq (rational_mul lo t) (rational_mul x t))
+            (rational_leq (rational_mul x t) (rational_mul hi t)))
+          (bool_and (rational_leq lo x) (rational_leq (rational_mul x t) (rational_mul hi t)))
+          (bool_and (rational_leq lo x) (rational_leq x hi))
+          (cong
+            Bool
+            Bool
+            (rational_leq (rational_mul lo t) (rational_mul x t))
+            (rational_leq lo x)
+            (λlower. bool_and lower (rational_leq (rational_mul x t) (rational_mul hi t)))
+            (rational_mul_leq_scale lo x t positive))
+          (cong
+            Bool
+            Bool
+            (rational_leq (rational_mul x t) (rational_mul hi t))
+            (rational_leq x hi)
+            (λupper. bool_and (rational_leq lo x) upper)
+            (rational_mul_leq_scale x hi t positive))
   }
 
 pub theorem interval_width_point
@@ -2006,6 +2038,119 @@ theorem rational_zero_leq (a : Rational) : IsTrue (rational_leq rational_zero a)
         Proved
   }
 
+theorem rational_mul_leq_scale
+      (a : Rational) (b : Rational) (t : Rational)
+    : IsTrue (leq_nat (Suc Zero) (numerator t))
+      → Equal Bool (rational_leq (rational_mul a t) (rational_mul b t)) (rational_leq a b) =
+  λpositive.
+    bool_eq_from_iff
+      (rational_leq (rational_mul a t) (rational_mul b t))
+      (rational_leq a b)
+      (rational_mul_leq_cancel_r a b t positive)
+      (λordered. rational_mul_mono a b t t ordered ((proof refl for rational_leq) t))
+
+theorem rational_mul_leq_cancel_r
+      (a : Rational) (b : Rational) (t : Rational)
+    : IsTrue (leq_nat (Suc Zero) (numerator t))
+      → IsTrue (rational_leq (rational_mul a t) (rational_mul b t))
+      → IsTrue (rational_leq a b) =
+  match a {
+    MkRational na da ↦
+      match b {
+        MkRational nb db ↦
+          match t {
+            MkRational p dt ↦
+              match p {
+                Zero ↦ λpositive. absurd positive;
+                Suc n ↦
+                  λpositive.
+                    λscaled.
+                      leq_nat_mul_right_cancel
+                        (mul na (Suc db))
+                        (mul nb (Suc da))
+                        (add (mul (Suc n) dt) n)
+                        (trans
+                          Bool
+                          (leq_nat
+                            (mul (mul na (Suc db)) (mul (Suc n) (Suc dt)))
+                            (mul (mul nb (Suc da)) (mul (Suc n) (Suc dt))))
+                          (leq_nat
+                            (mul (mul na (Suc n)) (mul (Suc db) (Suc dt)))
+                            (mul (mul nb (Suc n)) (mul (Suc da) (Suc dt))))
+                          True
+                          (sym
+                            Bool
+                            (leq_nat
+                              (mul (mul na (Suc n)) (mul (Suc db) (Suc dt)))
+                              (mul (mul nb (Suc n)) (mul (Suc da) (Suc dt))))
+                            (leq_nat
+                              (mul (mul na (Suc db)) (mul (Suc n) (Suc dt)))
+                              (mul (mul nb (Suc da)) (mul (Suc n) (Suc dt))))
+                            (leq_nat_cong_both
+                              (mul (mul na (Suc n)) (mul (Suc db) (Suc dt)))
+                              (mul (mul na (Suc db)) (mul (Suc n) (Suc dt)))
+                              (mul (mul nb (Suc n)) (mul (Suc da) (Suc dt)))
+                              (mul (mul nb (Suc da)) (mul (Suc n) (Suc dt)))
+                              (mul_scale_shuffle na (Suc n) (Suc db) (Suc dt))
+                              (mul_scale_shuffle nb (Suc n) (Suc da) (Suc dt))))
+                          scaled)
+              }
+          }
+      }
+  }
+
+theorem leq_nat_cong_both
+      (l : Nat) (lp : Nat) (r : Nat) (rp : Nat)
+    : Equal Nat l lp → Equal Nat r rp → Equal Bool (leq_nat l r) (leq_nat lp rp) =
+  λleft.
+    λright.
+      trans
+        Bool
+        (leq_nat l r)
+        (leq_nat lp r)
+        (leq_nat lp rp)
+        (cong Nat Bool l lp (λv. leq_nat v r) left)
+        (cong Nat Bool r rp (λv. leq_nat lp v) right)
+
+theorem mul_scale_shuffle
+      (a : Nat) (p : Nat) (c : Nat) (d : Nat)
+    : Equal Nat (mul (mul a p) (mul c d)) (mul (mul a c) (mul p d)) =
+  trans
+    Nat
+    (mul (mul a p) (mul c d))
+    (mul a (mul p (mul c d)))
+    (mul (mul a c) (mul p d))
+    (sym
+      Nat
+      (mul a (mul p (mul c d)))
+      (mul (mul a p) (mul c d))
+      ((proof assoc for mul) a p (mul c d)))
+    (trans
+      Nat
+      (mul a (mul p (mul c d)))
+      (mul a (mul c (mul p d)))
+      (mul (mul a c) (mul p d))
+      (cong
+        Nat
+        Nat
+        (mul p (mul c d))
+        (mul c (mul p d))
+        (λv. mul a v)
+        (trans
+          Nat
+          (mul p (mul c d))
+          (mul (mul p c) d)
+          (mul c (mul p d))
+          ((proof assoc for mul) p c d)
+          (trans
+            Nat
+            (mul (mul p c) d)
+            (mul (mul c p) d)
+            (mul c (mul p d))
+            (cong Nat Nat (mul p c) (mul c p) (λv. mul v d) ((proof comm for mul) p c))
+            (sym Nat (mul c (mul p d)) (mul (mul c p) d) ((proof assoc for mul) c p d)))))
+      ((proof assoc for mul) a c (mul p d)))
+
 theorem rational_distrib_r
       (x : Rational) (y : Rational) (z : Rational)
     : rational_equiv
@@ -2283,6 +2428,19 @@ membership of `x` in `[1, 2]`, even when `x` is unknown. An unshifted
 member need not belong to the shifted interval: `1` belongs to `[1, 2]`
 but not to `[2, 3]`.
 
+### Scaling by a positive point (§25)
+
+`interval_mul_point_exact i t x` equates membership of `x·t` in
+`interval_mul i (interval_point t)` with membership of `x` in `i`, provided
+`t` has a nonzero numerator. Unlike `interval_mul_encloses`, the equality
+also transports membership back to the original interval. It compares the
+two bounds separately, so it needs no endpoint-order premise.
+
+For `[1, 2]` scaled by `2`, membership of `x·2` in `[2, 4]` implies
+membership of `x` in `[1, 2]` even when `x` is unknown. Zero cannot be
+used: `[1, 2]` scales to `[0, 0]`, which contains `5·0` although `[1, 2]`
+does not contain `5`.
+
 ## 5. Design notes
 
 Bounds use `rational_leq`, not structural equality of `Rational`: different
@@ -2324,7 +2482,7 @@ interval subtraction are not.
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_width`,
    `interval_hull`, `interval_intersect`, `interval_inside` and
-   `interval_split_covers` form the public contract with sixty-four checked
+   `interval_split_covers` form the public contract with sixty-five checked
    public theorems, including `interval_width_mul`, `interval_width_inside`,
    `interval_width_bounds_sub`, `interval_width_zero_equiv`,
    `interval_split_width`, `interval_split_hull_inside` and
@@ -2332,6 +2490,8 @@ interval subtraction are not.
    nine public functions and all operation and law types from §§1–22 unchanged.
    Section 24 adds `interval_add_point_exact` and leaves the nine public
    functions and all operation and law types from §§1–23 unchanged.
+   Section 25 adds `interval_mul_point_exact` and leaves the nine public
+   functions and all operation and law types from §§1–24 unchanged.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
@@ -2341,10 +2501,13 @@ interval subtraction are not.
    and the point, ordered-addition, inside-monotonicity, zero-width
    member-equivalence and split-width proofs.
    [Shifting by a point](#shifting-by-a-point-24) explains the exact
-   membership law. The definition places the law between `interval_mul_point`
-   and `interval_width_point`, and groups its five helpers from
-   `rational_add_leq_shift` through `rational_zero_leq` before
-   `rational_distrib_r`. The helpers are not part of the public API.
+   addition membership law, and
+   [Scaling by a positive point](#scaling-by-a-positive-point-25) explains
+   the multiplication law. The two laws occur in that order between
+   `interval_mul_point` and `interval_width_point`. The five shift helpers
+   end at `rational_zero_leq`; the scale helpers `rational_mul_leq_scale`,
+   `rational_mul_leq_cancel_r`, `leq_nat_cong_both` and `mul_scale_shuffle`
+   follow before `rational_distrib_r`. All these helpers are private.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
@@ -2394,7 +2557,13 @@ interval subtraction are not.
    LawfulClasses' public `bool_eq_from_iff` joins the two implications.
    The five helpers are not part of the public API, and no Rational export
    is needed.
-4. **Trusted-base delta.** Zero: all sixty-four theorems and the split cover
+   The point-scale proof uses `rational_mul_mono` to preserve order. To
+   reflect it, `mul_scale_shuffle` exposes the common successor factor in
+   both cross products and `leq_nat_mul_right_cancel` cancels it. The proof
+   imports public Nat `add` to name that factor's predecessor and imports
+   the Nat cancellation law itself. `bool_eq_from_iff` joins the two
+   implications; `cong` lifts the equal comparisons through `bool_and`.
+4. **Trusted-base delta.** Zero: all sixty-five theorems and the split cover
    function have checked bodies, and the package declares no `Axiom` or new
    primitive. Imported rational, natural-number and logical providers retain
    their inherited trust.
@@ -2462,8 +2631,14 @@ interval subtraction are not.
    the owned law and its use in the converse, helper privacy, and unchanged
    trusted identities through Rational and RationalInterval. Its closed
    exclusion also computes without the law, so it is a usage example,
-   not evidence for the converse.
+   not evidence for the converse. The [§25 seed][mul-point-exact-seed]
+   pairs an open positive-scale converse with the corresponding refusal at
+   zero. The closed membership decisions and the refutation of premise-free
+   scaling explain why the positivity premise is necessary independently
+   of the refusal. The point-scale package test checks these cases, law
+   ownership and citation, helper privacy, and unchanged trusted identities.
    These package tests do not establish official conformance-runner execution,
    CI, publication or landing.
 
 [add-point-exact-seed]: ../../../../conformance/stdlib/numerical/seed-interval-add-point-exact.md
+[mul-point-exact-seed]: ../../../../conformance/stdlib/numerical/seed-interval-mul-point-exact.md
