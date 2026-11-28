@@ -271,9 +271,14 @@ the one-way-inclusion twin. Its mutation of the second inclusion made
 source was restored byte-identically.
 
 These are scratch observations, not execution of this authored Markdown
-seed. CV ran no tests. The seed has not been executed by the official
-conformance runner. No assembled AC-T, official conformance, CI,
-publication, landing, or measured landed-trust result is claimed.
+seed. On the exact assembled candidate
+`e8938dbcf8a791683f654f366a8f84849f6f523c`, Foundation QA reports that
+the `cat_graphs_reachability_edge_equiv` AC-T target passed 4/4 and that
+this Markdown seed was parsed and exercised as package-test input
+(`evt_74trr18cnrtd4`). This is package-test evidence, not official
+conformance-runner execution. The Markdown seed has not been executed by
+the official conformance runner. CV ran no tests. No CI, publication,
+landing, or measured landed-trust result is claimed.
 
 Clean-room provenance: no `local/refs/` or external reference
 implementations were consulted. This seed is grounded in the settled
