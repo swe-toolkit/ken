@@ -181,9 +181,14 @@ falsity arm accepted, and the zero-point twin refused with
 `KernelRejected(TypeMismatch)` at its premise argument.
 
 These are D0 observations, not execution of this authored Markdown seed.
-CV ran no tests. The seed has not been executed by the official
-conformance runner. No assembled AC-T, CI, publication, landing, or
-measured landed-trust result is claimed.
+Foundation QA reports candidate-local results on assembled candidate
+`5b2efc39ec4bf18e0ecec3917e24a8b81ed8f982`. The package target
+`cat_numeric_interval_mul_point_exact` passed 4/4, and roster guard
+`rational_interval_public_export_population_requires_review` passed
+1/1. These are package/roster results, not official execution of this
+Markdown seed. CV ran no tests. The seed has not been executed by the
+official conformance runner. No CI, publication, landing, or measured
+landed-trust result is claimed.
 
 Clean-room provenance: no `local/refs/` or external reference
 implementations were consulted. This seed is grounded in the settled
