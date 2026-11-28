@@ -111,7 +111,7 @@ fn seed_row<'a>(seed: &'a str, theorem: &str) -> Row<'a> {
                     selected = Some(Row {
                         fence: source,
                         declaration: span,
-                        body: body.span(),
+                        body: body.span().clone(),
                     });
                 }
             }
